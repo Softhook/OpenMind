@@ -6,6 +6,7 @@ let fileInput;
 let exportPNGButton;
 let exportPDFButton;
 let menuIsVisible = false;
+let fullScreenButton;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -38,6 +39,10 @@ function setup() {
   exportPDFButton.position(330, 10);
   exportPDFButton.mousePressed(exportPDF);
   
+  fullScreenButton = createButton('Full Screen');
+  fullScreenButton.position(430, 10);
+  fullScreenButton.mousePressed(toggleFullScreen);
+  
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
   fileInput.position(-200, -200); // Hide it off-screen
@@ -66,7 +71,7 @@ function updateMenuVisibility() {
   const triggerX = 50;
   const triggerY = 50;
   // Buttons span from ~x=10 to ~x=330 + width; leave generous margin
-  const buttonsRightEdge = 480;
+  const buttonsRightEdge = 600;
   const buttonsBandHeight = 50; // top row height
 
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
@@ -86,6 +91,7 @@ function showMenuButtons() {
   loadButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
+  fullScreenButton.style('display', 'inline-block');
 }
 
 function hideMenuButtons() {
@@ -94,6 +100,7 @@ function hideMenuButtons() {
   loadButton.style('display', 'none');
   exportPNGButton.style('display', 'none');
   exportPDFButton.style('display', 'none');
+  fullScreenButton.style('display', 'none');
 }
 
 function mousePressed() {
@@ -424,6 +431,15 @@ function exportPDF() {
   } catch (e) {
     console.error('Failed to export PDF:', e);
     alert('Failed to export PDF: ' + e.message);
+  }
+}
+
+function toggleFullScreen() {
+  try {
+    const fs = fullscreen();
+    fullscreen(!fs);
+  } catch (e) {
+    console.error('Failed to toggle fullscreen:', e);
   }
 }
 
