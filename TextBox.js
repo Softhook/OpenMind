@@ -45,6 +45,16 @@ class TextBox {
     
     // Selection (node-level, not text selection)
     this.selected = false;
+
+    // Background color (default white) and palette options
+    this.backgroundColor = { r: 255, g: 255, b: 255 };
+    this.colorPalette = [
+      { key: 'red', color: { r: 255, g: 140, b: 140 } },
+      { key: 'orange', color: { r: 255, g: 200, b: 140 } },
+      { key: 'white', color: { r: 255, g: 255, b: 255 } }
+    ];
+    this.colorCircleRadius = 8; // px
+    this.colorCircleSpacing = 10; // px between circles
     
     // Calculate initial dimensions
     this.updateDimensions();
@@ -159,16 +169,16 @@ class TextBox {
       strokeWeight(2);
     } else if (this.selected) {
       // Highlight selected boxes with a blue outline
-      fill(255);
+      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(60, 120, 255);
       strokeWeight(2.5);
     } else if (this.isMouseOver()) {
-      // Keep background white on hover (no grey fill)
-      fill(255);
+      // Hover state uses the box background color
+      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(100);
       strokeWeight(2);
     } else {
-      fill(255);
+      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(100);
       strokeWeight(1);
     }
@@ -242,7 +252,84 @@ class TextBox {
       }
     }
     
+    // Draw background color palette when box is selected (at top center)
+    if (this.selected) {
+      this.drawColorPalette();
+    }
+
     pop();
+  }
+
+  // Compute screen positions for the three color circles at the top edge
+  getColorPaletteCircles() {
+    const r = this.colorCircleRadius;
+    const spacing = this.colorCircleSpacing;
+    // Position the center circle just above the top edge with a small margin
+    const topY = this.y - this.height / 2 - r - 4;
+    const centerX = this.x;
+    const offsets = [- (2 * r + spacing), 0, (2 * r + spacing)];
+    const circles = [];
+    for (let i = 0; i < this.colorPalette.length; i++) {
+      circles.push({
+        x: centerX + offsets[i],
+        y: topY,
+        r,
+        key: this.colorPalette[i].key,
+        color: this.colorPalette[i].color
+      });
+    }
+    return circles;
+  }
+
+  // Draw the color palette circles and highlight the active one
+  drawColorPalette() {
+    const circles = this.getColorPaletteCircles();
+    push();
+    for (const c of circles) {
+      // Shadow for visibility
+      noStroke();
+      fill(0, 0, 0, 40);
+      circle(c.x + 1.5, c.y + 2, c.r * 2 + 2);
+
+      // Circle fill
+      stroke(80, 80, 80);
+      strokeWeight(1);
+      fill(c.color.r, c.color.g, c.color.b);
+      circle(c.x, c.y, c.r * 2);
+
+      // Active indicator ring
+      if (this.backgroundColor &&
+          this.backgroundColor.r === c.color.r &&
+          this.backgroundColor.g === c.color.g &&
+          this.backgroundColor.b === c.color.b) {
+        noFill();
+        stroke(60, 120, 255);
+        strokeWeight(2);
+        circle(c.x, c.y, c.r * 2 + 6);
+      }
+    }
+    pop();
+  }
+
+  // If mouse is over one of the color circles, return its key; else null
+  getColorCircleUnderMouse() {
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    const circles = this.getColorPaletteCircles();
+    for (const c of circles) {
+      if (dist(mx, my, c.x, c.y) <= c.r + 3) {
+        return c.key;
+      }
+    }
+    return null;
+  }
+
+  // Apply a background color by key from the palette
+  setBackgroundByKey(key) {
+    const entry = this.colorPalette.find(p => p.key === key);
+    if (entry) {
+      this.backgroundColor = { ...entry.color };
+    }
   }
 
   // Connector utilities (center points at each edge)
@@ -1018,7 +1105,8 @@ class TextBox {
       y: this.y,
       text: this.text,
       width: this.width,
-      height: this.height
+      height: this.height,
+      backgroundColor: this.backgroundColor
     };
   }
   
@@ -1044,6 +1132,15 @@ class TextBox {
     }
     if (data.height != null && !isNaN(data.height) && data.height > 0) {
       box.height = data.height;
+    }
+
+    // Load background color if present
+    if (data.backgroundColor && typeof data.backgroundColor === 'object') {
+      const c = data.backgroundColor;
+      const r = Number.isFinite(c.r) ? c.r : 255;
+      const g = Number.isFinite(c.g) ? c.g : 255;
+      const b = Number.isFinite(c.b) ? c.b : 255;
+      box.backgroundColor = { r, g, b };
     }
     
     return box;

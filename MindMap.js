@@ -204,6 +204,18 @@ class MindMap {
       }
     }
     
+      // Check if clicking on a background color circle of any selected box (top-most first)
+      for (let i = this.boxes.length - 1; i >= 0; i--) {
+        const box = this.boxes[i];
+        if (!box || !box.selected || typeof box.getColorCircleUnderMouse !== 'function') continue;
+        const key = box.getColorCircleUnderMouse();
+        if (key) {
+          this.pushUndo();
+          box.setBackgroundByKey(key);
+          return;
+        }
+      }
+    
     // Check if clicking on resize handle
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {

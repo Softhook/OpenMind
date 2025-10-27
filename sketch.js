@@ -605,8 +605,12 @@ function exportPNG() {
         continue;
       }
       
-      // Draw box background
-      pg.fill(255);
+      // Draw box background (use box background color if available)
+      if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
+        pg.fill(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
+      } else {
+        pg.fill(255);
+      }
       pg.stroke(100);
       pg.strokeWeight(1);
       pg.rect(box.x - box.width/2, box.y - box.height/2, box.width, box.height, box.cornerRadius);
@@ -821,13 +825,16 @@ function exportPDF() {
       let boxW = ts(box.width);
       let boxH = ts(box.height);
       
-      // Set colors based on state
-      if (box.isEditing) {
-        pdf.setFillColor(255, 255, 200);
-        pdf.setDrawColor(100, 100, 255);
-        pdf.setLineWidth(ts(2));
+      // Set fill color from box background; outline slightly heavier when selected
+      if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
+        pdf.setFillColor(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
       } else {
         pdf.setFillColor(255, 255, 255);
+      }
+      if (box.selected) {
+        pdf.setDrawColor(60, 120, 255);
+        pdf.setLineWidth(ts(2));
+      } else {
         pdf.setDrawColor(100, 100, 100);
         pdf.setLineWidth(ts(1));
       }
