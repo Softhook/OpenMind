@@ -24,6 +24,11 @@ class TextBox {
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
     
+    // Cursor blinking
+    this.cursorBlinkTime = 0;
+    this.cursorVisible = true;
+    this.cursorBlinkRate = 530; // milliseconds (slow blink)
+    
     // Calculate initial dimensions
     this.updateDimensions();
   }
@@ -139,6 +144,11 @@ class TextBox {
       text(wrappedLines[i], textX, startY + i * lineHeight);
     }
     
+    // Draw cursor when editing
+    if (this.isEditing) {
+      this.drawCursor(wrappedLines, textX, startY, lineHeight);
+    }
+    
     // Draw delete icon if mouse is near top-left corner
     if (this.isMouseNearDeleteIcon()) {
       let iconX = this.x - this.width/2;
@@ -248,6 +258,8 @@ class TextBox {
     this.cursorPosition = this.text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
+    this.cursorBlinkTime = millis();
+    this.cursorVisible = true;
   }
   
   stopEditing() {
@@ -263,6 +275,7 @@ class TextBox {
     this.text = this.text.slice(0, this.cursorPosition) + char + this.text.slice(this.cursorPosition);
     this.cursorPosition += char.length;
     this.updateDimensions();
+    this.resetCursorBlink();
   }
   
   removeChar() {
@@ -277,6 +290,7 @@ class TextBox {
       }
       this.updateDimensions();
     }
+    this.resetCursorBlink();
   }
   
   selectAll() {
@@ -483,5 +497,141 @@ class TextBox {
       box.height = data.height;
     }
     return box;
+  }
+  
+  // Helper methods for cursor
+  resetCursorBlink() {
+    this.cursorBlinkTime = millis();
+    this.cursorVisible = true;
+  }
+  
+  moveCursorLeft() {
+    if (this.cursorPosition > 0) {
+      this.cursorPosition--;
+      this.resetCursorBlink();
+    }
+  }
+  
+  moveCursorRight() {
+    if (this.cursorPosition < this.text.length) {
+      this.cursorPosition++;
+      this.resetCursorBlink();
+    }
+  }
+  
+  moveCursorUp() {
+    let wrappedLines = this.wrapText(this.text);
+    let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
+    
+    if (lineIndex > 0) {
+      // Move to previous line, same position or end of line
+      let prevLineLength = wrappedLines[lineIndex - 1].length;
+      let newPosInLine = min(posInLine, prevLineLength);
+      
+      // Calculate character position in original text
+      let charCount = 0;
+      for (let i = 0; i < lineIndex - 1; i++) {
+        charCount += wrappedLines[i].length;
+        // Account for spaces that were consumed during wrapping
+        if (i < wrappedLines.length - 1 && !this.text[charCount]) {
+          // No newline at this position means it was wrapped
+          if (this.text[charCount] !== '\n') {
+            charCount++; // Skip the space
+          }
+        }
+      }
+      this.cursorPosition = charCount + newPosInLine;
+      this.resetCursorBlink();
+    }
+  }
+  
+  moveCursorDown() {
+    let wrappedLines = this.wrapText(this.text);
+    let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
+    
+    if (lineIndex < wrappedLines.length - 1) {
+      // Move to next line, same position or end of line
+      let nextLineLength = wrappedLines[lineIndex + 1].length;
+      let newPosInLine = min(posInLine, nextLineLength);
+      
+      // Calculate character position in original text
+      let charCount = 0;
+      for (let i = 0; i < lineIndex + 1; i++) {
+        charCount += wrappedLines[i].length;
+        // Account for spaces that were consumed during wrapping
+        if (i < wrappedLines.length - 1 && charCount < this.text.length) {
+          if (this.text[charCount] === '\n') {
+            charCount++; // Skip newline
+          } else if (this.text[charCount] === ' ') {
+            charCount++; // Skip space
+          }
+        }
+      }
+      this.cursorPosition = charCount + newPosInLine;
+      this.resetCursorBlink();
+    }
+  }
+  
+  getCursorLineAndPosition(wrappedLines) {
+    let charCount = 0;
+    let lineIndex = 0;
+    let posInLine = 0;
+    
+    for (let i = 0; i < wrappedLines.length; i++) {
+      let lineLength = wrappedLines[i].length;
+      
+      if (charCount + lineLength >= this.cursorPosition) {
+        lineIndex = i;
+        posInLine = this.cursorPosition - charCount;
+        break;
+      }
+      
+      charCount += lineLength;
+      
+      // Account for wrapped spaces and newlines
+      if (charCount < this.text.length) {
+        if (this.text[charCount] === '\n') {
+          charCount++;
+        } else if (this.text[charCount] === ' ') {
+          charCount++;
+        }
+      }
+      
+      if (i === wrappedLines.length - 1) {
+        lineIndex = i;
+        posInLine = this.cursorPosition - charCount;
+      }
+    }
+    
+    return { lineIndex, posInLine };
+  }
+  
+  drawCursor(wrappedLines, textX, startY, lineHeight) {
+    // Update cursor blink state
+    let currentTime = millis();
+    if (currentTime - this.cursorBlinkTime > this.cursorBlinkRate) {
+      this.cursorVisible = !this.cursorVisible;
+      this.cursorBlinkTime = currentTime;
+    }
+    
+    if (!this.cursorVisible) {
+      return;
+    }
+    
+    // Find cursor position in wrapped text
+    let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
+    
+    // Calculate cursor screen position
+    textSize(this.fontSize);
+    let textBeforeCursor = wrappedLines[lineIndex].slice(0, posInLine);
+    let cursorX = textX + textWidth(textBeforeCursor);
+    let cursorY = startY + lineIndex * lineHeight;
+    
+    // Draw cursor line
+    push();
+    stroke(0, 0, 255);
+    strokeWeight(2);
+    line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
+    pop();
   }
 }

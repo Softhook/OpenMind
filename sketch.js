@@ -70,6 +70,14 @@ function keyPressed() {
     return false;
   }
   
+  // Prevent default behavior for arrow keys when editing
+  if (mindMap.selectedBox && mindMap.selectedBox.isEditing) {
+    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW || 
+        keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+      return false;
+    }
+  }
+  
   // Prevent default behavior for CMD+A, CMD+C, CMD+V when editing
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
     if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V') {

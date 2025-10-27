@@ -182,7 +182,16 @@ class MindMap {
         }
       }
       
-      if (keyCode === BACKSPACE) {
+      // Handle arrow keys for cursor movement
+      if (keyCode === LEFT_ARROW) {
+        this.selectedBox.moveCursorLeft();
+      } else if (keyCode === RIGHT_ARROW) {
+        this.selectedBox.moveCursorRight();
+      } else if (keyCode === UP_ARROW) {
+        this.selectedBox.moveCursorUp();
+      } else if (keyCode === DOWN_ARROW) {
+        this.selectedBox.moveCursorDown();
+      } else if (keyCode === BACKSPACE) {
         this.selectedBox.removeChar();
       } else if (keyCode === ENTER) {
         this.selectedBox.addChar('\n');
