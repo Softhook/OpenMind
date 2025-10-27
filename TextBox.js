@@ -23,6 +23,7 @@ class TextBox {
     this.resizeStartY = 0;
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
+    this.userResized = false; // tracks if user manually resized width/height
     
     // Text selection state
     this.isSelecting = false;
@@ -61,11 +62,14 @@ class TextBox {
       }
     }
     
-    // Only auto-size if not manually resized
-    if (!this.isResizing) {
+    // Width: only auto-size when the user hasn't manually resized.
+    // This prevents snapping the width after a manual resize.
+    if (!this.userResized) {
       this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
-      this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
     }
+
+    // Height: always reflow to fit wrapped lines for the current width
+    this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
   }
   
   wrapText(text) {
@@ -684,6 +688,7 @@ class TextBox {
   
   startResize(mx, my) {
     this.isResizing = true;
+    this.userResized = true; // mark that the user has manually resized the box
     this.resizeStartX = mx;
     this.resizeStartY = my;
     this.resizeStartWidth = this.width;
@@ -785,6 +790,8 @@ class TextBox {
   
   stopResize() {
     this.isResizing = false;
+    // Reflow text immediately using the final width so the height fits without extra clicks
+    this.updateDimensions();
   }
   
   // Get connection point on the edge of the box
@@ -865,6 +872,8 @@ class TextBox {
     // Set optional dimensions if valid
     if (data.width != null && !isNaN(data.width) && data.width > 0) {
       box.width = data.width;
+      // Preserve loaded width as a manual setting so updates don't auto-shrink
+      box.userResized = true;
     }
     if (data.height != null && !isNaN(data.height) && data.height > 0) {
       box.height = data.height;
