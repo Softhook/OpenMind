@@ -70,6 +70,18 @@ function keyPressed() {
   }
 }
 
+function mouseClicked(event) {
+  // Handle right click (context menu)
+  if (event.button === 2) {
+    if (mindMap.handleRightClick()) {
+      return false; // Prevent context menu
+    }
+  }
+}
+
+// Prevent default context menu
+document.addEventListener('contextmenu', event => event.preventDefault());
+
 function createNewBox() {
   // Create a new box at a semi-random position
   let x = random(200, width - 200);
@@ -84,9 +96,8 @@ function triggerFileLoad() {
 
 function handleFileLoad(file) {
   if (file.type === 'application' || file.name.endsWith('.json')) {
-    loadJSON(file.data, (data) => {
-      mindMap.load(data);
-    });
+    // file.data is already a parsed object from p5.js
+    mindMap.load(file.data);
   } else {
     console.error('Please load a JSON file');
   }

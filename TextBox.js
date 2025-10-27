@@ -132,36 +132,34 @@ class TextBox {
   getConnectionPoint(otherBox) {
     let dx = otherBox.x - this.x;
     let dy = otherBox.y - this.y;
-    let angle = atan2(dy, dx);
     
-    // Find intersection with rectangle edge
+    // Avoid division by zero
+    if (dx === 0 && dy === 0) {
+      return { x: this.x, y: this.y };
+    }
+    
     let hw = this.width / 2;
     let hh = this.height / 2;
     
+    // Calculate intersection with each edge and pick the correct one
     let px, py;
     
-    // Check which edge the angle intersects
-    let slope = tan(angle);
+    // Calculate the ratio to reach each edge
+    let t_right = (dx > 0) ? hw / dx : Infinity;
+    let t_left = (dx < 0) ? -hw / dx : Infinity;
+    let t_bottom = (dy > 0) ? hh / dy : Infinity;
+    let t_top = (dy < 0) ? -hh / dy : Infinity;
     
-    if (abs(dx) > abs(dy)) {
-      // More horizontal
-      if (dx > 0) {
-        px = this.x + hw;
-        py = this.y + slope * hw;
-      } else {
-        px = this.x - hw;
-        py = this.y - slope * hw;
-      }
-    } else {
-      // More vertical
-      if (dy > 0) {
-        py = this.y + hh;
-        px = this.x + hh / slope;
-      } else {
-        py = this.y - hh;
-        px = this.x - hh / slope;
-      }
-    }
+    // Find the smallest positive ratio (closest edge intersection)
+    let t = min(t_right, t_left, t_bottom, t_top);
+    
+    // Calculate the intersection point
+    px = this.x + t * dx;
+    py = this.y + t * dy;
+    
+    // Constrain to box bounds (for safety)
+    px = constrain(px, this.x - hw, this.x + hw);
+    py = constrain(py, this.y - hh, this.y + hh);
     
     return { x: px, y: py };
   }

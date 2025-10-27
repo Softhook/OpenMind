@@ -3,6 +3,7 @@ class MindMap {
     this.boxes = [];
     this.connections = [];
     this.selectedBox = null;
+    this.selectedConnection = null;
     this.connectingFrom = null;
   }
   
@@ -43,6 +44,12 @@ class MindMap {
   }
   
   handleMousePressed() {
+    // Deselect any previously selected connection
+    if (this.selectedConnection) {
+      this.selectedConnection.selected = false;
+      this.selectedConnection = null;
+    }
+    
     // Check if clicking on a box edge for connection
     for (let box of this.boxes) {
       if (box.isMouseOnEdge()) {
@@ -72,7 +79,21 @@ class MindMap {
       }
     }
     
-    // Clicked outside all boxes
+    // Check if clicking on a connection
+    for (let conn of this.connections) {
+      if (conn.isMouseOver()) {
+        // Deselect any selected box
+        if (this.selectedBox) {
+          this.selectedBox.stopEditing();
+          this.selectedBox = null;
+        }
+        this.selectedConnection = conn;
+        conn.selected = true;
+        return;
+      }
+    }
+    
+    // Clicked outside all boxes and connections
     if (this.selectedBox) {
       this.selectedBox.stopEditing();
       this.selectedBox = null;
@@ -112,6 +133,28 @@ class MindMap {
       } else if (key.length === 1) {
         this.selectedBox.addChar(key);
       }
+    } else if (keyCode === BACKSPACE) {
+      // Delete selected connection
+      if (this.selectedConnection) {
+        let index = this.connections.indexOf(this.selectedConnection);
+        if (index > -1) {
+          this.connections.splice(index, 1);
+          this.selectedConnection = null;
+        }
+      }
+      // Delete selected box (when not editing)
+      else if (this.selectedBox) {
+        // Remove connections that involve this box
+        this.connections = this.connections.filter(conn => 
+          conn.fromBox !== this.selectedBox && conn.toBox !== this.selectedBox
+        );
+        // Remove the box
+        let index = this.boxes.indexOf(this.selectedBox);
+        if (index > -1) {
+          this.boxes.splice(index, 1);
+          this.selectedBox = null;
+        }
+      }
     }
   }
   
@@ -122,10 +165,20 @@ class MindMap {
     };
   }
   
+  handleRightClick() {
+    // Reverse connection direction on right click
+    if (this.selectedConnection) {
+      this.selectedConnection.reverse();
+      return true; // Indicate we handled the right click
+    }
+    return false;
+  }
+  
   fromJSON(data) {
     this.boxes = [];
     this.connections = [];
     this.selectedBox = null;
+    this.selectedConnection = null;
     this.connectingFrom = null;
     
     // Load boxes
