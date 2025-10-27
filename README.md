@@ -7,6 +7,7 @@ A simple and intuitive mind mapping application built with p5.js.
 - **Create Nodes**: Click the "New Box" button to add new nodes to your mind map
 - **Edit Text**: Click inside any box to edit its text. The box automatically resizes to fit the content
 - **Move Nodes**: Click and drag any box to reposition it
+- **Multi-select & Group Drag**: Hold Shift and click multiple boxes to select them; while holding Shift, drag from a box edge to move them together
 - **Create Connections**: Click on the edge of a box, then click on another box to create a directed connection
 - **Save/Load**: Save your mind maps as JSON files and load them later
 - **Zoom View**: Use your mouse scroll/trackpad over the canvas to zoom the entire mind map in or out
@@ -45,6 +46,7 @@ A simple and intuitive mind mapping application built with p5.js.
 - **Hold Space** (when not editing text) and drag to pan the view
 - **Click-and-drag** on empty canvas (with nothing selected) to pan
 - Click near a box edge to drag the box; click inside to edit text
+- Hold **Shift** and click boxes to multi-select; then while holding **Shift**, drag from a selected box's edge to move all selected boxes together
 - Right-click a selected connection to reverse its direction
 - Press **0** or **Home** key to reset the view and fit all content
 

@@ -10,6 +10,9 @@ class MindMap {
     // Undo history (up to 5 snapshots)
     this.undoStack = [];
     this.maxUndo = 5;
+
+    // Multi-selection of boxes
+    this.selectedBoxes = new Set();
   }
   
   addBox(box) {
@@ -169,6 +172,7 @@ class MindMap {
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
+    const shiftDown = keyIsDown(16); // SHIFT
     
     // Deselect any previously selected connection
     if (this.selectedConnection) {
@@ -188,6 +192,11 @@ class MindMap {
         );
         // Remove the box
         this.boxes.splice(i, 1);
+        // Remove from multi-selection if present
+        if (this.selectedBoxes.has(box)) {
+          this.selectedBoxes.delete(box);
+        }
+        if (box.selected) box.selected = false;
         if (this.selectedBox === box) {
           this.selectedBox = null;
         }
@@ -199,6 +208,9 @@ class MindMap {
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {
         this.selectedBox = box;
+        // Single select this box when resizing
+        if (!shiftDown) this.clearBoxSelection();
+        this.addBoxToSelection(box);
         this.pushUndo();
         box.startResize(mx, my);
         return;
@@ -218,23 +230,52 @@ class MindMap {
     for (let i = this.boxes.length - 1; i >= 0; i--) {
       let box = this.boxes[i];
       if (box.isMouseOver()) {
-        // If a box is currently being edited, stop editing it
+        // If a different box is being edited and we're interacting with a new one, stop editing
         if (this.selectedBox && this.selectedBox !== box) {
           this.selectedBox.stopEditing();
         }
-        
-        // Start editing or dragging based on edge vs center
-        this.selectedBox = box;
-        // Drag only when clicking near the edges; otherwise enter editing (center area)
-        if (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge()) {
+
+        const onEdge = (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge());
+
+        if (onEdge) {
+          // Edge click: start drag. If Shift is held, drag all selected boxes (including this one).
           this.pushUndo();
+          // Ensure selection
+          if (!shiftDown) {
+            this.clearBoxSelection();
+          }
+          this.addBoxToSelection(box);
+
+          // Stop editing to avoid text interaction while dragging
           box.stopEditing();
-          box.startDrag(mx, my);
+
+          // Start drag for all selected boxes when shift held; otherwise just this one
+          if (shiftDown && this.selectedBoxes.size > 0) {
+            for (const b of this.selectedBoxes) {
+              b.startDrag(mx, my);
+            }
+          } else {
+            box.startDrag(mx, my);
+          }
         } else {
-          // Center area: start/edit text and allow selection
-          box.handleMouseDown(mx, my);
+          // Center click
+          if (shiftDown) {
+            // Toggle selection without entering text edit
+            this.toggleBoxSelection(box);
+            // Also stop editing any box when toggling selection
+            if (this.selectedBox) {
+              this.selectedBox.stopEditing();
+            }
+            this.selectedBox = null;
+          } else {
+            // Single-select and enter editing
+            this.clearBoxSelection();
+            this.addBoxToSelection(box);
+            this.selectedBox = box;
+            box.handleMouseDown(mx, my);
+          }
         }
-        
+
         // Move this box to the end (on top)
         this.boxes.splice(i, 1);
         this.boxes.push(box);
@@ -250,6 +291,8 @@ class MindMap {
           this.selectedBox.stopEditing();
           this.selectedBox = null;
         }
+        // Clear multi-selection
+        this.clearBoxSelection();
         this.selectedConnection = conn;
         conn.selected = true;
         return;
@@ -261,6 +304,7 @@ class MindMap {
       this.selectedBox.stopEditing();
       this.selectedBox = null;
     }
+    if (!shiftDown) this.clearBoxSelection();
   }
   
   handleMouseReleased() {
@@ -486,5 +530,39 @@ class MindMap {
   
   load(data) {
     this.fromJSON(data);
+  }
+
+  // Selection helpers
+  clearBoxSelection() {
+    if (!this.selectedBoxes) this.selectedBoxes = new Set();
+    for (const b of this.selectedBoxes) {
+      if (b) b.selected = false;
+    }
+    this.selectedBoxes.clear();
+  }
+
+  addBoxToSelection(box) {
+    if (!box) return;
+    if (!this.selectedBoxes) this.selectedBoxes = new Set();
+    this.selectedBoxes.add(box);
+    box.selected = true;
+  }
+
+  removeBoxFromSelection(box) {
+    if (!box || !this.selectedBoxes) return;
+    if (this.selectedBoxes.has(box)) this.selectedBoxes.delete(box);
+    box.selected = false;
+  }
+
+  toggleBoxSelection(box) {
+    if (!box) return;
+    if (!this.selectedBoxes) this.selectedBoxes = new Set();
+    if (this.selectedBoxes.has(box)) {
+      this.selectedBoxes.delete(box);
+      box.selected = false;
+    } else {
+      this.selectedBoxes.add(box);
+      box.selected = true;
+    }
   }
 }

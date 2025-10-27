@@ -43,6 +43,9 @@ class TextBox {
     // Interaction thickness for edge-drag zone (px inward from edges)
     this.dragEdgeThickness = 16;
     
+    // Selection (node-level, not text selection)
+    this.selected = false;
+    
     // Calculate initial dimensions
     this.updateDimensions();
   }
@@ -153,6 +156,11 @@ class TextBox {
       fill(255, 255, 200);
       stroke(100, 100, 255);
       strokeWeight(2);
+    } else if (this.selected) {
+      // Highlight selected boxes with a blue outline
+      fill(255);
+      stroke(60, 120, 255);
+      strokeWeight(2.5);
     } else if (this.isMouseOver()) {
       // Keep background white on hover (no grey fill)
       fill(255);
