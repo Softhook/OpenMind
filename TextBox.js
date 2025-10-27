@@ -154,7 +154,8 @@ class TextBox {
       stroke(100, 100, 255);
       strokeWeight(2);
     } else if (this.isMouseOver()) {
-      fill(240);
+      // Keep background white on hover (no grey fill)
+      fill(255);
       stroke(100);
       strokeWeight(2);
     } else {
