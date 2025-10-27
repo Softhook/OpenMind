@@ -153,8 +153,9 @@ class TextBox {
     
     // Draw box
     if (this.isEditing) {
+      // When editing text, keep a neutral outline (not blue)
       fill(255, 255, 200);
-      stroke(100, 100, 255);
+      stroke(120);
       strokeWeight(2);
     } else if (this.selected) {
       // Highlight selected boxes with a blue outline

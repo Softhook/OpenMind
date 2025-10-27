@@ -129,7 +129,8 @@ function updateCursorForHover() {
   // Panning cursor states
   const toolbarHeight = 40;
   const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
-  const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
+  const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
+  const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (isPanning) { cursor('grabbing'); return; }
   if (mouseY > toolbarHeight && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
@@ -233,7 +234,8 @@ function mousePressed() {
   if (mouseY > 40 && mindMap) {
     try {
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
-      const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
+      const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
+      const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
       const spaceHeld = keyIsDown(32);
       const overAny = isOverAnyInteractive();
       if (noSelection && !isEditing && (spaceHeld || !overAny)) {
