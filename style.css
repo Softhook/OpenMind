@@ -1,7 +1,27 @@
 html, body {
   margin: 0;
   padding: 0;
+  font-family: Arial, sans-serif;
 }
+
 canvas {
   display: block;
+}
+
+button {
+  padding: 8px 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+button:active {
+  background-color: #3d8b40;
 }
