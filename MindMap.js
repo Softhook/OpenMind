@@ -95,7 +95,7 @@ class MindMap {
         
         // Start editing or dragging
         this.selectedBox = box;
-        box.startEditing();
+        box.startEditing(mouseX, mouseY);
         box.startDrag(mouseX, mouseY);
         
         // Move this box to the end (on top)

@@ -35,15 +35,6 @@ function setup() {
 
 function draw() {
   background(240);
-  
-  // Draw instructions
-  push();
-  fill(80);
-  textAlign(LEFT, TOP);
-  textSize(12);
-  text("Click inside a box to edit | Click on edge to connect | Drag to move", 10, 50);
-  pop();
-  
   mindMap.draw();
 }
 

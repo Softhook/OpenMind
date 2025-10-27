@@ -140,6 +140,11 @@ class TextBox {
     let startY = this.y - totalHeight / 2 + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
     
+    // Draw selection highlight if there's a selection
+    if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.drawSelection(wrappedLines, textX, startY, lineHeight);
+    }
+    
     for (let i = 0; i < wrappedLines.length; i++) {
       text(wrappedLines[i], textX, startY + i * lineHeight);
     }
@@ -253,9 +258,67 @@ class TextBox {
     return onVerticalEdge || onHorizontalEdge;
   }
   
-  startEditing() {
+  getCursorPositionFromMouse(mx, my) {
+    textSize(this.fontSize);
+    let wrappedLines = this.wrapText(this.text);
+    let lineHeight = this.fontSize * 1.5;
+    let totalHeight = wrappedLines.length * lineHeight;
+    let startY = this.y - totalHeight / 2 + lineHeight / 2;
+    let textX = this.x - this.width / 2 + this.padding;
+    
+    // Find which line was clicked
+    let clickedLine = 0;
+    for (let i = 0; i < wrappedLines.length; i++) {
+      let lineY = startY + i * lineHeight;
+      if (i === wrappedLines.length - 1 || my < lineY + lineHeight / 2) {
+        clickedLine = i;
+        break;
+      }
+    }
+    
+    // Find position within the line
+    let lineText = wrappedLines[clickedLine];
+    let closestPos = lineText.length;
+    let minDist = Infinity;
+    
+    for (let i = 0; i <= lineText.length; i++) {
+      let textBefore = lineText.slice(0, i);
+      let xPos = textX + textWidth(textBefore);
+      let dist = abs(mx - xPos);
+      
+      if (dist < minDist) {
+        minDist = dist;
+        closestPos = i;
+      }
+    }
+    
+    // Convert line position to absolute text position
+    let charCount = 0;
+    for (let i = 0; i < clickedLine; i++) {
+      charCount += wrappedLines[i].length;
+      // Account for spaces/newlines between wrapped lines
+      if (charCount < this.text.length) {
+        if (this.text[charCount] === '\n') {
+          charCount++;
+        } else if (this.text[charCount] === ' ') {
+          charCount++;
+        }
+      }
+    }
+    
+    return charCount + closestPos;
+  }
+  
+  startEditing(mx = null, my = null) {
     this.isEditing = true;
-    this.cursorPosition = this.text.length;
+    
+    // If mouse coordinates provided, position cursor at click location
+    if (mx !== null && my !== null) {
+      this.cursorPosition = this.getCursorPositionFromMouse(mx, my);
+    } else {
+      this.cursorPosition = this.text.length;
+    }
+    
     this.selectionStart = -1;
     this.selectionEnd = -1;
     this.cursorBlinkTime = millis();
@@ -633,5 +696,91 @@ class TextBox {
     strokeWeight(2);
     line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
     pop();
+  }
+  
+  drawSelection(wrappedLines, textX, startY, lineHeight) {
+    let start = min(this.selectionStart, this.selectionEnd);
+    let end = max(this.selectionStart, this.selectionEnd);
+    
+    if (start === end) return;
+    
+    textSize(this.fontSize);
+    
+    // Convert absolute positions to line positions
+    let startInfo = this.getLineAndPositionFromChar(start, wrappedLines);
+    let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
+    
+    push();
+    fill(255, 100, 100, 100); // Red overlay with transparency
+    noStroke();
+    
+    if (startInfo.lineIndex === endInfo.lineIndex) {
+      // Selection within single line
+      let lineText = wrappedLines[startInfo.lineIndex];
+      let x1 = textX + textWidth(lineText.slice(0, startInfo.posInLine));
+      let x2 = textX + textWidth(lineText.slice(0, endInfo.posInLine));
+      let y = startY + startInfo.lineIndex * lineHeight;
+      
+      rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+    } else {
+      // Multi-line selection
+      for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
+        let lineText = wrappedLines[i];
+        let y = startY + i * lineHeight;
+        let x1, x2;
+        
+        if (i === startInfo.lineIndex) {
+          // First line: from start position to end of line
+          x1 = textX + textWidth(lineText.slice(0, startInfo.posInLine));
+          x2 = textX + textWidth(lineText);
+        } else if (i === endInfo.lineIndex) {
+          // Last line: from beginning to end position
+          x1 = textX;
+          x2 = textX + textWidth(lineText.slice(0, endInfo.posInLine));
+        } else {
+          // Middle lines: entire line
+          x1 = textX;
+          x2 = textX + textWidth(lineText);
+        }
+        
+        rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+      }
+    }
+    
+    pop();
+  }
+  
+  getLineAndPositionFromChar(charPos, wrappedLines) {
+    let charCount = 0;
+    let lineIndex = 0;
+    let posInLine = 0;
+    
+    for (let i = 0; i < wrappedLines.length; i++) {
+      let lineLength = wrappedLines[i].length;
+      
+      if (charCount + lineLength >= charPos) {
+        lineIndex = i;
+        posInLine = charPos - charCount;
+        break;
+      }
+      
+      charCount += lineLength;
+      
+      // Account for wrapped spaces and newlines
+      if (charCount < this.text.length) {
+        if (this.text[charCount] === '\n') {
+          charCount++;
+        } else if (this.text[charCount] === ' ') {
+          charCount++;
+        }
+      }
+      
+      if (i === wrappedLines.length - 1) {
+        lineIndex = i;
+        posInLine = charPos - charCount;
+      }
+    }
+    
+    return { lineIndex, posInLine };
   }
 }
