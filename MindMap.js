@@ -134,8 +134,14 @@ class MindMap {
         
         // Start editing or dragging
         this.selectedBox = box;
-        box.startEditing(mouseX, mouseY);
-        box.startDrag(mouseX, mouseY);
+        // If click is in text area, enter editing and prepare selection.
+        if (box.isPointInTextArea(mouseX, mouseY)) {
+          box.handleMouseDown(mouseX, mouseY);
+        } else {
+          // Otherwise drag the box
+          box.stopEditing();
+          box.startDrag(mouseX, mouseY);
+        }
         
         // Move this box to the end (on top)
         this.boxes.splice(i, 1);
@@ -183,6 +189,7 @@ class MindMap {
       if (!box) continue;
       box.stopDrag();
       box.stopResize();
+      box.stopSelecting();
     }
   }
   
@@ -194,8 +201,13 @@ class MindMap {
     
     for (let box of this.boxes) {
       if (!box) continue;
-      box.drag(mouseX, mouseY);
-      box.resize(mouseX, mouseY);
+      // If this is the actively edited box and selection is in progress, update selection
+      if (box === this.selectedBox && box.isSelecting) {
+        box.updateSelection(mouseX, mouseY);
+      } else {
+        box.drag(mouseX, mouseY);
+        box.resize(mouseX, mouseY);
+      }
     }
   }
   

@@ -38,6 +38,5 @@ A simple and intuitive mind mapping application built with p5.js.
 - Different box shapes and colors
 - Delete nodes and connections
 - Undo/redo functionality
-- Export as image
 - Keyboard shortcuts
 - Touch/mobile support

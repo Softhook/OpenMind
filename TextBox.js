@@ -24,6 +24,14 @@ class TextBox {
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
     
+    // Text selection state
+    this.isSelecting = false;
+    this.selectionAnchor = -1; // anchor index where drag started
+    this.lastClickTime = 0;
+    this.lastClickX = 0;
+    this.lastClickY = 0;
+    this.doubleClickThreshold = 300; // ms
+    
     // Cursor blinking
     this.cursorBlinkTime = 0;
     this.cursorVisible = true;
@@ -367,7 +375,141 @@ class TextBox {
   
   stopEditing() {
     this.isEditing = false;
+    this.isSelecting = false;
     this.updateDimensions();
+  }
+
+  // Determine if the given point is within the inner text area (excludes padding)
+  isPointInTextArea(mx, my) {
+    // No text? Nothing to select.
+    if (!this.text || this.text.length === 0) return false;
+    
+    textSize(this.fontSize);
+    const wrappedLines = this.wrapText(this.text);
+    const lineHeight = this.fontSize * 1.5;
+    const totalHeight = wrappedLines.length * lineHeight;
+    const startY = this.y - totalHeight / 2 + lineHeight / 2; // center of first line
+    const textX = this.x - this.width / 2 + this.padding;
+    
+    // Find the nearest line index based on Y
+    let lineIndex = Math.round((my - startY) / lineHeight);
+    if (lineIndex < 0 || lineIndex >= wrappedLines.length) return false;
+    
+    const lineCenterY = startY + lineIndex * lineHeight;
+    const lineTop = lineCenterY - lineHeight / 2;
+    const lineBottom = lineCenterY + lineHeight / 2;
+    
+    // Margins to make selecting easier, and dragging more reliable
+    const marginX = 6;
+    const marginY = 4;
+    if (my < lineTop - marginY || my > lineBottom + marginY) return false;
+    
+    const lineText = wrappedLines[lineIndex] || '';
+    const lineWidth = textWidth(lineText);
+    if (lineWidth <= 0) return false;
+    
+    const lineLeft = textX;
+    const lineRight = textX + lineWidth;
+    
+    // Only consider the actual text width on this line (with small margins)
+    return mx >= lineLeft - marginX && mx <= lineRight + marginX;
+  }
+
+  // Compute the bounds of the actual drawn text (not the whole box)
+  getTextBounds() {
+    // Prepare wrapping using current text and font
+    textSize(this.fontSize);
+    const wrappedLines = this.wrapText(this.text);
+    const lineHeight = this.fontSize * 1.5;
+    const totalHeight = wrappedLines.length * lineHeight;
+    const startY = this.y - totalHeight / 2 + lineHeight / 2;
+    const textX = this.x - this.width / 2 + this.padding;
+    // Compute max actual line width
+    let maxLineWidth = 0;
+    for (let i = 0; i < wrappedLines.length; i++) {
+      const w = textWidth(wrappedLines[i] || '');
+      if (w > maxLineWidth) maxLineWidth = w;
+    }
+    const top = this.y - totalHeight / 2;
+    const bottom = this.y + totalHeight / 2;
+    const left = textX;
+    const right = textX + maxLineWidth;
+    return { left, right, top, bottom };
+  }
+
+  // Start selecting text at mouse position
+  startSelecting(mx, my) {
+    this.isEditing = true;
+    this.isSelecting = true;
+    this.selectionAnchor = this.getCursorPositionFromMouse(mx, my);
+    this.selectionStart = this.selectionAnchor;
+    this.selectionEnd = this.selectionAnchor;
+    this.cursorPosition = this.selectionEnd;
+    this.resetCursorBlink();
+  }
+
+  // Update selection based on current mouse position
+  updateSelection(mx, my) {
+    if (!this.isSelecting) return;
+    let pos = this.getCursorPositionFromMouse(mx, my);
+    this.selectionEnd = pos;
+    this.cursorPosition = pos;
+    this.resetCursorBlink();
+  }
+
+  // Stop selecting
+  stopSelecting() {
+    this.isSelecting = false;
+    // Keep selection if start != end; caret only if equal
+  }
+
+  // Handle mouse down inside the box; supports single and double-click
+  handleMouseDown(mx, my) {
+    const now = millis();
+    const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
+                     dist(mx, my, this.lastClickX, this.lastClickY) < 6;
+    this.lastClickTime = now;
+    this.lastClickX = mx;
+    this.lastClickY = my;
+    
+    if (isDouble) {
+      // Double-click: select word under cursor
+      this.isEditing = true;
+      let pos = this.getCursorPositionFromMouse(mx, my);
+      this.selectWordAt(pos);
+      this.cursorPosition = this.selectionEnd;
+      this.resetCursorBlink();
+    } else {
+      // Single click: position caret and prepare for drag-selection
+      this.startEditing(mx, my);
+      this.startSelecting(mx, my);
+    }
+  }
+
+  // Select word boundaries around a position
+  selectWordAt(pos) {
+    if (this.text == null) this.text = '';
+    pos = constrain(pos, 0, this.text.length);
+    if (this.text.length === 0) {
+      this.selectionStart = 0;
+      this.selectionEnd = 0;
+      return;
+    }
+    // If on whitespace, expand to contiguous whitespace; else expand to word chars
+    const isWs = (ch) => ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+    let start = pos;
+    let end = pos;
+    if (pos > 0 && isWs(this.text[pos - 1]) && (pos >= this.text.length || isWs(this.text[pos]))) {
+      // Select whitespace block
+      while (start > 0 && isWs(this.text[start - 1])) start--;
+      while (end < this.text.length && isWs(this.text[end])) end++;
+    } else {
+      // Select non-whitespace word block
+      while (start > 0 && !isWs(this.text[start - 1])) start--;
+      while (end < this.text.length && !isWs(this.text[end])) end++;
+    }
+    this.selectionStart = start;
+    this.selectionEnd = end;
   }
   
   addChar(char) {
