@@ -73,7 +73,44 @@ function draw() {
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
+    // Update mouse cursor based on hover context
+    try {
+      updateCursorForHover();
+    } catch (e) {
+      // Non-fatal
+    }
   }
+}
+
+// Set mouse cursor based on what the user is hovering over
+function updateCursorForHover() {
+  if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
+  const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
+  if (!validMouse) { cursor('default'); return; }
+
+  // Check top-most first
+  for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
+    const box = mindMap.boxes[i];
+    if (!box) continue;
+    if (!box.isMouseOver()) continue;
+
+    if (box.isMouseOverResizeHandle && box.isMouseOverResizeHandle()) {
+      cursor('nwse-resize');
+      return;
+    }
+    if (box.getConnectorUnderMouse && box.getConnectorUnderMouse()) {
+      cursor('crosshair');
+      return;
+    }
+    if (box.isMouseOnEdge && box.isMouseOnEdge()) {
+      cursor('move');
+      return;
+    }
+    // Inside center area
+    cursor('text');
+    return;
+  }
+  cursor('default');
 }
 
 // Show or hide the top-left menu based on cursor position

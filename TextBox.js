@@ -40,6 +40,9 @@ class TextBox {
     this.cursorVisible = true;
     this.cursorBlinkRate = 530; // milliseconds (slow blink)
     
+    // Interaction thickness for edge-drag zone (px inward from edges)
+    this.dragEdgeThickness = 16;
+    
     // Calculate initial dimensions
     this.updateDimensions();
   }
@@ -320,17 +323,24 @@ class TextBox {
       return false;
     }
     
-    let edgeThreshold = 10;
+    // Make the draggable edge zone a bit larger, while keeping a minimum editable center
+    const minCenterWidth = 20;  // ensure at least 20px center horizontal edit zone
+    const minCenterHeight = 20; // ensure at least 20px center vertical edit zone
+    const maxEdgeX = max(4, this.width / 2 - minCenterWidth / 2);
+    const maxEdgeY = max(4, this.height / 2 - minCenterHeight / 2);
+    const edgeThresholdX = min(this.dragEdgeThickness, maxEdgeX);
+    const edgeThresholdY = min(this.dragEdgeThickness, maxEdgeY);
+
     let distFromLeft = abs(mouseX - (this.x - this.width/2));
     let distFromRight = abs(mouseX - (this.x + this.width/2));
     let distFromTop = abs(mouseY - (this.y - this.height/2));
     let distFromBottom = abs(mouseY - (this.y + this.height/2));
     
-    let onVerticalEdge = (distFromLeft < edgeThreshold || distFromRight < edgeThreshold) &&
+    let onVerticalEdge = (distFromLeft < edgeThresholdX || distFromRight < edgeThresholdX) &&
                          mouseY > this.y - this.height/2 &&
                          mouseY < this.y + this.height/2;
     
-    let onHorizontalEdge = (distFromTop < edgeThreshold || distFromBottom < edgeThreshold) &&
+    let onHorizontalEdge = (distFromTop < edgeThresholdY || distFromBottom < edgeThresholdY) &&
                            mouseX > this.x - this.width/2 &&
                            mouseX < this.x + this.width/2;
     

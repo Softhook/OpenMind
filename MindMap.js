@@ -192,15 +192,15 @@ class MindMap {
           this.selectedBox.stopEditing();
         }
         
-        // Start editing or dragging
+        // Start editing or dragging based on edge vs center
         this.selectedBox = box;
-        // If click is in text area, enter editing and prepare selection.
-        if (box.isPointInTextArea(mouseX, mouseY)) {
-          box.handleMouseDown(mouseX, mouseY);
-        } else {
-          // Otherwise drag the box
+        // Drag only when clicking near the edges; otherwise enter editing (center area)
+        if (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge()) {
           box.stopEditing();
           box.startDrag(mouseX, mouseY);
+        } else {
+          // Center area: start/edit text and allow selection
+          box.handleMouseDown(mouseX, mouseY);
         }
         
         // Move this box to the end (on top)
