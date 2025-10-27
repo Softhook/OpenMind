@@ -23,6 +23,8 @@ class TextBox {
     this.resizeStartY = 0;
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
+    this.resizeStartLeft = 0;   // left edge at resize start
+    this.resizeStartTop = 0;    // top edge at resize start
     this.userResized = false; // tracks if user manually resized width/height
     
     // Text selection state
@@ -818,6 +820,9 @@ class TextBox {
     this.resizeStartY = my;
     this.resizeStartWidth = this.width;
     this.resizeStartHeight = this.height;
+    // Remember fixed top-left so only bottom-right corner moves
+    this.resizeStartLeft = this.x - this.width / 2;
+    this.resizeStartTop = this.y - this.height / 2;
   }
   
   resize(mx, my) {
@@ -834,28 +839,37 @@ class TextBox {
       if (isNaN(deltaX) || isNaN(deltaY)) {
         return;
       }
-      
-      // Calculate minimum dimensions needed for text
-      textSize(this.fontSize);
-      let wrappedLines = this.wrapTextForWidth(this.resizeStartWidth + deltaX * 2);
-      let minRequiredHeight = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
-      
-      // Find minimum width that can fit the longest word
+
+      // New width/height when dragging bottom-right while keeping left/top fixed
+      let rawWidth = this.resizeStartWidth + deltaX;   // right edge shifts by deltaX
+      let rawHeight = this.resizeStartHeight + deltaY; // bottom edge shifts by deltaY
+
+      // Minimum width to fit the longest word (so words don't overflow)
       let minRequiredWidth = this.minWidth;
+      textSize(this.fontSize);
       if (this.text) {
         let words = this.text.split(/[\s\n]+/);
         for (let word of words) {
           if (word) {
             let wordWidth = textWidth(word) + this.padding * 2;
-            if (wordWidth > minRequiredWidth) {
-              minRequiredWidth = wordWidth;
-            }
+            if (wordWidth > minRequiredWidth) minRequiredWidth = wordWidth;
           }
         }
       }
-      
-      this.width = max(minRequiredWidth, this.resizeStartWidth + deltaX * 2);
-      this.height = max(minRequiredHeight, this.resizeStartHeight + deltaY * 2);
+
+      // Clamp width first, then compute required height based on wrapped lines for this width
+      let newWidth = max(minRequiredWidth, rawWidth);
+      let wrappedLines = this.wrapTextForWidth(newWidth);
+      let minRequiredHeight = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+      let newHeight = max(minRequiredHeight, rawHeight);
+
+      // Apply new size
+      this.width = newWidth;
+      this.height = newHeight;
+
+      // Recompute center so left/top remain fixed while bottom-right moves
+      this.x = this.resizeStartLeft + this.width / 2;
+      this.y = this.resizeStartTop + this.height / 2;
     }
   }
   
