@@ -112,9 +112,18 @@ function keyPressed() {
     }
   }
   
-  // Prevent default behavior for CMD+A, CMD+C, CMD+V when editing
+  // Prevent default behavior for CMD+A/C/V/X when editing
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
-    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V') {
+    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X') {
+      return false;
+    }
+  }
+
+  // Global shortcut: N key to create a new box when not editing text
+  if (mindMap && (!mindMap.selectedBox || !mindMap.selectedBox.isEditing)) {
+    const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18); // CMD/CTRL/ALT
+    if (!hasModifier && (key === 'n' || key === 'N')) {
+      createNewBox();
       return false;
     }
   }
@@ -142,19 +151,27 @@ function createNewBox() {
     console.error('MindMap not initialized');
     return;
   }
-  
-  // Create a new box at a semi-random position with bounds checking
-  let margin = 100;
-  let x = random(margin, max(margin + 100, width - margin));
-  let y = random(margin + 50, max(margin + 100, height - margin));
-  
-  // Ensure values are valid
-  if (isNaN(x) || isNaN(y)) {
+  // Prefer creating the box at the current cursor position inside the canvas content area
+  const toolbarHeight = 40; // top UI bar height used elsewhere
+  const pad = 60;           // minimal margin from edges
+  let x = mouseX;
+  let y = mouseY;
+
+  const validMouse = Number.isFinite(x) && Number.isFinite(y);
+  const insideCanvas = validMouse && x >= 0 && x <= width && y >= 0 && y <= height;
+  const insideContent = insideCanvas && y > toolbarHeight;
+
+  if (!insideContent) {
+    // Fallback to center if cursor isn't in the drawable area
     x = width / 2;
-    y = height / 2;
+    y = max(height / 2, toolbarHeight + pad);
   }
-  
-  mindMap.addBox(new TextBox(x, y, "New Node"));
+
+  // Constrain within safe margins
+  x = constrain(x, pad, max(pad, width - pad));
+  y = constrain(y, toolbarHeight + pad, max(toolbarHeight + pad, height - pad));
+
+  mindMap.addBox(new TextBox(x, y, ""));
 }
 
 function triggerFileLoad() {

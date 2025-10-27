@@ -1,5 +1,5 @@
 class TextBox {
-  constructor(x, y, text = "New Node") {
+  constructor(x, y, text = "") {
     this.x = x;
     this.y = y;
     this.text = text;
@@ -429,8 +429,15 @@ class TextBox {
 
   // Determine if the given point is within the inner text area (excludes padding)
   isPointInTextArea(mx, my) {
-    // No text? Nothing to select.
-    if (!this.text || this.text.length === 0) return false;
+    // If no text yet, allow clicking inside the padded inner box to start editing
+    if (!this.text || this.text.length === 0) {
+      const left = this.x - this.width / 2 + this.padding;
+      const right = this.x + this.width / 2 - this.padding;
+      const top = this.y - this.height / 2 + this.padding;
+      const bottom = this.y + this.height / 2 - this.padding;
+      const margin = 6; // make it a bit forgiving
+      return mx >= left - margin && mx <= right + margin && my >= top - margin && my <= bottom + margin;
+    }
     
     textSize(this.fontSize);
     const wrappedLines = this.wrapText(this.text);

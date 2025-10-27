@@ -239,6 +239,23 @@ class MindMap {
             console.error('Clipboard copy not supported:', e);
           }
           return;
+        } else if (key === 'x' || key === 'X') {
+          // Cut: copy selection then delete it
+          try {
+            let selectedText = this.selectedBox.getSelectedText();
+            if (selectedText && navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(selectedText).catch(err => {
+                console.error('Failed to cut (copy) text: ', err);
+              });
+            }
+          } catch (e) {
+            console.error('Clipboard cut not supported:', e);
+          }
+          // Delete selection regardless of clipboard outcome
+          if (this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
+            this.selectedBox.deleteSelection();
+          }
+          return;
         } else if (key === 'v' || key === 'V') {
           // Paste from clipboard
           try {
