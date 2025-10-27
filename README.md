@@ -10,7 +10,6 @@ A simple and intuitive mind mapping application built with p5.js.
 - **Multi-select & Group Drag**: Hold Shift and click multiple boxes to select them; while holding Shift, drag from a box edge to move them together
 - **Create Connections**: Click on the edge of a box, then click on another box to create a directed connection
 - **Save/Load**: Save your mind maps as JSON files and load them later
-- **Cloud Save/Load (JSONBase)**: Save and load your mind maps to/from JSONBase using your IID and secret
 - **Zoom View**: Use your mouse scroll/trackpad over the canvas to zoom the entire mind map in or out
 
 ## How to Use
@@ -20,8 +19,6 @@ A simple and intuitive mind mapping application built with p5.js.
    - **New Box**: Creates a new node at a random position
    - **Save**: Downloads your mind map as a JSON file
    - **Load**: Loads a previously saved mind map
-   - **Save Cloud**: Saves the current mind map to JSONBase under a key of your choice
-   - **Load Cloud**: Loads a mind map from JSONBase by key
 
 ### Keyboard Controls
 
@@ -69,11 +66,3 @@ A simple and intuitive mind mapping application built with p5.js.
 - Undo/redo functionality
 - Keyboard shortcuts
 - Touch/mobile support
-
-## Cloud Save/Load setup (JSONBase)
-
-- When you click Save Cloud or Load Cloud the first time, you'll be prompted for:
-   - IID
-   - Secret
-- These are stored locally in your browser's localStorage on this device only. You can clear them by running `window.JsonBase.clearConfig()` in the browser console.
-- Note: For production deployments, avoid embedding secrets in client code; use a small backend to proxy requests.

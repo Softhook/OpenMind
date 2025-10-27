@@ -9,8 +9,6 @@ let menuIsVisible = false;
 let fullScreenButton;
 let alignButton;
 let menuRightEdge = 600; // Updated after layout to cover hover band width
-let saveCloudButton;
-let loadCloudButton;
 
 // Camera/zoom state
 let camX = 0;
@@ -65,15 +63,6 @@ function setup() {
   loadButton = createButton('Load');
   loadButton.position(160, 10);
   loadButton.mousePressed(triggerFileLoad);
-  
-  // New: Cloud save/load
-  saveCloudButton = createButton('Save Cloud');
-  saveCloudButton.position(220, 10);
-  saveCloudButton.mousePressed(saveToJsonBase);
-
-  loadCloudButton = createButton('Load Cloud');
-  loadCloudButton.position(310, 10);
-  loadCloudButton.mousePressed(loadFromJsonBase);
   
   exportPNGButton = createButton('Export PNG');
   exportPNGButton.position(220, 10);
@@ -194,8 +183,6 @@ function showMenuButtons() {
   newBoxButton.style('display', 'inline-block');
   saveButton.style('display', 'inline-block');
   loadButton.style('display', 'inline-block');
-  if (saveCloudButton) saveCloudButton.style('display', 'inline-block');
-  if (loadCloudButton) loadCloudButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
@@ -206,15 +193,13 @@ function hideMenuButtons() {
   newBoxButton.style('display', 'none');
   saveButton.style('display', 'none');
   loadButton.style('display', 'none');
-  if (saveCloudButton) saveCloudButton.style('display', 'none');
-  if (loadCloudButton) loadCloudButton.style('display', 'none');
   exportPNGButton.style('display', 'none');
   exportPDFButton.style('display', 'none');
   fullScreenButton.style('display', 'none');
   alignButton.style('display', 'none');
 }
 
-// Arrange buttons: Load, Save, Save Cloud, Load Cloud, Export PNG, Export PDF, Full Screen, Align, then New Box
+// Arrange buttons: Load, Save, Export PNG, Export PDF, Full Screen, then New Box
 function layoutMenuButtons() {
   const startX = 10;
   const y = 10;
@@ -223,8 +208,6 @@ function layoutMenuButtons() {
   // Ensure buttons are displayed to get proper widths
   loadButton.style('display', 'inline-block');
   saveButton.style('display', 'inline-block');
-  if (saveCloudButton) saveCloudButton.style('display', 'inline-block');
-  if (loadCloudButton) loadCloudButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
@@ -236,8 +219,6 @@ function layoutMenuButtons() {
   let x = startX;
   loadButton.position(x, y); x += w(loadButton) + gap;
   saveButton.position(x, y); x += w(saveButton) + gap;
-  if (saveCloudButton) { saveCloudButton.position(x, y); x += w(saveCloudButton) + gap; }
-  if (loadCloudButton) { loadCloudButton.position(x, y); x += w(loadCloudButton) + gap; }
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
@@ -715,47 +696,6 @@ function getWrappedLinesForBox(box) {
   }
   
   return wrappedLines.length > 0 ? wrappedLines : [''];
-}
-
-// Cloud save/load using JSONBase provider
-async function saveToJsonBase() {
-  try {
-    if (!window.JsonBase) throw new Error('JSONBase provider not loaded');
-    // Ensure config; if missing, user will be prompted once
-    window.JsonBase.ensureConfig(true);
-
-    // Ask for a doc key to save under (default: "mindmap")
-    const defaultKey = 'mindmap';
-    let key = window.prompt('Enter a document key to save (e.g., "mindmap")', defaultKey);
-    if (!key) return;
-
-    const data = mindMap ? mindMap.toJSON() : {};
-    const result = await window.JsonBase.saveDocument({ key, data });
-    alert(`Saved to JSONBase at:\n${result.url}`);
-  } catch (e) {
-    console.error('Save Cloud failed:', e);
-    alert('Save Cloud failed: ' + e.message);
-  }
-}
-
-async function loadFromJsonBase() {
-  try {
-    if (!window.JsonBase) throw new Error('JSONBase provider not loaded');
-    window.JsonBase.ensureConfig(true);
-
-    let key = window.prompt('Enter the document key to load (e.g., "mindmap")', 'mindmap');
-    if (!key) return;
-
-    const { data, url } = await window.JsonBase.loadDocument({ key });
-    if (!data || !data.boxes || !data.connections) {
-      throw new Error('Loaded data is missing expected fields. Did you save a mind map under this key?');
-    }
-    mindMap.load(data);
-    alert(`Loaded from:\n${url}`);
-  } catch (e) {
-    console.error('Load Cloud failed:', e);
-    alert('Load Cloud failed: ' + e.message);
-  }
 }
 
 function exportPDF() {
