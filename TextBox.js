@@ -6,7 +6,8 @@ class TextBox {
     this.padding = 15;
     this.minWidth = 80;
     this.minHeight = 40;
-    this.fontSize = 16;
+    this.maxWidth = 300; // Maximum width before wrapping
+    this.fontSize = 14;
     this.isEditing = false;
     this.isDragging = false;
     this.dragOffsetX = 0;
@@ -24,18 +25,72 @@ class TextBox {
   updateDimensions() {
     textSize(this.fontSize);
     
+    // Get wrapped lines for dimension calculation
+    let wrappedLines = this.wrapText(this.text);
+    
     // Calculate text dimensions
-    let lines = this.text.split('\n');
     let maxLineWidth = 0;
-    for (let line of lines) {
+    for (let line of wrappedLines) {
       let lineWidth = textWidth(line);
       if (lineWidth > maxLineWidth) {
         maxLineWidth = lineWidth;
       }
     }
     
-    this.width = max(this.minWidth, maxLineWidth + this.padding * 2);
-    this.height = max(this.minHeight, lines.length * this.fontSize * 1.5 + this.padding * 2);
+    this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
+    this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+  }
+  
+  wrapText(text) {
+    let lines = text.split('\n');
+    let wrappedLines = [];
+    let maxTextWidth = this.maxWidth - this.padding * 2;
+    
+    textSize(this.fontSize);
+    
+    for (let line of lines) {
+      if (textWidth(line) <= maxTextWidth) {
+        wrappedLines.push(line);
+      } else {
+        // Break line into words
+        let words = line.split(' ');
+        let currentLine = '';
+        
+        for (let i = 0; i < words.length; i++) {
+          let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+          
+          if (textWidth(testLine) <= maxTextWidth) {
+            currentLine = testLine;
+          } else {
+            // If current line is not empty, push it
+            if (currentLine) {
+              wrappedLines.push(currentLine);
+              currentLine = words[i];
+            } else {
+              // Single word is too long, break it by characters
+              let word = words[i];
+              let charLine = '';
+              for (let char of word) {
+                if (textWidth(charLine + char) <= maxTextWidth) {
+                  charLine += char;
+                } else {
+                  if (charLine) wrappedLines.push(charLine);
+                  charLine = char;
+                }
+              }
+              currentLine = charLine;
+            }
+          }
+        }
+        
+        // Push the last line
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+        }
+      }
+    }
+    
+    return wrappedLines.length > 0 ? wrappedLines : [''];
   }
   
   draw() {
@@ -59,12 +114,21 @@ class TextBox {
     rect(this.x - this.width/2, this.y - this.height/2, 
          this.width, this.height, this.cornerRadius);
     
-    // Draw text
+    // Draw text with wrapping
     fill(0);
     noStroke();
-    textAlign(CENTER, CENTER);
+    textAlign(LEFT, CENTER);
     textSize(this.fontSize);
-    text(this.text, this.x, this.y);
+    
+    let wrappedLines = this.wrapText(this.text);
+    let lineHeight = this.fontSize * 1.5;
+    let totalHeight = wrappedLines.length * lineHeight;
+    let startY = this.y - totalHeight / 2 + lineHeight / 2;
+    let textX = this.x - this.width / 2 + this.padding;
+    
+    for (let i = 0; i < wrappedLines.length; i++) {
+      text(wrappedLines[i], textX, startY + i * lineHeight);
+    }
     
     // Draw delete icon if mouse is near top-left corner
     if (this.isMouseNearDeleteIcon()) {
