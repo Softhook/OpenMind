@@ -174,8 +174,8 @@ class TextBox {
     
     let wrappedLines = this.wrapText(this.text);
     let lineHeight = this.fontSize * 1.5;
-    let totalHeight = wrappedLines.length * lineHeight;
-    let startY = this.y - totalHeight / 2 + lineHeight / 2;
+    // Top-anchored text: start at top padding of the box
+    let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
     
     // Draw selection highlight if there's a selection
@@ -362,8 +362,8 @@ class TextBox {
     }
     
     let lineHeight = this.fontSize * 1.5;
-    let totalHeight = wrappedLines.length * lineHeight;
-    let startY = this.y - totalHeight / 2 + lineHeight / 2;
+    // Top-anchored text positioning
+    let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
     
     // Find which line was clicked
@@ -454,8 +454,8 @@ class TextBox {
     textSize(this.fontSize);
     const wrappedLines = this.wrapText(this.text);
     const lineHeight = this.fontSize * 1.5;
-    const totalHeight = wrappedLines.length * lineHeight;
-    const startY = this.y - totalHeight / 2 + lineHeight / 2; // center of first line
+    // Top-anchored: first line center at top+padding+lineHeight/2
+    const startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     const textX = this.x - this.width / 2 + this.padding;
     
     // Find the nearest line index based on Y
@@ -489,7 +489,6 @@ class TextBox {
     const wrappedLines = this.wrapText(this.text);
     const lineHeight = this.fontSize * 1.5;
     const totalHeight = wrappedLines.length * lineHeight;
-    const startY = this.y - totalHeight / 2 + lineHeight / 2;
     const textX = this.x - this.width / 2 + this.padding;
     // Compute max actual line width
     let maxLineWidth = 0;
@@ -497,8 +496,8 @@ class TextBox {
       const w = textWidth(wrappedLines[i] || '');
       if (w > maxLineWidth) maxLineWidth = w;
     }
-    const top = this.y - totalHeight / 2;
-    const bottom = this.y + totalHeight / 2;
+    const top = (this.y - this.height / 2) + this.padding;
+    const bottom = top + totalHeight;
     const left = textX;
     const right = textX + maxLineWidth;
     return { left, right, top, bottom };
@@ -939,8 +938,12 @@ class TextBox {
   
   stopResize() {
     this.isResizing = false;
+    // Preserve the top edge when reflowing dimensions after resize
+    const prevTop = this.y - this.height / 2;
     // Reflow text immediately using the final width so the height fits without extra clicks
     this.updateDimensions();
+    // Adjust center so the top remains fixed after height changes
+    this.y = prevTop + this.height / 2;
   }
   
   // Get connection point on the edge of the box

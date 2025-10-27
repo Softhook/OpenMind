@@ -495,8 +495,8 @@ function exportPDF() {
       
       let wrappedLines = getWrappedLines(box);
       let lineHeight = ts(box.fontSize * 1.5);
-      let totalHeight = wrappedLines.length * lineHeight;
-      let startY = ty(box.y) - totalHeight / 2 + lineHeight * 0.7;
+      // Top-anchored text in PDF: start at box top + padding
+      let startY = ty(box.y - box.height / 2) + ts(box.padding) + lineHeight * 0.7;
       let textX = tx(box.x - box.width / 2 + box.padding);
       
       for (let i = 0; i < wrappedLines.length; i++) {
