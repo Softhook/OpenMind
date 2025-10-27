@@ -225,6 +225,50 @@ class TextBox {
     
     pop();
   }
+
+  // Connector utilities (center points at each edge)
+  getConnectorPoints() {
+    const hw = this.width / 2;
+    const hh = this.height / 2;
+    return {
+      left: { x: this.x - hw, y: this.y },
+      right: { x: this.x + hw, y: this.y },
+      top: { x: this.x, y: this.y - hh },
+      bottom: { x: this.x, y: this.y + hh }
+    };
+  }
+
+  getConnectorCenter(side) {
+    const pts = this.getConnectorPoints();
+    return pts[side] || null;
+  }
+
+  getConnectorUnderMouse(hitRadius = 8) {
+    const pts = this.getConnectorPoints();
+    const sides = ['left', 'right', 'top', 'bottom'];
+    for (let side of sides) {
+      const p = pts[side];
+      if (!p) continue;
+      if (dist(mouseX, mouseY, p.x, p.y) <= hitRadius) {
+        return side;
+      }
+    }
+    return null;
+  }
+
+  drawConnectors(active = false) {
+    const pts = this.getConnectorPoints();
+    push();
+    noStroke();
+    const r = active ? 6 : 5;
+    const c = active ? color(100, 150, 255) : color(120);
+    fill(c);
+    circle(pts.left.x, pts.left.y, r * 2);
+    circle(pts.right.x, pts.right.y, r * 2);
+    circle(pts.top.x, pts.top.y, r * 2);
+    circle(pts.bottom.x, pts.bottom.y, r * 2);
+    pop();
+  }
   
   isMouseOver() {
     return mouseX > this.x - this.width/2 &&

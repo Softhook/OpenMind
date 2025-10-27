@@ -4,6 +4,7 @@ class MindMap {
     this.connections = [];
     this.selectedBox = null;
     this.selectedConnection = null;
+    // If connecting, stores { box, side }
     this.connectingFrom = null;
   }
   
@@ -36,42 +37,47 @@ class MindMap {
   }
   
   draw() {
-    // Draw connections first (behind boxes)
+    // Draw existing connections
     if (this.connections) {
       for (let conn of this.connections) {
-        if (conn) {
-          try {
-            conn.draw();
-          } catch (e) {
-            console.error('Error drawing connection:', e);
-          }
-        }
+        if (!conn) continue;
+        try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
       }
     }
-    
-    // Draw connecting line if in connection mode
-    if (this.connectingFrom && mouseX != null && mouseY != null && 
-        !isNaN(mouseX) && !isNaN(mouseY)) {
-      push();
-      stroke(100, 100, 255);
-      strokeWeight(2);
-      let start = this.connectingFrom.getConnectionPoint({ x: mouseX, y: mouseY });
-      if (start && !isNaN(start.x) && !isNaN(start.y)) {
-        line(start.x, start.y, mouseX, mouseY);
-      }
-      pop();
-    }
-    
+
     // Draw boxes
     if (this.boxes) {
       for (let box of this.boxes) {
-        if (box) {
-          try {
-            box.draw();
-          } catch (e) {
-            console.error('Error drawing box:', e);
-          }
+        if (!box) continue;
+        try { box.draw(); } catch (e) { console.error('Error drawing box:', e); }
+      }
+    }
+
+    // Draw connector dots on hovered or active boxes
+    if (this.boxes) {
+      for (let box of this.boxes) {
+        if (!box) continue;
+        const active = this.connectingFrom && this.connectingFrom.box === box;
+        if (box.isMouseOver() || active) {
+          try { box.drawConnectors(!!active); } catch (e) {}
         }
+      }
+    }
+
+    // Draw live connecting line and dots if connecting
+    if (this.connectingFrom && mouseX != null && mouseY != null && !isNaN(mouseX) && !isNaN(mouseY)) {
+      const { box, side } = this.connectingFrom;
+      const start = box.getConnectorCenter(side);
+      if (start && !isNaN(start.x) && !isNaN(start.y)) {
+        push();
+        stroke(100, 100, 255);
+        strokeWeight(2);
+        line(start.x, start.y, mouseX, mouseY);
+        noStroke();
+        fill(100, 150, 255);
+        circle(start.x, start.y, 10);
+        circle(mouseX, mouseY, 8);
+        pop();
       }
     }
   }
@@ -115,10 +121,11 @@ class MindMap {
       }
     }
     
-    // Check if clicking on a box edge for connection
+    // Check if clicking on a connector dot at box edge center for connection
     for (let box of this.boxes) {
-      if (box.isMouseOnEdge()) {
-        this.connectingFrom = box;
+      const side = box.getConnectorUnderMouse();
+      if (side) {
+        this.connectingFrom = { box, side };
         return;
       }
     }
@@ -176,8 +183,8 @@ class MindMap {
     if (this.connectingFrom) {
       for (let box of this.boxes) {
         if (!box) continue;
-        if (box !== this.connectingFrom && box.isMouseOver()) {
-          this.addConnection(this.connectingFrom, box);
+        if (box !== this.connectingFrom.box && box.isMouseOver()) {
+          this.addConnection(this.connectingFrom.box, box);
           break;
         }
       }
@@ -278,7 +285,7 @@ class MindMap {
       }
     }
   }
-  
+
   toJSON() {
     return {
       boxes: this.boxes.map(box => box.toJSON()),
