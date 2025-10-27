@@ -6,9 +6,14 @@ class MindMap {
     this.selectedConnection = null;
     // If connecting, stores { box, side }
     this.connectingFrom = null;
+
+    // Undo history (up to 5 snapshots)
+    this.undoStack = [];
+    this.maxUndo = 5;
   }
   
   addBox(box) {
+    this.pushUndo();
     this.boxes.push(box);
   }
   
@@ -33,7 +38,29 @@ class MindMap {
       }
     }
     
+    this.pushUndo();
     this.connections.push(new Connection(fromBox, toBox));
+  }
+
+  // Push current state to undo stack (before making a change)
+  pushUndo() {
+    try {
+      const snap = this.toJSON();
+      this.undoStack.push(JSON.parse(JSON.stringify(snap)));
+      if (this.undoStack.length > this.maxUndo) {
+        this.undoStack.shift();
+      }
+    } catch (e) {
+      console.warn('Failed to push undo snapshot:', e);
+    }
+  }
+
+  // Revert to the most recent snapshot
+  undo() {
+    if (!this.undoStack || this.undoStack.length === 0) return;
+    const snap = this.undoStack.pop();
+    if (!snap) return;
+    this.fromJSON(snap);
   }
   
   draw() {
@@ -152,6 +179,7 @@ class MindMap {
       let box = this.boxes[i];
       if (!box) continue; // Skip null boxes
       if (box.isMouseOverDeleteIcon()) {
+        this.pushUndo();
         // Remove connections that involve this box
         this.connections = this.connections.filter(conn => 
           conn.fromBox !== box && conn.toBox !== box
@@ -169,6 +197,7 @@ class MindMap {
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {
         this.selectedBox = box;
+        this.pushUndo();
         box.startResize(mouseX, mouseY);
         return;
       }
@@ -196,6 +225,7 @@ class MindMap {
         this.selectedBox = box;
         // Drag only when clicking near the edges; otherwise enter editing (center area)
         if (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge()) {
+          this.pushUndo();
           box.stopEditing();
           box.startDrag(mouseX, mouseY);
         } else {
@@ -305,6 +335,7 @@ class MindMap {
             console.error('Clipboard cut not supported:', e);
           }
           // Delete selection regardless of clipboard outcome
+          this.pushUndo();
           if (this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
             this.selectedBox.deleteSelection();
           }
@@ -315,6 +346,7 @@ class MindMap {
             if (navigator.clipboard && navigator.clipboard.readText) {
               navigator.clipboard.readText().then(text => {
                 if (text && this.selectedBox) {
+                  this.pushUndo();
                   this.selectedBox.pasteText(text);
                 }
               }).catch(err => {
@@ -338,6 +370,7 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
+        this.pushUndo();
         // Modifier variants for deletion
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line
           this.selectedBox.deleteToLineStart();
@@ -347,6 +380,7 @@ class MindMap {
           this.selectedBox.removeChar();
         }
       } else if (keyCode === DELETE) {
+        this.pushUndo();
         // Forward delete and modifier variants
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to end of line
           this.selectedBox.deleteToLineEnd();
@@ -356,13 +390,16 @@ class MindMap {
           this.selectedBox.removeForwardChar();
         }
       } else if (keyCode === ENTER) {
+        this.pushUndo();
         this.selectedBox.addChar('\n');
       } else if (key && key.length === 1) {
+        this.pushUndo();
         this.selectedBox.addChar(key);
       }
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
       // Delete selected connection only
       if (this.selectedConnection) {
+        this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
           this.connections.splice(index, 1);

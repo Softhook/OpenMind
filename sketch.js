@@ -48,7 +48,9 @@ function setup() {
   alignButton = createButton('Align');
   alignButton.position(520, 10);
   alignButton.mousePressed(() => {
-    try { mindMap && mindMap.alignBoxes(12); } catch (e) { console.error('Align failed:', e); }
+    try {
+      if (mindMap) { mindMap.pushUndo(); mindMap.alignBoxes(12); }
+    } catch (e) { console.error('Align failed:', e); }
   });
   
   // Create hidden file input for loading
@@ -217,6 +219,12 @@ function mouseDragged() {
 function keyPressed() {
   if (mindMap) {
     try {
+      // Handle CMD/CTRL+Z for undo at the top level
+      const isCmd = keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
+      if (isCmd && (key === 'z' || key === 'Z')) {
+        if (mindMap.undo) mindMap.undo();
+        return false; // prevent browser undo
+      }
       mindMap.handleKeyPressed(key, keyCode);
     } catch (e) {
       console.error('Error handling key press:', e);
@@ -240,9 +248,9 @@ function keyPressed() {
     }
   }
   
-  // Prevent default behavior for CMD+A/C/V/X when editing
+  // Prevent default behavior for CMD+A/C/V/X/Z when editing or when we handle undo
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
-    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X') {
+    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z') {
       return false;
     }
   }
@@ -279,6 +287,7 @@ function createNewBox() {
     console.error('MindMap not initialized');
     return;
   }
+  if (mindMap.pushUndo) mindMap.pushUndo();
   // Prefer creating the box at the current cursor position inside the canvas content area
   const toolbarHeight = 40; // top UI bar height used elsewhere
   const pad = 60;           // minimal margin from edges
