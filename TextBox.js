@@ -12,6 +12,9 @@ class TextBox {
     this.dragOffsetX = 0;
     this.dragOffsetY = 0;
     this.cornerRadius = 10;
+    this.cursorPosition = text.length;
+    this.selectionStart = -1;
+    this.selectionEnd = -1;
     
     // Calculate initial dimensions
     this.updateDimensions();
@@ -92,6 +95,9 @@ class TextBox {
   
   startEditing() {
     this.isEditing = true;
+    this.cursorPosition = this.text.length;
+    this.selectionStart = -1;
+    this.selectionEnd = -1;
   }
   
   stopEditing() {
@@ -100,15 +106,70 @@ class TextBox {
   }
   
   addChar(char) {
-    this.text += char;
+    // If there's a selection, replace it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+    }
+    this.text = this.text.slice(0, this.cursorPosition) + char + this.text.slice(this.cursorPosition);
+    this.cursorPosition += char.length;
     this.updateDimensions();
   }
   
   removeChar() {
     if (this.text.length > 0) {
-      this.text = this.text.slice(0, -1);
+      // If there's a selection, delete it
+      if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+        this.deleteSelection();
+      } else if (this.cursorPosition > 0) {
+        // Delete character before cursor
+        this.text = this.text.slice(0, this.cursorPosition - 1) + this.text.slice(this.cursorPosition);
+        this.cursorPosition--;
+      }
       this.updateDimensions();
     }
+  }
+  
+  selectAll() {
+    this.selectionStart = 0;
+    this.selectionEnd = this.text.length;
+  }
+  
+  getSelectedText() {
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      let start = min(this.selectionStart, this.selectionEnd);
+      let end = max(this.selectionStart, this.selectionEnd);
+      return this.text.slice(start, end);
+    }
+    return '';
+  }
+  
+  deleteSelection() {
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      let start = min(this.selectionStart, this.selectionEnd);
+      let end = max(this.selectionStart, this.selectionEnd);
+      this.text = this.text.slice(0, start) + this.text.slice(end);
+      this.cursorPosition = start;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
+      this.updateDimensions();
+    }
+  }
+  
+  pasteText(pastedText) {
+    // If there's a selection, replace it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      let start = min(this.selectionStart, this.selectionEnd);
+      let end = max(this.selectionStart, this.selectionEnd);
+      this.text = this.text.slice(0, start) + pastedText + this.text.slice(end);
+      this.cursorPosition = start + pastedText.length;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
+    } else {
+      // No selection, insert at cursor position
+      this.text = this.text.slice(0, this.cursorPosition) + pastedText + this.text.slice(this.cursorPosition);
+      this.cursorPosition += pastedText.length;
+    }
+    this.updateDimensions();
   }
   
   startDrag(mx, my) {

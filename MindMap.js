@@ -126,6 +126,34 @@ class MindMap {
   
   handleKeyPressed(key, keyCode) {
     if (this.selectedBox && this.selectedBox.isEditing) {
+      // Check for CMD/CTRL key combinations
+      if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
+        if (key === 'a' || key === 'A') {
+          // Select all text
+          this.selectedBox.selectAll();
+          return;
+        } else if (key === 'c' || key === 'C') {
+          // Copy selected text to clipboard
+          let selectedText = this.selectedBox.getSelectedText();
+          if (selectedText) {
+            navigator.clipboard.writeText(selectedText).catch(err => {
+              console.error('Failed to copy text: ', err);
+            });
+          }
+          return;
+        } else if (key === 'v' || key === 'V') {
+          // Paste from clipboard
+          navigator.clipboard.readText().then(text => {
+            if (text) {
+              this.selectedBox.pasteText(text);
+            }
+          }).catch(err => {
+            console.error('Failed to paste text: ', err);
+          });
+          return;
+        }
+      }
+      
       if (keyCode === BACKSPACE) {
         this.selectedBox.removeChar();
       } else if (keyCode === ENTER) {

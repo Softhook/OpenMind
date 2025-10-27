@@ -64,9 +64,17 @@ function mouseDragged() {
 
 function keyPressed() {
   mindMap.handleKeyPressed(key, keyCode);
+  
   // Prevent default behavior for backspace
   if (keyCode === BACKSPACE) {
     return false;
+  }
+  
+  // Prevent default behavior for CMD+A, CMD+C, CMD+V when editing
+  if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
+    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V') {
+      return false;
+    }
   }
 }
 
