@@ -5,6 +5,7 @@ let loadButton;
 let fileInput;
 let exportPNGButton;
 let exportPDFButton;
+let menuIsVisible = false;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -41,10 +42,14 @@ function setup() {
   fileInput = createFileInput(handleFileLoad);
   fileInput.position(-200, -200); // Hide it off-screen
   fileInput.style('display', 'none');
+
+  // Hide menu buttons initially
+  hideMenuButtons();
 }
 
 function draw() {
   background(240);
+  updateMenuVisibility();
   
   if (mindMap) {
     try {
@@ -53,6 +58,42 @@ function draw() {
       console.error('Error drawing mindmap:', e);
     }
   }
+}
+
+// Show or hide the top-left menu based on cursor position
+function updateMenuVisibility() {
+  // Define a small top-left trigger zone and a band covering the buttons area
+  const triggerX = 50;
+  const triggerY = 50;
+  // Buttons span from ~x=10 to ~x=330 + width; leave generous margin
+  const buttonsRightEdge = 480;
+  const buttonsBandHeight = 50; // top row height
+
+  const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
+  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && mouseX <= triggerX && mouseY <= triggerY;
+  const inButtonsBand = validMouse && mouseY >= 0 && mouseY <= buttonsBandHeight && mouseX >= 0 && mouseX <= buttonsRightEdge;
+  const shouldShow = inTrigger || inButtonsBand;
+
+  if (shouldShow !== menuIsVisible) {
+    if (shouldShow) showMenuButtons(); else hideMenuButtons();
+    menuIsVisible = shouldShow;
+  }
+}
+
+function showMenuButtons() {
+  newBoxButton.style('display', 'inline-block');
+  saveButton.style('display', 'inline-block');
+  loadButton.style('display', 'inline-block');
+  exportPNGButton.style('display', 'inline-block');
+  exportPDFButton.style('display', 'inline-block');
+}
+
+function hideMenuButtons() {
+  newBoxButton.style('display', 'none');
+  saveButton.style('display', 'none');
+  loadButton.style('display', 'none');
+  exportPNGButton.style('display', 'none');
+  exportPDFButton.style('display', 'none');
 }
 
 function mousePressed() {
