@@ -599,6 +599,124 @@ class TextBox {
     }
     this.resetCursorBlink();
   }
+
+  // Forward delete (Fn+Backspace on macOS / Delete key)
+  removeForwardChar() {
+    if (!this.text || this.text.length === 0) {
+      this.resetCursorBlink();
+      return;
+    }
+    // If there's a selection, delete it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+    } else if (this.cursorPosition < this.text.length) {
+      // Delete character after cursor
+      this.text = this.text.slice(0, this.cursorPosition) + this.text.slice(this.cursorPosition + 1);
+      // cursorPosition stays the same
+      this.updateDimensions();
+    }
+    this.resetCursorBlink();
+  }
+
+  // Delete the previous word (Alt/Option+Backspace or Ctrl+Backspace)
+  deleteWordLeft() {
+    if (!this.text) {
+      this.text = '';
+    }
+    // If there's a selection, delete it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+      this.resetCursorBlink();
+      return;
+    }
+    let pos = constrain(this.cursorPosition, 0, this.text.length);
+    if (pos === 0) {
+      this.resetCursorBlink();
+      return;
+    }
+    const isWs = (ch) => ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+    let i = pos;
+    // Skip whitespace directly left of cursor
+    while (i > 0 && isWs(this.text[i - 1])) i--;
+    // Then skip non-whitespace (the word)
+    while (i > 0 && !isWs(this.text[i - 1])) i--;
+    if (i < pos) {
+      this.text = this.text.slice(0, i) + this.text.slice(pos);
+      this.cursorPosition = i;
+      this.updateDimensions();
+    }
+    this.resetCursorBlink();
+  }
+
+  // Delete the next word (Alt/Option+Delete or Ctrl+Delete)
+  deleteWordRight() {
+    if (!this.text) {
+      this.text = '';
+    }
+    // If there's a selection, delete it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+      this.resetCursorBlink();
+      return;
+    }
+    let pos = constrain(this.cursorPosition, 0, this.text.length);
+    if (pos === this.text.length) {
+      this.resetCursorBlink();
+      return;
+    }
+    const isWs = (ch) => ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+    let i = pos;
+    // Skip whitespace directly right of cursor
+    while (i < this.text.length && isWs(this.text[i])) i++;
+    // Then skip non-whitespace (the word)
+    while (i < this.text.length && !isWs(this.text[i])) i++;
+    if (i > pos) {
+      this.text = this.text.slice(0, pos) + this.text.slice(i);
+      // cursorPosition unchanged
+      this.updateDimensions();
+    }
+    this.resetCursorBlink();
+  }
+
+  // Delete to start of logical line (up to previous \n)
+  deleteToLineStart() {
+    if (!this.text) this.text = '';
+    // If there's a selection, delete it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+      this.resetCursorBlink();
+      return;
+    }
+    let pos = constrain(this.cursorPosition, 0, this.text.length);
+    let nl = this.text.lastIndexOf('\n', max(0, pos - 1));
+    let start = nl === -1 ? 0 : nl + 1;
+    if (start < pos) {
+      this.text = this.text.slice(0, start) + this.text.slice(pos);
+      this.cursorPosition = start;
+      this.updateDimensions();
+    }
+    this.resetCursorBlink();
+  }
+
+  // Delete to end of logical line (to next \n or end)
+  deleteToLineEnd() {
+    if (!this.text) this.text = '';
+    // If there's a selection, delete it
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      this.deleteSelection();
+      this.resetCursorBlink();
+      return;
+    }
+    let pos = constrain(this.cursorPosition, 0, this.text.length);
+    let nl = this.text.indexOf('\n', pos);
+    let end = nl === -1 ? this.text.length : nl;
+    if (end > pos) {
+      this.text = this.text.slice(0, pos) + this.text.slice(end);
+      // cursor stays at pos
+      this.updateDimensions();
+    }
+    this.resetCursorBlink();
+  }
   
   selectAll() {
     this.selectionStart = 0;

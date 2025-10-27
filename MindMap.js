@@ -268,13 +268,29 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
-        this.selectedBox.removeChar();
+        // Modifier variants for deletion
+        if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line
+          this.selectedBox.deleteToLineStart();
+        } else if (keyIsDown(18) || keyIsDown(17)) { // ALT/OPTION or CTRL -> delete previous word
+          this.selectedBox.deleteWordLeft();
+        } else {
+          this.selectedBox.removeChar();
+        }
+      } else if (keyCode === DELETE) {
+        // Forward delete and modifier variants
+        if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to end of line
+          this.selectedBox.deleteToLineEnd();
+        } else if (keyIsDown(18) || keyIsDown(17)) { // ALT/OPTION or CTRL -> delete next word
+          this.selectedBox.deleteWordRight();
+        } else {
+          this.selectedBox.removeForwardChar();
+        }
       } else if (keyCode === ENTER) {
         this.selectedBox.addChar('\n');
       } else if (key && key.length === 1) {
         this.selectedBox.addChar(key);
       }
-    } else if (keyCode === BACKSPACE) {
+    } else if (keyCode === BACKSPACE || keyCode === DELETE) {
       // Delete selected connection only
       if (this.selectedConnection) {
         let index = this.connections.indexOf(this.selectedConnection);

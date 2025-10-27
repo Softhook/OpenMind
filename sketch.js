@@ -99,6 +99,10 @@ function keyPressed() {
   if (keyCode === BACKSPACE) {
     return false;
   }
+  // Prevent default behavior for forward delete
+  if (keyCode === DELETE) {
+    return false;
+  }
   
   // Prevent default behavior for arrow keys when editing
   if (mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing) {

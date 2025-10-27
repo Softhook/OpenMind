@@ -21,8 +21,20 @@ A simple and intuitive mind mapping application built with p5.js.
 ### Keyboard Controls
 
 - Type normally to add text to a selected box
-- Press **Backspace** to delete characters
 - Press **Enter** to add a new line
+- Press **Backspace** to delete the character before the caret
+- Press **Fn+Backspace** (or **Delete** on extended keyboards) to delete the character after the caret
+- Word deletion:
+   - macOS: **Option+Backspace** deletes the previous word, **Option+Delete** deletes the next word
+   - Windows/Linux: **Ctrl+Backspace** deletes the previous word, **Ctrl+Delete** deletes the next word
+- Line deletion (macOS only):
+   - **Cmd+Backspace** deletes to the start of the line
+   - **Cmd+Delete** deletes to the end of the line
+- Selection and clipboard:
+   - **Cmd/Ctrl+A** select all text in the box
+   - **Cmd/Ctrl+C** copy selection
+   - **Cmd/Ctrl+V** paste
+- Arrow keys move the caret; Up/Down move between wrapped lines
 
 ## File Structure
 
