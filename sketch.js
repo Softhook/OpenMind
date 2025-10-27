@@ -7,6 +7,7 @@ let exportPNGButton;
 let exportPDFButton;
 let menuIsVisible = false;
 let fullScreenButton;
+let menuRightEdge = 600; // Updated after layout to cover hover band width
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -48,6 +49,9 @@ function setup() {
   fileInput.position(-200, -200); // Hide it off-screen
   fileInput.style('display', 'none');
 
+  // Lay out buttons neatly left-to-right in requested order
+  layoutMenuButtons();
+
   // Hide menu buttons initially
   hideMenuButtons();
 }
@@ -70,8 +74,8 @@ function updateMenuVisibility() {
   // Define a small top-left trigger zone and a band covering the buttons area
   const triggerX = 50;
   const triggerY = 50;
-  // Buttons span from ~x=10 to ~x=330 + width; leave generous margin
-  const buttonsRightEdge = 600;
+  // Buttons span from x=10 to menuRightEdge (computed after layout)
+  const buttonsRightEdge = menuRightEdge;
   const buttonsBandHeight = 50; // top row height
 
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
@@ -101,6 +105,34 @@ function hideMenuButtons() {
   exportPNGButton.style('display', 'none');
   exportPDFButton.style('display', 'none');
   fullScreenButton.style('display', 'none');
+}
+
+// Arrange buttons: Load, Save, Export PNG, Export PDF, Full Screen, then New Box
+function layoutMenuButtons() {
+  const startX = 10;
+  const y = 10;
+  const gap = 10;
+
+  // Ensure buttons are displayed to get proper widths
+  loadButton.style('display', 'inline-block');
+  saveButton.style('display', 'inline-block');
+  exportPNGButton.style('display', 'inline-block');
+  exportPDFButton.style('display', 'inline-block');
+  fullScreenButton.style('display', 'inline-block');
+  newBoxButton.style('display', 'inline-block');
+
+  const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
+
+  let x = startX;
+  loadButton.position(x, y); x += w(loadButton) + gap;
+  saveButton.position(x, y); x += w(saveButton) + gap;
+  exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
+  exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
+  fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
+  newBoxButton.position(x, y); x += w(newBoxButton) + gap;
+
+  // Update the hover band to cover to the right of the last button
+  menuRightEdge = x + 10;
 }
 
 function mousePressed() {
