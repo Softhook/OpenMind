@@ -82,6 +82,59 @@ class MindMap {
     }
   }
   
+  // Align boxes' x and y positions when they are within a tolerance.
+  // Groups nearby coordinates into clusters and snaps each cluster to its average.
+  alignBoxes(tolerance = 12) {
+    const tol = Math.max(0, Number.isFinite(tolerance) ? tolerance : 12);
+    if (!this.boxes || this.boxes.length < 2) return;
+
+    // Helper: cluster numerical values and return array of clusters (arrays of indices)
+    const clusterValues = (values) => {
+      // values: [{v:number, i:number}]
+      const sorted = values.slice().sort((a, b) => a.v - b.v);
+      const clusters = [];
+      let current = [];
+      for (let k = 0; k < sorted.length; k++) {
+        const item = sorted[k];
+        if (current.length === 0) {
+          current.push(item);
+        } else {
+          const prev = current[current.length - 1];
+          if (Math.abs(item.v - prev.v) <= tol) {
+            current.push(item);
+          } else {
+            if (current.length > 0) clusters.push(current);
+            current = [item];
+          }
+        }
+      }
+      if (current.length > 0) clusters.push(current);
+      return clusters;
+    };
+
+    // X alignment
+    const xVals = this.boxes.map((b, i) => ({ v: b.x, i }));
+    const xClusters = clusterValues(xVals);
+    for (const cluster of xClusters) {
+      if (cluster.length < 2) continue; // Only snap when there are at least 2
+      const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
+      for (const it of cluster) {
+        this.boxes[it.i].x = avg;
+      }
+    }
+
+    // Y alignment
+    const yVals = this.boxes.map((b, i) => ({ v: b.y, i }));
+    const yClusters = clusterValues(yVals);
+    for (const cluster of yClusters) {
+      if (cluster.length < 2) continue;
+      const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
+      for (const it of cluster) {
+        this.boxes[it.i].y = avg;
+      }
+    }
+  }
+  
   handleMousePressed() {
     // Validate mouse coordinates
     if (mouseX == null || mouseY == null || isNaN(mouseX) || isNaN(mouseY)) {

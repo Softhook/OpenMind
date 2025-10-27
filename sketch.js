@@ -7,6 +7,7 @@ let exportPNGButton;
 let exportPDFButton;
 let menuIsVisible = false;
 let fullScreenButton;
+let alignButton;
 let menuRightEdge = 600; // Updated after layout to cover hover band width
 
 function setup() {
@@ -43,6 +44,12 @@ function setup() {
   fullScreenButton = createButton('Full Screen');
   fullScreenButton.position(430, 10);
   fullScreenButton.mousePressed(toggleFullScreen);
+
+  alignButton = createButton('Align');
+  alignButton.position(520, 10);
+  alignButton.mousePressed(() => {
+    try { mindMap && mindMap.alignBoxes(12); } catch (e) { console.error('Align failed:', e); }
+  });
   
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
@@ -96,6 +103,7 @@ function showMenuButtons() {
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
+  alignButton.style('display', 'inline-block');
 }
 
 function hideMenuButtons() {
@@ -105,6 +113,7 @@ function hideMenuButtons() {
   exportPNGButton.style('display', 'none');
   exportPDFButton.style('display', 'none');
   fullScreenButton.style('display', 'none');
+  alignButton.style('display', 'none');
 }
 
 // Arrange buttons: Load, Save, Export PNG, Export PDF, Full Screen, then New Box
@@ -119,6 +128,7 @@ function layoutMenuButtons() {
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
+  alignButton.style('display', 'inline-block');
   newBoxButton.style('display', 'inline-block');
 
   const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
@@ -129,6 +139,7 @@ function layoutMenuButtons() {
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
+  alignButton.position(x, y); x += w(alignButton) + gap;
   newBoxButton.position(x, y); x += w(newBoxButton) + gap;
 
   // Update the hover band to cover to the right of the last button
