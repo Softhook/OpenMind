@@ -15,6 +15,7 @@ class TextBox {
     this.cursorPosition = text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
+    this.deleteIconSize = 20;
     
     // Calculate initial dimensions
     this.updateDimensions();
@@ -65,6 +66,26 @@ class TextBox {
     textSize(this.fontSize);
     text(this.text, this.x, this.y);
     
+    // Draw delete icon if mouse is near top-left corner
+    if (this.isMouseNearDeleteIcon()) {
+      let iconX = this.x - this.width/2;
+      let iconY = this.y - this.height/2;
+      
+      // Draw red circle background
+      fill(220, 50, 50);
+      noStroke();
+      circle(iconX + this.deleteIconSize/2, iconY + this.deleteIconSize/2, this.deleteIconSize);
+      
+      // Draw white X
+      stroke(255);
+      strokeWeight(2);
+      let offset = this.deleteIconSize * 0.3;
+      let cx = iconX + this.deleteIconSize/2;
+      let cy = iconY + this.deleteIconSize/2;
+      line(cx - offset, cy - offset, cx + offset, cy + offset);
+      line(cx - offset, cy + offset, cx + offset, cy - offset);
+    }
+    
     pop();
   }
   
@@ -73,6 +94,27 @@ class TextBox {
            mouseX < this.x + this.width/2 &&
            mouseY > this.y - this.height/2 &&
            mouseY < this.y + this.height/2;
+  }
+  
+  isMouseNearDeleteIcon() {
+    // Show delete icon when mouse is in the top-left area
+    let iconX = this.x - this.width/2;
+    let iconY = this.y - this.height/2;
+    let hoverRadius = this.deleteIconSize * 2; // Larger hover area
+    
+    return mouseX > iconX - 10 && 
+           mouseX < iconX + hoverRadius &&
+           mouseY > iconY - 10 && 
+           mouseY < iconY + hoverRadius;
+  }
+  
+  isMouseOverDeleteIcon() {
+    // Check if mouse is directly over the delete icon
+    let iconX = this.x - this.width/2 + this.deleteIconSize/2;
+    let iconY = this.y - this.height/2 + this.deleteIconSize/2;
+    let distance = dist(mouseX, mouseY, iconX, iconY);
+    
+    return distance < this.deleteIconSize/2;
   }
   
   isMouseOnEdge() {
