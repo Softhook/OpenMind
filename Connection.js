@@ -67,9 +67,11 @@ class Connection {
   
   isMouseOver() {
     // Validate boxes and mouse coordinates
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     if (!this.fromBox || !this.toBox || 
-        mouseX == null || mouseY == null || 
-        isNaN(mouseX) || isNaN(mouseY)) {
+        mx == null || my == null || 
+        isNaN(mx) || isNaN(my)) {
       return false;
     }
     
@@ -85,7 +87,7 @@ class Connection {
     }
     
     // Distance from point to line segment
-    let d = this.distanceToSegment(mouseX, mouseY, start.x, start.y, end.x, end.y);
+    let d = this.distanceToSegment(mx, my, start.x, start.y, end.x, end.y);
     return d < 5; // 5 pixel threshold
   }
   

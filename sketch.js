@@ -10,6 +10,29 @@ let fullScreenButton;
 let alignButton;
 let menuRightEdge = 600; // Updated after layout to cover hover band width
 
+// Camera/zoom state
+let camX = 0;
+let camY = 0;
+let zoom = 1;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 3.0;
+const ZOOM_STEP = 1.05; // per wheel notch
+
+// Panning state
+let isPanning = false;
+let panStartMouseX = 0;
+let panStartMouseY = 0;
+let panStartCamX = 0;
+let panStartCamY = 0;
+
+// Helpers to convert mouse to world coordinates
+function worldMouseX() {
+  return (mouseX - camX) / zoom;
+}
+function worldMouseY() {
+  return (mouseY - camY) / zoom;
+}
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
   
@@ -71,7 +94,12 @@ function draw() {
   
   if (mindMap) {
     try {
+      // Draw scene with camera transform
+      push();
+      translate(camX, camY);
+      scale(zoom);
       mindMap.draw();
+      pop();
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
@@ -89,6 +117,12 @@ function updateCursorForHover() {
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   if (!validMouse) { cursor('default'); return; }
+
+  // Panning cursor states
+  const toolbarHeight = 40;
+  const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
+  if (isPanning) { cursor('grabbing'); return; }
+  if (mouseY > toolbarHeight && noSelection && keyIsDown(32)) { cursor('grab'); return; }
 
   // Check top-most first
   for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
@@ -189,6 +223,19 @@ function mousePressed() {
   // Prevent interaction with canvas when clicking on UI buttons
   if (mouseY > 40 && mindMap) {
     try {
+      const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
+      const spaceHeld = keyIsDown(32);
+      const overAny = isOverAnyInteractive();
+      if (noSelection && (spaceHeld || !overAny)) {
+        // Begin panning
+        isPanning = true;
+        panStartMouseX = mouseX;
+        panStartMouseY = mouseY;
+        panStartCamX = camX;
+        panStartCamY = camY;
+        return false;
+      }
+
       mindMap.handleMousePressed();
     } catch (e) {
       console.error('Error handling mouse press:', e);
@@ -197,6 +244,10 @@ function mousePressed() {
 }
 
 function mouseReleased() {
+  if (isPanning) {
+    isPanning = false;
+    return;
+  }
   if (mindMap) {
     try {
       mindMap.handleMouseReleased();
@@ -207,6 +258,13 @@ function mouseReleased() {
 }
 
 function mouseDragged() {
+  if (isPanning) {
+    // Screen-space pan
+    camX = panStartCamX + (mouseX - panStartMouseX);
+    camY = panStartCamY + (mouseY - panStartMouseY);
+    return false;
+  }
+
   if (mindMap) {
     try {
       mindMap.handleMouseDragged();
@@ -224,6 +282,10 @@ function keyPressed() {
       if (isCmd && (key === 'z' || key === 'Z')) {
         if (mindMap.undo) mindMap.undo();
         return false; // prevent browser undo
+      }
+      // Prevent page scroll when using space to pan (only if nothing selected)
+      if ((key === ' ' || keyCode === 32) && !mindMap.selectedBox && !mindMap.selectedConnection) {
+        return false;
       }
       mindMap.handleKeyPressed(key, keyCode);
     } catch (e) {
@@ -291,8 +353,8 @@ function createNewBox() {
   // Prefer creating the box at the current cursor position inside the canvas content area
   const toolbarHeight = 40; // top UI bar height used elsewhere
   const pad = 60;           // minimal margin from edges
-  let x = mouseX;
-  let y = mouseY;
+  let x = worldMouseX();
+  let y = worldMouseY();
 
   const validMouse = Number.isFinite(x) && Number.isFinite(y);
   const insideCanvas = validMouse && x >= 0 && x <= width && y >= 0 && y <= height;
@@ -354,6 +416,47 @@ function handleFileLoad(file) {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+}
+
+// Mouse wheel to zoom the whole view around the cursor
+function mouseWheel(event) {
+  // Only when over the canvas area
+  const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
+  if (!overCanvas) return;
+
+  // Compute world point under mouse before zoom
+  const wx = worldMouseX();
+  const wy = worldMouseY();
+
+  // Zoom in (negative deltaY) or out (positive)
+  const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+  const newZoom = constrain(zoom * factor, MIN_ZOOM, MAX_ZOOM);
+
+  // Adjust camera to keep the world point under the cursor stationary
+  camX = mouseX - wx * newZoom;
+  camY = mouseY - wy * newZoom;
+  zoom = newZoom;
+
+  // Prevent page scroll
+  return false;
+}
+
+// Determine if the mouse is over any interactive object (box or connection)
+function isOverAnyInteractive() {
+  if (!mindMap) return false;
+  // Check boxes from top-most first
+  for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
+    const box = mindMap.boxes[i];
+    if (!box) continue;
+    if (box.isMouseOver()) return true;
+  }
+  // Check connections
+  for (let i = 0; i < mindMap.connections.length; i++) {
+    const conn = mindMap.connections[i];
+    if (!conn) continue;
+    try { if (conn.isMouseOver()) return true; } catch (_) {}
+  }
+  return false;
 }
 
 function exportPNG() {

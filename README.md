@@ -9,6 +9,7 @@ A simple and intuitive mind mapping application built with p5.js.
 - **Move Nodes**: Click and drag any box to reposition it
 - **Create Connections**: Click on the edge of a box, then click on another box to create a directed connection
 - **Save/Load**: Save your mind maps as JSON files and load them later
+- **Zoom View**: Use your mouse scroll/trackpad over the canvas to zoom the entire mind map in or out
 
 ## How to Use
 
@@ -37,6 +38,14 @@ A simple and intuitive mind mapping application built with p5.js.
    - **Cmd/Ctrl+X** cut selection
    - **Cmd/Ctrl+V** paste
 - Arrow keys move the caret; Up/Down move between wrapped lines
+
+### Mouse/Trackpad Controls
+
+- Scroll over the canvas to zoom in/out of the entire view
+- Hold Space (when nothing is selected) and drag to pan the view
+- Or click-and-drag on empty canvas (with nothing selected) to pan
+- Click near a box edge to drag the box; click inside to edit text
+- Right-click a selected connection to reverse its direction
 
 ## File Structure
 

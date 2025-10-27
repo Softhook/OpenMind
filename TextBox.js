@@ -259,7 +259,9 @@ class TextBox {
     for (let side of sides) {
       const p = pts[side];
       if (!p) continue;
-      if (dist(mouseX, mouseY, p.x, p.y) <= hitRadius) {
+      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+      if (dist(mx, my, p.x, p.y) <= hitRadius) {
         return side;
       }
     }
@@ -281,10 +283,12 @@ class TextBox {
   }
   
   isMouseOver() {
-    return mouseX > this.x - this.width/2 &&
-           mouseX < this.x + this.width/2 &&
-           mouseY > this.y - this.height/2 &&
-           mouseY < this.y + this.height/2;
+      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+      return mx > this.x - this.width/2 &&
+        mx < this.x + this.width/2 &&
+        my > this.y - this.height/2 &&
+        my < this.y + this.height/2;
   }
   
   isMouseNearDeleteIcon() {
@@ -292,18 +296,21 @@ class TextBox {
     let iconX = this.x - this.width/2;
     let iconY = this.y - this.height/2;
     let hoverRadius = this.deleteIconSize * 2; // Larger hover area
-    
-    return mouseX > iconX - 10 && 
-           mouseX < iconX + hoverRadius &&
-           mouseY > iconY - 10 && 
-           mouseY < iconY + hoverRadius;
+      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+      return mx > iconX - 10 && 
+        mx < iconX + hoverRadius &&
+        my > iconY - 10 && 
+        my < iconY + hoverRadius;
   }
   
   isMouseOverDeleteIcon() {
     // Check if mouse is directly over the delete icon
     let iconX = this.x - this.width/2 + this.deleteIconSize/2;
     let iconY = this.y - this.height/2 + this.deleteIconSize/2;
-    let distance = dist(mouseX, mouseY, iconX, iconY);
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    let distance = dist(mx, my, iconX, iconY);
     
     return distance < this.deleteIconSize/2;
   }
@@ -311,11 +318,12 @@ class TextBox {
   isMouseOverResizeHandle() {
     let handleX = this.x + this.width/2 - this.resizeHandleSize;
     let handleY = this.y + this.height/2 - this.resizeHandleSize;
-    
-    return mouseX > handleX &&
-           mouseX < handleX + this.resizeHandleSize &&
-           mouseY > handleY &&
-           mouseY < handleY + this.resizeHandleSize;
+      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+      return mx > handleX &&
+        mx < handleX + this.resizeHandleSize &&
+        my > handleY &&
+        my < handleY + this.resizeHandleSize;
   }
   
   isMouseOnEdge() {
@@ -332,18 +340,20 @@ class TextBox {
     const edgeThresholdX = min(this.dragEdgeThickness, maxEdgeX);
     const edgeThresholdY = min(this.dragEdgeThickness, maxEdgeY);
 
-    let distFromLeft = abs(mouseX - (this.x - this.width/2));
-    let distFromRight = abs(mouseX - (this.x + this.width/2));
-    let distFromTop = abs(mouseY - (this.y - this.height/2));
-    let distFromBottom = abs(mouseY - (this.y + this.height/2));
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    let distFromLeft = abs(mx - (this.x - this.width/2));
+    let distFromRight = abs(mx - (this.x + this.width/2));
+    let distFromTop = abs(my - (this.y - this.height/2));
+    let distFromBottom = abs(my - (this.y + this.height/2));
     
     let onVerticalEdge = (distFromLeft < edgeThresholdX || distFromRight < edgeThresholdX) &&
-                         mouseY > this.y - this.height/2 &&
-                         mouseY < this.y + this.height/2;
+               my > this.y - this.height/2 &&
+               my < this.y + this.height/2;
     
     let onHorizontalEdge = (distFromTop < edgeThresholdY || distFromBottom < edgeThresholdY) &&
-                           mouseX > this.x - this.width/2 &&
-                           mouseX < this.x + this.width/2;
+                           mx > this.x - this.width/2 &&
+                           mx < this.x + this.width/2;
     
     return onVerticalEdge || onHorizontalEdge;
   }

@@ -92,18 +92,18 @@ class MindMap {
     }
 
     // Draw live connecting line and dots if connecting
-    if (this.connectingFrom && mouseX != null && mouseY != null && !isNaN(mouseX) && !isNaN(mouseY)) {
+    if (this.connectingFrom && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
       const { box, side } = this.connectingFrom;
       const start = box.getConnectorCenter(side);
       if (start && !isNaN(start.x) && !isNaN(start.y)) {
         push();
         stroke(100, 100, 255);
         strokeWeight(2);
-        line(start.x, start.y, mouseX, mouseY);
+        line(start.x, start.y, worldMouseX(), worldMouseY());
         noStroke();
         fill(100, 150, 255);
         circle(start.x, start.y, 10);
-        circle(mouseX, mouseY, 8);
+        circle(worldMouseX(), worldMouseY(), 8);
         pop();
       }
     }
@@ -164,7 +164,9 @@ class MindMap {
   
   handleMousePressed() {
     // Validate mouse coordinates
-    if (mouseX == null || mouseY == null || isNaN(mouseX) || isNaN(mouseY)) {
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
     
@@ -198,7 +200,7 @@ class MindMap {
       if (box.isMouseOverResizeHandle()) {
         this.selectedBox = box;
         this.pushUndo();
-        box.startResize(mouseX, mouseY);
+        box.startResize(mx, my);
         return;
       }
     }
@@ -227,10 +229,10 @@ class MindMap {
         if (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge()) {
           this.pushUndo();
           box.stopEditing();
-          box.startDrag(mouseX, mouseY);
+          box.startDrag(mx, my);
         } else {
           // Center area: start/edit text and allow selection
-          box.handleMouseDown(mouseX, mouseY);
+          box.handleMouseDown(mx, my);
         }
         
         // Move this box to the end (on top)
@@ -285,7 +287,9 @@ class MindMap {
   
   handleMouseDragged() {
     // Validate mouse coordinates
-    if (mouseX == null || mouseY == null || isNaN(mouseX) || isNaN(mouseY)) {
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
     
@@ -293,10 +297,10 @@ class MindMap {
       if (!box) continue;
       // If this is the actively edited box and selection is in progress, update selection
       if (box === this.selectedBox && box.isSelecting) {
-        box.updateSelection(mouseX, mouseY);
+        box.updateSelection(mx, my);
       } else {
-        box.drag(mouseX, mouseY);
-        box.resize(mouseX, mouseY);
+        box.drag(mx, my);
+        box.resize(mx, my);
       }
     }
   }
