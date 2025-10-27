@@ -818,14 +818,9 @@ class TextBox {
         return;
       }
       
+      // Move in world space - no constraints (allow infinite canvas)
       this.x = mx + this.dragOffsetX;
       this.y = my + this.dragOffsetY;
-      
-      // Constrain to canvas with margin
-      let margin = this.width / 2;
-      let marginY = this.height / 2;
-      this.x = constrain(this.x, margin, width - margin);
-      this.y = constrain(this.y, marginY, height - marginY);
     }
   }
   

@@ -25,12 +25,20 @@ let panStartMouseY = 0;
 let panStartCamX = 0;
 let panStartCamY = 0;
 
-// Helpers to convert mouse to world coordinates
+// Helpers to convert between screen and world coordinates
+// Transform: screen = world * zoom + cam
+// Inverse: world = (screen - cam) / zoom
 function worldMouseX() {
   return (mouseX - camX) / zoom;
 }
 function worldMouseY() {
   return (mouseY - camY) / zoom;
+}
+function screenX(worldX) {
+  return worldX * zoom + camX;
+}
+function screenY(worldY) {
+  return worldY * zoom + camY;
 }
 
 function setup() {
@@ -120,9 +128,10 @@ function updateCursorForHover() {
 
   // Panning cursor states
   const toolbarHeight = 40;
+  const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
   if (isPanning) { cursor('grabbing'); return; }
-  if (mouseY > toolbarHeight && noSelection && keyIsDown(32)) { cursor('grab'); return; }
+  if (mouseY > toolbarHeight && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
   // Check top-most first
   for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
@@ -223,10 +232,11 @@ function mousePressed() {
   // Prevent interaction with canvas when clicking on UI buttons
   if (mouseY > 40 && mindMap) {
     try {
+      const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
       const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection;
       const spaceHeld = keyIsDown(32);
       const overAny = isOverAnyInteractive();
-      if (noSelection && (spaceHeld || !overAny)) {
+      if (noSelection && !isEditing && (spaceHeld || !overAny)) {
         // Begin panning
         isPanning = true;
         panStartMouseX = mouseX;
@@ -259,9 +269,22 @@ function mouseReleased() {
 
 function mouseDragged() {
   if (isPanning) {
-    // Screen-space pan
+    // Screen-space pan with soft limits
     camX = panStartCamX + (mouseX - panStartMouseX);
     camY = panStartCamY + (mouseY - panStartMouseY);
+    
+    // Apply soft pan limits based on content bounds
+    if (mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
+      const bounds = getContentBounds();
+      const margin = 500; // Allow panning this far beyond content
+      const minCamX = -bounds.maxX * zoom - margin;
+      const maxCamX = -bounds.minX * zoom + width + margin;
+      const minCamY = -bounds.maxY * zoom - margin;
+      const maxCamY = -bounds.minY * zoom + height + margin;
+      
+      camX = constrain(camX, minCamX, maxCamX);
+      camY = constrain(camY, minCamY, maxCamY);
+    }
     return false;
   }
 
@@ -283,8 +306,9 @@ function keyPressed() {
         if (mindMap.undo) mindMap.undo();
         return false; // prevent browser undo
       }
-      // Prevent page scroll when using space to pan (only if nothing selected)
-      if ((key === ' ' || keyCode === 32) && !mindMap.selectedBox && !mindMap.selectedConnection) {
+      // Prevent page scroll when using space to pan (only if not editing)
+      const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
+      if ((key === ' ' || keyCode === 32) && !isEditing) {
         return false;
       }
       mindMap.handleKeyPressed(key, keyCode);
@@ -324,6 +348,11 @@ function keyPressed() {
       createNewBox();
       return false;
     }
+    // Reset view: press 0 or Home key
+    if (!hasModifier && (key === '0' || keyCode === 36)) {
+      resetView();
+      return false;
+    }
   }
 }
 
@@ -350,25 +379,23 @@ function createNewBox() {
     return;
   }
   if (mindMap.pushUndo) mindMap.pushUndo();
-  // Prefer creating the box at the current cursor position inside the canvas content area
-  const toolbarHeight = 40; // top UI bar height used elsewhere
-  const pad = 60;           // minimal margin from edges
-  let x = worldMouseX();
-  let y = worldMouseY();
-
-  const validMouse = Number.isFinite(x) && Number.isFinite(y);
-  const insideCanvas = validMouse && x >= 0 && x <= width && y >= 0 && y <= height;
-  const insideContent = insideCanvas && y > toolbarHeight;
-
-  if (!insideContent) {
-    // Fallback to center if cursor isn't in the drawable area
-    x = width / 2;
-    y = max(height / 2, toolbarHeight + pad);
+  
+  // Create box at cursor position in world space if over canvas, else at viewport center
+  let x, y;
+  const toolbarHeight = 40;
+  
+  if (mouseY > toolbarHeight && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+    // Mouse is over canvas (in screen space) - use world position
+    x = worldMouseX();
+    y = worldMouseY();
+  } else {
+    // Mouse not over canvas - create at center of current viewport in world space
+    x = worldMouseX.call(null, width / 2);
+    y = worldMouseY.call(null, height / 2);
+    // Actually, we need to convert viewport center to world coords
+    x = (width / 2 - camX) / zoom;
+    y = (height / 2 - camY) / zoom;
   }
-
-  // Constrain within safe margins
-  x = constrain(x, pad, max(pad, width - pad));
-  y = constrain(y, toolbarHeight + pad, max(toolbarHeight + pad, height - pad));
 
   mindMap.addBox(new TextBox(x, y, ""));
 }
@@ -441,6 +468,56 @@ function mouseWheel(event) {
   return false;
 }
 
+// Get bounding box of all content in world space
+function getContentBounds() {
+  if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
+    return { minX: 0, maxX: width, minY: 0, maxY: height };
+  }
+  
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let box of mindMap.boxes) {
+    if (!box) continue;
+    const left = box.x - box.width / 2;
+    const right = box.x + box.width / 2;
+    const top = box.y - box.height / 2;
+    const bottom = box.y + box.height / 2;
+    
+    minX = min(minX, left);
+    maxX = max(maxX, right);
+    minY = min(minY, top);
+    maxY = max(maxY, bottom);
+  }
+  
+  return { minX, maxX, minY, maxY };
+}
+
+// Reset camera to fit all content or default view
+function resetView() {
+  if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
+    // No content - reset to default
+    camX = 0;
+    camY = 0;
+    zoom = 1;
+    return;
+  }
+  
+  const bounds = getContentBounds();
+  const contentWidth = bounds.maxX - bounds.minX;
+  const contentHeight = bounds.maxY - bounds.minY;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  
+  // Calculate zoom to fit all content with 10% margin
+  const margin = 1.1;
+  const zoomX = width / (contentWidth * margin);
+  const zoomY = height / (contentHeight * margin);
+  zoom = constrain(min(zoomX, zoomY), MIN_ZOOM, MAX_ZOOM);
+  
+  // Center the content in viewport
+  camX = width / 2 - centerX * zoom;
+  camY = height / 2 - centerY * zoom;
+}
+
 // Determine if the mouse is over any interactive object (box or connection)
 function isOverAnyInteractive() {
   if (!mindMap) return false;
@@ -461,17 +538,158 @@ function isOverAnyInteractive() {
 
 function exportPNG() {
   try {
-    // Validate canvas dimensions
-    if (!width || !height || width <= 0 || height <= 0) {
-      throw new Error('Canvas not properly initialized');
+    // Validate mindMap
+    if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
+      alert('No content to export');
+      return;
     }
     
-    // Save the current canvas as PNG
-    saveCanvas('mindmap', 'png');
+    // Get content bounds in world space
+    const bounds = getContentBounds();
+    const contentWidth = bounds.maxX - bounds.minX;
+    const contentHeight = bounds.maxY - bounds.minY;
+    
+    // Add padding
+    const padding = 50;
+    const totalWidth = contentWidth + padding * 2;
+    const totalHeight = contentHeight + padding * 2;
+    
+    // Create an offscreen graphics buffer at the content size
+    const pg = createGraphics(totalWidth, totalHeight);
+    
+    // Calculate the offset to map world space to buffer space
+    const offsetX = padding - bounds.minX;
+    const offsetY = padding - bounds.minY;
+    
+    // Draw the mind map into the buffer
+    pg.push();
+    pg.translate(offsetX, offsetY);
+    pg.background(240);
+    
+    // Draw connections
+    for (let conn of mindMap.connections) {
+      if (!conn || !conn.fromBox || !conn.toBox) continue;
+      
+      let start = conn.fromBox.getConnectionPoint(conn.toBox);
+      let end = conn.toBox.getConnectionPoint(conn.fromBox);
+      
+      if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
+        continue;
+      }
+      
+      pg.stroke(80);
+      pg.strokeWeight(2);
+      pg.line(start.x, start.y, end.x, end.y);
+      
+      // Draw arrow
+      let angle = Math.atan2(end.y - start.y, end.x - start.x);
+      if (!isNaN(angle)) {
+        pg.fill(80);
+        pg.noStroke();
+        pg.push();
+        pg.translate(end.x, end.y);
+        pg.rotate(angle);
+        pg.triangle(0, 0, -10, -5, -10, 5);
+        pg.pop();
+      }
+    }
+    
+    // Draw boxes
+    for (let box of mindMap.boxes) {
+      if (!box) continue;
+      
+      if (box.x == null || box.y == null || box.width == null || box.height == null ||
+          isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
+        continue;
+      }
+      
+      // Draw box background
+      pg.fill(255);
+      pg.stroke(100);
+      pg.strokeWeight(1);
+      pg.rect(box.x - box.width/2, box.y - box.height/2, box.width, box.height, box.cornerRadius);
+      
+      // Draw text
+      pg.fill(0);
+      pg.noStroke();
+      pg.textAlign(LEFT, CENTER);
+      pg.textSize(box.fontSize);
+      
+      let wrappedLines = getWrappedLinesForBox(box);
+      let lineHeight = box.fontSize * 1.5;
+      let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
+      let textX = box.x - box.width / 2 + box.padding;
+      
+      for (let i = 0; i < wrappedLines.length; i++) {
+        if (wrappedLines[i] != null) {
+          pg.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
+        }
+      }
+    }
+    
+    pg.pop();
+    
+    // Save the buffer as PNG
+    save(pg, 'mindmap.png');
   } catch (e) {
     console.error('Failed to export PNG:', e);
-    alert('Failed to export PNG. Please try again.');
+    alert('Failed to export PNG: ' + e.message);
   }
+}
+
+// Helper to get wrapped lines (needed for PNG export since it uses offscreen buffer)
+function getWrappedLinesForBox(box) {
+  if (!box || !box.text) return [''];
+  
+  let lines = String(box.text).split('\n');
+  let wrappedLines = [];
+  let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
+  let maxTextWidth = max(10, baseWidth - box.padding * 2);
+  
+  for (let line of lines) {
+    if (!line || line === '') {
+      wrappedLines.push('');
+      continue;
+    }
+    
+    if (textWidth(line) <= maxTextWidth) {
+      wrappedLines.push(line);
+    } else {
+      let words = line.split(' ');
+      let currentLine = '';
+      
+      for (let i = 0; i < words.length; i++) {
+        let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+        
+        if (textWidth(testLine) <= maxTextWidth) {
+          currentLine = testLine;
+        } else {
+          if (currentLine) {
+            wrappedLines.push(currentLine);
+            currentLine = words[i];
+          } else {
+            let word = words[i];
+            let charLine = '';
+            for (let char of word) {
+              if (textWidth(charLine + char) <= maxTextWidth) {
+                charLine += char;
+              } else {
+                if (charLine) wrappedLines.push(charLine);
+                charLine = char;
+              }
+            }
+            currentLine = charLine;
+          }
+        }
+      }
+      
+      if (currentLine) {
+        wrappedLines.push(currentLine);
+      }
+    }
+  }
+  
+  return wrappedLines.length > 0 ? wrappedLines : [''];
 }
 
 function exportPDF() {
@@ -486,17 +704,30 @@ function exportPDF() {
       throw new Error('MindMap not properly initialized');
     }
     
-    // Validate canvas dimensions
-    if (!width || !height || width <= 0 || height <= 0) {
-      throw new Error('Invalid canvas dimensions');
+    if (mindMap.boxes.length === 0) {
+      alert('No content to export');
+      return;
     }
     
     // Create PDF using jsPDF
     const { jsPDF } = window.jspdf;
     
-    // Create PDF with landscape orientation
+    // Get content bounds in world space
+    const bounds = getContentBounds();
+    const contentWidth = bounds.maxX - bounds.minX;
+    const contentHeight = bounds.maxY - bounds.minY;
+    const contentCenterX = (bounds.minX + bounds.maxX) / 2;
+    const contentCenterY = (bounds.minY + bounds.maxY) / 2;
+    
+    // Add some padding around content
+    const padding = 50;
+    const totalWidth = contentWidth + padding * 2;
+    const totalHeight = contentHeight + padding * 2;
+    
+    // Choose orientation based on content aspect ratio
+    const isLandscape = totalWidth > totalHeight;
     const pdf = new jsPDF({
-      orientation: width > height ? 'landscape' : 'portrait',
+      orientation: isLandscape ? 'landscape' : 'portrait',
       unit: 'pt',
       format: 'a4'
     });
@@ -505,11 +736,11 @@ function exportPDF() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     
-    // Calculate scaling to fit canvas to page with margins
+    // Calculate scaling to fit all content to page with margins
     const margin = 20;
     const scale = Math.min(
-      (pageWidth - 2 * margin) / width,
-      (pageHeight - 2 * margin) / height
+      (pageWidth - 2 * margin) / totalWidth,
+      (pageHeight - 2 * margin) / totalHeight
     );
     
     // Validate scale
@@ -517,14 +748,15 @@ function exportPDF() {
       throw new Error('Invalid scaling calculation');
     }
     
-    // Calculate offset to center the content
-    const offsetX = (pageWidth - width * scale) / 2;
-    const offsetY = (pageHeight - height * scale) / 2;
+    // Calculate offset to center the content on the page
+    // We need to map world space to PDF space
+    const offsetX = margin - bounds.minX * scale + (pageWidth - totalWidth * scale) / 2;
+    const offsetY = margin - bounds.minY * scale + (pageHeight - totalHeight * scale) / 2;
     
-    // Helper function to transform coordinates
-    function tx(x) { return offsetX + x * scale; }
-    function ty(y) { return offsetY + y * scale; }
-    function ts(s) { return s * scale; }
+    // Helper function to transform world coordinates to PDF coordinates
+    function tx(worldX) { return offsetX + worldX * scale; }
+    function ty(worldY) { return offsetY + worldY * scale; }
+    function ts(size) { return size * scale; }
     
     // Draw connections first (behind boxes)
     pdf.setLineWidth(ts(2));

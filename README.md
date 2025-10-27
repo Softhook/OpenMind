@@ -41,11 +41,12 @@ A simple and intuitive mind mapping application built with p5.js.
 
 ### Mouse/Trackpad Controls
 
-- Scroll over the canvas to zoom in/out of the entire view
-- Hold Space (when nothing is selected) and drag to pan the view
-- Or click-and-drag on empty canvas (with nothing selected) to pan
+- **Scroll** over the canvas to zoom in/out of the entire view
+- **Hold Space** (when not editing text) and drag to pan the view
+- **Click-and-drag** on empty canvas (with nothing selected) to pan
 - Click near a box edge to drag the box; click inside to edit text
 - Right-click a selected connection to reverse its direction
+- Press **0** or **Home** key to reset the view and fit all content
 
 ## File Structure
 
