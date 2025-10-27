@@ -12,38 +12,76 @@ class MindMap {
   }
   
   addConnection(fromBox, toBox) {
-    // Check if connection already exists
+    // Validate inputs
+    if (!fromBox || !toBox) {
+      console.warn('Cannot create connection: invalid boxes');
+      return;
+    }
+    
+    // Prevent self-connections
+    if (fromBox === toBox) {
+      console.warn('Cannot create connection to self');
+      return;
+    }
+    
+    // Check if connection already exists (same direction)
     for (let conn of this.connections) {
       if (conn.fromBox === fromBox && conn.toBox === toBox) {
+        console.warn('Connection already exists');
         return; // Connection already exists
       }
     }
+    
     this.connections.push(new Connection(fromBox, toBox));
   }
   
   draw() {
     // Draw connections first (behind boxes)
-    for (let conn of this.connections) {
-      conn.draw();
+    if (this.connections) {
+      for (let conn of this.connections) {
+        if (conn) {
+          try {
+            conn.draw();
+          } catch (e) {
+            console.error('Error drawing connection:', e);
+          }
+        }
+      }
     }
     
     // Draw connecting line if in connection mode
-    if (this.connectingFrom) {
+    if (this.connectingFrom && mouseX != null && mouseY != null && 
+        !isNaN(mouseX) && !isNaN(mouseY)) {
       push();
       stroke(100, 100, 255);
       strokeWeight(2);
       let start = this.connectingFrom.getConnectionPoint({ x: mouseX, y: mouseY });
-      line(start.x, start.y, mouseX, mouseY);
+      if (start && !isNaN(start.x) && !isNaN(start.y)) {
+        line(start.x, start.y, mouseX, mouseY);
+      }
       pop();
     }
     
     // Draw boxes
-    for (let box of this.boxes) {
-      box.draw();
+    if (this.boxes) {
+      for (let box of this.boxes) {
+        if (box) {
+          try {
+            box.draw();
+          } catch (e) {
+            console.error('Error drawing box:', e);
+          }
+        }
+      }
     }
   }
   
   handleMousePressed() {
+    // Validate mouse coordinates
+    if (mouseX == null || mouseY == null || isNaN(mouseX) || isNaN(mouseY)) {
+      return;
+    }
+    
     // Deselect any previously selected connection
     if (this.selectedConnection) {
       this.selectedConnection.selected = false;
@@ -53,6 +91,7 @@ class MindMap {
     // Check if clicking on delete icon of any box
     for (let i = this.boxes.length - 1; i >= 0; i--) {
       let box = this.boxes[i];
+      if (!box) continue; // Skip null boxes
       if (box.isMouseOverDeleteIcon()) {
         // Remove connections that involve this box
         this.connections = this.connections.filter(conn => 
@@ -130,6 +169,7 @@ class MindMap {
     // Complete connection if in connection mode
     if (this.connectingFrom) {
       for (let box of this.boxes) {
+        if (!box) continue;
         if (box !== this.connectingFrom && box.isMouseOver()) {
           this.addConnection(this.connectingFrom, box);
           break;
@@ -140,13 +180,20 @@ class MindMap {
     
     // Stop dragging and resizing all boxes
     for (let box of this.boxes) {
+      if (!box) continue;
       box.stopDrag();
       box.stopResize();
     }
   }
   
   handleMouseDragged() {
+    // Validate mouse coordinates
+    if (mouseX == null || mouseY == null || isNaN(mouseX) || isNaN(mouseY)) {
+      return;
+    }
+    
     for (let box of this.boxes) {
+      if (!box) continue;
       box.drag(mouseX, mouseY);
       box.resize(mouseX, mouseY);
     }
@@ -162,22 +209,32 @@ class MindMap {
           return;
         } else if (key === 'c' || key === 'C') {
           // Copy selected text to clipboard
-          let selectedText = this.selectedBox.getSelectedText();
-          if (selectedText) {
-            navigator.clipboard.writeText(selectedText).catch(err => {
-              console.error('Failed to copy text: ', err);
-            });
+          try {
+            let selectedText = this.selectedBox.getSelectedText();
+            if (selectedText && navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(selectedText).catch(err => {
+                console.error('Failed to copy text: ', err);
+              });
+            }
+          } catch (e) {
+            console.error('Clipboard copy not supported:', e);
           }
           return;
         } else if (key === 'v' || key === 'V') {
           // Paste from clipboard
-          navigator.clipboard.readText().then(text => {
-            if (text) {
-              this.selectedBox.pasteText(text);
+          try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              navigator.clipboard.readText().then(text => {
+                if (text && this.selectedBox) {
+                  this.selectedBox.pasteText(text);
+                }
+              }).catch(err => {
+                console.error('Failed to paste text: ', err);
+              });
             }
-          }).catch(err => {
-            console.error('Failed to paste text: ', err);
-          });
+          } catch (e) {
+            console.error('Clipboard paste not supported:', e);
+          }
           return;
         }
       }
@@ -195,7 +252,7 @@ class MindMap {
         this.selectedBox.removeChar();
       } else if (keyCode === ENTER) {
         this.selectedBox.addChar('\n');
-      } else if (key.length === 1) {
+      } else if (key && key.length === 1) {
         this.selectedBox.addChar(key);
       }
     } else if (keyCode === BACKSPACE) {
@@ -227,20 +284,52 @@ class MindMap {
   }
   
   fromJSON(data) {
+    // Validate input data
+    if (!data || typeof data !== 'object') {
+      console.error('Invalid data format');
+      return;
+    }
+    
     this.boxes = [];
     this.connections = [];
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
     
-    // Load boxes
-    for (let boxData of data.boxes) {
-      this.boxes.push(TextBox.fromJSON(boxData));
+    // Load boxes with error handling
+    if (Array.isArray(data.boxes)) {
+      for (let boxData of data.boxes) {
+        try {
+          if (boxData) {
+            let box = TextBox.fromJSON(boxData);
+            if (box) {
+              this.boxes.push(box);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load box:', e);
+        }
+      }
+    } else {
+      console.warn('No boxes data found');
     }
     
-    // Load connections
-    for (let connData of data.connections) {
-      this.connections.push(Connection.fromJSON(connData, this.boxes));
+    // Load connections with error handling
+    if (Array.isArray(data.connections)) {
+      for (let connData of data.connections) {
+        try {
+          if (connData) {
+            let conn = Connection.fromJSON(connData, this.boxes);
+            if (conn && conn.fromBox && conn.toBox) {
+              this.connections.push(conn);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load connection:', e);
+        }
+      }
+    } else {
+      console.warn('No connections data found');
     }
   }
   

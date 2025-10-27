@@ -34,6 +34,11 @@ class TextBox {
   }
   
   updateDimensions() {
+    // Ensure text is defined
+    if (this.text == null) {
+      this.text = '';
+    }
+    
     textSize(this.fontSize);
     
     // Get wrapped lines for dimension calculation
@@ -56,13 +61,29 @@ class TextBox {
   }
   
   wrapText(text) {
+    // Handle null or undefined text
+    if (text == null) {
+      text = '';
+    }
+    
+    // Ensure text is a string
+    text = String(text);
+    
     let lines = text.split('\n');
     let wrappedLines = [];
-    let maxTextWidth = this.width - this.padding * 2;
+    // Guard width before initial sizing
+    let baseWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
+    let maxTextWidth = max(10, baseWidth - this.padding * 2); // Ensure minimum width
     
     textSize(this.fontSize);
     
     for (let line of lines) {
+      // Handle empty lines
+      if (line === '') {
+        wrappedLines.push('');
+        continue;
+      }
+      
       if (textWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
       } else {
@@ -259,8 +280,19 @@ class TextBox {
   }
   
   getCursorPositionFromMouse(mx, my) {
+    // Validate mouse coordinates
+    if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+      return this.text ? this.text.length : 0;
+    }
+    
     textSize(this.fontSize);
     let wrappedLines = this.wrapText(this.text);
+    
+    // Handle empty wrapped lines
+    if (!wrappedLines || wrappedLines.length === 0) {
+      return 0;
+    }
+    
     let lineHeight = this.fontSize * 1.5;
     let totalHeight = wrappedLines.length * lineHeight;
     let startY = this.y - totalHeight / 2 + lineHeight / 2;
@@ -312,12 +344,20 @@ class TextBox {
   startEditing(mx = null, my = null) {
     this.isEditing = true;
     
+    // Ensure text is defined
+    if (this.text == null) {
+      this.text = '';
+    }
+    
     // If mouse coordinates provided, position cursor at click location
-    if (mx !== null && my !== null) {
+    if (mx !== null && my !== null && !isNaN(mx) && !isNaN(my)) {
       this.cursorPosition = this.getCursorPositionFromMouse(mx, my);
     } else {
       this.cursorPosition = this.text.length;
     }
+    
+    // Clamp cursor position to valid range
+    this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
     
     this.selectionStart = -1;
     this.selectionEnd = -1;
@@ -331,10 +371,24 @@ class TextBox {
   }
   
   addChar(char) {
+    // Ensure text is defined
+    if (this.text == null) {
+      this.text = '';
+    }
+    
+    // Validate char
+    if (char == null) {
+      return;
+    }
+    
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       this.deleteSelection();
     }
+    
+    // Ensure cursor position is valid
+    this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
+    
     this.text = this.text.slice(0, this.cursorPosition) + char + this.text.slice(this.cursorPosition);
     this.cursorPosition += char.length;
     this.updateDimensions();
@@ -383,6 +437,21 @@ class TextBox {
   }
   
   pasteText(pastedText) {
+    // Validate pasted text
+    if (pastedText == null) {
+      return;
+    }
+    
+    // Ensure text is defined
+    if (this.text == null) {
+      this.text = '';
+    }
+    
+    pastedText = String(pastedText);
+    
+    // Ensure cursor position is valid
+    this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
+    
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
@@ -407,8 +476,19 @@ class TextBox {
   
   drag(mx, my) {
     if (this.isDragging) {
+      // Validate mouse coordinates
+      if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+        return;
+      }
+      
       this.x = mx + this.dragOffsetX;
       this.y = my + this.dragOffsetY;
+      
+      // Constrain to canvas with margin
+      let margin = this.width / 2;
+      let marginY = this.height / 2;
+      this.x = constrain(this.x, margin, width - margin);
+      this.y = constrain(this.y, marginY, height - marginY);
     }
   }
   
@@ -426,21 +506,35 @@ class TextBox {
   
   resize(mx, my) {
     if (this.isResizing) {
+      // Validate mouse coordinates
+      if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+        return;
+      }
+      
       let deltaX = mx - this.resizeStartX;
       let deltaY = my - this.resizeStartY;
+      
+      // Prevent NaN
+      if (isNaN(deltaX) || isNaN(deltaY)) {
+        return;
+      }
       
       // Calculate minimum dimensions needed for text
       textSize(this.fontSize);
       let wrappedLines = this.wrapTextForWidth(this.resizeStartWidth + deltaX * 2);
-      let minRequiredHeight = wrappedLines.length * this.fontSize * 1.5 + this.padding * 2;
+      let minRequiredHeight = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
       
       // Find minimum width that can fit the longest word
       let minRequiredWidth = this.minWidth;
-      let words = this.text.split(/[\s\n]+/);
-      for (let word of words) {
-        let wordWidth = textWidth(word) + this.padding * 2;
-        if (wordWidth > minRequiredWidth) {
-          minRequiredWidth = wordWidth;
+      if (this.text) {
+        let words = this.text.split(/[\s\n]+/);
+        for (let word of words) {
+          if (word) {
+            let wordWidth = textWidth(word) + this.padding * 2;
+            if (wordWidth > minRequiredWidth) {
+              minRequiredWidth = wordWidth;
+            }
+          }
         }
       }
       
@@ -452,7 +546,9 @@ class TextBox {
   wrapTextForWidth(targetWidth) {
     let lines = this.text.split('\n');
     let wrappedLines = [];
-    let maxTextWidth = targetWidth - this.padding * 2;
+    // Guard width for invalid targetWidth
+    let baseWidth = (targetWidth != null && isFinite(targetWidth)) ? targetWidth : ((this.width != null && isFinite(this.width)) ? this.width : this.minWidth);
+    let maxTextWidth = max(10, baseWidth - this.padding * 2);
     
     textSize(this.fontSize);
     
@@ -507,12 +603,17 @@ class TextBox {
   
   // Get connection point on the edge of the box
   getConnectionPoint(otherBox) {
+    // Validate other box
+    if (!otherBox || otherBox.x == null || otherBox.y == null) {
+      return { x: this.x, y: this.y };
+    }
+    
     let dx = otherBox.x - this.x;
     let dy = otherBox.y - this.y;
     
-    // Avoid division by zero
+    // Avoid division by zero and handle same position
     if (dx === 0 && dy === 0) {
-      return { x: this.x, y: this.y };
+      return { x: this.x + this.width / 2, y: this.y };
     }
     
     let hw = this.width / 2;
@@ -521,7 +622,7 @@ class TextBox {
     // Calculate intersection with each edge and pick the correct one
     let px, py;
     
-    // Calculate the ratio to reach each edge
+    // Calculate the ratio to reach each edge (handle division by zero)
     let t_right = (dx > 0) ? hw / dx : Infinity;
     let t_left = (dx < 0) ? -hw / dx : Infinity;
     let t_bottom = (dy > 0) ? hh / dy : Infinity;
@@ -530,9 +631,19 @@ class TextBox {
     // Find the smallest positive ratio (closest edge intersection)
     let t = min(t_right, t_left, t_bottom, t_top);
     
+    // Validate t
+    if (!isFinite(t) || isNaN(t)) {
+      return { x: this.x, y: this.y };
+    }
+    
     // Calculate the intersection point
     px = this.x + t * dx;
     py = this.y + t * dy;
+    
+    // Validate results
+    if (isNaN(px) || isNaN(py) || !isFinite(px) || !isFinite(py)) {
+      return { x: this.x, y: this.y };
+    }
     
     // Constrain to box bounds (for safety)
     px = constrain(px, this.x - hw, this.x + hw);
@@ -552,13 +663,27 @@ class TextBox {
   }
   
   static fromJSON(data) {
-    let box = new TextBox(data.x, data.y, data.text);
-    if (data.width !== undefined) {
+    // Validate input data
+    if (!data || typeof data !== 'object') {
+      console.warn('Invalid box data');
+      return null;
+    }
+    
+    // Validate required fields with defaults
+    let x = (data.x != null && !isNaN(data.x)) ? data.x : 100;
+    let y = (data.y != null && !isNaN(data.y)) ? data.y : 100;
+    let text = data.text != null ? String(data.text) : 'New Node';
+    
+    let box = new TextBox(x, y, text);
+    
+    // Set optional dimensions if valid
+    if (data.width != null && !isNaN(data.width) && data.width > 0) {
       box.width = data.width;
     }
-    if (data.height !== undefined) {
+    if (data.height != null && !isNaN(data.height) && data.height > 0) {
       box.height = data.height;
     }
+    
     return box;
   }
   
@@ -569,6 +694,9 @@ class TextBox {
   }
   
   moveCursorLeft() {
+    if (this.text == null) {
+      this.text = '';
+    }
     if (this.cursorPosition > 0) {
       this.cursorPosition--;
       this.resetCursorBlink();
@@ -576,6 +704,9 @@ class TextBox {
   }
   
   moveCursorRight() {
+    if (this.text == null) {
+      this.text = '';
+    }
     if (this.cursorPosition < this.text.length) {
       this.cursorPosition++;
       this.resetCursorBlink();
@@ -636,12 +767,24 @@ class TextBox {
   }
   
   getCursorLineAndPosition(wrappedLines) {
+    // Validate inputs
+    if (!wrappedLines || wrappedLines.length === 0) {
+      return { lineIndex: 0, posInLine: 0 };
+    }
+    
+    if (this.text == null) {
+      this.text = '';
+    }
+    
+    // Ensure cursor position is valid
+    this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
+    
     let charCount = 0;
     let lineIndex = 0;
     let posInLine = 0;
     
     for (let i = 0; i < wrappedLines.length; i++) {
-      let lineLength = wrappedLines[i].length;
+      let lineLength = wrappedLines[i] ? wrappedLines[i].length : 0;
       
       if (charCount + lineLength >= this.cursorPosition) {
         lineIndex = i;
@@ -670,6 +813,13 @@ class TextBox {
   }
   
   drawCursor(wrappedLines, textX, startY, lineHeight) {
+    // Validate inputs
+    if (!wrappedLines || wrappedLines.length === 0 || 
+        textX == null || startY == null || lineHeight == null ||
+        isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
+      return;
+    }
+    
     // Update cursor blink state
     let currentTime = millis();
     if (currentTime - this.cursorBlinkTime > this.cursorBlinkRate) {
@@ -684,11 +834,22 @@ class TextBox {
     // Find cursor position in wrapped text
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
     
+    // Validate line index
+    if (lineIndex < 0 || lineIndex >= wrappedLines.length) {
+      return;
+    }
+    
     // Calculate cursor screen position
     textSize(this.fontSize);
-    let textBeforeCursor = wrappedLines[lineIndex].slice(0, posInLine);
+    let lineText = wrappedLines[lineIndex] || '';
+    let textBeforeCursor = lineText.slice(0, max(0, posInLine));
     let cursorX = textX + textWidth(textBeforeCursor);
     let cursorY = startY + lineIndex * lineHeight;
+    
+    // Validate cursor position
+    if (isNaN(cursorX) || isNaN(cursorY)) {
+      return;
+    }
     
     // Draw cursor line
     push();
@@ -699,10 +860,17 @@ class TextBox {
   }
   
   drawSelection(wrappedLines, textX, startY, lineHeight) {
+    // Validate inputs
+    if (!wrappedLines || wrappedLines.length === 0 || 
+        textX == null || startY == null || lineHeight == null ||
+        isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
+      return;
+    }
+    
     let start = min(this.selectionStart, this.selectionEnd);
     let end = max(this.selectionStart, this.selectionEnd);
     
-    if (start === end) return;
+    if (start === end || start < 0 || end < 0) return;
     
     textSize(this.fontSize);
     
@@ -710,40 +878,52 @@ class TextBox {
     let startInfo = this.getLineAndPositionFromChar(start, wrappedLines);
     let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
     
+    // Validate line indices
+    if (startInfo.lineIndex < 0 || startInfo.lineIndex >= wrappedLines.length ||
+        endInfo.lineIndex < 0 || endInfo.lineIndex >= wrappedLines.length) {
+      return;
+    }
+    
     push();
     fill(255, 100, 100, 100); // Red overlay with transparency
     noStroke();
     
     if (startInfo.lineIndex === endInfo.lineIndex) {
       // Selection within single line
-      let lineText = wrappedLines[startInfo.lineIndex];
-      let x1 = textX + textWidth(lineText.slice(0, startInfo.posInLine));
-      let x2 = textX + textWidth(lineText.slice(0, endInfo.posInLine));
+      let lineText = wrappedLines[startInfo.lineIndex] || '';
+      let x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
+      let x2 = textX + textWidth(lineText.slice(0, max(0, endInfo.posInLine)));
       let y = startY + startInfo.lineIndex * lineHeight;
       
-      rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+      if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
+        rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+      }
     } else {
       // Multi-line selection
       for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
-        let lineText = wrappedLines[i];
+        if (i < 0 || i >= wrappedLines.length) continue;
+        
+        let lineText = wrappedLines[i] || '';
         let y = startY + i * lineHeight;
         let x1, x2;
         
         if (i === startInfo.lineIndex) {
           // First line: from start position to end of line
-          x1 = textX + textWidth(lineText.slice(0, startInfo.posInLine));
+          x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
           x2 = textX + textWidth(lineText);
         } else if (i === endInfo.lineIndex) {
           // Last line: from beginning to end position
           x1 = textX;
-          x2 = textX + textWidth(lineText.slice(0, endInfo.posInLine));
+          x2 = textX + textWidth(lineText.slice(0, max(0, endInfo.posInLine)));
         } else {
           // Middle lines: entire line
           x1 = textX;
           x2 = textX + textWidth(lineText);
         }
         
-        rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+        if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
+          rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+        }
       }
     }
     
