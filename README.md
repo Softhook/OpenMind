@@ -72,8 +72,30 @@ A simple and intuitive mind mapping application built with p5.js.
 
 ## Cloud Save/Load setup (JSONBase)
 
-- When you click Save Cloud or Load Cloud the first time, you'll be prompted for:
-   - IID
-   - Secret
-- These are stored locally in your browser's localStorage on this device only. You can clear them by running `window.JsonBase.clearConfig()` in the browser console.
-- Note: For production deployments, avoid embedding secrets in client code; use a small backend to proxy requests.
+Direct browser calls to JSONBase may be blocked by CORS (e.g., on GitHub Pages). Use the proxy below for a smooth experience.
+
+### Option A: Local proxy (quickest)
+
+1) Start the proxy server:
+    - Open a terminal in the `server` folder and run:
+       - Install deps: `npm install`
+       - Run: `npm start`
+    - It will start at http://localhost:3001
+2) In the browser console (on the OpenMind page), set the base URL:
+    - `window.JsonBase.setConfig({ baseUrl: 'http://localhost:3001/jsonbase' })`
+3) Click Save Cloud/Load Cloud. You'll be prompted for IID and secret once (stored in localStorage on your device). You can clear them via `window.JsonBase.clearConfig()`.
+
+Note: For local proxy you can also set env vars so the browser doesn't need the secret:
+- `JSONBASE_IID` and `JSONBASE_SECRET` (or pass via headers X-JSONBASE-IID / X-JSONBASE-SECRET for dev only).
+
+### Option B: Deploy proxy (for GitHub Pages)
+
+Deploy the `server` folder to a host that supports Node (Render, Railway, Fly.io, Heroku, etc.) and set env vars:
+- `JSONBASE_IID=o15FSkhapPNV`
+- `JSONBASE_SECRET=...your secret...`
+
+Then in the OpenMind page console set:
+`window.JsonBase.setConfig({ baseUrl: 'https://<your-proxy-domain>/jsonbase' })`
+
+Security note:
+- Avoid exposing your JSONBase secret in client-side code. Prefer setting it on the proxy server via environment variables.
