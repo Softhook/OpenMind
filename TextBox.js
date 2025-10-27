@@ -48,10 +48,13 @@ class TextBox {
 
     // Background color (default white) and palette options
     this.backgroundColor = { r: 255, g: 255, b: 255 };
+    // Order: white, orange, red, light-green, light-blue
     this.colorPalette = [
-      { key: 'red', color: { r: 255, g: 140, b: 140 } },
+      { key: 'white', color: { r: 255, g: 255, b: 255 } },
       { key: 'orange', color: { r: 255, g: 200, b: 140 } },
-      { key: 'white', color: { r: 255, g: 255, b: 255 } }
+      { key: 'red', color: { r: 255, g: 140, b: 140 } },
+      { key: 'light-green', color: { r: 200, g: 255, b: 200 } },
+      { key: 'light-blue', color: { r: 180, g: 210, b: 255 } }
     ];
     this.colorCircleRadius = 8; // px
     this.colorCircleSpacing = 10; // px between circles
@@ -252,8 +255,8 @@ class TextBox {
       }
     }
     
-    // Draw background color palette when box is selected (at top center)
-    if (this.selected) {
+    // Draw background color palette only when selected and not editing
+    if (this.selected && !this.isEditing) {
       this.drawColorPalette();
     }
 
@@ -264,14 +267,14 @@ class TextBox {
   getColorPaletteCircles() {
     const r = this.colorCircleRadius;
     const spacing = this.colorCircleSpacing;
-    // Position the center circle just above the top edge with a small margin
+    const marginLeft = 6; // small inset from the very corner
+    // Position the circles just above the top edge, left-aligned with top-left corner
     const topY = this.y - this.height / 2 - r - 4;
-    const centerX = this.x;
-    const offsets = [- (2 * r + spacing), 0, (2 * r + spacing)];
+    const leftX = this.x - this.width / 2 + marginLeft + r;
     const circles = [];
     for (let i = 0; i < this.colorPalette.length; i++) {
       circles.push({
-        x: centerX + offsets[i],
+        x: leftX + i * (2 * r + spacing),
         y: topY,
         r,
         key: this.colorPalette[i].key,
