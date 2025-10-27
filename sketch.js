@@ -5,7 +5,7 @@ let loadButton;
 let fileInput;
 
 function setup() {
-  createCanvas(1200, 800);
+  createCanvas(windowWidth, windowHeight);
   
   mindMap = new MindMap();
   
@@ -108,4 +108,8 @@ function handleFileLoad(file) {
   } else {
     console.error('Please load a JSON file');
   }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
