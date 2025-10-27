@@ -17,6 +17,12 @@ class TextBox {
     this.selectionStart = -1;
     this.selectionEnd = -1;
     this.deleteIconSize = 20;
+    this.resizeHandleSize = 12;
+    this.isResizing = false;
+    this.resizeStartX = 0;
+    this.resizeStartY = 0;
+    this.resizeStartWidth = 0;
+    this.resizeStartHeight = 0;
     
     // Calculate initial dimensions
     this.updateDimensions();
@@ -37,14 +43,17 @@ class TextBox {
       }
     }
     
-    this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
-    this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+    // Only auto-size if not manually resized
+    if (!this.isResizing) {
+      this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
+      this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+    }
   }
   
   wrapText(text) {
     let lines = text.split('\n');
     let wrappedLines = [];
-    let maxTextWidth = this.maxWidth - this.padding * 2;
+    let maxTextWidth = this.width - this.padding * 2;
     
     textSize(this.fontSize);
     
@@ -150,6 +159,26 @@ class TextBox {
       line(cx - offset, cy + offset, cx + offset, cy - offset);
     }
     
+    // Draw resize handle in bottom-right corner
+    if (this.isMouseOver() || this.isResizing) {
+      let handleX = this.x + this.width/2 - this.resizeHandleSize;
+      let handleY = this.y + this.height/2 - this.resizeHandleSize;
+      
+      // Draw handle background
+      fill(this.isMouseOverResizeHandle() ? 150 : 180);
+      noStroke();
+      rect(handleX, handleY, this.resizeHandleSize, this.resizeHandleSize);
+      
+      // Draw handle grip lines
+      stroke(100);
+      strokeWeight(1);
+      for (let i = 0; i < 3; i++) {
+        let offset = i * 3 + 2;
+        line(handleX + offset, handleY + this.resizeHandleSize - 2,
+             handleX + this.resizeHandleSize - 2, handleY + offset);
+      }
+    }
+    
     pop();
   }
   
@@ -181,7 +210,22 @@ class TextBox {
     return distance < this.deleteIconSize/2;
   }
   
+  isMouseOverResizeHandle() {
+    let handleX = this.x + this.width/2 - this.resizeHandleSize;
+    let handleY = this.y + this.height/2 - this.resizeHandleSize;
+    
+    return mouseX > handleX &&
+           mouseX < handleX + this.resizeHandleSize &&
+           mouseY > handleY &&
+           mouseY < handleY + this.resizeHandleSize;
+  }
+  
   isMouseOnEdge() {
+    // Don't trigger edge connection if over resize handle
+    if (this.isMouseOverResizeHandle()) {
+      return false;
+    }
+    
     let edgeThreshold = 10;
     let distFromLeft = abs(mouseX - (this.x - this.width/2));
     let distFromRight = abs(mouseX - (this.x + this.width/2));
@@ -295,6 +339,95 @@ class TextBox {
     this.isDragging = false;
   }
   
+  startResize(mx, my) {
+    this.isResizing = true;
+    this.resizeStartX = mx;
+    this.resizeStartY = my;
+    this.resizeStartWidth = this.width;
+    this.resizeStartHeight = this.height;
+  }
+  
+  resize(mx, my) {
+    if (this.isResizing) {
+      let deltaX = mx - this.resizeStartX;
+      let deltaY = my - this.resizeStartY;
+      
+      // Calculate minimum dimensions needed for text
+      textSize(this.fontSize);
+      let wrappedLines = this.wrapTextForWidth(this.resizeStartWidth + deltaX * 2);
+      let minRequiredHeight = wrappedLines.length * this.fontSize * 1.5 + this.padding * 2;
+      
+      // Find minimum width that can fit the longest word
+      let minRequiredWidth = this.minWidth;
+      let words = this.text.split(/[\s\n]+/);
+      for (let word of words) {
+        let wordWidth = textWidth(word) + this.padding * 2;
+        if (wordWidth > minRequiredWidth) {
+          minRequiredWidth = wordWidth;
+        }
+      }
+      
+      this.width = max(minRequiredWidth, this.resizeStartWidth + deltaX * 2);
+      this.height = max(minRequiredHeight, this.resizeStartHeight + deltaY * 2);
+    }
+  }
+  
+  wrapTextForWidth(targetWidth) {
+    let lines = this.text.split('\n');
+    let wrappedLines = [];
+    let maxTextWidth = targetWidth - this.padding * 2;
+    
+    textSize(this.fontSize);
+    
+    for (let line of lines) {
+      if (textWidth(line) <= maxTextWidth) {
+        wrappedLines.push(line);
+      } else {
+        // Break line into words
+        let words = line.split(' ');
+        let currentLine = '';
+        
+        for (let i = 0; i < words.length; i++) {
+          let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+          
+          if (textWidth(testLine) <= maxTextWidth) {
+            currentLine = testLine;
+          } else {
+            // If current line is not empty, push it
+            if (currentLine) {
+              wrappedLines.push(currentLine);
+              currentLine = words[i];
+            } else {
+              // Single word is too long, break it by characters
+              let word = words[i];
+              let charLine = '';
+              for (let char of word) {
+                if (textWidth(charLine + char) <= maxTextWidth) {
+                  charLine += char;
+                } else {
+                  if (charLine) wrappedLines.push(charLine);
+                  charLine = char;
+                }
+              }
+              currentLine = charLine;
+            }
+          }
+        }
+        
+        // Push the last line
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+        }
+      }
+    }
+    
+    return wrappedLines.length > 0 ? wrappedLines : [''];
+  }
+  
+  stopResize() {
+    this.isResizing = false;
+  }
+  
   // Get connection point on the edge of the box
   getConnectionPoint(otherBox) {
     let dx = otherBox.x - this.x;
@@ -335,11 +468,20 @@ class TextBox {
     return {
       x: this.x,
       y: this.y,
-      text: this.text
+      text: this.text,
+      width: this.width,
+      height: this.height
     };
   }
   
   static fromJSON(data) {
-    return new TextBox(data.x, data.y, data.text);
+    let box = new TextBox(data.x, data.y, data.text);
+    if (data.width !== undefined) {
+      box.width = data.width;
+    }
+    if (data.height !== undefined) {
+      box.height = data.height;
+    }
+    return box;
   }
 }

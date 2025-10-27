@@ -67,6 +67,15 @@ class MindMap {
       }
     }
     
+    // Check if clicking on resize handle
+    for (let box of this.boxes) {
+      if (box.isMouseOverResizeHandle()) {
+        this.selectedBox = box;
+        box.startResize(mouseX, mouseY);
+        return;
+      }
+    }
+    
     // Check if clicking on a box edge for connection
     for (let box of this.boxes) {
       if (box.isMouseOnEdge()) {
@@ -129,15 +138,17 @@ class MindMap {
       this.connectingFrom = null;
     }
     
-    // Stop dragging all boxes
+    // Stop dragging and resizing all boxes
     for (let box of this.boxes) {
       box.stopDrag();
+      box.stopResize();
     }
   }
   
   handleMouseDragged() {
     for (let box of this.boxes) {
       box.drag(mouseX, mouseY);
+      box.resize(mouseX, mouseY);
     }
   }
   
