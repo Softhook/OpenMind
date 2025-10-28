@@ -171,8 +171,20 @@ function updateCursorForHover() {
   const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
   const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
+  if (mindMap.draggingConnection) { cursor('grabbing'); return; }
   if (isPanning) { cursor('grabbing'); return; }
   if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
+
+  // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
+  if (mindMap && mindMap.connections) {
+    for (let i = mindMap.connections.length - 1; i >= 0; i--) {
+      const conn = mindMap.connections[i];
+      if (!conn || !conn.isMouseOverArrowHead) continue;
+      try {
+        if (conn.isMouseOverArrowHead()) { cursor('alias'); return; }
+      } catch (_) {}
+    }
+  }
 
   // Check top-most first
   for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
@@ -185,6 +197,7 @@ function updateCursorForHover() {
       return;
     }
     if (box.getConnectorUnderMouse && box.getConnectorUnderMouse()) {
+      // Only show crosshair if not over any arrowhead (checked above)
       cursor('crosshair');
       return;
     }
@@ -587,7 +600,10 @@ function isOverAnyInteractive() {
   for (let i = 0; i < mindMap.connections.length; i++) {
     const conn = mindMap.connections[i];
     if (!conn) continue;
-    try { if (conn.isMouseOver()) return true; } catch (_) {}
+    try {
+      if (conn.isMouseOver && conn.isMouseOver()) return true;
+      if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) return true;
+    } catch (_) {}
   }
   return false;
 }

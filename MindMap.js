@@ -9,6 +9,7 @@ class MindMap {
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
+    this.draggingConnection = null; // { conn, originalTo }
 
     // Undo history - optimized with larger stack
     this.undoStack = [];
@@ -80,10 +81,11 @@ class MindMap {
   }
   
   draw() {
-    // Draw existing connections
+    // Draw existing connections (skip the one being reattached)
     if (this.connections) {
       for (let conn of this.connections) {
         if (!conn) continue;
+        if (this.draggingConnection && this.draggingConnection.conn === conn) continue;
         try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
       }
     }
@@ -122,6 +124,31 @@ class MindMap {
         fill(100, 150, 255);
         circle(start.x, start.y, 10);
         circle(worldMouseX(), worldMouseY(), 8);
+        pop();
+      }
+    }
+
+    // Draw live reattach line if dragging an existing connection's arrow head
+    if (this.draggingConnection && this.draggingConnection.conn && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+      const conn = this.draggingConnection.conn;
+      const from = conn.fromBox ? conn.fromBox.getConnectionPoint({ x: worldMouseX(), y: worldMouseY() }) : null;
+      if (from && !isNaN(from.x) && !isNaN(from.y)) {
+        const mx = worldMouseX();
+        const my = worldMouseY();
+        push();
+        stroke(100, 100, 255);
+        strokeWeight(2);
+        line(from.x, from.y, mx, my);
+        // Arrow head at mouse
+        const angle = atan2(my - from.y, mx - from.x);
+        fill(100, 150, 255);
+        noStroke();
+        push();
+        translate(mx, my);
+        rotate(angle);
+        const size = (conn.arrowSize || 10);
+        triangle(0, 0, -size, -size/2, -size, size/2);
+        pop();
         pop();
       }
     }
@@ -244,6 +271,26 @@ class MindMap {
       }
     }
     
+    // PRIORITY: Arrowhead reattach comes before connector dots to avoid conflict when overlapping
+    // Check if clicking on an existing connection's arrow head to reattach
+    for (let i = this.connections.length - 1; i >= 0; i--) {
+      const conn = this.connections[i];
+      if (!conn || !conn.isMouseOverArrowHead || !conn.getArrowHeadPosition) continue;
+      try {
+        if (conn.isMouseOverArrowHead()) {
+          // Begin dragging the arrow head to a new target
+          this.draggingConnection = { conn, originalTo: conn.toBox };
+          // Select this connection
+          if (this.selectedConnection && this.selectedConnection !== conn) {
+            this.selectedConnection.selected = false;
+          }
+          this.selectedConnection = conn;
+          conn.selected = true;
+          return;
+        }
+      } catch (_) {}
+    }
+
     // Check if clicking on a connector dot at box edge center for connection
     for (let box of this.boxes) {
       const side = box.getConnectorUnderMouse();
@@ -335,6 +382,34 @@ class MindMap {
   }
   
   handleMouseReleased() {
+    // Complete reattachment if dragging an existing connection
+    if (this.draggingConnection && this.draggingConnection.conn) {
+      const { conn, originalTo } = this.draggingConnection;
+      let droppedOn = null;
+      for (let box of this.boxes) {
+        if (!box) continue;
+        if (box.isMouseOver && box.isMouseOver()) { droppedOn = box; break; }
+      }
+
+      let changed = false;
+      if (droppedOn && conn.fromBox && droppedOn !== conn.fromBox) {
+        // Avoid creating duplicates
+        const duplicate = this.connections.some(c => c !== conn && c.fromBox === conn.fromBox && c.toBox === droppedOn);
+        if (!duplicate) {
+          if (droppedOn !== originalTo) {
+            this.pushUndo();
+            conn.toBox = droppedOn;
+            changed = true;
+          }
+        }
+      }
+
+      // If not changed, keep original
+      conn.toBox = changed ? conn.toBox : originalTo;
+      this.draggingConnection = null;
+      return;
+    }
+
     // Complete connection if in connection mode
     if (this.connectingFrom) {
       for (let box of this.boxes) {

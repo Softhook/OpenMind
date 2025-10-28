@@ -15,6 +15,27 @@ class Connection {
     this.selected = false;
   }
   
+  // Get the world-space point of the arrow head (end point at toBox edge)
+  getArrowHeadPosition() {
+    if (!this.fromBox || !this.toBox) return null;
+    const end = this.toBox.getConnectionPoint(this.fromBox);
+    if (!end || !isFinite(end.x) || !isFinite(end.y)) return null;
+    return end;
+  }
+
+  // Hit-test for the arrow head (small circular radius around the end)
+  isMouseOverArrowHead() {
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    if (!isFinite(mx) || !isFinite(my)) return false;
+    const end = this.getArrowHeadPosition();
+    if (!end) return false;
+    // Scale hit radius slightly with zoom so it's usable at different scales
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const hitR = 10 / Math.sqrt(Math.max(0.25, Math.min(4, currentZoom)));
+    return dist(mx, my, end.x, end.y) <= hitR;
+  }
+
   draw() {
     // Validate boxes exist
     if (!this.fromBox || !this.toBox) {
