@@ -455,6 +455,14 @@ class MindMap {
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
       if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
+        if (key === 'b' || key === 'B') {
+          // Toggle bold formatting on selected text
+          if (this.selectedBox && this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
+            this.pushUndo();
+            this.selectedBox.toggleBoldOnSelection();
+          }
+          return;
+        }
         if (key === 'a' || key === 'A') {
           // Select all text
           this.selectedBox.selectAll();
