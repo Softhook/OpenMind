@@ -47,6 +47,8 @@ let panStartMouseX = 0;
 let panStartMouseY = 0;
 let panStartCamX = 0;
 let panStartCamY = 0;
+let rightPanActive = false; // true if current pan initiated by right mouse button
+let suppressNextRightClick = false; // avoid triggering right-click action after a pan drag
 
 // Multi-box selection drag state
 let isSelectingMultiple = false;
@@ -308,14 +310,16 @@ function mousePressed() {
       const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
       const spaceHeld = keyIsDown(32);
       const overAny = isOverAnyInteractive();
+      const rightDown = (typeof mouseButton !== 'undefined' && mouseButton === RIGHT);
       
-      // Panning ONLY with spacebar
-      if (spaceHeld && !isEditing) {
+      // Panning with spacebar OR right mouse when nothing is selected
+      if ((spaceHeld && !isEditing) || (rightDown && noSelection && !isEditing)) {
         isPanning = true;
         panStartMouseX = mouseX;
         panStartMouseY = mouseY;
         panStartCamX = camX;
         panStartCamY = camY;
+        rightPanActive = !!rightDown;
         return false;
       }
       
@@ -338,7 +342,16 @@ function mousePressed() {
 
 function mouseReleased() {
   if (isPanning) {
+    // If we were panning with right mouse, suppress the subsequent right-click action if it moved
+    if (rightPanActive) {
+      const dx = mouseX - panStartMouseX;
+      const dy = mouseY - panStartMouseY;
+      if (dx * dx + dy * dy > 9) { // >3px movement
+        suppressNextRightClick = true;
+      }
+    }
     isPanning = false;
+    rightPanActive = false;
     return;
   }
   
@@ -461,6 +474,11 @@ function keyPressed() {
 function mouseClicked(event) {
   // Handle right click (context menu)
   if (event && event.button === 2 && mindMap) {
+    // If the right click follows a right-drag pan, ignore it
+    if (suppressNextRightClick) {
+      suppressNextRightClick = false;
+      return false;
+    }
     try {
       if (mindMap.handleRightClick()) {
         return false; // Prevent context menu

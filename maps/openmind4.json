@@ -170,18 +170,6 @@
     },
     {
       "x": 1185.3157640175784,
-      "y": 1222.8445621875,
-      "text": "Limited\nWhat's significance about the complexity limit is that it shows that this is not solution but best seen as a form of prototyping. ",
-      "width": 308.1928361406251,
-      "height": 114,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1185.3157640175784,
       "y": 1089.0573087187502,
       "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
       "width": 304.4459375000001,
@@ -210,6 +198,18 @@
       "text": "Nonlinear\nDesining without a plan ",
       "width": 310.6827734374999,
       "height": 72,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1185.3157640175784,
+      "y": 1222.8445621875,
+      "text": "Limited\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
+      "width": 308.1928361406251,
+      "height": 114,
       "backgroundColor": {
         "r": 255,
         "g": 255,
