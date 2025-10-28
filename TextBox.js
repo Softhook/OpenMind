@@ -243,7 +243,9 @@ class TextBox {
     if (this.isMouseNearDeleteIcon()) {
       // Get current zoom level from global scope
       const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-      const scaledIconSize = this.deleteIconSize / currentZoom;
+      // Apply moderate scaling: icons get smaller when zoomed in
+      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+      const scaledIconSize = this.deleteIconSize / zoomFactor;
       
       let iconX = this.x + this.width/2 - scaledIconSize;
       let iconY = this.y - this.height/2;
@@ -258,12 +260,12 @@ class TextBox {
       // Draw red gradient-style circle background
       fill(this.isMouseOverDeleteIcon() ? color(235, 60, 60) : color(220, 50, 50));
       stroke(180, 40, 40);
-      strokeWeight(1.5/currentZoom);
+      strokeWeight(1.5 / zoomFactor);
       circle(cx, cy, scaledIconSize);
       
       // Draw white X with rounded ends
       stroke(255);
-      strokeWeight(2.5/currentZoom);
+      strokeWeight(2.5 / zoomFactor);
       strokeCap(ROUND);
       let offset = scaledIconSize * 0.28;
       line(cx - offset, cy - offset, cx + offset, cy + offset);
@@ -275,7 +277,9 @@ class TextBox {
     if (!this.isEditing && (this.isMouseOver() || this.isResizing)) {
       // Get current zoom level from global scope
       const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-      const scaledHandleSize = this.resizeHandleSize / currentZoom;
+      // Apply moderate scaling: icons get smaller when zoomed in
+      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+      const scaledHandleSize = this.resizeHandleSize / zoomFactor;
       
       let handleX = this.x + this.width/2 - scaledHandleSize;
       let handleY = this.y + this.height/2 - scaledHandleSize;
@@ -290,12 +294,12 @@ class TextBox {
       // Draw circular handle background with hover state
       fill(this.isMouseOverResizeHandle() ? color(100, 150, 255) : color(140, 140, 140));
       stroke(this.isMouseOverResizeHandle() ? color(70, 120, 230) : color(100, 100, 100));
-      strokeWeight(1.5/currentZoom);
+      strokeWeight(1.5 / zoomFactor);
       circle(cx, cy, scaledHandleSize);
       
       // Draw modern resize arrows (diagonal double-headed arrow)
       stroke(255);
-      strokeWeight(1.8/currentZoom);
+      strokeWeight(1.8 / zoomFactor);
       strokeCap(ROUND);
       
       // Main diagonal line
@@ -329,11 +333,13 @@ class TextBox {
 
   // Compute screen positions for the three color circles at the top edge
   getColorPaletteCircles() {
-    const r = this.colorCircleRadius;
-    const spacing = this.colorCircleSpacing;
-    const marginLeft = 6; // small inset from the very corner
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const r = this.colorCircleRadius / zoomFactor;
+    const spacing = this.colorCircleSpacing / zoomFactor;
+    const marginLeft = 6 / zoomFactor; // small inset from the very corner
     // Position the circles just above the top edge, left-aligned with top-left corner
-    const topY = this.y - this.height / 2 - r - 4;
+    const topY = this.y - this.height / 2 - r - 4 / zoomFactor;
     const leftX = this.x - this.width / 2 + marginLeft + r;
     const circles = [];
     for (let i = 0; i < this.colorPalette.length; i++) {
@@ -350,12 +356,14 @@ class TextBox {
 
   // Draw the color palette circles and highlight the active one
   drawColorPalette() {
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     const circles = this.getColorPaletteCircles();
     push();
     for (const c of circles) {
       // Circle fill
       stroke(80, 80, 80);
-      strokeWeight(1);
+      strokeWeight(1 / zoomFactor);
       fill(c.color.r, c.color.g, c.color.b);
       circle(c.x, c.y, c.r * 2);
 
@@ -366,8 +374,8 @@ class TextBox {
           this.backgroundColor.b === c.color.b) {
         noFill();
         stroke(60, 120, 255);
-        strokeWeight(2);
-        circle(c.x, c.y, c.r * 2 + 6);
+        strokeWeight(2 / zoomFactor);
+        circle(c.x, c.y, c.r * 2 + 6 / zoomFactor);
       }
     }
     pop();
@@ -379,7 +387,9 @@ class TextBox {
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     const circles = this.getColorPaletteCircles();
     for (const c of circles) {
-      if (dist(mx, my, c.x, c.y) <= c.r + 3) {
+      const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+      if (dist(mx, my, c.x, c.y) <= c.r + 3 / zoomFactor) {
         return c.key;
       }
     }
@@ -412,6 +422,9 @@ class TextBox {
   }
 
   getConnectorUnderMouse(hitRadius = 8) {
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const scaledHitRadius = hitRadius / Math.sqrt(zoomFactor);
     const pts = this.getConnectorPoints();
     const sides = ['left', 'right', 'top', 'bottom'];
     for (let side of sides) {
@@ -419,7 +432,7 @@ class TextBox {
       if (!p) continue;
       const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
       const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-      if (dist(mx, my, p.x, p.y) <= hitRadius) {
+      if (dist(mx, my, p.x, p.y) <= scaledHitRadius) {
         return side;
       }
     }
@@ -427,10 +440,12 @@ class TextBox {
   }
 
   drawConnectors(active = false) {
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     const pts = this.getConnectorPoints();
     push();
     noStroke();
-    const r = active ? 6 : 5;
+    const r = (active ? 6 : 5) / Math.sqrt(zoomFactor);
     const c = active ? color(100, 150, 255) : color(120);
     fill(c);
     circle(pts.left.x, pts.left.y, r * 2);
@@ -452,22 +467,24 @@ class TextBox {
   isMouseNearDeleteIcon() {
     // Show delete icon when mouse is in the top-right area
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const scaledIconSize = this.deleteIconSize / currentZoom;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const scaledIconSize = this.deleteIconSize / zoomFactor;
     let iconX = this.x + this.width/2 - scaledIconSize;
     let iconY = this.y - this.height/2;
     let hoverRadius = scaledIconSize * 2; // Larger hover area
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     return mx > iconX - hoverRadius + scaledIconSize && 
-      mx < iconX + scaledIconSize + 10/currentZoom &&
-      my > iconY - 10/currentZoom && 
+      mx < iconX + scaledIconSize + 10 / zoomFactor &&
+      my > iconY - 10 / zoomFactor && 
       my < iconY + hoverRadius;
   }
   
   isMouseOverDeleteIcon() {
     // Check if mouse is directly over the delete icon
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const scaledIconSize = this.deleteIconSize / currentZoom;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const scaledIconSize = this.deleteIconSize / zoomFactor;
     let iconX = this.x + this.width/2 - scaledIconSize/2;
     let iconY = this.y - this.height/2 + scaledIconSize/2;
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -479,7 +496,8 @@ class TextBox {
   
   isMouseOverResizeHandle() {
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const scaledHandleSize = this.resizeHandleSize / currentZoom;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const scaledHandleSize = this.resizeHandleSize / zoomFactor;
     let handleX = this.x + this.width/2 - scaledHandleSize;
     let handleY = this.y + this.height/2 - scaledHandleSize;
     let cx = handleX + scaledHandleSize/2;
