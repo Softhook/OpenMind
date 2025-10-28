@@ -48,6 +48,13 @@ let panStartMouseY = 0;
 let panStartCamX = 0;
 let panStartCamY = 0;
 
+// Multi-box selection drag state
+let isSelectingMultiple = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+let selectionCurrentX = 0;
+let selectionCurrentY = 0;
+
 // Performance optimization: debounce expensive operations
 let lastResizeTime = 0;
 const RESIZE_DEBOUNCE_MS = 16; // ~60fps
@@ -153,6 +160,11 @@ function draw() {
       translate(camX, camY);
       scale(zoom);
       mindMap.draw();
+      
+      // Draw selection rectangle if selecting multiple boxes
+      if (isSelectingMultiple) {
+        drawSelectionRectangle();
+      }
       pop();
     } catch (e) {
       console.error('Error drawing mindmap:', e);
@@ -172,13 +184,13 @@ function updateCursorForHover() {
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   if (!validMouse) { cursor('default'); return; }
 
-  // Panning cursor states
+  // Panning cursor states (only when spacebar is held)
   const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
   const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (mindMap.draggingConnection) { cursor('grabbing'); return; }
   if (isPanning) { cursor('grabbing'); return; }
-  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
+  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
   if (mindMap && mindMap.connections) {
@@ -296,13 +308,24 @@ function mousePressed() {
       const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
       const spaceHeld = keyIsDown(32);
       const overAny = isOverAnyInteractive();
-      if (noSelection && !isEditing && (spaceHeld || !overAny)) {
-        // Begin panning
+      
+      // Panning ONLY with spacebar
+      if (spaceHeld && !isEditing) {
         isPanning = true;
         panStartMouseX = mouseX;
         panStartMouseY = mouseY;
         panStartCamX = camX;
         panStartCamY = camY;
+        return false;
+      }
+      
+      // Multi-box selection when clicking in empty space with no box selected
+      if (noSelection && !isEditing && !overAny) {
+        isSelectingMultiple = true;
+        selectionStartX = worldMouseX();
+        selectionStartY = worldMouseY();
+        selectionCurrentX = selectionStartX;
+        selectionCurrentY = selectionStartY;
         return false;
       }
 
@@ -318,6 +341,14 @@ function mouseReleased() {
     isPanning = false;
     return;
   }
+  
+  if (isSelectingMultiple) {
+    // Complete multi-box selection
+    completeMultiBoxSelection();
+    isSelectingMultiple = false;
+    return;
+  }
+  
   if (mindMap) {
     try {
       mindMap.handleMouseReleased();
@@ -345,6 +376,13 @@ function mouseDragged() {
       camX = constrain(camX, minCamX, maxCamX);
       camY = constrain(camY, minCamY, maxCamY);
     }
+    return false;
+  }
+  
+  if (isSelectingMultiple) {
+    // Update selection rectangle current corner
+    selectionCurrentX = worldMouseX();
+    selectionCurrentY = worldMouseY();
     return false;
   }
 
@@ -1063,6 +1101,49 @@ function buildTextHierarchy() {
   }
   
   return result;
+}
+
+// Draw the selection rectangle during multi-box selection
+function drawSelectionRectangle() {
+  const x1 = min(selectionStartX, selectionCurrentX);
+  const y1 = min(selectionStartY, selectionCurrentY);
+  const x2 = max(selectionStartX, selectionCurrentX);
+  const y2 = max(selectionStartY, selectionCurrentY);
+  
+  push();
+  // Semi-transparent blue fill
+  fill(100, 150, 255, 50);
+  // Blue border
+  stroke(100, 150, 255);
+  strokeWeight(2 / zoom);
+  rect(x1, y1, x2 - x1, y2 - y1);
+  pop();
+}
+
+// Complete multi-box selection by selecting all boxes within the rectangle
+function completeMultiBoxSelection() {
+  if (!mindMap) return;
+  
+  const x1 = min(selectionStartX, selectionCurrentX);
+  const y1 = min(selectionStartY, selectionCurrentY);
+  const x2 = max(selectionStartX, selectionCurrentX);
+  const y2 = max(selectionStartY, selectionCurrentY);
+  
+  // Clear current selection if shift is not held
+  const shiftHeld = keyIsDown(16);
+  if (!shiftHeld) {
+    mindMap.clearBoxSelection();
+  }
+  
+  // Select all boxes whose centers fall within the rectangle
+  for (const box of mindMap.boxes) {
+    if (!box) continue;
+    
+    // Check if box center is within selection rectangle
+    if (box.x >= x1 && box.x <= x2 && box.y >= y1 && box.y <= y2) {
+      mindMap.addBoxToSelection(box);
+    }
+  }
 }
 
 // Helper function to get wrapped lines for a text box (duplicates TextBox logic)
