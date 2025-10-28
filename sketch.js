@@ -308,11 +308,15 @@ function keyPressed() {
         if (mindMap.undo) mindMap.undo();
         return false; // prevent browser undo
       }
-      // Prevent page scroll when using space to pan (only if not editing)
+      // Space handling: if not editing, always prevent default, and still allow MindMap to react (e.g., reverse connection)
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
       if ((key === ' ' || keyCode === 32) && !isEditing) {
+        // Route to MindMap first (may reverse a selected connection)
+        mindMap.handleKeyPressed(key, keyCode);
+        // Prevent page scroll regardless (space is used for panning and shortcuts)
         return false;
       }
+      // All other keys
       mindMap.handleKeyPressed(key, keyCode);
     } catch (e) {
       console.error('Error handling key press:', e);

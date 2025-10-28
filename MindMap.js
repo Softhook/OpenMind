@@ -456,6 +456,13 @@ class MindMap {
         this.pushUndo();
         this.selectedBox.addChar(key);
       }
+    } else if ((key === ' ' || keyCode === 32)) {
+      // Space: reverse selected connection when not editing
+      if (this.selectedConnection) {
+        this.pushUndo();
+        this.selectedConnection.reverse();
+      }
+      // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
       // Delete selected connection only
       if (this.selectedConnection) {
@@ -479,6 +486,7 @@ class MindMap {
   handleRightClick() {
     // Reverse connection direction on right click
     if (this.selectedConnection) {
+      this.pushUndo();
       this.selectedConnection.reverse();
       return true; // Indicate we handled the right click
     }

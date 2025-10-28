@@ -29,6 +29,7 @@ A simple and intuitive mind mapping application built with p5.js.
 - Press **Backspace** to delete the character before the caret
 - Press **Fn+Backspace** (or **Delete** on extended keyboards) to delete the character after the caret
 - Press **N** (when not editing) to create a new box
+- When a connection (arrow) is selected, press **Space** to reverse its direction
 - Word deletion:
    - macOS: **Option+Backspace** deletes the previous word, **Option+Delete** deletes the next word
    - Windows/Linux: **Ctrl+Backspace** deletes the previous word, **Ctrl+Delete** deletes the next word
@@ -50,6 +51,7 @@ A simple and intuitive mind mapping application built with p5.js.
 - Click near a box edge to drag the box; click inside to edit text
 - Hold **Shift** and click boxes to multi-select; then while holding **Shift**, drag from a selected box's edge to move all selected boxes together
 - Right-click a selected connection to reverse its direction
+   - Tip: You can also press **Space** when a connection is selected
 - Press **0** or **Home** key to reset the view and fit all content
 
 ## File Structure
