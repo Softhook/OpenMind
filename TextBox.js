@@ -1,11 +1,11 @@
 class TextBox {
   // Constants
-  static PADDING = 15;
+  static PADDING = 12;
   static MIN_WIDTH = 80;
   static MIN_HEIGHT = 40;
   static MAX_WIDTH = 300;
   static FONT_SIZE = 14;
-  static CORNER_RADIUS = 10;
+  static CORNER_RADIUS = 6;
   static RESIZE_HANDLE_SIZE = 18;
   static CURSOR_BLINK_RATE = 530;
   static DRAG_EDGE_THICKNESS = 16;
