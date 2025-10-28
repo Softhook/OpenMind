@@ -253,7 +253,16 @@ class MindMap {
         const key = box.getColorCircleUnderMouse();
         if (key) {
           this.pushUndo();
-          box.setBackgroundByKey(key);
+          // Apply color to all selected boxes
+          if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+            for (const selectedBox of this.selectedBoxes) {
+              if (selectedBox && typeof selectedBox.setBackgroundByKey === 'function') {
+                selectedBox.setBackgroundByKey(key);
+              }
+            }
+          } else {
+            box.setBackgroundByKey(key);
+          }
           return;
         }
       }
@@ -312,19 +321,31 @@ class MindMap {
         const onEdge = (typeof box.isMouseOnEdge === 'function' && box.isMouseOnEdge());
 
         if (onEdge) {
-          // Edge click: start drag. If Shift is held, drag all selected boxes (including this one).
+          // Edge click: start drag. If multiple boxes are selected, drag all of them together.
           this.pushUndo();
-          // Ensure selection
-          if (!shiftDown) {
-            this.clearBoxSelection();
+          
+          // If this box is already in selection and we have multiple selected, drag all
+          const hasMultipleSelected = this.selectedBoxes && this.selectedBoxes.size > 1;
+          const boxInSelection = this.selectedBoxes && this.selectedBoxes.has(box);
+          
+          if (!boxInSelection || shiftDown) {
+            // Box not selected or shift held: update selection
+            if (!shiftDown) {
+              this.clearBoxSelection();
+            }
+            this.addBoxToSelection(box);
           }
-          this.addBoxToSelection(box);
 
           // Stop editing to avoid text interaction while dragging
           box.stopEditing();
 
-          // Start drag for all selected boxes when shift held; otherwise just this one
-          if (shiftDown && this.selectedBoxes.size > 0) {
+          // Start drag for all selected boxes if we have multiple, otherwise just this one
+          if (hasMultipleSelected && boxInSelection) {
+            for (const b of this.selectedBoxes) {
+              b.startDrag(mx, my);
+            }
+          } else if (this.selectedBoxes.size > 1) {
+            // Box was just added to an existing multi-selection
             for (const b of this.selectedBoxes) {
               b.startDrag(mx, my);
             }
