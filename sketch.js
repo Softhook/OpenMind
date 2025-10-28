@@ -838,7 +838,7 @@ function exportPNG() {
       
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
-          pg.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
+          drawStyledTextForExport(String(wrappedLines[i]), textX, startY + i * lineHeight, box.fontSize, pg);
         }
       }
     }
@@ -853,6 +853,65 @@ function exportPNG() {
   }
 }
 
+// Helper to calculate styled text width (similar to TextBox.getStyledTextWidth)
+function getStyledTextWidthForExport(text, fontSize, pg = null) {
+  if (!text || text.length === 0) return 0;
+  
+  const segments = TextBox.parseMarkdownBold(text);
+  let totalWidth = 0;
+  
+  if (pg) {
+    // For offscreen graphics
+    pg.textSize(fontSize);
+    for (const segment of segments) {
+      if (segment.text.length === 0) continue;
+      if (segment.bold) {
+        pg.textStyle(BOLD);
+      } else {
+        pg.textStyle(NORMAL);
+      }
+      totalWidth += pg.textWidth(segment.text);
+    }
+    pg.textStyle(NORMAL);
+  } else {
+    // For main canvas
+    textSize(fontSize);
+    for (const segment of segments) {
+      if (segment.text.length === 0) continue;
+      if (segment.bold) {
+        textStyle(BOLD);
+      } else {
+        textStyle(NORMAL);
+      }
+      totalWidth += textWidth(segment.text);
+    }
+    textStyle(NORMAL);
+  }
+  
+  return totalWidth;
+}
+
+// Helper to draw styled text for export
+function drawStyledTextForExport(text, x, y, fontSize, pg) {
+  const segments = TextBox.parseMarkdownBold(text);
+  let currentX = x;
+  
+  pg.textSize(fontSize);
+  for (const segment of segments) {
+    if (segment.text.length === 0) continue;
+    
+    if (segment.bold) {
+      pg.textStyle(BOLD);
+    } else {
+      pg.textStyle(NORMAL);
+    }
+    
+    pg.text(segment.text, currentX, y);
+    currentX += pg.textWidth(segment.text);
+  }
+  pg.textStyle(NORMAL);
+}
+
 // Helper to get wrapped lines (needed for PNG export since it uses offscreen buffer)
 function getWrappedLinesForBox(box) {
   if (!box || !box.text) return [''];
@@ -862,10 +921,7 @@ function getWrappedLinesForBox(box) {
   let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
   let maxTextWidth = max(10, baseWidth - box.padding * 2);
   
-  // Ensure text measurements match the box font size
-  // Note: textWidth uses the current global p5 textSize, not the offscreen buffer.
-  // We set it here to match how the text will be drawn into the PNG buffer.
-  textSize(box.fontSize || 14);
+  const fontSize = box.fontSize || 14;
   
   for (let line of lines) {
     if (!line || line === '') {
@@ -873,7 +929,7 @@ function getWrappedLinesForBox(box) {
       continue;
     }
     
-    if (textWidth(line) <= maxTextWidth) {
+    if (getStyledTextWidthForExport(line, fontSize) <= maxTextWidth) {
       wrappedLines.push(line);
     } else {
       let words = line.split(' ');
@@ -882,21 +938,44 @@ function getWrappedLinesForBox(box) {
       for (let i = 0; i < words.length; i++) {
         let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
         
-        if (textWidth(testLine) <= maxTextWidth) {
+        if (getStyledTextWidthForExport(testLine, fontSize) <= maxTextWidth) {
           currentLine = testLine;
         } else {
           if (currentLine) {
             wrappedLines.push(currentLine);
             currentLine = words[i];
           } else {
+            // Single word is too long - break intelligently, keeping ** markers together
             let word = words[i];
             let charLine = '';
-            for (let char of word) {
-              if (textWidth(charLine + char) <= maxTextWidth) {
+            let j = 0;
+            
+            while (j < word.length) {
+              let char = word[j];
+              
+              // If we encounter **, keep them together
+              if (char === '*' && j < word.length - 1 && word[j + 1] === '*') {
+                let testWithMarker = charLine + '**';
+                if (getStyledTextWidthForExport(testWithMarker, fontSize) <= maxTextWidth || charLine === '') {
+                  charLine += '**';
+                  j += 2;
+                  continue;
+                } else {
+                  if (charLine) wrappedLines.push(charLine);
+                  charLine = '**';
+                  j += 2;
+                  continue;
+                }
+              }
+              
+              let testChar = charLine + char;
+              if (getStyledTextWidthForExport(testChar, fontSize) <= maxTextWidth) {
                 charLine += char;
+                j++;
               } else {
                 if (charLine) wrappedLines.push(charLine);
                 charLine = char;
+                j++;
               }
             }
             currentLine = charLine;
@@ -1069,7 +1148,7 @@ function exportPDF() {
       
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
-          pdf.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
+          drawStyledTextForPDF(pdf, String(wrappedLines[i]), textX, startY + i * lineHeight, ts(box.fontSize));
         }
       }
     }
@@ -1089,6 +1168,28 @@ function toggleFullScreen() {
   } catch (e) {
     console.error('Failed to toggle fullscreen:', e);
   }
+}
+
+// Helper to draw styled text in PDF
+function drawStyledTextForPDF(pdf, text, x, y, fontSize) {
+  const segments = TextBox.parseMarkdownBold(text);
+  let currentX = x;
+  
+  for (const segment of segments) {
+    if (segment.text.length === 0) continue;
+    
+    // jsPDF uses setFont with 'bold' or 'normal' styles
+    if (segment.bold) {
+      pdf.setFont(undefined, 'bold');
+    } else {
+      pdf.setFont(undefined, 'normal');
+    }
+    
+    pdf.text(segment.text, currentX, y);
+    // Calculate width of this segment for positioning next segment
+    currentX += pdf.getTextWidth(segment.text);
+  }
+  pdf.setFont(undefined, 'normal');
 }
 
 function exportText() {
@@ -1252,7 +1353,7 @@ function getWrappedLines(box) {
   let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
   let maxTextWidth = max(10, baseWidth - box.padding * 2);
   
-  textSize(box.fontSize);
+  const fontSize = box.fontSize;
   
   for (let line of lines) {
     if (!line || line === '') {
@@ -1260,7 +1361,7 @@ function getWrappedLines(box) {
       continue;
     }
     
-    if (textWidth(line) <= maxTextWidth) {
+    if (getStyledTextWidthForExport(line, fontSize) <= maxTextWidth) {
       wrappedLines.push(line);
     } else {
       let words = line.split(' ');
@@ -1269,21 +1370,44 @@ function getWrappedLines(box) {
       for (let i = 0; i < words.length; i++) {
         let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
         
-        if (textWidth(testLine) <= maxTextWidth) {
+        if (getStyledTextWidthForExport(testLine, fontSize) <= maxTextWidth) {
           currentLine = testLine;
         } else {
           if (currentLine) {
             wrappedLines.push(currentLine);
             currentLine = words[i];
           } else {
+            // Single word is too long - break intelligently, keeping ** markers together
             let word = words[i];
             let charLine = '';
-            for (let char of word) {
-              if (textWidth(charLine + char) <= maxTextWidth) {
+            let j = 0;
+            
+            while (j < word.length) {
+              let char = word[j];
+              
+              // If we encounter **, keep them together
+              if (char === '*' && j < word.length - 1 && word[j + 1] === '*') {
+                let testWithMarker = charLine + '**';
+                if (getStyledTextWidthForExport(testWithMarker, fontSize) <= maxTextWidth || charLine === '') {
+                  charLine += '**';
+                  j += 2;
+                  continue;
+                } else {
+                  if (charLine) wrappedLines.push(charLine);
+                  charLine = '**';
+                  j += 2;
+                  continue;
+                }
+              }
+              
+              let testChar = charLine + char;
+              if (getStyledTextWidthForExport(testChar, fontSize) <= maxTextWidth) {
                 charLine += char;
+                j++;
               } else {
                 if (charLine) wrappedLines.push(charLine);
                 charLine = char;
+                j++;
               }
             }
             currentLine = charLine;

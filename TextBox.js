@@ -94,7 +94,7 @@ class TextBox {
     // Calculate text dimensions
     let maxLineWidth = 0;
     for (let line of wrappedLines) {
-      let lineWidth = textWidth(line);
+      let lineWidth = this.getStyledTextWidth(line);
       if (lineWidth > maxLineWidth) {
         maxLineWidth = lineWidth;
       }
@@ -133,17 +133,17 @@ class TextBox {
         continue;
       }
       
-      if (textWidth(line) <= maxTextWidth) {
+      if (this.getStyledTextWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
       } else {
-        // Break line into words
+        // Break line into words, but be smart about markdown markers
         let words = line.split(' ');
         let currentLine = '';
         
         for (let i = 0; i < words.length; i++) {
           let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
           
-          if (textWidth(testLine) <= maxTextWidth) {
+          if (this.getStyledTextWidth(testLine) <= maxTextWidth) {
             currentLine = testLine;
           } else {
             // If current line is not empty, push it
@@ -151,15 +151,39 @@ class TextBox {
               wrappedLines.push(currentLine);
               currentLine = words[i];
             } else {
-              // Single word is too long, break it by characters
+              // Single word is too long - try to break it intelligently
+              // Don't break in the middle of ** markers
               let word = words[i];
               let charLine = '';
-              for (let char of word) {
-                if (textWidth(charLine + char) <= maxTextWidth) {
+              let j = 0;
+              
+              while (j < word.length) {
+                let char = word[j];
+                
+                // If we encounter **, keep them together
+                if (char === '*' && j < word.length - 1 && word[j + 1] === '*') {
+                  let testWithMarker = charLine + '**';
+                  if (this.getStyledTextWidth(testWithMarker) <= maxTextWidth || charLine === '') {
+                    charLine += '**';
+                    j += 2;
+                    continue;
+                  } else {
+                    // Can't fit the marker, break here
+                    if (charLine) wrappedLines.push(charLine);
+                    charLine = '**';
+                    j += 2;
+                    continue;
+                  }
+                }
+                
+                let testChar = charLine + char;
+                if (this.getStyledTextWidth(testChar) <= maxTextWidth) {
                   charLine += char;
+                  j++;
                 } else {
                   if (charLine) wrappedLines.push(charLine);
                   charLine = char;
+                  j++;
                 }
               }
               currentLine = charLine;
@@ -181,6 +205,52 @@ class TextBox {
     return result;
   }
   
+  // Draw all wrapped lines with proper bold state tracking
+  drawStyledLines(wrappedLines, x, startY, lineHeight) {
+    push();
+    
+    let isBold = false; // Track if we're currently in a bold section
+    
+    for (let lineIndex = 0; lineIndex < wrappedLines.length; lineIndex++) {
+      const lineText = wrappedLines[lineIndex];
+      const y = startY + lineIndex * lineHeight;
+      let currentX = x;
+      
+      let i = 0;
+      while (i < lineText.length) {
+        // Check for ** marker
+        if (i < lineText.length - 1 && lineText[i] === '*' && lineText[i + 1] === '*') {
+          // Toggle bold state
+          isBold = !isBold;
+          i += 2; // Skip both * characters
+          continue;
+        }
+        
+        // Collect consecutive characters with the same bold state
+        let segment = '';
+        while (i < lineText.length) {
+          // Check for ** marker
+          if (i < lineText.length - 1 && lineText[i] === '*' && lineText[i + 1] === '*') {
+            break; // Stop segment at marker
+          }
+          segment += lineText[i];
+          i++;
+        }
+        
+        // Draw the segment
+        if (segment.length > 0) {
+          textStyle(isBold ? BOLD : NORMAL);
+          text(segment, currentX, y);
+          currentX += textWidth(segment);
+        }
+      }
+    }
+    
+    pop();
+    textStyle(NORMAL);
+  }
+  
+  // Get the starting character positions for each wrapped line in the original text
   draw() {
     push();
     
@@ -226,9 +296,8 @@ class TextBox {
       this.drawSelection(wrappedLines, textX, startY, lineHeight);
     }
     
-    for (let i = 0; i < wrappedLines.length; i++) {
-      text(wrappedLines[i], textX, startY + i * lineHeight);
-    }
+    // Draw all lines with proper bold state tracking across lines
+    this.drawStyledLines(wrappedLines, textX, startY, lineHeight);
     
     // Draw cursor when editing
     if (this.isEditing) {
@@ -498,7 +567,7 @@ class TextBox {
     
     for (let i = 0; i <= lineText.length; i++) {
       let textBefore = lineText.slice(0, i);
-      let xPos = textX + textWidth(textBefore);
+      let xPos = textX + this.getStyledTextWidth(textBefore);
       let dist = abs(mx - xPos);
       
       if (dist < minDist) {
@@ -587,7 +656,7 @@ class TextBox {
     if (my < lineTop - marginY || my > lineBottom + marginY) return false;
     
     const lineText = wrappedLines[lineIndex] || '';
-    const lineWidth = textWidth(lineText);
+    const lineWidth = this.getStyledTextWidth(lineText);
     if (lineWidth <= 0) return false;
     
     const lineLeft = textX;
@@ -608,7 +677,7 @@ class TextBox {
     // Compute max actual line width
     let maxLineWidth = 0;
     for (let i = 0; i < wrappedLines.length; i++) {
-      const w = textWidth(wrappedLines[i] || '');
+      const w = this.getStyledTextWidth(wrappedLines[i] || '');
       if (w > maxLineWidth) maxLineWidth = w;
     }
     const top = (this.y - this.height / 2) + this.padding;
@@ -970,7 +1039,7 @@ class TextBox {
         let words = this.text.split(/[\s\n]+/);
         for (let word of words) {
           if (word) {
-            let wordWidth = textWidth(word) + this.padding * 2;
+            let wordWidth = this.getStyledTextWidth(word) + this.padding * 2;
             if (wordWidth > minRequiredWidth) minRequiredWidth = wordWidth;
           }
         }
@@ -1002,17 +1071,17 @@ class TextBox {
     textSize(this.fontSize);
     
     for (let line of lines) {
-      if (textWidth(line) <= maxTextWidth) {
+      if (this.getStyledTextWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
       } else {
-        // Break line into words
+        // Break line into words, but be smart about markdown markers
         let words = line.split(' ');
         let currentLine = '';
         
         for (let i = 0; i < words.length; i++) {
           let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
           
-          if (textWidth(testLine) <= maxTextWidth) {
+          if (this.getStyledTextWidth(testLine) <= maxTextWidth) {
             currentLine = testLine;
           } else {
             // If current line is not empty, push it
@@ -1020,15 +1089,39 @@ class TextBox {
               wrappedLines.push(currentLine);
               currentLine = words[i];
             } else {
-              // Single word is too long, break it by characters
+              // Single word is too long - try to break it intelligently
+              // Don't break in the middle of ** markers
               let word = words[i];
               let charLine = '';
-              for (let char of word) {
-                if (textWidth(charLine + char) <= maxTextWidth) {
+              let j = 0;
+              
+              while (j < word.length) {
+                let char = word[j];
+                
+                // If we encounter **, keep them together
+                if (char === '*' && j < word.length - 1 && word[j + 1] === '*') {
+                  let testWithMarker = charLine + '**';
+                  if (this.getStyledTextWidth(testWithMarker) <= maxTextWidth || charLine === '') {
+                    charLine += '**';
+                    j += 2;
+                    continue;
+                  } else {
+                    // Can't fit the marker, break here
+                    if (charLine) wrappedLines.push(charLine);
+                    charLine = '**';
+                    j += 2;
+                    continue;
+                  }
+                }
+                
+                let testChar = charLine + char;
+                if (this.getStyledTextWidth(testChar) <= maxTextWidth) {
                   charLine += char;
+                  j++;
                 } else {
                   if (charLine) wrappedLines.push(charLine);
                   charLine = char;
+                  j++;
                 }
               }
               currentLine = charLine;
@@ -1310,7 +1403,7 @@ class TextBox {
     textSize(this.fontSize);
     let lineText = wrappedLines[lineIndex] || '';
     let textBeforeCursor = lineText.slice(0, max(0, posInLine));
-    let cursorX = textX + textWidth(textBeforeCursor);
+    let cursorX = textX + this.getStyledTextWidth(textBeforeCursor);
     let cursorY = startY + lineIndex * lineHeight;
     
     // Validate cursor position
@@ -1358,9 +1451,16 @@ class TextBox {
     if (startInfo.lineIndex === endInfo.lineIndex) {
       // Selection within single line
       let lineText = wrappedLines[startInfo.lineIndex] || '';
-      let x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
-      let x2 = textX + textWidth(lineText.slice(0, max(0, endInfo.posInLine)));
+      // Get visual width excluding ** markers
+      // We need to get the visual position up to the actual character positions
+      // accounting for any ** markers that should be skipped
+      let x1 = textX + this.getVisualWidthUpToPosition(lineText, max(0, startInfo.posInLine));
+      let x2 = textX + this.getVisualWidthUpToPosition(lineText, max(0, endInfo.posInLine));
       let y = startY + startInfo.lineIndex * lineHeight;
+      
+      console.log('Selection debug - Line:', JSON.stringify(lineText));
+      console.log('Start pos in line:', startInfo.posInLine, 'End pos in line:', endInfo.posInLine);
+      console.log('Text from start to end:', JSON.stringify(lineText.substring(startInfo.posInLine, endInfo.posInLine)));
       
       if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
         rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
@@ -1376,16 +1476,16 @@ class TextBox {
         
         if (i === startInfo.lineIndex) {
           // First line: from start position to end of line
-          x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
-          x2 = textX + textWidth(lineText);
+          x1 = textX + this.getVisualWidthUpToPosition(lineText, max(0, startInfo.posInLine));
+          x2 = textX + this.getVisualWidthUpToPosition(lineText, lineText.length);
         } else if (i === endInfo.lineIndex) {
           // Last line: from beginning to end position
           x1 = textX;
-          x2 = textX + textWidth(lineText.slice(0, max(0, endInfo.posInLine)));
+          x2 = textX + this.getVisualWidthUpToPosition(lineText, max(0, endInfo.posInLine));
         } else {
           // Middle lines: entire line
           x1 = textX;
-          x2 = textX + textWidth(lineText);
+          x2 = textX + this.getVisualWidthUpToPosition(lineText, lineText.length);
         }
         
         if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
@@ -1395,6 +1495,96 @@ class TextBox {
     }
     
     pop();
+  }
+  
+  // Get visual width of text, excluding ** markers and applying bold styling
+  getVisualWidthExcludingMarkers(text) {
+    if (!text || text.length === 0) return 0;
+    
+    let totalWidth = 0;
+    let i = 0;
+    let isBold = false;
+    
+    push();
+    textSize(this.fontSize);
+    
+    while (i < text.length) {
+      // Check for ** marker
+      if (i < text.length - 1 && text[i] === '*' && text[i + 1] === '*') {
+        isBold = !isBold;
+        i += 2; // Skip the markers, don't add to width
+        continue;
+      }
+      
+      // Collect consecutive characters with same bold state
+      let segment = '';
+      while (i < text.length) {
+        if (i < text.length - 1 && text[i] === '*' && text[i + 1] === '*') {
+          break;
+        }
+        segment += text[i];
+        i++;
+      }
+      
+      if (segment.length > 0) {
+        textStyle(isBold ? BOLD : NORMAL);
+        totalWidth += textWidth(segment);
+      }
+    }
+    
+    pop();
+    textStyle(NORMAL);
+    
+    return totalWidth;
+  }
+  
+  // Get visual width up to a specific character position in the text
+  // This accounts for ** markers that should be excluded from visual rendering
+  // Position is in the original text WITH markers
+  getVisualWidthUpToPosition(text, position) {
+    if (!text || text.length === 0 || position <= 0) return 0;
+    
+    // The position refers to a character index in the text that includes ** markers
+    // We need to render all visible characters up to (but not including) that position
+    // BUT we need to skip ** markers and not render them
+    
+    let totalWidth = 0;
+    let isBold = false;
+    
+    push();
+    textSize(this.fontSize);
+    
+    let i = 0;
+    while (i < position && i < text.length) {
+      // Check for ** marker at current position
+      if (i < text.length - 1 && text[i] === '*' && text[i + 1] === '*') {
+        // We encountered a marker - toggle bold state and skip it
+        isBold = !isBold;
+        i += 2;
+        continue;
+      }
+      
+      // Collect consecutive visible characters with same bold state
+      let segment = '';
+      while (i < position && i < text.length) {
+        // Stop if we hit a marker
+        if (i < text.length - 1 && text[i] === '*' && text[i + 1] === '*') {
+          break;
+        }
+        segment += text[i];
+        i++;
+      }
+      
+      if (segment.length > 0) {
+        textStyle(isBold ? BOLD : NORMAL);
+        totalWidth += textWidth(segment);
+      }
+    }
+    
+    pop();
+    textStyle(NORMAL);
+    
+    return totalWidth;
   }
   
   getLineAndPositionFromChar(charPos, wrappedLines) {
@@ -1429,5 +1619,185 @@ class TextBox {
     }
     
     return { lineIndex, posInLine };
+  }
+
+  // Strip markdown markers from text (for display purposes)
+  static stripMarkdown(text) {
+    if (!text) return '';
+    return text.replace(/\*\*/g, '');
+  }
+
+  // Map a position in the visual text (without **) to a position in the actual text (with **)
+  visualToActualPosition(visualPos) {
+    if (!this.text) return visualPos;
+    
+    let actualPos = 0;
+    let visualCount = 0;
+    let i = 0;
+    
+    while (i < this.text.length && visualCount < visualPos) {
+      // Skip ** markers (they don't count in visual position)
+      if (i < this.text.length - 1 && this.text[i] === '*' && this.text[i + 1] === '*') {
+        i += 2;
+        actualPos += 2;
+      } else {
+        i++;
+        actualPos++;
+        visualCount++;
+      }
+    }
+    
+    return actualPos;
+  }
+
+  // Map a position in the actual text (with **) to a position in the visual text (without **)
+  actualToVisualPosition(actualPos) {
+    if (!this.text) return actualPos;
+    
+    let visualPos = 0;
+    
+    for (let i = 0; i < actualPos && i < this.text.length; i++) {
+      // Skip ** markers
+      if (i < this.text.length - 1 && this.text[i] === '*' && this.text[i + 1] === '*') {
+        i++; // Skip the second *
+        // Don't increment visualPos
+      } else {
+        visualPos++;
+      }
+    }
+    
+    return visualPos;
+  }
+
+  // Calculate the actual width of text accounting for bold formatting
+  getStyledTextWidth(text) {
+    // Delegate to the method that properly handles ** markers
+    return this.getVisualWidthExcludingMarkers(text);
+  }
+
+  // Parse text with markdown-style **bold** markers
+  // Returns array of segments: [{text: string, bold: boolean}, ...]
+  static parseMarkdownBold(text) {
+    if (!text || text.length === 0) return [{text: '', bold: false}];
+    
+    const segments = [];
+    let isBold = false;
+    let currentText = '';
+    
+    let i = 0;
+    while (i < text.length) {
+      // Check for ** marker
+      if (i < text.length - 1 && text[i] === '*' && text[i + 1] === '*') {
+        // Save current segment if it has content
+        if (currentText.length > 0) {
+          segments.push({text: currentText, bold: isBold});
+          currentText = '';
+        }
+        // Toggle bold state
+        isBold = !isBold;
+        i += 2; // Skip both * characters
+      } else {
+        currentText += text[i];
+        i++;
+      }
+    }
+    
+    // Add remaining text
+    if (currentText.length > 0) {
+      segments.push({text: currentText, bold: isBold});
+    }
+    
+    return segments.length > 0 ? segments : [{text: '', bold: false}];
+  }
+
+  // Draw a line of text with markdown-style bold formatting
+  // This properly handles bold text that wraps across multiple lines
+  // Toggle bold formatting on selected text by adding/removing ** markers
+  toggleBoldOnSelection() {
+    if (!this.text) this.text = '';
+    if (this.selectionStart === -1 || this.selectionEnd === -1) return;
+    
+    let start = min(this.selectionStart, this.selectionEnd);
+    let end = max(this.selectionStart, this.selectionEnd);
+    
+    if (start === end) return; // No selection
+    
+    console.log('Toggle bold - Full text:', this.text);
+    console.log('Selection range:', start, '-', end);
+    console.log('Selected text:', JSON.stringify(this.text.slice(start, end)));
+    
+    // Get the selected text
+    const selectedText = this.text.slice(start, end);
+    
+    // Strategy: Check if the selection is currently bold and toggle it
+    // A selection is "bold" if it's wrapped by ** (either inside or outside the selection bounds)
+    
+    let isBold = false;
+    let markerBeforeStart = -1;  // position of ** before selection
+    let markerAfterEnd = -1;     // position of ** after selection
+    
+    // Check for ** immediately before selection
+    if (start >= 2 && this.text[start - 2] === '*' && this.text[start - 1] === '*') {
+      markerBeforeStart = start - 2;
+      console.log('Found ** before selection at', markerBeforeStart);
+    }
+    
+    // Check for ** immediately after selection
+    if (end <= this.text.length - 2 && this.text[end] === '*' && this.text[end + 1] === '*') {
+      markerAfterEnd = end;
+      console.log('Found ** after selection at', markerAfterEnd);
+    }
+    
+    // If both markers exist, the selection is currently bold
+    if (markerBeforeStart !== -1 && markerAfterEnd !== -1) {
+      isBold = true;
+      console.log('Selection is bold (markers outside)');
+    }
+    
+    // Also check if the selection itself starts and ends with **
+    if (selectedText.startsWith('**') && selectedText.endsWith('**') && selectedText.length >= 4) {
+      isBold = true;
+      console.log('Selection is bold (markers inside)');
+    }
+    
+    if (isBold) {
+      // REMOVE BOLD: Remove the ** markers
+      if (markerBeforeStart !== -1 && markerAfterEnd !== -1) {
+        // Markers are outside the selection
+        this.text = this.text.slice(0, markerBeforeStart) + 
+                    this.text.slice(start, end) + 
+                    this.text.slice(markerAfterEnd + 2);
+        this.selectionStart = markerBeforeStart;
+        this.selectionEnd = end - 2;
+        this.cursorPosition = this.selectionEnd;
+        console.log('Removed bold (outside markers)');
+      } else if (selectedText.startsWith('**') && selectedText.endsWith('**')) {
+        // Markers are inside the selection
+        const innerText = selectedText.slice(2, -2);
+        this.text = this.text.slice(0, start) + innerText + this.text.slice(end);
+        this.selectionStart = start;
+        this.selectionEnd = start + innerText.length;
+        this.cursorPosition = this.selectionEnd;
+        console.log('Removed bold (inside markers)');
+      }
+    } else {
+      // ADD BOLD: Wrap selection with **
+      // First, strip any existing ** markers from the selection to avoid nesting
+      const cleanedSelection = selectedText.replace(/\*\*/g, '');
+      console.log('Adding bold. Cleaned selection:', JSON.stringify(cleanedSelection));
+      
+      this.text = this.text.slice(0, start) + '**' + cleanedSelection + '**' + this.text.slice(end);
+      
+      const lengthDiff = selectedText.length - cleanedSelection.length;
+      this.selectionStart = start + 2;
+      this.selectionEnd = end - lengthDiff + 2;
+      this.cursorPosition = this.selectionEnd;
+    }
+    
+    console.log('Result text:', this.text);
+    console.log('New selection:', this.selectionStart, '-', this.selectionEnd);
+    
+    this.updateDimensions();
+    this.resetCursorBlink();
   }
 }
