@@ -647,16 +647,6 @@ class MindMap {
     };
   }
   
-  handleRightClick() {
-    // Reverse connection direction on right click
-    if (this.selectedConnection) {
-      this.pushUndo();
-      this.selectedConnection.reverse();
-      return true; // Indicate we handled the right click
-    }
-    return false;
-  }
-  
   fromJSON(data) {
     // Validate input data
     if (!data || typeof data !== 'object') {

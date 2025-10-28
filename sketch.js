@@ -471,23 +471,7 @@ function keyPressed() {
   }
 }
 
-function mouseClicked(event) {
-  // Handle right click (context menu)
-  if (event && event.button === 2 && mindMap) {
-    // If the right click follows a right-drag pan, ignore it
-    if (suppressNextRightClick) {
-      suppressNextRightClick = false;
-      return false;
-    }
-    try {
-      if (mindMap.handleRightClick()) {
-        return false; // Prevent context menu
-      }
-    } catch (e) {
-      console.error('Error handling right click:', e);
-    }
-  }
-}
+// Note: Right-click no longer triggers any connection action; context menu is prevented below.
 
 // Prevent default context menu
 document.addEventListener('contextmenu', event => event.preventDefault());

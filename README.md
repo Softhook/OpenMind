@@ -1,58 +1,70 @@
 # OpenMind - Mind Mapping Software
 
-A simple and intuitive mind mapping application built with p5.js.
+A simple mind mapping application built with p5.js.
 
 ## Features
 
-- **Create Nodes**: Click the "New Box" button to add new nodes to your mind map
-- **Edit Text**: Click inside any box to edit its text. The box automatically resizes to fit the content
-- **Move Nodes**: Click and drag any box to reposition it
-- **Multi-select & Group Drag**: Hold Shift and click multiple boxes to select them; while holding Shift, drag from a box edge to move them together
-- **Create Connections**: Click on the edge of a box, then click on another box to create a directed connection
-- **Save/Load**: Save your mind maps as JSON files and load them later
-   - On Chromium-based browsers (Chrome/Edge), Save will open a system "Save As" dialog so you can choose the exact folder via the File System Access API
-   - On other browsers, it will download the file (usually to your Downloads folder)
-- **Zoom View**: Use your mouse scroll/trackpad over the canvas to zoom the entire mind map in or out
+- Create and edit nodes with auto-resizing text boxes
+- Move nodes, resize via the bottom-right circular handle, and multi-select
+- Multi-select & group drag: toggle selection with Shift, then drag from a selected box edge to move as a group
+- Create connections between boxes; drag a connection’s arrowhead to reattach to a different box
+- Reverse a connection via Space (when selected)
+- Copy/Paste nodes (Cmd/Ctrl+C, Cmd/Ctrl+V) at the cursor location
+- Delete selected nodes or connections (Backspace/Delete)
+- Undo (Cmd/Ctrl+Z)
+- Pan and zoom the entire view, reset to fit
+- Export PNG, PDF, and Text
+- Save/Load maps as JSON files
+   - On Chromium-based browsers (Chrome/Edge), Save opens a system Save As dialog (File System Access API)
+   - On other browsers, it downloads to your default Downloads folder
 
 ## How to Use
 
-1. Open `index.html` in a web browser
-2. Use the buttons at the top:
+. Use the menu at the top:
    - **New Box**: Creates a new node at a random position
    - **Save**: Downloads your mind map as a JSON file
    - **Load**: Loads a previously saved mind map
 
 ### Keyboard Controls
 
-- Type normally to add text to a selected box
-- Press **Enter** to add a new line
-- Press **Backspace** to delete the character before the caret
-- Press **Fn+Backspace** (or **Delete** on extended keyboards) to delete the character after the caret
-- Press **N** (when not editing) to create a new box
-- When a connection (arrow) is selected, press **Space** to reverse its direction
+Global (when NOT editing text):
+
+- N: create a new box at the cursor
+- Space: reverse the selected connection
+- 0 or Home: reset view to fit all content
+- Backspace/Delete: delete selected box(es) or selected connection
+- Cmd/Ctrl+C: copy selected box(es)
+- Cmd/Ctrl+V: paste copied box(es) at the cursor location
+- Cmd/Ctrl+Z: undo last action
+
+While editing a text box:
+
+- Type to insert characters; Enter inserts a newline
+- Backspace: delete character before the caret
+- Delete (Fn+Backspace on macOS laptops): delete character after the caret
 - Word deletion:
-   - macOS: **Option+Backspace** deletes the previous word, **Option+Delete** deletes the next word
-   - Windows/Linux: **Ctrl+Backspace** deletes the previous word, **Ctrl+Delete** deletes the next word
-- Line deletion (macOS only):
-   - **Cmd+Backspace** deletes to the start of the line
-   - **Cmd+Delete** deletes to the end of the line
+  - macOS: Option+Backspace (previous word), Option+Delete (next word)
+  - Windows/Linux: Ctrl+Backspace (previous word), Ctrl+Delete (next word)
+- Line deletion (macOS): Cmd+Backspace (to start of line), Cmd+Delete (to end of line)
 - Selection and clipboard:
-   - **Cmd/Ctrl+A** select all text in the box
-   - **Cmd/Ctrl+C** copy selection
-   - **Cmd/Ctrl+X** cut selection
-   - **Cmd/Ctrl+V** paste
+  - Cmd/Ctrl+A: select all text in the box
+  - Cmd/Ctrl+C: copy selection
+  - Cmd/Ctrl+X: cut selection
+  - Cmd/Ctrl+V: paste
 - Arrow keys move the caret; Up/Down move between wrapped lines
 
 ### Mouse/Trackpad Controls
 
-- **Scroll** over the canvas to zoom in/out of the entire view
-- **Hold Space** (when not editing text) and drag to pan the view
-- **Right-click and drag** on empty canvas (when nothing is selected) to pan
+- Scroll over the canvas to zoom in/out around the cursor
+- Hold Space (when not editing) and drag to pan the view
+- Right-click and drag on empty canvas (when nothing is selected) to pan
+- Click-drag on empty canvas (with nothing selected) to draw a selection rectangle; release to select boxes whose centers are inside; hold Shift to add to selection
 - Click near a box edge to drag the box; click inside to edit text
-- Hold **Shift** and click boxes to multi-select; then while holding **Shift**, drag from a selected box's edge to move all selected boxes together
-- Right-click a selected connection to reverse its direction
-   - Tip: You can also press **Space** when a connection is selected
-- Press **0** or **Home** key to reset the view and fit all content
+- Drag the circular handle at the bottom-right of a box to resize it
+- Create a connection: hover to show connector dots, click a connector dot on a box edge, then click another box
+- Reattach a connection: drag its arrowhead to a different target box
+- Click a connection to select it
+- With a connection selected, press Space to reverse its direction
 
 ## File Structure
 
@@ -63,21 +75,9 @@ A simple and intuitive mind mapping application built with p5.js.
 - `MindMap.js` - MindMap class for managing the entire mind map with undo/redo
 - `style.css` - Styling for the UI
 
-## Performance Optimizations
-
-This application has been optimized for better performance:
-
-- **Text Wrapping Cache**: Text wrapping calculations are cached to avoid redundant computations
-- **Configuration Constants**: Magic numbers extracted into configuration objects for consistency
-- **Memory Management**: Undo stack limited to prevent memory leaks (20 snapshots)
-- **Debounced Resize**: Window resize operations are debounced to reduce computational load
-- **Dirty Flagging**: Change tracking to minimize unnecessary updates
-- **Error Boundaries**: Comprehensive error handling throughout the application
-
 ## Future Enhancements
 
+- Redo functionality
 - Different box shapes and colors
-- Delete nodes and connections
-- Undo/redo functionality
-- Keyboard shortcuts
+- Additional keyboard shortcuts and custom bindings
 - Touch/mobile support
