@@ -1,77 +1,98 @@
 class TextBox {
+  // Constants
+  static PADDING = 15;
+  static MIN_WIDTH = 80;
+  static MIN_HEIGHT = 40;
+  static MAX_WIDTH = 300;
+  static FONT_SIZE = 14;
+  static CORNER_RADIUS = 10;
+  static DELETE_ICON_SIZE = 20;
+  static RESIZE_HANDLE_SIZE = 12;
+  static CURSOR_BLINK_RATE = 530;
+  static DRAG_EDGE_THICKNESS = 16;
+  static COLOR_CIRCLE_RADIUS = 8;
+  static COLOR_CIRCLE_SPACING = 10;
+  static LINE_HEIGHT_MULTIPLIER = 1.5;
+  
   constructor(x, y, text = "") {
     this.x = x;
     this.y = y;
     this.text = text;
-    this.padding = 15;
-    this.minWidth = 80;
-    this.minHeight = 40;
-    this.maxWidth = 300; // Maximum width before wrapping
-    this.fontSize = 14;
+    this.padding = TextBox.PADDING;
+    this.minWidth = TextBox.MIN_WIDTH;
+    this.minHeight = TextBox.MIN_HEIGHT;
+    this.maxWidth = TextBox.MAX_WIDTH;
+    this.fontSize = TextBox.FONT_SIZE;
     this.isEditing = false;
     this.isDragging = false;
     this.dragOffsetX = 0;
     this.dragOffsetY = 0;
-    this.cornerRadius = 10;
+    this.cornerRadius = TextBox.CORNER_RADIUS;
     this.cursorPosition = text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
-    this.deleteIconSize = 20;
-    this.resizeHandleSize = 12;
+    this.deleteIconSize = TextBox.DELETE_ICON_SIZE;
+    this.resizeHandleSize = TextBox.RESIZE_HANDLE_SIZE;
     this.isResizing = false;
     this.resizeStartX = 0;
     this.resizeStartY = 0;
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
-    this.resizeStartLeft = 0;   // left edge at resize start
-    this.resizeStartTop = 0;    // top edge at resize start
-    this.userResized = false; // tracks if user manually resized width/height
+    this.resizeStartLeft = 0;
+    this.resizeStartTop = 0;
+    this.userResized = false;
+    
+    // Cache for wrapped text lines
+    this.cachedWrappedLines = null;
+    this.cachedWidth = null;
     
     // Text selection state
     this.isSelecting = false;
-    this.selectionAnchor = -1; // anchor index where drag started
+    this.selectionAnchor = -1;
     this.lastClickTime = 0;
     this.lastClickX = 0;
     this.lastClickY = 0;
-    this.doubleClickThreshold = 300; // ms
+    this.doubleClickThreshold = 300;
     
     // Cursor blinking
     this.cursorBlinkTime = 0;
     this.cursorVisible = true;
-    this.cursorBlinkRate = 530; // milliseconds (slow blink)
+    this.cursorBlinkRate = TextBox.CURSOR_BLINK_RATE;
     
-    // Interaction thickness for edge-drag zone (px inward from edges)
-    this.dragEdgeThickness = 16;
+    // Interaction thickness for edge-drag zone
+    this.dragEdgeThickness = TextBox.DRAG_EDGE_THICKNESS;
     
     // Selection (node-level, not text selection)
     this.selected = false;
 
-    // Background color (default white) and palette options
+    // Background color and palette
     this.backgroundColor = { r: 255, g: 255, b: 255 };
-    // Order: white, orange, red, light-green, light-blue
-    this.colorPalette = [
+    this.colorPalette = TextBox.getColorPalette();
+    this.colorCircleRadius = TextBox.COLOR_CIRCLE_RADIUS;
+    this.colorCircleSpacing = TextBox.COLOR_CIRCLE_SPACING;
+    
+    // Calculate initial dimensions
+    this.updateDimensions();
+  }
+  
+  static getColorPalette() {
+    return [
       { key: 'white', color: { r: 255, g: 255, b: 255 } },
       { key: 'orange', color: { r: 255, g: 200, b: 140 } },
       { key: 'red', color: { r: 255, g: 140, b: 140 } },
       { key: 'light-green', color: { r: 200, g: 255, b: 200 } },
       { key: 'light-blue', color: { r: 180, g: 210, b: 255 } }
     ];
-    this.colorCircleRadius = 8; // px
-    this.colorCircleSpacing = 10; // px between circles
-    
-    // Calculate initial dimensions
-    this.updateDimensions();
   }
   
   updateDimensions() {
-    // Ensure text is defined
-    if (this.text == null) {
-      this.text = '';
-    }
+    if (this.text == null) this.text = '';
+    
+    // Invalidate cache
+    this.cachedWrappedLines = null;
+    this.cachedWidth = null;
     
     textSize(this.fontSize);
-    
-    // Get wrapped lines for dimension calculation
     let wrappedLines = this.wrapText(this.text);
     
     // Calculate text dimensions
@@ -83,30 +104,29 @@ class TextBox {
       }
     }
     
-    // Width: only auto-size when the user hasn't manually resized.
-    // This prevents snapping the width after a manual resize.
+    // Width: only auto-size when the user hasn't manually resized
     if (!this.userResized) {
       this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
     }
 
     // Height: always reflow to fit wrapped lines for the current width
-    this.height = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+    const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
+    this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
   }
   
   wrapText(text) {
-    // Handle null or undefined text
-    if (text == null) {
-      text = '';
-    }
-    
-    // Ensure text is a string
+    if (text == null) text = '';
     text = String(text);
+    
+    // Use cache if width hasn't changed
+    const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
+    if (this.cachedWrappedLines && this.cachedWidth === currentWidth && this.text === text) {
+      return this.cachedWrappedLines;
+    }
     
     let lines = text.split('\n');
     let wrappedLines = [];
-    // Guard width before initial sizing
-    let baseWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
-    let maxTextWidth = max(10, baseWidth - this.padding * 2); // Ensure minimum width
+    let maxTextWidth = max(10, currentWidth - this.padding * 2);
     
     textSize(this.fontSize);
     
@@ -158,7 +178,11 @@ class TextBox {
       }
     }
     
-    return wrappedLines.length > 0 ? wrappedLines : [''];
+    const result = wrappedLines.length > 0 ? wrappedLines : [''];
+    // Cache the result
+    this.cachedWrappedLines = result;
+    this.cachedWidth = currentWidth;
+    return result;
   }
   
   draw() {
@@ -196,7 +220,7 @@ class TextBox {
     textSize(this.fontSize);
     
     let wrappedLines = this.wrapText(this.text);
-    let lineHeight = this.fontSize * 1.5;
+    let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     // Top-anchored text: start at top padding of the box
     let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
@@ -471,7 +495,7 @@ class TextBox {
       return 0;
     }
     
-    let lineHeight = this.fontSize * 1.5;
+    let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     // Top-anchored text positioning
     let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
@@ -563,7 +587,7 @@ class TextBox {
     
     textSize(this.fontSize);
     const wrappedLines = this.wrapText(this.text);
-    const lineHeight = this.fontSize * 1.5;
+    const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     // Top-anchored: first line center at top+padding+lineHeight/2
     const startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     const textX = this.x - this.width / 2 + this.padding;
@@ -597,7 +621,7 @@ class TextBox {
     // Prepare wrapping using current text and font
     textSize(this.fontSize);
     const wrappedLines = this.wrapText(this.text);
-    const lineHeight = this.fontSize * 1.5;
+    const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     const totalHeight = wrappedLines.length * lineHeight;
     const textX = this.x - this.width / 2 + this.padding;
     // Compute max actual line width
@@ -974,7 +998,7 @@ class TextBox {
       // Clamp width first, then compute required height based on wrapped lines for this width
       let newWidth = max(minRequiredWidth, rawWidth);
       let wrappedLines = this.wrapTextForWidth(newWidth);
-      let minRequiredHeight = max(this.minHeight, wrappedLines.length * this.fontSize * 1.5 + this.padding * 2);
+      let minRequiredHeight = max(this.minHeight, wrappedLines.length * this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER + this.padding * 2);
       let newHeight = max(minRequiredHeight, rawHeight);
 
       // Apply new size

@@ -57,11 +57,22 @@ A simple and intuitive mind mapping application built with p5.js.
 ## File Structure
 
 - `index.html` - Main HTML file
-- `sketch.js` - p5.js main sketch and application logic
-- `TextBox.js` - TextBox class for node boxes
+- `sketch.js` - p5.js main sketch and application logic with optimized rendering
+- `TextBox.js` - TextBox class for node boxes with cached text wrapping
 - `Connection.js` - Connection class for arrows between boxes
-- `MindMap.js` - MindMap class for managing the entire mind map
+- `MindMap.js` - MindMap class for managing the entire mind map with undo/redo
 - `style.css` - Styling for the UI
+
+## Performance Optimizations
+
+This application has been optimized for better performance:
+
+- **Text Wrapping Cache**: Text wrapping calculations are cached to avoid redundant computations
+- **Configuration Constants**: Magic numbers extracted into configuration objects for consistency
+- **Memory Management**: Undo stack limited to prevent memory leaks (20 snapshots)
+- **Debounced Resize**: Window resize operations are debounced to reduce computational load
+- **Dirty Flagging**: Change tracking to minimize unnecessary updates
+- **Error Boundaries**: Comprehensive error handling throughout the application
 
 ## Future Enhancements
 

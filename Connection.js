@@ -1,11 +1,17 @@
 class Connection {
+  // Constants
+  static ARROW_SIZE = 10;
+  static HIT_THRESHOLD = 5; // pixels for click detection
+  static STROKE_WEIGHT_NORMAL = 2;
+  static STROKE_WEIGHT_SELECTED = 3;
+  
   constructor(fromBox, toBox) {
     if (!fromBox || !toBox) {
       console.error('Connection requires valid boxes');
     }
     this.fromBox = fromBox;
     this.toBox = toBox;
-    this.arrowSize = 10;
+    this.arrowSize = Connection.ARROW_SIZE;
     this.selected = false;
   }
   
@@ -32,10 +38,10 @@ class Connection {
     // Draw line
     if (this.selected) {
       stroke(100, 150, 255);
-      strokeWeight(3);
+      strokeWeight(Connection.STROKE_WEIGHT_SELECTED);
     } else {
       stroke(80);
-      strokeWeight(2);
+      strokeWeight(Connection.STROKE_WEIGHT_NORMAL);
     }
     line(start.x, start.y, end.x, end.y);
     
@@ -88,7 +94,7 @@ class Connection {
     
     // Distance from point to line segment
     let d = this.distanceToSegment(mx, my, start.x, start.y, end.x, end.y);
-    return d < 5; // 5 pixel threshold
+    return d < Connection.HIT_THRESHOLD;
   }
   
   distanceToSegment(px, py, x1, y1, x2, y2) {

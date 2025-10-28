@@ -1,23 +1,30 @@
 class MindMap {
+  // Constants for configuration
+  static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
+  static ALIGN_TOLERANCE = 12;
+  
   constructor() {
     this.boxes = [];
     this.connections = [];
     this.selectedBox = null;
     this.selectedConnection = null;
-    // If connecting, stores { box, side }
     this.connectingFrom = null;
 
-    // Undo history (up to 5 snapshots)
+    // Undo history - optimized with larger stack
     this.undoStack = [];
-    this.maxUndo = 5;
+    this.maxUndo = MindMap.MAX_UNDO_STACK;
 
     // Multi-selection of boxes
     this.selectedBoxes = new Set();
+    
+    // Performance optimization: track if content has changed
+    this.isDirty = true;
   }
   
   addBox(box) {
     this.pushUndo();
     this.boxes.push(box);
+    this.isDirty = true;
   }
   
   addConnection(fromBox, toBox) {
@@ -37,19 +44,24 @@ class MindMap {
     for (let conn of this.connections) {
       if (conn.fromBox === fromBox && conn.toBox === toBox) {
         console.warn('Connection already exists');
-        return; // Connection already exists
+        return;
       }
     }
     
     this.pushUndo();
     this.connections.push(new Connection(fromBox, toBox));
+    this.isDirty = true;
   }
 
   // Push current state to undo stack (before making a change)
   pushUndo() {
     try {
       const snap = this.toJSON();
-      this.undoStack.push(JSON.parse(JSON.stringify(snap)));
+      // Deep clone to prevent reference issues
+      const clonedSnap = JSON.parse(JSON.stringify(snap));
+      this.undoStack.push(clonedSnap);
+      
+      // Limit stack size for memory management
       if (this.undoStack.length > this.maxUndo) {
         this.undoStack.shift();
       }
@@ -64,6 +76,7 @@ class MindMap {
     const snap = this.undoStack.pop();
     if (!snap) return;
     this.fromJSON(snap);
+    this.isDirty = true;
   }
   
   draw() {
@@ -114,8 +127,8 @@ class MindMap {
   
   // Align boxes' x and y positions when they are within a tolerance.
   // Groups nearby coordinates into clusters and snaps each cluster to its average.
-  alignBoxes(tolerance = 12) {
-    const tol = Math.max(0, Number.isFinite(tolerance) ? tolerance : 12);
+  alignBoxes(tolerance = MindMap.ALIGN_TOLERANCE) {
+    const tol = Math.max(0, Number.isFinite(tolerance) ? tolerance : MindMap.ALIGN_TOLERANCE);
     if (!this.boxes || this.boxes.length < 2) return;
 
     // Helper: cluster numerical values and return array of clusters (arrays of indices)
@@ -500,11 +513,15 @@ class MindMap {
       return;
     }
     
+    // Clean up existing references to prevent memory leaks
     this.boxes = [];
     this.connections = [];
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
+    if (this.selectedBoxes) {
+      this.selectedBoxes.clear();
+    }
     
     // Load boxes with error handling
     if (Array.isArray(data.boxes)) {
@@ -541,6 +558,8 @@ class MindMap {
     } else {
       console.warn('No connections data found');
     }
+    
+    this.isDirty = true;
   }
   
   async save() {

@@ -1,3 +1,28 @@
+// Configuration constants
+const CONFIG = {
+  ZOOM: {
+    MIN: 0.2,
+    MAX: 3.0,
+    STEP: 1.05
+  },
+  CAMERA: {
+    PAN_MARGIN: 500
+  },
+  UI: {
+    TOOLBAR_HEIGHT: 40,
+    MENU_TRIGGER_X: 50,
+    MENU_TRIGGER_Y: 50,
+    BUTTONS_BAND_HEIGHT: 50,
+    BUTTON_START_X: 10,
+    BUTTON_Y: 10,
+    BUTTON_GAP: 10
+  },
+  EXPORT: {
+    PADDING: 50,
+    MARGIN: 20
+  }
+};
+
 let mindMap;
 let newBoxButton;
 let saveButton;
@@ -8,15 +33,12 @@ let exportPDFButton;
 let menuIsVisible = false;
 let fullScreenButton;
 let alignButton;
-let menuRightEdge = 600; // Updated after layout to cover hover band width
+let menuRightEdge = 600;
 
 // Camera/zoom state
 let camX = 0;
 let camY = 0;
 let zoom = 1;
-const MIN_ZOOM = 0.2;
-const MAX_ZOOM = 3.0;
-const ZOOM_STEP = 1.05; // per wheel notch
 
 // Panning state
 let isPanning = false;
@@ -24,6 +46,10 @@ let panStartMouseX = 0;
 let panStartMouseY = 0;
 let panStartCamX = 0;
 let panStartCamY = 0;
+
+// Performance optimization: debounce expensive operations
+let lastResizeTime = 0;
+const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 
 // Helpers to convert between screen and world coordinates
 // Transform: screen = world * zoom + cam
@@ -42,16 +68,32 @@ function screenY(worldY) {
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
-  
-  mindMap = new MindMap();
-  
-  // Create initial boxes as examples
-  mindMap.addBox(new TextBox(300, 200, "Main Idea"));
-  mindMap.addBox(new TextBox(500, 300, "Sub Topic 1"));
-  mindMap.addBox(new TextBox(500, 100, "Sub Topic 2"));
-  
-  // Create UI buttons
+  try {
+    createCanvas(windowWidth, windowHeight);
+    
+    mindMap = new MindMap();
+    
+    // Create initial boxes as examples
+    mindMap.addBox(new TextBox(300, 200, "Main Idea"));
+    mindMap.addBox(new TextBox(500, 300, "Sub Topic 1"));
+    mindMap.addBox(new TextBox(500, 100, "Sub Topic 2"));
+    
+    // Create UI buttons
+    setupUIButtons();
+    
+    // Lay out buttons neatly
+    layoutMenuButtons();
+
+    // Hide menu buttons initially
+    hideMenuButtons();
+  } catch (e) {
+    console.error('Setup failed:', e);
+    alert('Failed to initialize application: ' + e.message);
+  }
+}
+
+// Separate function for UI button setup to improve organization
+function setupUIButtons() {
   newBoxButton = createButton('New Box');
   newBoxButton.position(10, 10);
   newBoxButton.mousePressed(createNewBox);
@@ -80,20 +122,19 @@ function setup() {
   alignButton.position(520, 10);
   alignButton.mousePressed(() => {
     try {
-      if (mindMap) { mindMap.pushUndo(); mindMap.alignBoxes(12); }
-    } catch (e) { console.error('Align failed:', e); }
+      if (mindMap && mindMap.pushUndo && mindMap.alignBoxes) {
+        mindMap.pushUndo();
+        mindMap.alignBoxes(12);
+      }
+    } catch (e) {
+      console.error('Align failed:', e);
+    }
   });
   
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
-  fileInput.position(-200, -200); // Hide it off-screen
+  fileInput.position(-200, -200);
   fileInput.style('display', 'none');
-
-  // Lay out buttons neatly left-to-right in requested order
-  layoutMenuButtons();
-
-  // Hide menu buttons initially
-  hideMenuButtons();
 }
 
 function draw() {
@@ -127,12 +168,11 @@ function updateCursorForHover() {
   if (!validMouse) { cursor('default'); return; }
 
   // Panning cursor states
-  const toolbarHeight = 40;
   const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
   const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (isPanning) { cursor('grabbing'); return; }
-  if (mouseY > toolbarHeight && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
+  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && noSelection && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
   // Check top-most first
   for (let i = mindMap.boxes.length - 1; i >= 0; i--) {
@@ -161,16 +201,11 @@ function updateCursorForHover() {
 
 // Show or hide the top-left menu based on cursor position
 function updateMenuVisibility() {
-  // Define a small top-left trigger zone and a band covering the buttons area
-  const triggerX = 50;
-  const triggerY = 50;
-  // Buttons span from x=10 to menuRightEdge (computed after layout)
-  const buttonsRightEdge = menuRightEdge;
-  const buttonsBandHeight = 50; // top row height
-
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
-  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && mouseX <= triggerX && mouseY <= triggerY;
-  const inButtonsBand = validMouse && mouseY >= 0 && mouseY <= buttonsBandHeight && mouseX >= 0 && mouseX <= buttonsRightEdge;
+  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && 
+    mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
+  const inButtonsBand = validMouse && mouseY >= 0 && 
+    mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0 && mouseX <= menuRightEdge;
   const shouldShow = inTrigger || inButtonsBand;
 
   if (shouldShow !== menuIsVisible) {
@@ -180,30 +215,31 @@ function updateMenuVisibility() {
 }
 
 function showMenuButtons() {
-  newBoxButton.style('display', 'inline-block');
-  saveButton.style('display', 'inline-block');
-  loadButton.style('display', 'inline-block');
-  exportPNGButton.style('display', 'inline-block');
-  exportPDFButton.style('display', 'inline-block');
-  fullScreenButton.style('display', 'inline-block');
-  alignButton.style('display', 'inline-block');
+  // Guard if setup failed and buttons are not yet created
+  if (newBoxButton && newBoxButton.style) newBoxButton.style('display', 'inline-block');
+  if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
+  if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
+  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
+  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
+  if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'inline-block');
+  if (alignButton && alignButton.style) alignButton.style('display', 'inline-block');
 }
 
 function hideMenuButtons() {
-  newBoxButton.style('display', 'none');
-  saveButton.style('display', 'none');
-  loadButton.style('display', 'none');
-  exportPNGButton.style('display', 'none');
-  exportPDFButton.style('display', 'none');
-  fullScreenButton.style('display', 'none');
-  alignButton.style('display', 'none');
+  if (newBoxButton && newBoxButton.style) newBoxButton.style('display', 'none');
+  if (saveButton && saveButton.style) saveButton.style('display', 'none');
+  if (loadButton && loadButton.style) loadButton.style('display', 'none');
+  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
+  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
+  if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'none');
+  if (alignButton && alignButton.style) alignButton.style('display', 'none');
 }
 
 // Arrange buttons: Load, Save, Export PNG, Export PDF, Full Screen, then New Box
 function layoutMenuButtons() {
-  const startX = 10;
-  const y = 10;
-  const gap = 10;
+  const startX = CONFIG.UI.BUTTON_START_X;
+  const y = CONFIG.UI.BUTTON_Y;
+  const gap = CONFIG.UI.BUTTON_GAP;
 
   // Ensure buttons are displayed to get proper widths
   loadButton.style('display', 'inline-block');
@@ -231,7 +267,7 @@ function layoutMenuButtons() {
 
 function mousePressed() {
   // Prevent interaction with canvas when clicking on UI buttons
-  if (mouseY > 40 && mindMap) {
+  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mindMap) {
     try {
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
       const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
@@ -278,7 +314,7 @@ function mouseDragged() {
     // Apply soft pan limits based on content bounds
     if (mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
       const bounds = getContentBounds();
-      const margin = 500; // Allow panning this far beyond content
+      const margin = CONFIG.CAMERA.PAN_MARGIN;
       const minCamX = -bounds.maxX * zoom - margin;
       const maxCamX = -bounds.minX * zoom + width + margin;
       const minCamY = -bounds.maxY * zoom - margin;
@@ -388,9 +424,8 @@ function createNewBox() {
   
   // Create box at cursor position in world space if over canvas, else at viewport center
   let x, y;
-  const toolbarHeight = 40;
   
-  if (mouseY > toolbarHeight && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     // Mouse is over canvas (in screen space) - use world position
     x = worldMouseX();
     y = worldMouseY();
@@ -414,41 +449,56 @@ function triggerFileLoad() {
 function handleFileLoad(file) {
   if (!file) {
     console.error('No file provided');
+    alert('Please select a valid file');
     return;
   }
   
-  if (file.type === 'application' || file.name.endsWith('.json')) {
-    try {
-      // Validate file.data exists
-      if (!file.data) {
-        console.error('File data is empty or invalid');
-        return;
-      }
-      
-      // If data is a string, try to parse it
-      let data = file.data;
-      if (typeof data === 'string') {
-        try {
-          data = JSON.parse(data);
-        } catch (e) {
-          console.error('Failed to parse JSON:', e);
-          return;
-        }
-      }
-      
-      mindMap.load(data);
-    } catch (e) {
-      console.error('Failed to load file:', e);
-      alert('Failed to load file. The file may be corrupted or invalid.');
-    }
-  } else {
-    console.error('Please load a JSON file');
+  // Validate file type
+  if (!file.type.includes('application') && !file.name.endsWith('.json')) {
+    console.error('Invalid file type:', file.type);
     alert('Please load a JSON file');
+    return;
+  }
+  
+  try {
+    // Validate file.data exists
+    if (!file.data) {
+      throw new Error('File data is empty or invalid');
+    }
+    
+    // If data is a string, try to parse it
+    let data = file.data;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) {
+        throw new Error('Failed to parse JSON: ' + e.message);
+      }
+    }
+    
+    // Validate data structure
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid JSON structure');
+    }
+    
+    if (!data.boxes || !Array.isArray(data.boxes)) {
+      throw new Error('Missing or invalid boxes data');
+    }
+    
+    mindMap.load(data);
+  } catch (e) {
+    console.error('Failed to load file:', e);
+    alert('Failed to load file: ' + e.message);
   }
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
+  const now = millis();
+  // Debounce resize to avoid expensive recalculations
+  if (now - lastResizeTime > RESIZE_DEBOUNCE_MS) {
+    resizeCanvas(windowWidth, windowHeight);
+    lastResizeTime = now;
+  }
 }
 
 // Mouse wheel to zoom the whole view around the cursor
@@ -462,8 +512,8 @@ function mouseWheel(event) {
   const wy = worldMouseY();
 
   // Zoom in (negative deltaY) or out (positive)
-  const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-  const newZoom = constrain(zoom * factor, MIN_ZOOM, MAX_ZOOM);
+  const factor = event.deltaY < 0 ? CONFIG.ZOOM.STEP : 1 / CONFIG.ZOOM.STEP;
+  const newZoom = constrain(zoom * factor, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
 
   // Adjust camera to keep the world point under the cursor stationary
   camX = mouseX - wx * newZoom;
@@ -517,7 +567,7 @@ function resetView() {
   const margin = 1.1;
   const zoomX = width / (contentWidth * margin);
   const zoomY = height / (contentHeight * margin);
-  zoom = constrain(min(zoomX, zoomY), MIN_ZOOM, MAX_ZOOM);
+  zoom = constrain(min(zoomX, zoomY), CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
   
   // Center the content in viewport
   camX = width / 2 - centerX * zoom;
@@ -556,7 +606,7 @@ function exportPNG() {
     const contentHeight = bounds.maxY - bounds.minY;
     
     // Add padding
-    const padding = 50;
+    const padding = CONFIG.EXPORT.PADDING;
     const totalWidth = contentWidth + padding * 2;
     const totalHeight = contentHeight + padding * 2;
     
@@ -626,7 +676,7 @@ function exportPNG() {
       pg.textSize(box.fontSize);
       
       let wrappedLines = getWrappedLinesForBox(box);
-      let lineHeight = box.fontSize * 1.5;
+      let lineHeight = box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5);
       let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
       let textX = box.x - box.width / 2 + box.padding;
       
@@ -655,6 +705,11 @@ function getWrappedLinesForBox(box) {
   let wrappedLines = [];
   let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
   let maxTextWidth = max(10, baseWidth - box.padding * 2);
+  
+  // Ensure text measurements match the box font size
+  // Note: textWidth uses the current global p5 textSize, not the offscreen buffer.
+  // We set it here to match how the text will be drawn into the PNG buffer.
+  textSize(box.fontSize || 14);
   
   for (let line of lines) {
     if (!line || line === '') {
@@ -730,7 +785,7 @@ function exportPDF() {
     const contentCenterY = (bounds.minY + bounds.maxY) / 2;
     
     // Add some padding around content
-    const padding = 50;
+    const padding = CONFIG.EXPORT.PADDING;
     const totalWidth = contentWidth + padding * 2;
     const totalHeight = contentHeight + padding * 2;
     
@@ -747,7 +802,7 @@ function exportPDF() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     
     // Calculate scaling to fit all content to page with margins
-    const margin = 20;
+    const margin = CONFIG.EXPORT.MARGIN;
     const scale = Math.min(
       (pageWidth - 2 * margin) / totalWidth,
       (pageHeight - 2 * margin) / totalHeight
@@ -851,7 +906,7 @@ function exportPDF() {
       pdf.setTextColor(0, 0, 0);
       
       let wrappedLines = getWrappedLines(box);
-      let lineHeight = ts(box.fontSize * 1.5);
+      let lineHeight = ts(box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5));
       // Top-anchored text in PDF: start at box top + padding
       let startY = ty(box.y - box.height / 2) + ts(box.padding) + lineHeight * 0.7;
       let textX = tx(box.x - box.width / 2 + box.padding);
