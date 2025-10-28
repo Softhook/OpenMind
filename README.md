@@ -10,6 +10,8 @@ A simple and intuitive mind mapping application built with p5.js.
 - **Multi-select & Group Drag**: Hold Shift and click multiple boxes to select them; while holding Shift, drag from a box edge to move them together
 - **Create Connections**: Click on the edge of a box, then click on another box to create a directed connection
 - **Save/Load**: Save your mind maps as JSON files and load them later
+   - On Chromium-based browsers (Chrome/Edge), Save will open a system "Save As" dialog so you can choose the exact folder via the File System Access API
+   - On other browsers, it will download the file (usually to your Downloads folder)
 - **Zoom View**: Use your mouse scroll/trackpad over the canvas to zoom the entire mind map in or out
 
 ## How to Use

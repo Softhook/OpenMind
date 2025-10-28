@@ -535,9 +535,34 @@ class MindMap {
     }
   }
   
-  save() {
-    let data = this.toJSON();
-    saveJSON(data, 'mindmap.json');
+  async save() {
+    const data = this.toJSON();
+    try {
+      // Use the File System Access API when available to let the user choose a location
+      if (typeof window !== 'undefined' && window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: 'openmind.json',
+          types: [
+            {
+              description: 'JSON Files',
+              accept: { 'application/json': ['.json'] }
+            }
+          ]
+        });
+        const writable = await handle.createWritable();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        // Fallback: regular download (browser chooses default Downloads location)
+        saveJSON(data, 'openmind.json');
+      }
+    } catch (e) {
+      // User may cancel the dialog; that's not an error
+      if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
+      console.error('Save failed:', e);
+      try { alert('Save failed: ' + (e && e.message ? e.message : String(e))); } catch (_) {}
+    }
   }
   
   load(data) {
