@@ -6,7 +6,6 @@ class TextBox {
   static MAX_WIDTH = 300;
   static FONT_SIZE = 14;
   static CORNER_RADIUS = 10;
-  static DELETE_ICON_SIZE = 18;
   static RESIZE_HANDLE_SIZE = 18;
   static CURSOR_BLINK_RATE = 530;
   static DRAG_EDGE_THICKNESS = 16;
@@ -31,7 +30,6 @@ class TextBox {
     this.cursorPosition = text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
-    this.deleteIconSize = TextBox.DELETE_ICON_SIZE;
     this.resizeHandleSize = TextBox.RESIZE_HANDLE_SIZE;
     this.isResizing = false;
     this.resizeStartX = 0;
@@ -237,40 +235,6 @@ class TextBox {
       this.drawCursor(wrappedLines, textX, startY, lineHeight);
     }
     
-    // Draw delete icon if mouse is near top-right corner
-    if (this.isMouseNearDeleteIcon()) {
-      // Get current zoom level from global scope
-      const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-      // Apply moderate scaling: icons get smaller when zoomed in
-      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
-      const scaledIconSize = this.deleteIconSize / zoomFactor;
-      
-      let iconX = this.x + this.width/2 - scaledIconSize;
-      let iconY = this.y - this.height/2;
-      let cx = iconX + scaledIconSize/2;
-      let cy = iconY + scaledIconSize/2;
-      
-      // Draw shadow for depth
-      fill(0, 0, 0, 30);
-      noStroke();
-      circle(cx + 1/currentZoom, cy + 1.5/currentZoom, scaledIconSize);
-      
-      // Draw red gradient-style circle background
-      fill(this.isMouseOverDeleteIcon() ? color(235, 60, 60) : color(220, 50, 50));
-      stroke(180, 40, 40);
-      strokeWeight(1.5 / zoomFactor);
-      circle(cx, cy, scaledIconSize);
-      
-      // Draw white X with rounded ends
-      stroke(255);
-      strokeWeight(2.5 / zoomFactor);
-      strokeCap(ROUND);
-      let offset = scaledIconSize * 0.28;
-      line(cx - offset, cy - offset, cx + offset, cy + offset);
-      line(cx - offset, cy + offset, cx + offset, cy - offset);
-      strokeCap(SQUARE); // Reset to default
-    }
-    
     // Draw resize handle in bottom-right corner (only when not editing)
     if (!this.isEditing && (this.isMouseOver() || this.isResizing)) {
       // Get current zoom level from global scope
@@ -449,36 +413,6 @@ class TextBox {
         mx < this.x + this.width/2 &&
         my > this.y - this.height/2 &&
         my < this.y + this.height/2;
-  }
-  
-  isMouseNearDeleteIcon() {
-    // Show delete icon when mouse is in the top-right area
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
-    const scaledIconSize = this.deleteIconSize / zoomFactor;
-    let iconX = this.x + this.width/2 - scaledIconSize;
-    let iconY = this.y - this.height/2;
-    let hoverRadius = scaledIconSize * 2; // Larger hover area
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    return mx > iconX - hoverRadius + scaledIconSize && 
-      mx < iconX + scaledIconSize + 10 / zoomFactor &&
-      my > iconY - 10 / zoomFactor && 
-      my < iconY + hoverRadius;
-  }
-  
-  isMouseOverDeleteIcon() {
-    // Check if mouse is directly over the delete icon
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
-    const scaledIconSize = this.deleteIconSize / zoomFactor;
-    let iconX = this.x + this.width/2 - scaledIconSize/2;
-    let iconY = this.y - this.height/2 + scaledIconSize/2;
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    let distance = dist(mx, my, iconX, iconY);
-    
-    return distance < scaledIconSize/2;
   }
   
   isMouseOverResizeHandle() {

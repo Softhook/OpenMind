@@ -62,45 +62,9 @@
     },
     {
       "x": 1181.3157640175784,
-      "y": 830.6075000000001,
-      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation. ",
-      "width": 310.6827734374999,
-      "height": 114,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1181.3157640175784,
       "y": 697.73,
       "text": "Inventing\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
       "width": 295.38941406250024,
-      "height": 135,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1181.3157640175784,
-      "y": 1098.8445621875,
-      "text": "Limited\nWhat's significance about the complexity limit is that it shows that this is not solution but best seen as a form of prototyping. ",
-      "width": 308.1928361406251,
-      "height": 114,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1181.3157640175784,
-      "y": 965.0573087187502,
-      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
-      "width": 304.4459375000001,
       "height": 135,
       "backgroundColor": {
         "r": 255,
@@ -203,47 +167,95 @@
         "g": 200,
         "b": 140
       }
+    },
+    {
+      "x": 1185.3157640175784,
+      "y": 1222.8445621875,
+      "text": "Limited\nWhat's significance about the complexity limit is that it shows that this is not solution but best seen as a form of prototyping. ",
+      "width": 308.1928361406251,
+      "height": 114,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1185.3157640175784,
+      "y": 1089.0573087187502,
+      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
+      "width": 304.4459375000001,
+      "height": 135,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1181.3157640175784,
+      "y": 830.6075000000001,
+      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation. ",
+      "width": 310.6827734374999,
+      "height": 114,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1180,
+      "y": 958,
+      "text": "Nonlinear\nDesining without a plan ",
+      "width": 310.6827734374999,
+      "height": 72,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
     {
-      "from": 9,
-      "to": 10
+      "from": 6,
+      "to": 7
     },
     {
       "from": 3,
-      "to": 9
-    },
-    {
-      "from": 15,
-      "to": 14
-    },
-    {
-      "from": 14,
-      "to": 13
+      "to": 6
     },
     {
       "from": 12,
+      "to": 11
+    },
+    {
+      "from": 11,
+      "to": 10
+    },
+    {
+      "from": 9,
       "to": 0
     },
     {
       "from": 2,
+      "to": 10
+    },
+    {
+      "from": 7,
+      "to": 2
+    },
+    {
+      "from": 8,
+      "to": 9
+    },
+    {
+      "from": 4,
       "to": 13
     },
     {
       "from": 10,
-      "to": 2
-    },
-    {
-      "from": 11,
-      "to": 12
-    },
-    {
-      "from": 4,
-      "to": 16
-    },
-    {
-      "from": 13,
       "to": 0
     }
   ]

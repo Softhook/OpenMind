@@ -225,31 +225,7 @@ class MindMap {
       this.selectedConnection = null;
     }
     
-    // Check if clicking on delete icon of any box
-    for (let i = this.boxes.length - 1; i >= 0; i--) {
-      let box = this.boxes[i];
-      if (!box) continue; // Skip null boxes
-      if (box.isMouseOverDeleteIcon()) {
-        this.pushUndo();
-        // Remove connections that involve this box
-        this.connections = this.connections.filter(conn => 
-          conn.fromBox !== box && conn.toBox !== box
-        );
-        // Remove the box
-        this.boxes.splice(i, 1);
-        // Remove from multi-selection if present
-        if (this.selectedBoxes.has(box)) {
-          this.selectedBoxes.delete(box);
-        }
-        if (box.selected) box.selected = false;
-        if (this.selectedBox === box) {
-          this.selectedBox = null;
-        }
-        return;
-      }
-    }
-    
-      // Check if clicking on a background color circle of any selected box (top-most first)
+    // Check if clicking on a background color circle of any selected box (top-most first)
       for (let i = this.boxes.length - 1; i >= 0; i--) {
         const box = this.boxes[i];
         if (!box || !box.selected || box.isEditing || typeof box.getColorCircleUnderMouse !== 'function') continue;
@@ -628,8 +604,32 @@ class MindMap {
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
-      // Delete selected connection only
-      if (this.selectedConnection) {
+      // Delete selected boxes or connection
+      if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+        // Delete all selected boxes
+        this.pushUndo();
+        const boxesToDelete = Array.from(this.selectedBoxes);
+        
+        for (const box of boxesToDelete) {
+          // Remove connections involving this box
+          this.connections = this.connections.filter(conn => 
+            conn.fromBox !== box && conn.toBox !== box
+          );
+          
+          // Remove the box
+          const index = this.boxes.indexOf(box);
+          if (index > -1) {
+            this.boxes.splice(index, 1);
+          }
+        }
+        
+        // Clear selection
+        this.clearBoxSelection();
+        if (this.selectedBox) {
+          this.selectedBox = null;
+        }
+      } else if (this.selectedConnection) {
+        // Delete selected connection only
         this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
