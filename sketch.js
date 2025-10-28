@@ -30,6 +30,7 @@ let loadButton;
 let fileInput;
 let exportPNGButton;
 let exportPDFButton;
+let exportTextButton;
 let menuIsVisible = false;
 let fullScreenButton;
 let alignButton;
@@ -114,8 +115,12 @@ function setupUIButtons() {
   exportPDFButton.position(330, 10);
   exportPDFButton.mousePressed(exportPDF);
   
+  exportTextButton = createButton('Export Text');
+  exportTextButton.position(430, 10);
+  exportTextButton.mousePressed(exportText);
+  
   fullScreenButton = createButton('Full Screen');
-  fullScreenButton.position(430, 10);
+  fullScreenButton.position(530, 10);
   fullScreenButton.mousePressed(toggleFullScreen);
 
   alignButton = createButton('Align');
@@ -234,6 +239,7 @@ function showMenuButtons() {
   if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
+  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
   if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'inline-block');
   if (alignButton && alignButton.style) alignButton.style('display', 'inline-block');
 }
@@ -244,6 +250,7 @@ function hideMenuButtons() {
   if (loadButton && loadButton.style) loadButton.style('display', 'none');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
+  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
   if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'none');
   if (alignButton && alignButton.style) alignButton.style('display', 'none');
 }
@@ -259,6 +266,7 @@ function layoutMenuButtons() {
   saveButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
+  exportTextButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
   alignButton.style('display', 'inline-block');
   newBoxButton.style('display', 'inline-block');
@@ -270,6 +278,7 @@ function layoutMenuButtons() {
   saveButton.position(x, y); x += w(saveButton) + gap;
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
+  exportTextButton.position(x, y); x += w(exportTextButton) + gap;
   fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
   alignButton.position(x, y); x += w(alignButton) + gap;
   newBoxButton.position(x, y); x += w(newBoxButton) + gap;
@@ -949,6 +958,111 @@ function toggleFullScreen() {
   } catch (e) {
     console.error('Failed to toggle fullscreen:', e);
   }
+}
+
+function exportText() {
+  try {
+    // Validate mindMap
+    if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
+      alert('No content to export');
+      return;
+    }
+    
+    // Build a hierarchy based on connections
+    const hierarchy = buildTextHierarchy();
+    
+    // Generate text output
+    let textOutput = hierarchy.join('\n\n');
+    
+    // Create a blob and download
+    const blob = new Blob([textOutput], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mindmap-text.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Failed to export text:', e);
+    alert('Failed to export text: ' + e.message);
+  }
+}
+
+function buildTextHierarchy() {
+  // Build adjacency list from connections (from -> to)
+  const children = new Map(); // box -> array of child boxes
+  const parents = new Map();  // box -> array of parent boxes
+  
+  for (let box of mindMap.boxes) {
+    children.set(box, []);
+    parents.set(box, []);
+  }
+  
+  for (let conn of mindMap.connections) {
+    if (!conn.fromBox || !conn.toBox) continue;
+    children.get(conn.fromBox).push(conn.toBox);
+    parents.get(conn.toBox).push(conn.fromBox);
+  }
+  
+  // Find root nodes (boxes with no parents)
+  const roots = mindMap.boxes.filter(box => parents.get(box).length === 0);
+  
+  // If no roots found (circular graph), use all boxes sorted by position
+  if (roots.length === 0) {
+    return mindMap.boxes
+      .map(box => box.text || '')
+      .filter(text => text.trim() !== '');
+  }
+  
+  // Traverse from each root using depth-first search
+  const visited = new Set();
+  const result = [];
+  
+  function traverse(box) {
+    if (visited.has(box)) return;
+    visited.add(box);
+    
+    // Add this box's text
+    if (box.text && box.text.trim() !== '') {
+      result.push(box.text.trim());
+    }
+    
+    // Traverse children
+    const boxChildren = children.get(box) || [];
+    for (let child of boxChildren) {
+      traverse(child);
+    }
+  }
+  
+  // Sort roots by y-position (top to bottom), then x-position (left to right)
+  roots.sort((a, b) => {
+    const yDiff = a.y - b.y;
+    if (Math.abs(yDiff) > 50) return yDiff; // Different rows
+    return a.x - b.x; // Same row, sort by x
+  });
+  
+  // Traverse from each root
+  for (let root of roots) {
+    traverse(root);
+  }
+  
+  // Add any unvisited boxes (disconnected components)
+  const unvisited = mindMap.boxes.filter(box => !visited.has(box));
+  unvisited.sort((a, b) => {
+    const yDiff = a.y - b.y;
+    if (Math.abs(yDiff) > 50) return yDiff;
+    return a.x - b.x;
+  });
+  
+  for (let box of unvisited) {
+    if (box.text && box.text.trim() !== '') {
+      result.push(box.text.trim());
+    }
+  }
+  
+  return result;
 }
 
 // Helper function to get wrapped lines for a text box (duplicates TextBox logic)
