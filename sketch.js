@@ -15,7 +15,7 @@ const CONFIG = {
     BUTTONS_BAND_HEIGHT: 50,
     BUTTON_START_X: 10,
     BUTTON_Y: 10,
-    BUTTON_GAP: 10
+    BUTTON_GAP: 5
   },
   EXPORT: {
     PADDING: 50,
@@ -24,7 +24,6 @@ const CONFIG = {
 };
 
 let mindMap;
-let newBoxButton;
 let saveButton;
 let loadButton;
 let fileInput;
@@ -33,7 +32,6 @@ let exportPDFButton;
 let exportTextButton;
 let menuIsVisible = false;
 let fullScreenButton;
-let alignButton;
 let menuRightEdge = 600;
 
 // Camera/zoom state
@@ -194,10 +192,6 @@ function setup() {
 
 // Separate function for UI button setup to improve organization
 function setupUIButtons() {
-  newBoxButton = createButton('New Box');
-  newBoxButton.position(10, 10);
-  newBoxButton.mousePressed(createNewBox);
-  
   saveButton = createButton('Save');
   saveButton.position(100, 10);
   saveButton.mousePressed(() => mindMap.save());
@@ -221,19 +215,6 @@ function setupUIButtons() {
   fullScreenButton = createButton('Full Screen');
   fullScreenButton.position(530, 10);
   fullScreenButton.mousePressed(toggleFullScreen);
-
-  alignButton = createButton('Align');
-  alignButton.position(520, 10);
-  alignButton.mousePressed(() => {
-    try {
-      if (mindMap && mindMap.pushUndo && mindMap.alignBoxes) {
-        mindMap.pushUndo();
-        mindMap.alignBoxes(12);
-      }
-    } catch (e) {
-      console.error('Align failed:', e);
-    }
-  });
   
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
@@ -342,28 +323,24 @@ function updateMenuVisibility() {
 
 function showMenuButtons() {
   // Guard if setup failed and buttons are not yet created
-  if (newBoxButton && newBoxButton.style) newBoxButton.style('display', 'inline-block');
   if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
   if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
   if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'inline-block');
-  if (alignButton && alignButton.style) alignButton.style('display', 'inline-block');
 }
 
 function hideMenuButtons() {
-  if (newBoxButton && newBoxButton.style) newBoxButton.style('display', 'none');
   if (saveButton && saveButton.style) saveButton.style('display', 'none');
   if (loadButton && loadButton.style) loadButton.style('display', 'none');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
   if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'none');
-  if (alignButton && alignButton.style) alignButton.style('display', 'none');
 }
 
-// Arrange buttons: Load, Save, Export PNG, Export PDF, Full Screen, then New Box
+// Arrange buttons: Load, Save, Export PNG, Export PDF, Export Text, Full Screen
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
   const y = CONFIG.UI.BUTTON_Y;
@@ -376,8 +353,6 @@ function layoutMenuButtons() {
   exportPDFButton.style('display', 'inline-block');
   exportTextButton.style('display', 'inline-block');
   fullScreenButton.style('display', 'inline-block');
-  alignButton.style('display', 'inline-block');
-  newBoxButton.style('display', 'inline-block');
 
   const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
 
@@ -388,8 +363,6 @@ function layoutMenuButtons() {
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
   fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
-  alignButton.position(x, y); x += w(alignButton) + gap;
-  newBoxButton.position(x, y); x += w(newBoxButton) + gap;
 
   // Update the hover band to cover to the right of the last button
   menuRightEdge = x + 10;
@@ -564,6 +537,14 @@ function keyPressed() {
     // Reset view: press 0 or Home key
     if (!hasModifier && (key === '0' || keyCode === 36)) {
       resetView();
+      return false;
+    }
+    // Align boxes: press A key
+    if (!hasModifier && (key === 'a' || key === 'A')) {
+      if (mindMap.pushUndo && mindMap.alignBoxes) {
+        mindMap.pushUndo();
+        mindMap.alignBoxes(12);
+      }
       return false;
     }
   }

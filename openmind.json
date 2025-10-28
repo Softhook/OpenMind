@@ -2,7 +2,7 @@
   "boxes": [
     {
       "x": -411.17833942577244,
-      "y": 915.4388148152973,
+      "y": 918.6162289954536,
       "text": "2 This position is also dangerously normative: it assumes there is a “proper” or “real” state of things against which AI’s behaviour should be judged, reinforcing rigid distinctions rather than exploring how new kinds of design are produced through human–AI interaction.",
       "width": 300.19075724364336,
       "height": 177,
@@ -157,7 +157,7 @@
       }
     },
     {
-      "x": 1173.8026103423883,
+      "x": 1177.193691673234,
       "y": 1158.771763007705,
       "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
       "width": 304.4459375000001,
@@ -169,7 +169,7 @@
       }
     },
     {
-      "x": 1173.8026103423883,
+      "x": 1171.8779276556556,
       "y": 1027.7144542889548,
       "text": "Nonlinear\nDesining without a plan ",
       "width": 310.6827734374999,
@@ -181,7 +181,7 @@
       }
     },
     {
-      "x": 1173.8026103423883,
+      "x": 1177.193691673234,
       "y": 1292.5590164764549,
       "text": "Limited\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
       "width": 308.1928361406251,
@@ -193,8 +193,8 @@
       }
     },
     {
-      "x": 1173.8026103423883,
-      "y": 915.4388148152973,
+      "x": 1167.9701838967778,
+      "y": 912.261400635141,
       "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
       "width": 310.6827734374999,
       "height": 135,
@@ -205,7 +205,7 @@
       }
     },
     {
-      "x": 1173.8026103423883,
+      "x": 1181.3157640175784,
       "y": 697.73,
       "text": "Inventing\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
       "width": 295.38941406250024,
@@ -217,7 +217,7 @@
       }
     },
     {
-      "x": 1173.8026103423883,
+      "x": 1167.2644031378502,
       "y": 1480.0285142805462,
       "text": "Even vast improvment will not remove these inherant qualities of gen AI.\n\nRequires openess and looseness to go with it",
       "width": 260.8344307276841,
