@@ -451,7 +451,7 @@ class MindMap {
     }
   }
   
-  handleKeyPressed(key, keyCode) {
+  handleKeyPressed(key, keyCode, isRepeat = false) {
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
       if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
@@ -520,7 +520,7 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
-        this.pushUndo();
+        if (!isRepeat) this.pushUndo();
         // Modifier variants for deletion
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line
           this.selectedBox.deleteToLineStart();
@@ -530,7 +530,7 @@ class MindMap {
           this.selectedBox.removeChar();
         }
       } else if (keyCode === DELETE) {
-        this.pushUndo();
+        if (!isRepeat) this.pushUndo();
         // Forward delete and modifier variants
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to end of line
           this.selectedBox.deleteToLineEnd();

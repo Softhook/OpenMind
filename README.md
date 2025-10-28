@@ -53,6 +53,13 @@ While editing a text box:
   - Cmd/Ctrl+V: paste
 - Arrow keys move the caret; Up/Down move between wrapped lines
 
+Note on key repeat:
+
+- Holding Backspace/Delete will continuously delete. The app includes a fallback key-repeat if your browser/OS doesn’t auto-repeat these keys.
+- On macOS, if holding letter keys shows the accent popup and you prefer repeat for letters too, you can enable system key repeat by disabling press-and-hold accents (optional):
+  - Optional macOS setting: `defaults write -g ApplePressAndHoldEnabled -bool false` then log out/in.
+  - This is not required for Backspace/Delete; those repeat regardless, and the app provides a fallback for reliability.
+
 ### Mouse/Trackpad Controls
 
 - Scroll over the canvas to zoom in/out around the cursor

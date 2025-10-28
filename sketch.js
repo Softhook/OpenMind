@@ -61,6 +61,96 @@ let selectionCurrentY = 0;
 let lastResizeTime = 0;
 const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 
+// Fallback key-repeat manager (for Backspace/Delete) to ensure repeat works even if the browser/OS doesn't auto-repeat
+const KeyRepeat = {
+  // Only handle non-character deletion keys to avoid interfering with native typing.
+  // Don't rely on p5's keyCode constants being pre-defined at load time.
+  isTracked(code) {
+    const BK = (typeof BACKSPACE !== 'undefined') ? BACKSPACE : 8;
+    const DEL = (typeof DELETE !== 'undefined') ? DELETE : 46;
+    return code === BK || code === DEL;
+  },
+  initialDelay: 400, // ms before repeating starts (match typical OS behavior)
+  repeatInterval: 50, // ms between repeats
+  nativeRepeatThreshold: 150, // ms - if we see keydowns faster than this, browser is repeating
+  state: new Map(), // keyCode -> { active, pressedAt, lastEventAt, lastNativeKeydownAt, prevNativeKeydownAt }
+
+  _ensure(keyCode) {
+    // Ensure keyCode is a number for consistent Map lookups
+    const code = Number(keyCode);
+    if (!this.state.has(code)) {
+      this.state.set(code, { active: false, pressedAt: 0, lastEventAt: 0, lastNativeKeydownAt: 0, prevNativeKeydownAt: 0 });
+    }
+    return this.state.get(code);
+  },
+
+  noteNativeKeydown(keyCode) {
+    if (!this.isTracked(keyCode)) return;
+    const s = this._ensure(keyCode);
+    s.prevNativeKeydownAt = s.lastNativeKeydownAt;
+    s.lastNativeKeydownAt = millis();
+  },
+
+  start(keyCode) {
+    if (!this.isTracked(keyCode)) return;
+    const now = millis();
+    const s = this._ensure(keyCode);
+    s.active = true;
+    s.pressedAt = now;
+    s.lastEventAt = now; // last synthetic repeat time
+    // lastNativeKeydownAt updated by noteNativeKeydown from keyPressed
+  },
+
+  stop(keyCode) {
+    if (!this.isTracked(keyCode)) return;
+    const s = this._ensure(keyCode);
+    s.active = false;
+  },
+
+  reset() {
+    // Stop all tracked keys (e.g., on window blur)
+    for (const [, s] of this.state) s.active = false;
+  },
+
+  update() {
+    if (!mindMap) return;
+    const now = millis();
+    // Iterate over keys that are in the state map (those we've seen pressed)
+    for (const [keyCode, s] of this.state) {
+      if (!s.active || !this.isTracked(keyCode)) continue;
+
+      // Detect if browser is already delivering native repeats by checking time between consecutive keydowns
+      // If we've seen two keydowns close together (faster than our threshold), browser is handling repeat
+      const timeBetweenNativeKeydowns = s.lastNativeKeydownAt - s.prevNativeKeydownAt;
+      const hasNativeRepeat = s.prevNativeKeydownAt > 0 && 
+                              timeBetweenNativeKeydowns > 0 && 
+                              timeBetweenNativeKeydowns < this.nativeRepeatThreshold;
+      
+      if (hasNativeRepeat) {
+        // Browser is handling repeat, don't synthesize
+        continue;
+      }
+
+      // Start our fallback repeat only after initialDelay from the original press
+      if (now - s.pressedAt < this.initialDelay) continue;
+
+      // Fire at repeatInterval cadence
+      if (now - s.lastEventAt >= this.repeatInterval) {
+        s.lastEventAt = now;
+        // Call into existing handler with isRepeat = true so we can avoid spamming undo stack
+        try {
+          // We pass a null/space for key where appropriate; handler keys off keyCode for deletion
+          if (typeof mindMap.handleKeyPressed === 'function') {
+            mindMap.handleKeyPressed('', keyCode, true);
+          }
+        } catch (e) {
+          // Non-fatal
+        }
+      }
+    }
+  }
+};
+
 // Helpers to convert between screen and world coordinates
 // Transform: screen = world * zoom + cam
 // Inverse: world = (screen - cam) / zoom
@@ -177,6 +267,10 @@ function draw() {
     } catch (e) {
       // Non-fatal
     }
+    // Drive fallback key repeat after draw so we don't block rendering
+    try {
+      KeyRepeat.update();
+    } catch (_) {}
   }
 }
 
@@ -431,6 +525,10 @@ function keyPressed() {
       console.error('Error handling key press:', e);
     }
   }
+  // Track native keydowns for deletion keys to coordinate with fallback repeat
+  KeyRepeat.noteNativeKeydown(keyCode);
+  // Start fallback repeat tracking for deletion keys
+  KeyRepeat.start(keyCode);
   
   // Prevent default behavior for backspace
   if (keyCode === BACKSPACE) {
@@ -469,6 +567,18 @@ function keyPressed() {
       return false;
     }
   }
+}
+
+function keyReleased() {
+  // Stop fallback repeat on key release
+  KeyRepeat.stop(keyCode);
+}
+
+// Ensure repeats stop if the window loses focus
+if (typeof window !== 'undefined') {
+  window.addEventListener('blur', () => {
+    try { KeyRepeat.reset(); } catch (_) {}
+  });
 }
 
 // Note: Right-click no longer triggers any connection action; context menu is prevented below.
