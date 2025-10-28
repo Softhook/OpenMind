@@ -79,9 +79,7 @@ class TextBox {
     return [
       { key: 'white', color: { r: 255, g: 255, b: 255 } },
       { key: 'orange', color: { r: 255, g: 200, b: 140 } },
-      { key: 'red', color: { r: 255, g: 140, b: 140 } },
-      { key: 'light-green', color: { r: 200, g: 255, b: 200 } },
-      { key: 'light-blue', color: { r: 180, g: 210, b: 255 } }
+      { key: 'red', color: { r: 255, g: 140, b: 140 } }
     ];
   }
   
@@ -331,21 +329,21 @@ class TextBox {
     pop();
   }
 
-  // Compute screen positions for the three color circles at the top edge
+  // Compute screen positions for the three color circles on the left edge
   getColorPaletteCircles() {
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
     const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     const r = this.colorCircleRadius / zoomFactor;
     const spacing = this.colorCircleSpacing / zoomFactor;
-    const marginLeft = 6 / zoomFactor; // small inset from the very corner
-    // Position the circles just above the top edge, left-aligned with top-left corner
-    const topY = this.y - this.height / 2 - r - 4 / zoomFactor;
-    const leftX = this.x - this.width / 2 + marginLeft + r;
+    const marginTop = 6 / zoomFactor; // small inset from the very corner
+    // Position the circles on the left side, running vertically down
+    const leftX = this.x - this.width / 2 - r - 4 / zoomFactor;
+    const topY = this.y - this.height / 2 + marginTop + r;
     const circles = [];
     for (let i = 0; i < this.colorPalette.length; i++) {
       circles.push({
-        x: leftX + i * (2 * r + spacing),
-        y: topY,
+        x: leftX,
+        y: topY + i * (2 * r + spacing),
         r,
         key: this.colorPalette[i].key,
         color: this.colorPalette[i].color
@@ -354,7 +352,7 @@ class TextBox {
     return circles;
   }
 
-  // Draw the color palette circles and highlight the active one
+  // Draw the color palette circles
   drawColorPalette() {
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
     const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
@@ -366,17 +364,6 @@ class TextBox {
       strokeWeight(1 / zoomFactor);
       fill(c.color.r, c.color.g, c.color.b);
       circle(c.x, c.y, c.r * 2);
-
-      // Active indicator ring
-      if (this.backgroundColor &&
-          this.backgroundColor.r === c.color.r &&
-          this.backgroundColor.g === c.color.g &&
-          this.backgroundColor.b === c.color.b) {
-        noFill();
-        stroke(60, 120, 255);
-        strokeWeight(2 / zoomFactor);
-        circle(c.x, c.y, c.r * 2 + 6 / zoomFactor);
-      }
     }
     pop();
   }
