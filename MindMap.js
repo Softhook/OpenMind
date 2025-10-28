@@ -18,6 +18,9 @@ class MindMap {
     // Multi-selection of boxes
     this.selectedBoxes = new Set();
     
+    // Clipboard for copying/pasting boxes
+    this.copiedBoxes = [];
+    
     // Performance optimization: track if content has changed
     this.isDirty = true;
   }
@@ -566,6 +569,56 @@ class MindMap {
       } else if (key && key.length === 1) {
         this.pushUndo();
         this.selectedBox.addChar(key);
+      }
+    } else if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
+      // CMD/CTRL combinations when NOT editing text
+      if (key === 'c' || key === 'C') {
+        // Copy selected box(es)
+        if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+          this.copiedBoxes = [];
+          for (const box of this.selectedBoxes) {
+            if (box) {
+              this.copiedBoxes.push(box.toJSON());
+            }
+          }
+        } else if (this.selectedBox) {
+          this.copiedBoxes = [this.selectedBox.toJSON()];
+        }
+        return;
+      } else if (key === 'v' || key === 'V') {
+        // Paste copied box(es) at cursor position
+        if (this.copiedBoxes && this.copiedBoxes.length > 0) {
+          this.pushUndo();
+          const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+          const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+          
+          // Calculate offset from first copied box to paste location
+          const firstBox = this.copiedBoxes[0];
+          const offsetX = mx - firstBox.x;
+          const offsetY = my - firstBox.y;
+          
+          // Clear current selection
+          this.clearBoxSelection();
+          if (this.selectedBox) {
+            this.selectedBox.stopEditing();
+            this.selectedBox = null;
+          }
+          
+          // Paste all copied boxes with offset
+          for (const boxData of this.copiedBoxes) {
+            const newBoxData = {
+              ...boxData,
+              x: boxData.x + offsetX,
+              y: boxData.y + offsetY
+            };
+            const newBox = TextBox.fromJSON(newBoxData);
+            if (newBox) {
+              this.boxes.push(newBox);
+              this.addBoxToSelection(newBox);
+            }
+          }
+        }
+        return;
       }
     } else if ((key === ' ' || keyCode === 32)) {
       // Space: reverse selected connection when not editing
