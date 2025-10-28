@@ -1,47 +1,11 @@
 {
   "boxes": [
     {
-      "x": -439.1995231180741,
-      "y": 579.6405835681138,
-      "text": "Methods Problem: Design focuses on conceptual arguments and small scale test cases with students.\nAnd thus fails to offer a pragmatic engagement with AI.",
-      "width": 237.3505859375,
-      "height": 156,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -433.4352166224299,
-      "y": 743.3366727884256,
-      "text": "1  tends to use existing metaphots such as “hallucinations,” which are empirically inaccurate by overlooking the nuanced ways AI systems actually operate. ",
-      "width": 245.99114613982863,
-      "height": 135,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -411.5975948445115,
+      "x": -411.17833942577244,
       "y": 918.6162289954536,
       "text": "2 This position is also dangerously normative: it assumes there is a “proper” or “real” state of things against which AI’s behaviour should be judged, reinforcing rigid distinctions rather than exploring how new kinds of design are produced through human–AI interaction.",
       "width": 300.19075724364336,
       "height": 177,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -447.30289811807415,
-      "y": 433.5341785000769,
-      "text": "Gen Ai presents a problem for Design",
-      "width": 190.5791015625,
-      "height": 72,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -61,8 +25,8 @@
       }
     },
     {
-      "x": 90.79985009695943,
-      "y": 580.6462780619513,
+      "x": 93.73985009695942,
+      "y": 580.1434308150326,
       "text": "My approach investigates AI empirically as a reflective practice ourside the pressure and dynamics of commercial design with clients.",
       "width": 241.22829134457658,
       "height": 135,
@@ -73,23 +37,71 @@
       }
     },
     {
-      "x": 95.20985009695943,
-      "y": 721.1503572175354,
-      "text": "My approach is inqusitive not normative and can Idetify the key qualities of AI",
-      "width": 232.13564420924416,
-      "height": 93,
+      "x": 1212.4014649971468,
+      "y": 540.0719315777324,
+      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
+      "width": 243.9306640625,
+      "height": 114,
       "backgroundColor": {
         "r": 255,
-        "g": 200,
-        "b": 140
+        "g": 255,
+        "b": 255
       }
     },
     {
-      "x": 714.0723191670141,
-      "y": 540.0719315777324,
-      "text": "I offer something that aligns with the history of critical art& design methods.",
-      "width": 200.5927734375,
+      "x": 709.5486595835071,
+      "y": 947.7875,
+      "text": "useful in many contexts pedagogy",
+      "width": 190.72792968750002,
+      "height": 72,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1181.3157640175784,
+      "y": 830.6075000000001,
+      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation. ",
+      "width": 310.6827734374999,
       "height": 114,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1181.3157640175784,
+      "y": 697.73,
+      "text": "Inventing\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
+      "width": 295.38941406250024,
+      "height": 135,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1181.3157640175784,
+      "y": 1098.8445621875,
+      "text": "Limited\nWhat's significance about the complexity limit is that it shows that this is not solution but best seen as a form of prototyping. ",
+      "width": 308.1928361406251,
+      "height": 114,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1181.3157640175784,
+      "y": 965.0573087187502,
+      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
+      "width": 304.4459375000001,
+      "height": 135,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -109,59 +121,11 @@
       }
     },
     {
-      "x": 1212.4014649971468,
+      "x": 709.5486595835071,
       "y": 540.0719315777324,
-      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
-      "width": 243.9306640625,
+      "text": "I offer something that aligns with the history of critical art& design methods.",
+      "width": 200.5927734375,
       "height": 114,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 95.20985009695943,
-      "y": 856.4010894446103,
-      "text": "Provides designers with  armoury for engaging with AI",
-      "width": 229.6853857456603,
-      "height": 72,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 705.025,
-      "y": 947.7875,
-      "text": "useful in many contexts pedagogy",
-      "width": 190.72792968750002,
-      "height": 72,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1183.5100000000002,
-      "y": 830.6075000000001,
-      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation. ",
-      "width": 310.6827734374999,
-      "height": 114,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1177.9975000000002,
-      "y": 697.73,
-      "text": "Inventing\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
-      "width": 295.38941406250024,
-      "height": 135,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -170,7 +134,7 @@
     },
     {
       "x": 785.8821257082957,
-      "y": 726.5530290345059,
+      "y": 727.6455613468223,
       "text": "These qualities are new and different not good or badn\n\n1\tInventing\n2\tForgetting\n3\tNonlinear\n4\tAbundant\n5\tLimited",
       "width": 328.3583984375,
       "height": 198,
@@ -181,66 +145,106 @@
       }
     },
     {
-      "x": 1183.2488211953132,
-      "y": 1098.8445621875,
-      "text": "Limited\nWhat's significance about the complexity limit is that it shows that this is not solution but best seen as a form of prototyping. ",
-      "width": 308.1928361406251,
-      "height": 114,
+      "x": 93.73985009695942,
+      "y": 727.6455613468223,
+      "text": "My approach is inqusitive not normative and can Idetify the key qualities of AI",
+      "width": 232.13564420924416,
+      "height": 93,
       "backgroundColor": {
         "r": 255,
-        "g": 255,
-        "b": 255
+        "g": 200,
+        "b": 140
       }
     },
     {
-      "x": 1180.5067348750001,
-      "y": 965.0573087187502,
-      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
-      "width": 304.4459375000001,
+      "x": -411.17833942577244,
+      "y": 727.6455613468223,
+      "text": "1  tends to use existing metaphots such as “hallucinations,” which are empirically inaccurate by overlooking the nuanced ways AI systems actually operate. ",
+      "width": 245.99114613982863,
       "height": 135,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -411.17833942577244,
+      "y": 562.7790558150325,
+      "text": "Methods Problem: Design focuses on conceptual arguments and small scale test cases with students.\nAnd thus fails to offer a pragmatic engagement with AI.",
+      "width": 237.3505859375,
+      "height": 156,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -411.17833942577244,
+      "y": 249.4718035000766,
+      "text": "Gen Ai presents a problem for Design",
+      "width": 190.5791015625,
+      "height": 72,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 93.73985009695942,
+      "y": 856.4010894446103,
+      "text": "Both the method and the idetified qualities provid designers with tools for engaging with AI",
+      "width": 229.6853857456603,
+      "height": 114,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
     }
   ],
   "connections": [
     {
-      "from": 8,
-      "to": 7
-    },
-    {
       "from": 9,
-      "to": 8
+      "to": 10
     },
     {
       "from": 3,
-      "to": 0
+      "to": 9
     },
     {
-      "from": 0,
-      "to": 1
-    },
-    {
-      "from": 6,
-      "to": 2
-    },
-    {
-      "from": 5,
-      "to": 1
-    },
-    {
-      "from": 7,
-      "to": 5
+      "from": 15,
+      "to": 14
     },
     {
       "from": 14,
-      "to": 6
+      "to": 13
+    },
+    {
+      "from": 12,
+      "to": 0
+    },
+    {
+      "from": 2,
+      "to": 13
+    },
+    {
+      "from": 10,
+      "to": 2
     },
     {
       "from": 11,
-      "to": 10
+      "to": 12
+    },
+    {
+      "from": 4,
+      "to": 16
+    },
+    {
+      "from": 13,
+      "to": 0
     }
   ]
 }
