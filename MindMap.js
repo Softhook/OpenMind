@@ -96,10 +96,12 @@ class MindMap {
       }
     }
 
-    // Draw connector dots on hovered or active boxes
+    // Draw connector dots on hovered or active boxes (but not when editing)
     if (this.boxes) {
       for (let box of this.boxes) {
         if (!box) continue;
+        // Don't show connectors if the box is being edited
+        if (box.isEditing) continue;
         const active = this.connectingFrom && this.connectingFrom.box === box;
         if (box.isMouseOver() || active) {
           try { box.drawConnectors(!!active); } catch (e) {}
