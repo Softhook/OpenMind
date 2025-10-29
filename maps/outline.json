@@ -73,71 +73,11 @@
       }
     },
     {
-      "x": 267.25596959133964,
-      "y": 1911.624530562448,
-      "text": "Limited\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
-      "width": 308.1928361406251,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 1610.1628724957395,
-      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
-      "width": 310.6827734374999,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -111.30594828719506,
       "y": 1324.783842333756,
       "text": "text diary. the mthod itself with 5 steps in a table",
       "width": 304.65157487513767,
       "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 1446.868951517083,
-      "text": "Genre Inventing\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
-      "width": 295.38941406250024,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 1324.783842333756,
-      "text": "Flow\nDesining without a plan ",
-      "width": 310.6827734374999,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 1779.9251566105434,
-      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
-      "width": 304.4459375000001,
-      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -186,18 +126,6 @@
       "text": "Both the method and the idetified qualities provid designers with tools for engaging with AI",
       "width": 229.6853857456603,
       "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 2085.2934132921537,
-      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.\n\nRequires openess and looseness to go with it",
-      "width": 328.3583984375,
-      "height": 171,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -337,9 +265,93 @@
       }
     },
     {
-      "x": 698.8145108119949,
-      "y": 1408.7240249653541,
-      "text": "5.2 Designing with archetypes",
+      "x": -114.4191953151905,
+      "y": 1409.9526643216573,
+      "text": "Lev Manocich langauge of new media. Trying to idetify the core principles of new media",
+      "width": 290.7669921875,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 267.25596959133964,
+      "y": 2135.6934132921533,
+      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.\n\nRequires openess and looseness to go with it",
+      "width": 328.3583984375,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 260.9559695913397,
+      "y": 1792.5251566105435,
+      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
+      "width": 304.4459375000001,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 256.75596959133964,
+      "y": 1660.018951517083,
+      "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
+      "width": 295.38941406250024,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 268.30596959133965,
+      "y": 1344.733842333756,
+      "text": "Nonlinear Flow\nDesining without a plan surprise. change direction. cimiheski - flow state. but not being in control",
+      "width": 310.6827734374999,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 268.30596959133965,
+      "y": 1489.4128724957393,
+      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
+      "width": 310.6827734374999,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 268.30596959133965,
+      "y": 1957.824530562448,
+      "text": "Complexity Limitations \nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
+      "width": 308.1928361406251,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 692.1995108119949,
+      "y": 1473.621342333756,
+      "text": "5.1 Designing with an unstable Agent",
       "width": 200.5927734375,
       "height": 66,
       "backgroundColor": {
@@ -349,9 +361,21 @@
       }
     },
     {
-      "x": 698.8145108119949,
-      "y": 1324.783842333756,
-      "text": "5.1 Designing with an unstable Agent",
+      "x": 700.8553193723096,
+      "y": 1333.3199499466573,
+      "text": "Plundergeist - Plunderphonics",
+      "width": 218.63226562499995,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 692.1995108119949,
+      "y": 1557.5615249653542,
+      "text": "5.2 Designing through archetypes",
       "width": 200.5927734375,
       "height": 66,
       "backgroundColor": {
@@ -372,107 +396,95 @@
     },
     {
       "from": 0,
-      "to": 12
-    },
-    {
-      "from": 21,
-      "to": 5
-    },
-    {
-      "from": 26,
-      "to": 4
-    },
-    {
-      "from": 17,
-      "to": 8
-    },
-    {
-      "from": 8,
-      "to": 18
-    },
-    {
-      "from": 18,
-      "to": 10
-    },
-    {
-      "from": 9,
       "to": 7
     },
     {
-      "from": 4,
-      "to": 17
+      "from": 15,
+      "to": 5
+    },
+    {
+      "from": 20,
+      "to": 4
     },
     {
       "from": 11,
       "to": 6
     },
     {
+      "from": 6,
+      "to": 12
+    },
+    {
       "from": 12,
-      "to": 13
+      "to": 26
     },
     {
-      "from": 13,
-      "to": 14
+      "from": 7,
+      "to": 8
     },
     {
-      "from": 14,
+      "from": 8,
+      "to": 9
+    },
+    {
+      "from": 9,
+      "to": 10
+    },
+    {
+      "from": 10,
       "to": 15
     },
     {
-      "from": 15,
-      "to": 21
-    },
-    {
-      "from": 22,
-      "to": 23
-    },
-    {
-      "from": 23,
-      "to": 24
-    },
-    {
-      "from": 24,
-      "to": 25
-    },
-    {
-      "from": 6,
-      "to": 16
-    },
-    {
       "from": 16,
-      "to": 19
+      "to": 17
     },
     {
-      "from": 19,
-      "to": 29
+      "from": 17,
+      "to": 18
+    },
+    {
+      "from": 18,
+      "to": 19
     },
     {
       "from": 3,
       "to": 1
     },
     {
-      "from": 20,
-      "to": 22
+      "from": 14,
+      "to": 16
     },
     {
       "from": 29,
-      "to": 28
+      "to": 31
     },
     {
-      "from": 28,
-      "to": 20
+      "from": 31,
+      "to": 14
     },
     {
       "from": 5,
-      "to": 27
+      "to": 21
+    },
+    {
+      "from": 21,
+      "to": 20
+    },
+    {
+      "from": 26,
+      "to": 29
     },
     {
       "from": 27,
-      "to": 26
+      "to": 29
     },
     {
-      "from": 7,
-      "to": 11
+      "from": 25,
+      "to": 31
+    },
+    {
+      "from": 24,
+      "to": 31
     }
   ]
 }

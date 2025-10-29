@@ -12,4 +12,6 @@ reflow text boxes based on connections
 
 Center a loaded file after load 
 
-Selecting a few boxes and then using a line should try and horizontally or vertically align the edges of all the boxes 
+Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
+
+pressing s key make all the selected boxes the same width of possible
