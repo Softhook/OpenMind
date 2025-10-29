@@ -1,7 +1,7 @@
 class TextBox {
   // Constants
   static PADDING = 12;
-  static MIN_WIDTH = 100;
+  static MIN_WIDTH = 150;
   static MIN_HEIGHT = 40;
   static MAX_WIDTH = 300;
   static FONT_SIZE = 14;
@@ -184,26 +184,30 @@ class TextBox {
   draw() {
     push();
     
+    // Get current zoom level from global scope
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    
     // Draw box
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(120);
-      strokeWeight(2);
+      strokeWeight(2 / zoomFactor);
     } else if (this.selected) {
       // Highlight selected boxes with a blue outline
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(60, 120, 255);
-      strokeWeight(2.5);
+      strokeWeight(2.5 / zoomFactor);
     } else if (this.isMouseOver()) {
       // Hover state uses the box background color
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(100);
-      strokeWeight(2);
+      strokeWeight(2 / zoomFactor);
     } else {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(100);
-      strokeWeight(1);
+      strokeWeight(1 / zoomFactor);
     }
     
     rect(this.x - this.width/2, this.y - this.height/2, 
