@@ -2,7 +2,7 @@
   "boxes": [
     {
       "x": -1013.4358380419181,
-      "y": 1658.3968508359103,
+      "y": 1659.2079011764968,
       "text": "1  tends to use existing metaphots such as “hallucinations,” which are empirically inaccurate by overlooking the nuanced ways AI systems actually operate. ",
       "width": 245.99114613982863,
       "height": 129,
@@ -14,7 +14,7 @@
     },
     {
       "x": -1013.4358380419181,
-      "y": 1349.3634422363095,
+      "y": 1335.3969838368469,
       "text": "Gen Ai presents a problem for Design",
       "width": 190.5791015625,
       "height": 66,
@@ -26,7 +26,7 @@
     },
     {
       "x": -1013.4358380419181,
-      "y": 1494.0765828623853,
+      "y": 1492.9106552707237,
       "text": " Problem: Design focuses on conceptual arguments and small scale test cases with students.\nAnd thus fails to offer a pragmatic engagement with AI.",
       "width": 275.3422973492188,
       "height": 129,
@@ -62,7 +62,7 @@
     },
     {
       "x": -557.6175804879488,
-      "y": 1324.783842333756,
+      "y": 1335.3969838368469,
       "text": "lots of arguments on copyright not much on refective practice",
       "width": 300.19075724364336,
       "height": 66,
@@ -73,8 +73,8 @@
       }
     },
     {
-      "x": -111.30594828719506,
-      "y": 1324.783842333756,
+      "x": -112.34369729652688,
+      "y": 1335.3969838368469,
       "text": "text diary. the mthod itself with 5 steps in a table",
       "width": 304.65157487513767,
       "height": 66,
@@ -133,7 +133,7 @@
       }
     },
     {
-      "x": -111.30594828719506,
+      "x": -112.34369729652688,
       "y": 1242.831835445232,
       "text": "3.\tMy method",
       "width": 297.96156958644315,
@@ -145,7 +145,7 @@
       }
     },
     {
-      "x": 267.25596959133964,
+      "x": 265.30596959133965,
       "y": 1242.831835445232,
       "text": "4.\tObservations",
       "width": 297.96156958644315,
@@ -157,7 +157,7 @@
       }
     },
     {
-      "x": 698.8145108119949,
+      "x": 696.0172129520736,
       "y": 1242.831835445232,
       "text": "5. Findings",
       "width": 297.96156958644315,
@@ -206,7 +206,7 @@
     },
     {
       "x": 1082.3748049093956,
-      "y": 1494.0765828623853,
+      "y": 1492.9106552707237,
       "text": "This matters because it position AI not some total novel but something that designers can have agency over ",
       "width": 237.3994140625,
       "height": 108,
@@ -217,32 +217,8 @@
       }
     },
     {
-      "x": 1082.3748049093956,
-      "y": 1610.1628724957395,
-      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
-      "width": 243.9306640625,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1082.3748049093956,
-      "y": 1729.109709825631,
-      "text": "useful in many contexts pedagogy",
-      "width": 190.72792968750002,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -557.6175804879488,
-      "y": 1494.0765828623853,
+      "y": 1492.9106552707237,
       "text": "Reflective Practice",
       "width": 300.19075724364336,
       "height": 45,
@@ -254,7 +230,7 @@
     },
     {
       "x": -557.6175804879488,
-      "y": 1408.7240249653541,
+      "y": 1409.3383446435057,
       "text": "do the real lit review last",
       "width": 300.19075724364336,
       "height": 45,
@@ -265,31 +241,7 @@
       }
     },
     {
-      "x": -114.4191953151905,
-      "y": 1409.9526643216573,
-      "text": "Lev Manocich langauge of new media. Trying to idetify the core principles of new media",
-      "width": 290.7669921875,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 267.25596959133964,
-      "y": 2135.6934132921533,
-      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.\n\nRequires openess and looseness to go with it",
-      "width": 328.3583984375,
-      "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 260.9559695913397,
+      "x": 265.30596959133965,
       "y": 1792.5251566105435,
       "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
       "width": 304.4459375000001,
@@ -301,8 +253,8 @@
       }
     },
     {
-      "x": 256.75596959133964,
-      "y": 1660.018951517083,
+      "x": 265.30596959133965,
+      "y": 1659.2079011764968,
       "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
       "width": 295.38941406250024,
       "height": 129,
@@ -313,8 +265,8 @@
       }
     },
     {
-      "x": 268.30596959133965,
-      "y": 1344.733842333756,
+      "x": 265.30596959133965,
+      "y": 1335.3969838368469,
       "text": "Nonlinear Flow\nDesining without a plan surprise. change direction. cimiheski - flow state. but not being in control",
       "width": 310.6827734374999,
       "height": 108,
@@ -325,8 +277,8 @@
       }
     },
     {
-      "x": 268.30596959133965,
-      "y": 1489.4128724957393,
+      "x": 265.30596959133965,
+      "y": 1492.9106552707237,
       "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
       "width": 310.6827734374999,
       "height": 129,
@@ -337,7 +289,7 @@
       }
     },
     {
-      "x": 268.30596959133965,
+      "x": 265.30596959133965,
       "y": 1957.824530562448,
       "text": "Complexity Limitations \nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
       "width": 308.1928361406251,
@@ -349,7 +301,7 @@
       }
     },
     {
-      "x": 692.1995108119949,
+      "x": 696.0172129520736,
       "y": 1473.621342333756,
       "text": "5.1 Designing with an unstable Agent",
       "width": 200.5927734375,
@@ -361,8 +313,8 @@
       }
     },
     {
-      "x": 700.8553193723096,
-      "y": 1333.3199499466573,
+      "x": 696.0172129520736,
+      "y": 1335.3969838368469,
       "text": "Plundergeist - Plunderphonics",
       "width": 218.63226562499995,
       "height": 45,
@@ -373,11 +325,131 @@
       }
     },
     {
-      "x": 692.1995108119949,
+      "x": 696.0172129520736,
       "y": 1557.5615249653542,
       "text": "5.2 Designing through archetypes",
       "width": 200.5927734375,
       "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 265.30596959133965,
+      "y": 2135.6934132921533,
+      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.",
+      "width": 328.3583984375,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -112.34369729652688,
+      "y": 1409.3383446435057,
+      "text": "Lev Manocich langauge of new media.  Trying to idetify the core principles of new media",
+      "width": 290.7669921875,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -160.22624319230354,
+      "y": 1977.525296043376,
+      "text": "3.\tPlay and Reflect\r\nEngage critically and emotively with the prototype. Attend to what it evokes, how it assembles or unsettles cultural contexts, and the tensions or resonances that surface.\r",
+      "width": 422.7189062500001,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -161.3287431923035,
+      "y": 2187.997796043377,
+      "text": "5 Saturation and Boredom\r\nIdentify when no more novelty emerges and stop.\r",
+      "width": 422.7189062500001,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -161.32874319230353,
+      "y": 2093.1827960433766,
+      "text": "4.\tRe-prompt to hone\r\nCraft a new prompt that builds on these insights. The aim is to hone or intensify the haunted aspects by deliberately reworking fragments drawn from the prototype.\r",
+      "width": 422.7189062500001,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -163.1849691947219,
+      "y": 1871.5281320095194,
+      "text": "2.\tGenerate Haunted Prototype\r\nUse gen AI to rapidly produce a playable artefact. This is “haunted” by plundered cultural traces and echoes.\r",
+      "width": 413.5620312500001,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -168.0225491866607,
+      "y": 1779.1772899684076,
+      "text": "1  Prompt for Archetype\nEstablish an entry point to anchor the process in a recognisable form.",
+      "width": 414.4766796875001,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1083.3748049093956,
+      "y": 1624.109709825631,
+      "text": "useful in many contexts pedagogy",
+      "width": 190.72792968750002,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 649.3703193723098,
+      "y": 1837.3749499466571,
+      "text": "Requires openess and looseness to go with it",
+      "width": 149.88351562499997,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 737.3748049093956,
+      "y": 1687.1628724957395,
+      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
+      "width": 243.9306640625,
+      "height": 108,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -403,7 +475,7 @@
       "to": 5
     },
     {
-      "from": 20,
+      "from": 18,
       "to": 4
     },
     {
@@ -411,12 +483,8 @@
       "to": 6
     },
     {
-      "from": 6,
-      "to": 12
-    },
-    {
       "from": 12,
-      "to": 26
+      "to": 22
     },
     {
       "from": 7,
@@ -431,20 +499,8 @@
       "to": 10
     },
     {
-      "from": 10,
-      "to": 15
-    },
-    {
       "from": 16,
       "to": 17
-    },
-    {
-      "from": 17,
-      "to": 18
-    },
-    {
-      "from": 18,
-      "to": 19
     },
     {
       "from": 3,
@@ -455,36 +511,36 @@
       "to": 16
     },
     {
-      "from": 29,
-      "to": 31
-    },
-    {
-      "from": 31,
-      "to": 14
+      "from": 25,
+      "to": 27
     },
     {
       "from": 5,
-      "to": 21
+      "to": 19
+    },
+    {
+      "from": 19,
+      "to": 18
+    },
+    {
+      "from": 22,
+      "to": 25
+    },
+    {
+      "from": 23,
+      "to": 25
     },
     {
       "from": 21,
-      "to": 20
+      "to": 27
     },
     {
-      "from": 26,
-      "to": 29
+      "from": 20,
+      "to": 27
     },
     {
-      "from": 27,
-      "to": 29
-    },
-    {
-      "from": 25,
-      "to": 31
-    },
-    {
-      "from": 24,
-      "to": 31
+      "from": 37,
+      "to": 27
     }
   ]
 }

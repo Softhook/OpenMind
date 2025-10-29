@@ -1,16 +1,16 @@
 class TextBox {
   // Constants
   static PADDING = 12;
-  static MIN_WIDTH = 80;
+  static MIN_WIDTH = 100;
   static MIN_HEIGHT = 40;
   static MAX_WIDTH = 300;
   static FONT_SIZE = 14;
   static CORNER_RADIUS = 6;
   static RESIZE_HANDLE_SIZE = 18;
   static CURSOR_BLINK_RATE = 530;
-  static DRAG_EDGE_THICKNESS = 16;
+  static DRAG_EDGE_THICKNESS = 18;
   static COLOR_CIRCLE_RADIUS = 8;
-  static COLOR_CIRCLE_SPACING = 4;
+  static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
   constructor(x, y, text = "") {
@@ -299,7 +299,7 @@ class TextBox {
     const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     const r = this.colorCircleRadius / zoomFactor;
     const spacing = this.colorCircleSpacing / zoomFactor;
-    const marginTop = 6 / zoomFactor; // small inset from the very corner
+    const marginTop = 0; // align top of first circle with top of text box
     // Position the circles on the left side, running vertically down
     const leftX = this.x - this.width / 2 - r - 4 / zoomFactor;
     const topY = this.y - this.height / 2 + marginTop + r;
