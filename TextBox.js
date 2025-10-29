@@ -100,8 +100,8 @@ class TextBox {
       }
     }
     
-    // Width: auto-size when the user hasn't manually resized, or when there's only a single line
-    if (!this.userResized || wrappedLines.length === 1) {
+    // Width: only auto-size when the user hasn't manually resized
+    if (!this.userResized) {
       this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
     }
 
