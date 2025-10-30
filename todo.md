@@ -15,3 +15,5 @@ Center a loaded file after load
 Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
 
 pressing s key make all the selected boxes the same width of possible
+
+While typing or coppying text in once is get over 10 words then do the line break
