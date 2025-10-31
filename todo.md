@@ -2,7 +2,7 @@ When copying text into the application you need to sanitize it to remove strange
 
 It'd be nice if the boxes shrank automatically to the minimum size needed horizontally when there is  only a single line of text
 
-add a timed outosave
+add a timed outosave that saves to the browser. load from browser state on opening app. show a small circulr indicator in the top right to indicate if the currenct state of the map has been saved. if the current map state is saved make the indicator green. show red if its not saved
 
 add a dashed line connection
 
