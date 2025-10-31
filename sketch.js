@@ -172,9 +172,9 @@ function setup() {
     mindMap = new MindMap();
     
     // Create initial boxes as examples
-    mindMap.addBox(new TextBox(300, 200, "Main Idea"));
-    mindMap.addBox(new TextBox(500, 300, "Sub Topic 1"));
-    mindMap.addBox(new TextBox(500, 100, "Sub Topic 2"));
+    mindMap.addBox(new TextBox(300, 200, "Idea"));
+    mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+    mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
     
     // Create UI buttons
     setupUIButtons();

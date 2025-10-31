@@ -376,7 +376,7 @@ class TextBox {
     return pts[side] || null;
   }
 
-  getConnectorUnderMouse(hitRadius = 8) {
+  getConnectorUnderMouse(hitRadius = 10) {
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
     const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     const scaledHitRadius = hitRadius / Math.sqrt(zoomFactor);
