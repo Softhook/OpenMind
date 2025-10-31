@@ -17,6 +17,8 @@ class MindMap {
 
     // Multi-selection of boxes
     this.selectedBoxes = new Set();
+    // Multi-selection of connections
+    this.selectedConnections = new Set();
     
     // Clipboard for copying/pasting boxes
     this.copiedBoxes = [];
@@ -365,8 +367,14 @@ class MindMap {
           this.selectedBox.stopEditing();
           this.selectedBox = null;
         }
-        // Clear multi-selection
+        // Clear multi-selection of boxes
         this.clearBoxSelection();
+
+        // Clear any previous connection multi-selection and select this connection
+        if (this.clearConnectionSelection) this.clearConnectionSelection();
+        if (this.addConnectionToSelection) this.addConnectionToSelection(conn);
+
+        // Keep legacy single pointer as well
         this.selectedConnection = conn;
         conn.selected = true;
         return;
@@ -604,7 +612,7 @@ class MindMap {
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
-      // Delete selected boxes or connection
+      // Delete selected boxes or connection(s)
       if (this.selectedBoxes && this.selectedBoxes.size > 0) {
         // Delete all selected boxes
         this.pushUndo();
@@ -627,6 +635,14 @@ class MindMap {
         this.clearBoxSelection();
         if (this.selectedBox) {
           this.selectedBox = null;
+        }
+      } else if (this.selectedConnections && this.selectedConnections.size > 0) {
+        // Delete all selected connections (multi-selection)
+        this.pushUndo();
+        this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
+        this.clearConnectionSelection();
+        if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
+          this.selectedConnection = null;
         }
       } else if (this.selectedConnection) {
         // Delete selected connection only
@@ -662,6 +678,9 @@ class MindMap {
     this.connectingFrom = null;
     if (this.selectedBoxes) {
       this.selectedBoxes.clear();
+    }
+    if (this.selectedConnections) {
+      this.selectedConnections.clear();
     }
     
     // Load boxes with error handling
@@ -768,6 +787,38 @@ class MindMap {
     } else {
       this.selectedBoxes.add(box);
       box.selected = true;
+    }
+  }
+
+  // --- Connection multi-selection helpers ---
+  clearConnectionSelection() {
+    if (!this.selectedConnections) this.selectedConnections = new Set();
+    for (const c of this.selectedConnections) {
+      if (c) c.selected = false;
+    }
+    this.selectedConnections.clear();
+  }
+
+  addConnectionToSelection(conn) {
+    if (!conn) return;
+    if (!this.selectedConnections) this.selectedConnections = new Set();
+    this.selectedConnections.add(conn);
+    conn.selected = true;
+  }
+
+  removeConnectionFromSelection(conn) {
+    if (!conn || !this.selectedConnections) return;
+    if (this.selectedConnections.has(conn)) this.selectedConnections.delete(conn);
+    conn.selected = false;
+  }
+
+  toggleConnectionSelection(conn) {
+    if (!conn) return;
+    if (!this.selectedConnections) this.selectedConnections = new Set();
+    if (this.selectedConnections.has(conn)) {
+      this.removeConnectionFromSelection(conn);
+    } else {
+      this.addConnectionToSelection(conn);
     }
   }
 }

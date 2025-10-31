@@ -1214,6 +1214,64 @@ function drawSelectionRectangle() {
 }
 
 // Complete multi-box selection by selecting all boxes within the rectangle
+// Helper: segment (x1,y1)-(x2,y2) intersects axis-aligned rect [rx1,ry1] - [rx2,ry2]
+function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
+  // Normalize rect coordinates
+  const minRx = Math.min(rx1, rx2);
+  const maxRx = Math.max(rx1, rx2);
+  const minRy = Math.min(ry1, ry2);
+  const maxRy = Math.max(ry1, ry2);
+
+  // Quick bounding-box early-out: if the segment's bbox doesn't overlap the rect, no intersection
+  const segMinX = Math.min(x1, x2);
+  const segMaxX = Math.max(x1, x2);
+  const segMinY = Math.min(y1, y2);
+  const segMaxY = Math.max(y1, y2);
+  if (segMaxX < minRx || segMinX > maxRx || segMaxY < minRy || segMinY > maxRy) {
+    return false;
+  }
+
+  // Quick check: any endpoint inside rect
+  if ((x1 >= minRx && x1 <= maxRx && y1 >= minRy && y1 <= maxRy) ||
+      (x2 >= minRx && x2 <= maxRx && y2 >= minRy && y2 <= maxRy)) {
+    return true;
+  }
+
+  // Helper: orientation
+  function orient(ax, ay, bx, by, cx, cy) {
+    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  }
+
+  // Helper: check segment intersection
+  function segmentsIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+    const o1 = orient(ax, ay, bx, by, cx, cy);
+    const o2 = orient(ax, ay, bx, by, dx, dy);
+    const o3 = orient(cx, cy, dx, dy, ax, ay);
+    const o4 = orient(cx, cy, dx, dy, bx, by);
+
+    if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) && Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
+        (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) && Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
+        (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) && Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
+        (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) && Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
+      return true; // collinear overlap cases
+    }
+
+    return (o1 * o2 < 0) && (o3 * o4 < 0);
+  }
+
+  // Rectangle edges
+  // left edge
+  if (segmentsIntersect(x1, y1, x2, y2, minRx, minRy, minRx, maxRy)) return true;
+  // right edge
+  if (segmentsIntersect(x1, y1, x2, y2, maxRx, minRy, maxRx, maxRy)) return true;
+  // top edge
+  if (segmentsIntersect(x1, y1, x2, y2, minRx, minRy, maxRx, minRy)) return true;
+  // bottom edge
+  if (segmentsIntersect(x1, y1, x2, y2, minRx, maxRy, maxRx, maxRy)) return true;
+
+  return false;
+}
+
 function completeMultiBoxSelection() {
   if (!mindMap) return;
   
@@ -1226,6 +1284,8 @@ function completeMultiBoxSelection() {
   const shiftHeld = keyIsDown(16);
   if (!shiftHeld) {
     mindMap.clearBoxSelection();
+    // Also clear existing connection selection when starting a fresh rectangle selection
+    if (mindMap.clearConnectionSelection) mindMap.clearConnectionSelection();
   }
   
   // Select all boxes that intersect the selection rectangle (any part of the box)
@@ -1242,6 +1302,23 @@ function completeMultiBoxSelection() {
     const intersects = !(right < x1 || left > x2 || bottom < y1 || top > y2);
     if (intersects) {
       mindMap.addBoxToSelection(box);
+    }
+  }
+
+  // NEW: Select connections that intersect the selection rectangle
+  if (mindMap.connections && mindMap.addConnectionToSelection) {
+    for (const conn of mindMap.connections) {
+      if (!conn || !conn.fromBox || !conn.toBox) continue;
+      try {
+        const start = conn.fromBox.getConnectionPoint(conn.toBox);
+        const end = conn.toBox.getConnectionPoint(conn.fromBox);
+        if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) continue;
+        if (segmentIntersectsRect(start.x, start.y, end.x, end.y, x1, y1, x2, y2)) {
+          mindMap.addConnectionToSelection(conn);
+        }
+      } catch (e) {
+        // ignore geometry errors per-connection
+      }
     }
   }
 }
