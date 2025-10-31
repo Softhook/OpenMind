@@ -1,7 +1,7 @@
 class Connection {
   // Constants
-  static ARROW_SIZE = 10;
-  static HIT_THRESHOLD = 5; // pixels for click detection
+  static ARROW_SIZE = 12;
+  static HIT_THRESHOLD = 7; // pixels for click detection
   static STROKE_WEIGHT_NORMAL = 2;
   static STROKE_WEIGHT_SELECTED = 3;
   
