@@ -221,11 +221,7 @@ class MindMap {
     }
     const shiftDown = keyIsDown(16); // SHIFT
     
-    // Deselect any previously selected connection
-    if (this.selectedConnection) {
-      this.selectedConnection.selected = false;
-      this.selectedConnection = null;
-    }
+    // (connection deselection centralized in clearConnectionSelection())
     
     // Check if clicking on a background color circle of any selected box (top-most first)
       for (let i = this.boxes.length - 1; i >= 0; i--) {
@@ -392,10 +388,6 @@ class MindMap {
 
     // Always clear connection multi-selection and single selected connection
     if (this.clearConnectionSelection) this.clearConnectionSelection();
-    if (this.selectedConnection) {
-      try { this.selectedConnection.selected = false; } catch (_) {}
-      this.selectedConnection = null;
-    }
   }
   
   handleMouseReleased() {
@@ -806,6 +798,12 @@ class MindMap {
       if (c) c.selected = false;
     }
     this.selectedConnections.clear();
+
+    // Also clear the single selectedConnection pointer if present
+    if (this.selectedConnection) {
+      try { this.selectedConnection.selected = false; } catch (_) {}
+      this.selectedConnection = null;
+    }
   }
 
   addConnectionToSelection(conn) {
