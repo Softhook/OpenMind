@@ -1,6 +1,8 @@
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
 
+when loading a file the layout needs to refresh when it is the same file already loaded
+
 
 It'd be nice if the boxes shrank automatically to the minimum size needed horizontally when there is  only a single line of text
 
