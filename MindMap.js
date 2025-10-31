@@ -381,12 +381,21 @@ class MindMap {
       }
     }
     
-    // Clicked outside all boxes and connections
+    // Clicked outside all boxes and connections -> clear all selections
     if (this.selectedBox) {
       this.selectedBox.stopEditing();
       this.selectedBox = null;
     }
-    if (!shiftDown) this.clearBoxSelection();
+
+    // Always clear box multi-selection when clicking the empty background
+    this.clearBoxSelection();
+
+    // Always clear connection multi-selection and single selected connection
+    if (this.clearConnectionSelection) this.clearConnectionSelection();
+    if (this.selectedConnection) {
+      try { this.selectedConnection.selected = false; } catch (_) {}
+      this.selectedConnection = null;
+    }
   }
   
   handleMouseReleased() {
