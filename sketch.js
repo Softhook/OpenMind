@@ -1228,12 +1228,19 @@ function completeMultiBoxSelection() {
     mindMap.clearBoxSelection();
   }
   
-  // Select all boxes whose centers fall within the rectangle
+  // Select all boxes that intersect the selection rectangle (any part of the box)
   for (const box of mindMap.boxes) {
     if (!box) continue;
-    
-    // Check if box center is within selection rectangle
-    if (box.x >= x1 && box.x <= x2 && box.y >= y1 && box.y <= y2) {
+
+    // Compute box bounds (box.x,box.y are centers)
+    const left = box.x - (box.width || 0) / 2;
+    const right = box.x + (box.width || 0) / 2;
+    const top = box.y - (box.height || 0) / 2;
+    const bottom = box.y + (box.height || 0) / 2;
+
+    // Check for any overlap between selection rectangle and box bounds
+    const intersects = !(right < x1 || left > x2 || bottom < y1 || top > y2);
+    if (intersects) {
       mindMap.addBoxToSelection(box);
     }
   }
