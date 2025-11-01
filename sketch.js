@@ -13,11 +13,12 @@ const CONFIG = {
     MENU_TRIGGER_X: 50,
     MENU_TRIGGER_Y: 50,
     BUTTONS_BAND_HEIGHT: 50,
-    BUTTON_START_X: 10,
+    BUTTON_START_X: 40,
     BUTTON_Y: 10,
     BUTTON_GAP: 5,
     SAVE_INDICATOR_SIZE: 16,
-    SAVE_INDICATOR_MARGIN: 20
+    SAVE_INDICATOR_X: 20,
+    SAVE_INDICATOR_Y: 26
   },
   EXPORT: {
     PADDING: 50,
@@ -41,7 +42,6 @@ let menuRightEdge = 600;
 
 // Autosave state
 let autosaveTimer = null;
-let lastAutosaveTime = 0;
 
 // Camera/zoom state
 let camX = 0;
@@ -1431,22 +1431,18 @@ function startAutosave() {
   // Set up periodic autosave
   autosaveTimer = setInterval(() => {
     if (mindMap && !mindMap.isSaved) {
-      const success = mindMap.saveToLocalStorage();
-      if (success) {
-        lastAutosaveTime = millis();
-      }
+      mindMap.saveToLocalStorage();
     }
   }, CONFIG.AUTOSAVE.INTERVAL);
 }
 
-// Draw save indicator in top-right corner
+// Draw save indicator at far left of menu when visible
 function drawSaveIndicator() {
-  if (!mindMap) return;
+  if (!mindMap || !menuIsVisible) return;
   
   const size = CONFIG.UI.SAVE_INDICATOR_SIZE;
-  const margin = CONFIG.UI.SAVE_INDICATOR_MARGIN;
-  const x = width - margin - size / 2;
-  const y = margin + size / 2;
+  const x = CONFIG.UI.SAVE_INDICATOR_X;
+  const y = CONFIG.UI.SAVE_INDICATOR_Y;
   
   push();
   // Draw circle

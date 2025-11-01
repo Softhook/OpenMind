@@ -752,6 +752,9 @@ class MindMap {
         // Fallback: regular download (browser chooses default Downloads location)
         saveJSON(data, 'openmind.json');
       }
+      // Mark as saved regardless of localStorage outcome; seed localStorage best-effort
+      this.isSaved = true;
+      try { this.saveToLocalStorage(); } catch (_) {}
     } catch (e) {
       // User may cancel the dialog; that's not an error
       if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
@@ -762,6 +765,9 @@ class MindMap {
   
   load(data) {
     this.fromJSON(data);
+    // Seed autosave immediately after loading external data so the indicator shows saved
+    try { this.saveToLocalStorage(); } catch (_) {}
+    this.isSaved = true;
   }
 
   // Selection helpers
