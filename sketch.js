@@ -520,9 +520,9 @@ function keyPressed() {
     }
   }
   
-  // Prevent default behavior for CMD+A/C/V/X/Z when editing or when we handle undo
+  // Prevent default behavior for CMD+A/C/V/X/Z/B when editing or when we handle undo
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
-    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z') {
+    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z' || key === 'b' || key === 'B') {
       return false;
     }
   }

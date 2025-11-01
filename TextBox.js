@@ -133,44 +133,15 @@ class TextBox {
         continue;
       }
       
-      if (textWidth(line) <= maxTextWidth) {
+      // Measure text width without bold markers
+      const lineWithoutMarkers = this.removeBoldMarkers(line);
+      const visualWidth = this.getVisualTextWidth(line);
+      
+      if (visualWidth <= maxTextWidth) {
         wrappedLines.push(line);
       } else {
-        // Break line into words
-        let words = line.split(' ');
-        let currentLine = '';
-        
-        for (let i = 0; i < words.length; i++) {
-          let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-          
-          if (textWidth(testLine) <= maxTextWidth) {
-            currentLine = testLine;
-          } else {
-            // If current line is not empty, push it
-            if (currentLine) {
-              wrappedLines.push(currentLine);
-              currentLine = words[i];
-            } else {
-              // Single word is too long, break it by characters
-              let word = words[i];
-              let charLine = '';
-              for (let char of word) {
-                if (textWidth(charLine + char) <= maxTextWidth) {
-                  charLine += char;
-                } else {
-                  if (charLine) wrappedLines.push(charLine);
-                  charLine = char;
-                }
-              }
-              currentLine = charLine;
-            }
-          }
-        }
-        
-        // Push the last line
-        if (currentLine) {
-          wrappedLines.push(currentLine);
-        }
+        // Break line into words - need to handle bold markers carefully
+        wrappedLines.push(...this.wrapLineWithBold(line, maxTextWidth));
       }
     }
     
@@ -179,6 +150,70 @@ class TextBox {
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
     return result;
+  }
+
+  // Get visual width of text (accounting for bold markers but measuring actual rendered width)
+  getVisualTextWidth(text) {
+    if (!text) return 0;
+    
+    const segments = this.parseBoldSegments(text);
+    let totalWidth = 0;
+    
+    push();
+    textSize(this.fontSize);
+    for (const segment of segments) {
+      if (segment.bold) {
+        textStyle(BOLD);
+      } else {
+        textStyle(NORMAL);
+      }
+      totalWidth += textWidth(segment.text);
+    }
+    pop();
+    
+    return totalWidth;
+  }
+
+  // Wrap a line that may contain bold markers
+  wrapLineWithBold(line, maxTextWidth) {
+    const wrappedLines = [];
+    let currentLine = '';
+    let currentVisualWidth = 0;
+    
+    // Split by spaces but keep track of bold markers
+    const parts = line.split(' ');
+    
+    textSize(this.fontSize);
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const testLine = currentLine + (currentLine ? ' ' : '') + part;
+      const testWidth = this.getVisualTextWidth(testLine);
+      
+      if (testWidth <= maxTextWidth) {
+        currentLine = testLine;
+        currentVisualWidth = testWidth;
+      } else {
+        // Line would be too long
+        if (currentLine) {
+          wrappedLines.push(currentLine);
+          currentLine = part;
+          currentVisualWidth = this.getVisualTextWidth(part);
+        } else {
+          // Single word is too long - need to break it character by character
+          // This is complex with bold markers, so we'll just push it as is for now
+          wrappedLines.push(part);
+          currentLine = '';
+          currentVisualWidth = 0;
+        }
+      }
+    }
+    
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+    
+    return wrappedLines.length > 0 ? wrappedLines : [''];
   }
   
   draw() {
@@ -230,8 +265,9 @@ class TextBox {
       this.drawSelection(wrappedLines, textX, startY, lineHeight);
     }
     
+    // Draw text with bold support
     for (let i = 0; i < wrappedLines.length; i++) {
-      text(wrappedLines[i], textX, startY + i * lineHeight);
+      this.drawLineWithBold(wrappedLines[i], textX, startY + i * lineHeight);
     }
     
     // Draw cursor when editing
@@ -295,6 +331,146 @@ class TextBox {
     }
 
     pop();
+  }
+
+  // Parse text and draw with bold support
+  drawLineWithBold(lineText, x, y) {
+    if (!lineText) return;
+    
+    // Parse the line for bold markers (**)
+    const segments = this.parseBoldSegments(lineText);
+    let currentX = x;
+    
+    push();
+    textAlign(LEFT, CENTER);
+    textSize(this.fontSize);
+    fill(0);
+    noStroke();
+    
+    for (const segment of segments) {
+      if (segment.bold) {
+        textStyle(BOLD);
+      } else {
+        textStyle(NORMAL);
+      }
+      text(segment.text, currentX, y);
+      currentX += textWidth(segment.text);
+    }
+    
+    pop();
+  }
+
+  // Parse a string into segments with bold markers
+  // Returns: [{ text: "...", bold: true/false }, ...]
+  parseBoldSegments(str) {
+    if (!str || str.indexOf('**') === -1) {
+      return [{ text: str, bold: false }];
+    }
+    
+    const segments = [];
+    let currentPos = 0;
+    let isBold = false;
+    let currentText = '';
+    
+    for (let i = 0; i < str.length; i++) {
+      if (i < str.length - 1 && str[i] === '*' && str[i + 1] === '*') {
+        // Found bold marker
+        if (currentText) {
+          segments.push({ text: currentText, bold: isBold });
+          currentText = '';
+        }
+        isBold = !isBold;
+        i++; // Skip the second *
+      } else {
+        currentText += str[i];
+      }
+    }
+    
+    // Add remaining text
+    if (currentText) {
+      segments.push({ text: currentText, bold: isBold });
+    }
+    
+    return segments.length > 0 ? segments : [{ text: '', bold: false }];
+  }
+
+  // Remove bold markers from text for width calculations
+  removeBoldMarkers(text) {
+    if (!text) return '';
+    return text.replace(/\*\*/g, '');
+  }
+
+  // Toggle bold for the current selection or cursor position
+  toggleBold() {
+    if (!this.text) this.text = '';
+    
+    // If there's a selection, wrap it in bold markers
+    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      let start = min(this.selectionStart, this.selectionEnd);
+      let end = max(this.selectionStart, this.selectionEnd);
+      
+      // Check if selection is already bold
+      const before = this.text.substring(max(0, start - 2), start);
+      const after = this.text.substring(end, min(this.text.length, end + 2));
+      
+      if (before === '**' && after === '**') {
+        // Remove bold markers
+        this.text = this.text.substring(0, start - 2) + 
+                    this.text.substring(start, end) + 
+                    this.text.substring(end + 2);
+        this.cursorPosition = start - 2;
+        this.selectionStart = start - 2;
+        this.selectionEnd = end - 2;
+      } else {
+        // Add bold markers
+        const selectedText = this.text.substring(start, end);
+        this.text = this.text.substring(0, start) + 
+                    '**' + selectedText + '**' + 
+                    this.text.substring(end);
+        this.cursorPosition = end + 4;
+        this.selectionStart = start + 2;
+        this.selectionEnd = end + 2;
+      }
+    } else {
+      // No selection - check if we're inside bold text and toggle
+      const pos = this.cursorPosition;
+      
+      // Find the nearest bold markers around cursor
+      let beforeMarker = this.text.lastIndexOf('**', pos - 1);
+      let afterMarker = this.text.indexOf('**', pos);
+      
+      // Count markers before cursor to determine if we're in bold
+      let markerCount = 0;
+      let tempPos = 0;
+      while (tempPos < pos) {
+        const nextMarker = this.text.indexOf('**', tempPos);
+        if (nextMarker !== -1 && nextMarker < pos) {
+          markerCount++;
+          tempPos = nextMarker + 2;
+        } else {
+          break;
+        }
+      }
+      
+      const isInsideBold = markerCount % 2 === 1;
+      
+      if (isInsideBold) {
+        // We're inside bold, remove the markers
+        if (beforeMarker !== -1 && afterMarker !== -1) {
+          this.text = this.text.substring(0, beforeMarker) + 
+                      this.text.substring(beforeMarker + 2, afterMarker) + 
+                      this.text.substring(afterMarker + 2);
+          this.cursorPosition = pos - 2;
+        }
+      } else {
+        // Insert bold markers at cursor
+        this.text = this.text.substring(0, pos) + '****' + this.text.substring(pos);
+        this.cursorPosition = pos + 2;
+      }
+    }
+    
+    this.updateDimensions();
+    this.resetCursorBlink();
   }
 
   // Compute screen positions for the three color circles on the left edge
