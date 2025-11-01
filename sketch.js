@@ -189,8 +189,7 @@ function setup() {
       mindMap.addBox(new TextBox(300, 200, "Idea"));
       mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
       mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
-      // Mark as saved since we just created the initial state
-      mindMap.isSaved = true;
+      // Initial state is unsaved, will be autosaved on first interval
     }
     
     // Create UI buttons

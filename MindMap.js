@@ -855,13 +855,17 @@ class MindMap {
       const saved = localStorage.getItem('openmind_autosave');
       if (saved) {
         const data = JSON.parse(saved);
+        // fromJSON handles validation internally
         this.fromJSON(data);
+        // Only mark as saved if we successfully loaded data
         this.isSaved = true;
         return true;
       }
       return false;
     } catch (e) {
       console.error('Failed to load from localStorage:', e);
+      // Don't mark as saved if loading failed
+      this.isSaved = false;
       return false;
     }
   }
