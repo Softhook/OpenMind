@@ -133,8 +133,7 @@ class TextBox {
         continue;
       }
       
-      // Measure text width without bold markers
-      const lineWithoutMarkers = this.removeBoldMarkers(line);
+      // Measure visual text width accounting for bold markers
       const visualWidth = this.getVisualTextWidth(line);
       
       if (visualWidth <= maxTextWidth) {
@@ -428,7 +427,6 @@ class TextBox {
     }
     
     const segments = [];
-    let currentPos = 0;
     let isBold = false;
     let currentText = '';
     
