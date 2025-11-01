@@ -91,10 +91,10 @@ class TextBox {
     textSize(this.fontSize);
     let wrappedLines = this.wrapText(this.text);
     
-    // Calculate text dimensions
+    // Calculate text dimensions accounting for bold markers
     let maxLineWidth = 0;
     for (let line of wrappedLines) {
-      let lineWidth = textWidth(line);
+      let lineWidth = this.getVisualTextWidth(line);
       if (lineWidth > maxLineWidth) {
         maxLineWidth = lineWidth;
       }
@@ -199,12 +199,20 @@ class TextBox {
           wrappedLines.push(currentLine);
           currentLine = part;
           currentVisualWidth = this.getVisualTextWidth(part);
+          
+          // Check if single part is too long and needs breaking
+          if (currentVisualWidth > maxTextWidth) {
+            const brokenParts = this.breakLongPartWithBold(part, maxTextWidth);
+            wrappedLines.push(...brokenParts.slice(0, -1));
+            currentLine = brokenParts[brokenParts.length - 1] || '';
+            currentVisualWidth = this.getVisualTextWidth(currentLine);
+          }
         } else {
-          // Single word is too long - need to break it character by character
-          // This is complex with bold markers, so we'll just push it as is for now
-          wrappedLines.push(part);
-          currentLine = '';
-          currentVisualWidth = 0;
+          // Single word is too long - break it with bold marker awareness
+          const brokenParts = this.breakLongPartWithBold(part, maxTextWidth);
+          wrappedLines.push(...brokenParts.slice(0, -1));
+          currentLine = brokenParts[brokenParts.length - 1] || '';
+          currentVisualWidth = this.getVisualTextWidth(currentLine);
         }
       }
     }
@@ -214,6 +222,58 @@ class TextBox {
     }
     
     return wrappedLines.length > 0 ? wrappedLines : [''];
+  }
+
+  // Break a long part (word) into multiple lines while preserving bold markers
+  breakLongPartWithBold(part, maxTextWidth) {
+    const lines = [];
+    let currentLine = '';
+    let inBold = false;
+    let i = 0;
+    
+    textSize(this.fontSize);
+    
+    while (i < part.length) {
+      // Check for bold marker
+      if (i < part.length - 1 && part[i] === '*' && part[i + 1] === '*') {
+        // Add marker to current line
+        currentLine += '**';
+        inBold = !inBold;
+        i += 2;
+        continue;
+      }
+      
+      // Try adding next character
+      const testLine = currentLine + part[i];
+      const testWidth = this.getVisualTextWidth(testLine);
+      
+      if (testWidth <= maxTextWidth) {
+        currentLine += part[i];
+        i++;
+      } else {
+        // Line is full
+        if (currentLine) {
+          // If we're in bold, close it for this line
+          if (inBold) {
+            lines.push(currentLine + '**');
+            currentLine = '**'; // Start next line with bold marker
+          } else {
+            lines.push(currentLine);
+            currentLine = '';
+          }
+        }
+        // Add current character to new line
+        currentLine += part[i];
+        i++;
+      }
+    }
+    
+    // Add remaining text
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+    
+    return lines.length > 0 ? lines : [''];
   }
   
   draw() {
