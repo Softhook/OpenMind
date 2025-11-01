@@ -454,7 +454,18 @@ class MindMap {
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
-    
+    // If any gesture is in progress (dragging/resizing/connecting), mark as unsaved continuously
+    // This ensures autosave doesn’t flip to saved mid-gesture and miss later changes in the same gesture.
+    try {
+      let gestureActive = !!this.connectingFrom || !!this.draggingConnection;
+      if (!gestureActive) {
+        for (let b of this.boxes) {
+          if (b && (b.isDragging || b.isResizing)) { gestureActive = true; break; }
+        }
+      }
+      if (gestureActive) this.isSaved = false;
+    } catch (_) {}
+
     for (let box of this.boxes) {
       if (!box) continue;
       // If this is the actively edited box and selection is in progress, update selection
