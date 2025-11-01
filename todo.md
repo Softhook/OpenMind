@@ -1,4 +1,4 @@
-the arrow keys move the focus between the orange and red boxes
+Arrow key navigation implemented: moves focus between red boxes first (priority 1), then orange boxes (priority 2), then white boxes (priority 3). Within each color group, boxes are sorted top-to-bottom, then left-to-right. Works when not editing text.
 
 keyboard shortcuts
 f for toggle fullscreen

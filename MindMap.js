@@ -219,6 +219,102 @@ class MindMap {
     }
   }
   
+  // Navigate between boxes using arrow keys
+  // Priority: red boxes first, then orange, then white
+  // Within same color: top-to-bottom, then left-to-right
+  navigateBoxes(keyCode) {
+    if (!this.boxes || this.boxes.length === 0) return;
+    
+    // Get color priority for a box
+    const getColorPriority = (box) => {
+      if (!box || !box.backgroundColor) return 999; // white/default gets lowest priority
+      const { r, g, b } = box.backgroundColor;
+      
+      // Red: r=255, g=140, b=140
+      if (r === 255 && g === 140 && b === 140) return 1;
+      
+      // Orange: r=255, g=200, b=140
+      if (r === 255 && g === 200 && b === 140) return 2;
+      
+      // White or other: lowest priority
+      return 999;
+    };
+    
+    // Sort boxes by color priority, then position
+    const sortedBoxes = [...this.boxes].sort((a, b) => {
+      // First by color priority
+      const colorDiff = getColorPriority(a) - getColorPriority(b);
+      if (colorDiff !== 0) return colorDiff;
+      
+      // Then by position: top-to-bottom (y), then left-to-right (x)
+      const yDiff = a.y - b.y;
+      if (Math.abs(yDiff) > 10) return yDiff; // Different rows
+      return a.x - b.x; // Same row, sort by x
+    });
+    
+    // Find current box in sorted list
+    let currentIndex = -1;
+    if (this.selectedBox) {
+      currentIndex = sortedBoxes.indexOf(this.selectedBox);
+    }
+    
+    // Calculate next box based on arrow key
+    let nextIndex = -1;
+    
+    if (keyCode === UP_ARROW || keyCode === LEFT_ARROW) {
+      // Move to previous box
+      if (currentIndex === -1) {
+        nextIndex = sortedBoxes.length - 1; // No selection, go to last
+      } else {
+        nextIndex = (currentIndex - 1 + sortedBoxes.length) % sortedBoxes.length;
+      }
+    } else if (keyCode === DOWN_ARROW || keyCode === RIGHT_ARROW) {
+      // Move to next box
+      if (currentIndex === -1) {
+        nextIndex = 0; // No selection, go to first
+      } else {
+        nextIndex = (currentIndex + 1) % sortedBoxes.length;
+      }
+    }
+    
+    // Select the next box
+    if (nextIndex >= 0 && nextIndex < sortedBoxes.length) {
+      const nextBox = sortedBoxes[nextIndex];
+      
+      // Stop editing current box
+      if (this.selectedBox && this.selectedBox.isEditing) {
+        this.selectedBox.stopEditing();
+      }
+      
+      // Clear all selections
+      this.clearBoxSelection();
+      if (this.selectedConnection) {
+        this.selectedConnection.selected = false;
+        this.selectedConnection = null;
+      }
+      if (this.clearConnectionSelection) {
+        this.clearConnectionSelection();
+      }
+      
+      // Select the new box
+      this.selectedBox = nextBox;
+      this.addBoxToSelection(nextBox);
+      
+      // Optionally: pan camera to show the selected box
+      this.panToBox(nextBox);
+    }
+  }
+  
+  // Helper method to pan camera to center a box
+  panToBox(box) {
+    if (!box) return;
+    
+    // Call the global helper function from sketch.js to center camera on this box
+    if (typeof centerCameraOn === 'function') {
+      centerCameraOn(box.x, box.y);
+    }
+  }
+  
   handleMousePressed() {
     // Validate mouse coordinates
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -537,7 +633,7 @@ class MindMap {
         }
       }
       
-      // Handle arrow keys for cursor movement
+      // Handle arrow keys for cursor movement within text
       if (keyCode === LEFT_ARROW) {
         this.selectedBox.moveCursorLeft();
       } else if (keyCode === RIGHT_ARROW) {
@@ -573,6 +669,9 @@ class MindMap {
         this.pushUndo();
         this.selectedBox.addChar(key);
       }
+    } else if (keyCode === UP_ARROW || keyCode === DOWN_ARROW || keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
+      // Arrow keys for box navigation when NOT editing text
+      this.navigateBoxes(keyCode);
     } else if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
       // CMD/CTRL combinations when NOT editing text
       if (key === 'c' || key === 'C') {

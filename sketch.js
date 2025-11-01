@@ -565,6 +565,14 @@ function keyPressed() {
     }
   }
   
+  // Prevent default behavior for arrow keys when navigating between boxes
+  if (mindMap && (!mindMap.selectedBox || !mindMap.selectedBox.isEditing)) {
+    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW || 
+        keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+      return false;
+    }
+  }
+  
   // Prevent default behavior for CMD+A/C/V/X/Z when editing or when we handle undo
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
     if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z') {
@@ -757,6 +765,12 @@ function getContentBounds() {
   }
   
   return { minX, maxX, minY, maxY };
+}
+
+// Center camera on a specific world position without changing zoom
+function centerCameraOn(worldX, worldY) {
+  camX = width / 2 - worldX * zoom;
+  camY = height / 2 - worldY * zoom;
 }
 
 // Reset camera to fit all content or default view
