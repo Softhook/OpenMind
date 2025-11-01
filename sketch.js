@@ -502,14 +502,35 @@ function mouseDragged() {
 function keyPressed() {
   if (mindMap) {
     try {
-      // Handle CMD/CTRL+Z for undo at the top level
+      // Handle CMD/CTRL modifier key
       const isCmd = keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
+      const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
+      
+      // Handle CMD/CTRL+Z for undo at the top level
       if (isCmd && (key === 'z' || key === 'Z')) {
         if (mindMap.undo) mindMap.undo();
         return false; // prevent browser undo
       }
+      
+      // Handle CMD/CTRL+S for save
+      if (isCmd && (key === 's' || key === 'S')) {
+        mindMap.save();
+        return false; // prevent browser save dialog
+      }
+      
+      // Handle CMD/CTRL+L for load
+      if (isCmd && (key === 'l' || key === 'L')) {
+        triggerFileLoad();
+        return false; // prevent browser default
+      }
+      
+      // Handle F key for fullscreen toggle (only when not editing)
+      if (!isEditing && !isCmd && (key === 'f' || key === 'F')) {
+        toggleFullScreen();
+        return false;
+      }
+      
       // Space handling: if not editing, always prevent default, and still allow MindMap to react (e.g., reverse connection)
-      const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
       if ((key === ' ' || keyCode === 32) && !isEditing) {
         // Route to MindMap first (may reverse a selected connection)
         mindMap.handleKeyPressed(key, keyCode);

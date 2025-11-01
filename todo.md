@@ -2,7 +2,7 @@ the arrow keys move the focus between the orange and red boxes
 
 keyboard shortcuts
 f for toggle fullscreen
-CMD S and CMD L
+CMD + S for saving and CMD + L for loading
 
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
