@@ -25,6 +25,9 @@ class MindMap {
     
     // Performance optimization: track if content has changed
     this.isDirty = true;
+    
+    // Autosave tracking
+    this.isSaved = true; // Track if current state is saved
   }
   
   addBox(box) {
@@ -71,6 +74,9 @@ class MindMap {
       if (this.undoStack.length > this.maxUndo) {
         this.undoStack.shift();
       }
+      
+      // Mark as unsaved since we're about to make a change
+      this.isSaved = false;
     } catch (e) {
       console.warn('Failed to push undo snapshot:', e);
     }
@@ -83,6 +89,7 @@ class MindMap {
     if (!snap) return;
     this.fromJSON(snap);
     this.isDirty = true;
+    this.isSaved = false;
   }
   
   draw() {
@@ -826,6 +833,45 @@ class MindMap {
       this.removeConnectionFromSelection(conn);
     } else {
       this.addConnectionToSelection(conn);
+    }
+  }
+
+  // Autosave to localStorage
+  saveToLocalStorage() {
+    try {
+      const data = this.toJSON();
+      localStorage.setItem('openmind_autosave', JSON.stringify(data));
+      this.isSaved = true;
+      return true;
+    } catch (e) {
+      console.error('Failed to autosave to localStorage:', e);
+      return false;
+    }
+  }
+
+  // Load from localStorage
+  loadFromLocalStorage() {
+    try {
+      const saved = localStorage.getItem('openmind_autosave');
+      if (saved) {
+        const data = JSON.parse(saved);
+        this.fromJSON(data);
+        this.isSaved = true;
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Failed to load from localStorage:', e);
+      return false;
+    }
+  }
+
+  // Check if there's a saved state in localStorage
+  hasLocalStorageData() {
+    try {
+      return localStorage.getItem('openmind_autosave') !== null;
+    } catch (e) {
+      return false;
     }
   }
 }

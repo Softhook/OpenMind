@@ -15,11 +15,16 @@ const CONFIG = {
     BUTTONS_BAND_HEIGHT: 50,
     BUTTON_START_X: 10,
     BUTTON_Y: 10,
-    BUTTON_GAP: 5
+    BUTTON_GAP: 5,
+    SAVE_INDICATOR_SIZE: 16,
+    SAVE_INDICATOR_MARGIN: 20
   },
   EXPORT: {
     PADDING: 50,
     MARGIN: 20
+  },
+  AUTOSAVE: {
+    INTERVAL: 30000 // Autosave every 30 seconds
   }
 };
 
@@ -33,6 +38,10 @@ let exportTextButton;
 let menuIsVisible = false;
 let fullScreenButton;
 let menuRightEdge = 600;
+
+// Autosave state
+let autosaveTimer = null;
+let lastAutosaveTime = 0;
 
 // Camera/zoom state
 let camX = 0;
@@ -171,10 +180,18 @@ function setup() {
     
     mindMap = new MindMap();
     
-    // Create initial boxes as examples
-    mindMap.addBox(new TextBox(300, 200, "Idea"));
-    mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
-    mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+    // Try to load from localStorage first
+    const hasAutosave = mindMap.hasLocalStorageData();
+    if (hasAutosave) {
+      mindMap.loadFromLocalStorage();
+    } else {
+      // Create initial boxes as examples only if no autosave exists
+      mindMap.addBox(new TextBox(300, 200, "Idea"));
+      mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+      mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+      // Mark as saved since we just created the initial state
+      mindMap.isSaved = true;
+    }
     
     // Create UI buttons
     setupUIButtons();
@@ -184,6 +201,9 @@ function setup() {
 
     // Hide menu buttons initially
     hideMenuButtons();
+    
+    // Start autosave timer
+    startAutosave();
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -242,6 +262,10 @@ function draw() {
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
+    
+    // Draw save indicator (in screen space, not world space)
+    drawSaveIndicator();
+    
     // Update mouse cursor based on hover context
     try {
       updateCursorForHover();
@@ -1396,4 +1420,45 @@ function getWrappedLines(box) {
   }
   
   return wrappedLines.length > 0 ? wrappedLines : [''];
+}
+
+// Autosave functions
+function startAutosave() {
+  // Clear any existing timer
+  if (autosaveTimer) {
+    clearInterval(autosaveTimer);
+  }
+  
+  // Set up periodic autosave
+  autosaveTimer = setInterval(() => {
+    if (mindMap && !mindMap.isSaved) {
+      const success = mindMap.saveToLocalStorage();
+      if (success) {
+        lastAutosaveTime = millis();
+      }
+    }
+  }, CONFIG.AUTOSAVE.INTERVAL);
+}
+
+// Draw save indicator in top-right corner
+function drawSaveIndicator() {
+  if (!mindMap) return;
+  
+  const size = CONFIG.UI.SAVE_INDICATOR_SIZE;
+  const margin = CONFIG.UI.SAVE_INDICATOR_MARGIN;
+  const x = width - margin - size / 2;
+  const y = margin + size / 2;
+  
+  push();
+  // Draw circle
+  noStroke();
+  if (mindMap.isSaved) {
+    // Green when saved
+    fill(76, 175, 80);
+  } else {
+    // Red when unsaved
+    fill(244, 67, 54);
+  }
+  circle(x, y, size);
+  pop();
 }
