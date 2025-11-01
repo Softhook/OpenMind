@@ -468,6 +468,11 @@ class MindMap {
           // Select all text
           this.selectedBox.selectAll();
           return;
+        } else if (key === 'b' || key === 'B') {
+          // Toggle bold
+          this.pushUndo();
+          this.selectedBox.toggleBold();
+          return;
         } else if (key === 'c' || key === 'C') {
           // Copy selected text to clipboard
           try {
