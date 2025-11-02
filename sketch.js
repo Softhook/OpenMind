@@ -1,12 +1,16 @@
-// Configuration constants
+// ============================================================================
+// CONFIGURATION CONSTANTS
+// ============================================================================
+// Central configuration object for all app settings
+
 const CONFIG = {
   ZOOM: {
-    MIN: 0.2,
-    MAX: 3.0,
-    STEP: 1.05
+    MIN: 0.2,              // Minimum zoom level (20%)
+    MAX: 3.0,              // Maximum zoom level (300%)
+    STEP: 1.05             // Zoom factor per scroll step
   },
   CAMERA: {
-    PAN_MARGIN: 500
+    PAN_MARGIN: 500        // Soft limit margin for panning (pixels)
   },
   UI: {
     TOOLBAR_HEIGHT: 40,
@@ -21,13 +25,18 @@ const CONFIG = {
     SAVE_INDICATOR_Y: 26
   },
   EXPORT: {
-    PADDING: 50,
-    MARGIN: 20
+    PADDING: 50,           // Padding around content in exports
+    MARGIN: 20             // Page margins for PDF export
   },
   AUTOSAVE: {
-    INTERVAL: 30000 // Autosave every 30 seconds
+    INTERVAL: 30000        // Autosave interval in milliseconds (30 seconds)
   }
 };
+
+// ============================================================================
+// GLOBAL STATE
+// ============================================================================
+// Application state variables for the mind map, UI, and camera/zoom
 
 let mindMap;
 let saveButton;
@@ -68,7 +77,12 @@ let selectionCurrentY = 0;
 let lastResizeTime = 0;
 const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 
-// Fallback key-repeat manager (for Backspace/Delete) to ensure repeat works even if the browser/OS doesn't auto-repeat
+// ============================================================================
+// KEY REPEAT MANAGER
+// ============================================================================
+// Fallback key-repeat for Backspace/Delete to ensure repeat works even if
+// the browser/OS doesn't auto-repeat these keys
+
 const KeyRepeat = {
   // Only handle non-character deletion keys to avoid interfering with native typing.
   // Don't rely on p5's keyCode constants being pre-defined at load time.
@@ -158,22 +172,55 @@ const KeyRepeat = {
   }
 };
 
-// Helpers to convert between screen and world coordinates
+// ============================================================================
+// COORDINATE TRANSFORMATION UTILITIES
+// ============================================================================
+// These helpers convert between screen space (pixels on canvas) and world space
+// (the infinite pan/zoom coordinate system).
 // Transform: screen = world * zoom + cam
 // Inverse: world = (screen - cam) / zoom
+
+/**
+ * Converts mouse X position from screen space to world space
+ * @returns {number} World X coordinate
+ */
 function worldMouseX() {
   return (mouseX - camX) / zoom;
 }
+
+/**
+ * Converts mouse Y position from screen space to world space
+ * @returns {number} World Y coordinate
+ */
 function worldMouseY() {
   return (mouseY - camY) / zoom;
 }
+
+/**
+ * Converts world X coordinate to screen space
+ * @param {number} worldX - World X coordinate
+ * @returns {number} Screen X coordinate
+ */
 function screenX(worldX) {
   return worldX * zoom + camX;
 }
+
+/**
+ * Converts world Y coordinate to screen space
+ * @param {number} worldY - World Y coordinate
+ * @returns {number} Screen Y coordinate
+ */
 function screenY(worldY) {
   return worldY * zoom + camY;
 }
 
+// ============================================================================
+// P5.JS SETUP AND DRAW
+// ============================================================================
+
+/**
+ * p5.js setup function - initializes canvas and application state
+ */
 function setup() {
   try {
     createCanvas(windowWidth, windowHeight);
@@ -210,7 +257,13 @@ function setup() {
   }
 }
 
-// Separate function for UI button setup to improve organization
+// ============================================================================
+// UI BUTTON MANAGEMENT
+// ============================================================================
+
+/**
+ * Creates all UI buttons and file input
+ */
 function setupUIButtons() {
   saveButton = createButton('Save');
   saveButton.position(100, 10);
@@ -242,6 +295,9 @@ function setupUIButtons() {
   fileInput.style('display', 'none');
 }
 
+/**
+ * p5.js draw function - renders the mind map and UI every frame
+ */
 function draw() {
   background(240);
   updateMenuVisibility();
@@ -392,6 +448,13 @@ function layoutMenuButtons() {
   menuRightEdge = x + 10;
 }
 
+// ============================================================================
+// MOUSE AND KEYBOARD INPUT HANDLERS
+// ============================================================================
+
+/**
+ * Handles mouse press events
+ */
 function mousePressed() {
   // Prevent interaction with canvas when clicking on UI buttons
   if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mindMap) {
@@ -431,6 +494,9 @@ function mousePressed() {
   }
 }
 
+/**
+ * Handles mouse release events
+ */
 function mouseReleased() {
   if (isPanning) {
     // If we were panning with right mouse, suppress the subsequent right-click action if it moved
@@ -462,6 +528,9 @@ function mouseReleased() {
   }
 }
 
+/**
+ * Handles mouse drag events
+ */
 function mouseDragged() {
   if (isPanning) {
     // Screen-space pan with soft limits
@@ -499,6 +568,9 @@ function mouseDragged() {
   }
 }
 
+/**
+ * Handles key press events
+ */
 function keyPressed() {
   if (mindMap) {
     try {
@@ -603,6 +675,9 @@ function keyPressed() {
   }
 }
 
+/**
+ * Handles key release events
+ */
 function keyReleased() {
   // Stop fallback repeat on key release
   KeyRepeat.stop(keyCode);
@@ -712,6 +787,9 @@ function handleFileLoad(file) {
   }
 }
 
+/**
+ * Handles window resize events (with debouncing for performance)
+ */
 function windowResized() {
   const now = millis();
   // Debounce resize to avoid expensive recalculations
@@ -721,7 +799,11 @@ function windowResized() {
   }
 }
 
-// Mouse wheel to zoom the whole view around the cursor
+/**
+ * Handles mouse wheel events for zooming
+ * @param {Object} event - Mouse wheel event
+ * @returns {boolean} false to prevent default browser behavior
+ */
 function mouseWheel(event) {
   // Only when over the canvas area
   const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
@@ -744,7 +826,14 @@ function mouseWheel(event) {
   return false;
 }
 
-// Get bounding box of all content in world space
+// ============================================================================
+// CAMERA AND VIEW CONTROL
+// ============================================================================
+
+/**
+ * Gets the bounding box of all content in world space
+ * @returns {Object} Bounds with minX, maxX, minY, maxY properties
+ */
 function getContentBounds() {
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
     return { minX: 0, maxX: width, minY: 0, maxY: height };
@@ -767,13 +856,19 @@ function getContentBounds() {
   return { minX, maxX, minY, maxY };
 }
 
-// Center camera on a specific world position without changing zoom
+/**
+ * Centers the camera on a specific world position without changing zoom
+ * @param {number} worldX - World X coordinate
+ * @param {number} worldY - World Y coordinate
+ */
 function centerCameraOn(worldX, worldY) {
   camX = width / 2 - worldX * zoom;
   camY = height / 2 - worldY * zoom;
 }
 
-// Reset camera to fit all content or default view
+/**
+ * Resets camera to fit all content in view or default view if empty
+ */
 function resetView() {
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
     // No content - reset to default
@@ -821,6 +916,13 @@ function isOverAnyInteractive() {
   return false;
 }
 
+// ============================================================================
+// EXPORT FUNCTIONS
+// ============================================================================
+
+/**
+ * Exports the mind map as a PNG image
+ */
 function exportPNG() {
   try {
     // Validate mindMap
@@ -904,7 +1006,7 @@ function exportPNG() {
       pg.textAlign(LEFT, CENTER);
       pg.textSize(box.fontSize);
       
-      let wrappedLines = getWrappedLinesForBox(box);
+      let wrappedLines = getWrappedLines(box);
       let lineHeight = box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5);
       let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
       let textX = box.x - box.width / 2 + box.padding;
@@ -926,29 +1028,43 @@ function exportPNG() {
   }
 }
 
-// Helper to get wrapped lines (needed for PNG export since it uses offscreen buffer)
-function getWrappedLinesForBox(box) {
-  if (!box || !box.text) return [''];
+// ============================================================================
+// TEXT WRAPPING UTILITIES
+// ============================================================================
+
+/**
+ * Wraps text for a box based on its width, padding, and font size.
+ * This shared utility is used for exports (PNG, PDF) since they use offscreen buffers.
+ * 
+ * @param {Object} box - The text box to wrap text for
+ * @returns {Array<string>} Array of wrapped text lines
+ */
+function getWrappedLines(box) {
+  // Validate box and its properties
+  if (!box || !box.text || box.width == null || box.padding == null || box.fontSize == null) {
+    return [''];
+  }
   
   let lines = String(box.text).split('\n');
   let wrappedLines = [];
   let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
   let maxTextWidth = max(10, baseWidth - box.padding * 2);
   
-  // Ensure text measurements match the box font size
-  // Note: textWidth uses the current global p5 textSize, not the offscreen buffer.
-  // We set it here to match how the text will be drawn into the PNG buffer.
-  textSize(box.fontSize || 14);
+  // Set text size to match box font size for accurate measurements
+  textSize(box.fontSize);
   
   for (let line of lines) {
+    // Handle empty lines (explicit newlines)
     if (!line || line === '') {
       wrappedLines.push('');
       continue;
     }
     
+    // If line fits within width, add it as-is
     if (textWidth(line) <= maxTextWidth) {
       wrappedLines.push(line);
     } else {
+      // Line is too long, wrap by words
       let words = line.split(' ');
       let currentLine = '';
       
@@ -962,6 +1078,7 @@ function getWrappedLinesForBox(box) {
             wrappedLines.push(currentLine);
             currentLine = words[i];
           } else {
+            // Single word is too long, break it by characters
             let word = words[i];
             let charLine = '';
             for (let char of word) {
@@ -986,6 +1103,9 @@ function getWrappedLinesForBox(box) {
   return wrappedLines.length > 0 ? wrappedLines : [''];
 }
 
+/**
+ * Exports the mind map as a PDF document
+ */
 function exportPDF() {
   try {
     // Validate dependencies
@@ -1155,6 +1275,9 @@ function exportPDF() {
   }
 }
 
+/**
+ * Toggles fullscreen mode
+ */
 function toggleFullScreen() {
   try {
     const fs = fullscreen();
@@ -1164,6 +1287,9 @@ function toggleFullScreen() {
   }
 }
 
+/**
+ * Exports the mind map as a text file with hierarchy
+ */
 function exportText() {
   try {
     // Validate mindMap
@@ -1194,6 +1320,10 @@ function exportText() {
   }
 }
 
+/**
+ * Builds a text hierarchy from the mind map based on connections
+ * @returns {Array<string>} Array of text lines representing the hierarchy
+ */
 function buildTextHierarchy() {
   // Build adjacency list from connections (from -> to)
   const children = new Map(); // box -> array of child boxes
@@ -1269,7 +1399,13 @@ function buildTextHierarchy() {
   return result;
 }
 
-// Draw the selection rectangle during multi-box selection
+// ============================================================================
+// MULTI-BOX SELECTION FUNCTIONS
+// ============================================================================
+
+/**
+ * Draws the selection rectangle during multi-box selection
+ */
 function drawSelectionRectangle() {
   const x1 = min(selectionStartX, selectionCurrentX);
   const y1 = min(selectionStartY, selectionCurrentY);
@@ -1286,8 +1422,18 @@ function drawSelectionRectangle() {
   pop();
 }
 
-// Complete multi-box selection by selecting all boxes within the rectangle
-// Helper: segment (x1,y1)-(x2,y2) intersects axis-aligned rect [rx1,ry1] - [rx2,ry2]
+/**
+ * Checks if a line segment intersects an axis-aligned rectangle
+ * @param {number} x1 - Segment start X
+ * @param {number} y1 - Segment start Y
+ * @param {number} x2 - Segment end X
+ * @param {number} y2 - Segment end Y
+ * @param {number} rx1 - Rectangle corner 1 X
+ * @param {number} ry1 - Rectangle corner 1 Y
+ * @param {number} rx2 - Rectangle corner 2 X
+ * @param {number} ry2 - Rectangle corner 2 Y
+ * @returns {boolean} true if segment intersects rectangle
+ */
 function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
   // Normalize rect coordinates
   const minRx = Math.min(rx1, rx2);
@@ -1345,6 +1491,9 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
   return false;
 }
 
+/**
+ * Completes multi-box selection by selecting all boxes and connections within the rectangle
+ */
 function completeMultiBoxSelection() {
   if (!mindMap) return;
   
@@ -1396,68 +1545,13 @@ function completeMultiBoxSelection() {
   }
 }
 
-// Helper function to get wrapped lines for a text box (duplicates TextBox logic)
-function getWrappedLines(box) {
-  // Validate box and its properties
-  if (!box || !box.text || box.width == null || box.padding == null || box.fontSize == null) {
-    return [''];
-  }
-  
-  let lines = String(box.text).split('\n');
-  let wrappedLines = [];
-  // Guard width in case it's not initialized yet
-  let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
-  let maxTextWidth = max(10, baseWidth - box.padding * 2);
-  
-  textSize(box.fontSize);
-  
-  for (let line of lines) {
-    if (!line || line === '') {
-      wrappedLines.push('');
-      continue;
-    }
-    
-    if (textWidth(line) <= maxTextWidth) {
-      wrappedLines.push(line);
-    } else {
-      let words = line.split(' ');
-      let currentLine = '';
-      
-      for (let i = 0; i < words.length; i++) {
-        let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-        
-        if (textWidth(testLine) <= maxTextWidth) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) {
-            wrappedLines.push(currentLine);
-            currentLine = words[i];
-          } else {
-            let word = words[i];
-            let charLine = '';
-            for (let char of word) {
-              if (textWidth(charLine + char) <= maxTextWidth) {
-                charLine += char;
-              } else {
-                if (charLine) wrappedLines.push(charLine);
-                charLine = char;
-              }
-            }
-            currentLine = charLine;
-          }
-        }
-      }
-      
-      if (currentLine) {
-        wrappedLines.push(currentLine);
-      }
-    }
-  }
-  
-  return wrappedLines.length > 0 ? wrappedLines : [''];
-}
+// ============================================================================
+// AUTOSAVE FUNCTIONS
+// ============================================================================
 
-// Autosave functions
+/**
+ * Starts the autosave timer that periodically saves to localStorage
+ */
 function startAutosave() {
   // Clear any existing timer
   if (autosaveTimer) {

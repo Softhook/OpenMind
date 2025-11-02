@@ -1,3 +1,6 @@
+/**
+ * Connection class - represents a directional arrow connection between two boxes
+ */
 class Connection {
   // Constants
   static ARROW_SIZE = 12;
@@ -5,6 +8,11 @@ class Connection {
   static STROKE_WEIGHT_NORMAL = 2;
   static STROKE_WEIGHT_SELECTED = 3;
   
+  /**
+   * Creates a new Connection between two boxes
+   * @param {TextBox} fromBox - Source box
+   * @param {TextBox} toBox - Target box
+   */
   constructor(fromBox, toBox) {
     if (!fromBox || !toBox) {
       console.error('Connection requires valid boxes');
@@ -15,7 +23,10 @@ class Connection {
     this.selected = false;
   }
   
-  // Get the world-space point of the arrow head (end point at toBox edge)
+  /**
+   * Gets the world-space position of the arrow head (end point at toBox edge)
+   * @returns {Object|null} Point with x and y coordinates, or null if invalid
+   */
   getArrowHeadPosition() {
     if (!this.fromBox || !this.toBox) return null;
     const end = this.toBox.getConnectionPoint(this.fromBox);
@@ -23,7 +34,10 @@ class Connection {
     return end;
   }
 
-  // Hit-test for the arrow head (small circular radius around the end)
+  /**
+   * Checks if mouse is over the arrow head (for reattachment)
+   * @returns {boolean} true if mouse is over arrow head
+   */
   isMouseOverArrowHead() {
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
@@ -36,6 +50,9 @@ class Connection {
     return dist(mx, my, end.x, end.y) <= hitR;
   }
 
+  /**
+   * Draws the connection (line and arrow head)
+   */
   draw() {
     // Validate boxes exist
     if (!this.fromBox || !this.toBox) {
@@ -92,6 +109,10 @@ class Connection {
     pop();
   }
   
+  /**
+   * Checks if mouse is over the connection line
+   * @returns {boolean} true if mouse is over the line
+   */
   isMouseOver() {
     // Validate boxes and mouse coordinates
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -118,6 +139,16 @@ class Connection {
     return d < Connection.HIT_THRESHOLD;
   }
   
+  /**
+   * Calculates distance from a point to a line segment
+   * @param {number} px - Point X
+   * @param {number} py - Point Y
+   * @param {number} x1 - Segment start X
+   * @param {number} y1 - Segment start Y
+   * @param {number} x2 - Segment end X
+   * @param {number} y2 - Segment end Y
+   * @returns {number} Distance in pixels
+   */
   distanceToSegment(px, py, x1, y1, x2, y2) {
     // Validate all inputs
     if (px == null || py == null || x1 == null || y1 == null || x2 == null || y2 == null ||
@@ -156,6 +187,9 @@ class Connection {
     return dist(px, py, closestX, closestY);
   }
   
+  /**
+   * Reverses the connection direction (swaps from and to boxes)
+   */
   reverse() {
     // Swap from and to boxes
     let temp = this.fromBox;
@@ -163,6 +197,11 @@ class Connection {
     this.toBox = temp;
   }
   
+  /**
+   * Serializes the connection to JSON
+   * @param {Array<TextBox>} boxes - Array of all boxes (for indexing)
+   * @returns {Object} JSON representation with from/to box indices
+   */
   toJSON(boxes) {
     return {
       from: boxes.indexOf(this.fromBox),
@@ -170,6 +209,12 @@ class Connection {
     };
   }
   
+  /**
+   * Creates a Connection from JSON data
+   * @param {Object} data - JSON data with from/to indices
+   * @param {Array<TextBox>} boxes - Array of all boxes
+   * @returns {Connection|null} New Connection instance or null if invalid
+   */
   static fromJSON(data, boxes) {
     // Validate inputs
     if (!data || !boxes || !Array.isArray(boxes)) {
