@@ -31,6 +31,12 @@ class MindMap {
     
     // Arrow key navigation tracking
     this.isArrowKeyNavigating = false;
+    
+    // Pan animation settings
+    this.panAnimationSpeed = 0.15; // 0 to 1, higher = faster (0.15 is smooth)
+    this.isPanAnimating = false;
+    this.panTargetX = 0;
+    this.panTargetY = 0;
   }
   
   addBox(box) {
@@ -95,7 +101,40 @@ class MindMap {
     this.isSaved = false;
   }
   
+  // Update animation states (call this every frame)
+  update() {
+    // Handle pan animation
+    if (this.isPanAnimating && typeof centerCameraOn === 'function') {
+      // Get current camera position in world space
+      const currentWorldX = typeof camX !== 'undefined' && typeof width !== 'undefined' && typeof zoom !== 'undefined' 
+        ? (width / 2 - camX) / zoom 
+        : 0;
+      const currentWorldY = typeof camY !== 'undefined' && typeof height !== 'undefined' && typeof zoom !== 'undefined'
+        ? (height / 2 - camY) / zoom
+        : 0;
+      
+      // Calculate distance to target
+      const dx = this.panTargetX - currentWorldX;
+      const dy = this.panTargetY - currentWorldY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Stop animating if we're close enough
+      if (distance < 1) {
+        centerCameraOn(this.panTargetX, this.panTargetY);
+        this.isPanAnimating = false;
+      } else {
+        // Smoothly interpolate toward target
+        const newX = currentWorldX + dx * this.panAnimationSpeed;
+        const newY = currentWorldY + dy * this.panAnimationSpeed;
+        centerCameraOn(newX, newY);
+      }
+    }
+  }
+  
   draw() {
+    // Update animations
+    this.update();
+    
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
       for (let conn of this.connections) {
@@ -423,12 +462,19 @@ class MindMap {
   }
   
   // Helper method to pan camera to center a box
-  panToBox(box) {
+  panToBox(box, animated = true) {
     if (!box) return;
     
-    // Call the global helper function from sketch.js to center camera on this box
-    if (typeof centerCameraOn === 'function') {
-      centerCameraOn(box.x, box.y);
+    if (animated) {
+      // Start animated pan
+      this.panTargetX = box.x;
+      this.panTargetY = box.y;
+      this.isPanAnimating = true;
+    } else {
+      // Instant pan
+      if (typeof centerCameraOn === 'function') {
+        centerCameraOn(box.x, box.y);
+      }
     }
   }
   
