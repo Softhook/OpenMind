@@ -1,8 +1,5 @@
-Arrow key navigation implemented: moves focus between red boxes first (priority 1), then orange boxes (priority 2), then white boxes (priority 3). Within each color group, boxes are sorted top-to-bottom, then left-to-right. Works when not editing text.
+I discovered a problem with the text box fields. Soft returns and hard returns and perhaps some other invisible characters are throwing off the text selection and cursor position. We need to be able to use returns so I can just sanitise them.
 
-keyboard shortcuts
-f for toggle fullscreen
-CMD + S for saving and CMD + L for loading
 
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
