@@ -28,6 +28,9 @@ class MindMap {
     
     // Autosave tracking
     this.isSaved = true; // Track if current state is saved
+    
+    // Arrow key navigation tracking
+    this.isArrowKeyNavigating = false;
   }
   
   addBox(box) {
@@ -393,6 +396,9 @@ class MindMap {
   selectAndPanToBox(box) {
     if (!box) return;
     
+    // Mark that we're navigating via arrow keys
+    this.isArrowKeyNavigating = true;
+    
     // Stop editing current box
     if (this.selectedBox && this.selectedBox.isEditing) {
       this.selectedBox.stopEditing();
@@ -427,6 +433,9 @@ class MindMap {
   }
   
   handleMousePressed() {
+    // Clear arrow key navigation flag when mouse is used
+    this.isArrowKeyNavigating = false;
+    
     // Validate mouse coordinates
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;

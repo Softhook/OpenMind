@@ -289,8 +289,10 @@ class TextBox {
       strokeCap(SQUARE); // Reset to default
     }
     
-    // Draw background color palette only when selected and not editing
-    if (this.selected && !this.isEditing) {
+    // Draw background color palette only when selected and not editing, and not during arrow key navigation
+    // Access mindMap from global scope to check navigation state
+    const isArrowNav = (typeof mindMap !== 'undefined' && mindMap && mindMap.isArrowKeyNavigating);
+    if (this.selected && !this.isEditing && !isArrowNav) {
       this.drawColorPalette();
     }
 
