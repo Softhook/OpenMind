@@ -7,7 +7,7 @@ class TextBox {
   static PADDING = 12;
   static MIN_WIDTH = 150;
   static MIN_HEIGHT = 40;
-  static MAX_WIDTH = 300;
+  static MAX_WIDTH = 400;
   static FONT_SIZE = 14;
   static CORNER_RADIUS = 6;
   static RESIZE_HANDLE_SIZE = 18;
@@ -117,6 +117,21 @@ class TextBox {
   }
   
   /**
+   * Gets the maximum width of logical lines (split by \n) without wrapping
+   * @returns {number} Maximum line width in pixels
+   */
+  getNaturalMaxLineWidth() {
+    textSize(this.fontSize);
+    let lines = this.text.split('\n');
+    let maxWidth = 0;
+    for (let line of lines) {
+      let w = textWidth(line);
+      if (w > maxWidth) maxWidth = w;
+    }
+    return maxWidth;
+  }
+
+  /**
    * Recalculates box dimensions based on text content
    */
   updateDimensions() {
@@ -128,22 +143,26 @@ class TextBox {
     this.cachedLineCharMap = null;
     
     textSize(this.fontSize);
-    let wrappedLines = this.wrapText(this.text);
     
-    // Calculate text dimensions
-    let maxLineWidth = 0;
-    for (let line of wrappedLines) {
-      let lineWidth = textWidth(line);
-      if (lineWidth > maxLineWidth) {
-        maxLineWidth = lineWidth;
+    // Compute natural width of logical lines (no wrapping)
+    const naturalWidth = this.getNaturalMaxLineWidth() + this.padding * 2;
+    const clampedNatural = max(this.minWidth, min(this.maxWidth, naturalWidth));
+    const isSingleLogicalLine = this.text.indexOf('\n') === -1;
+
+    // Width behavior:
+    // - If user hasn't manually resized: fully auto-size to natural width (clamped)
+    // - If user HAS resized but content is a single logical line: allow SHRINKING
+    //   down to the natural width (but never expanding beyond user's width)
+    if (!this.userResized) {
+      this.width = clampedNatural;
+    } else if (isSingleLogicalLine && Number.isFinite(this.width)) {
+      if (clampedNatural < this.width) {
+        this.width = clampedNatural;
       }
     }
-    
-    // Width: only auto-size when the user hasn't manually resized
-    if (!this.userResized) {
-      this.width = max(this.minWidth, min(this.maxWidth, maxLineWidth + this.padding * 2));
-    }
 
+    let wrappedLines = this.wrapText(this.text);
+    
     // Height: always reflow to fit wrapped lines for the current width
     const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
