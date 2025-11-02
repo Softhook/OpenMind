@@ -16,7 +16,7 @@ class TextBox {
   constructor(x, y, text = "") {
     this.x = x;
     this.y = y;
-    this.text = text;
+    this.text = TextBox.sanitizeText(text);
     this.padding = TextBox.PADDING;
     this.minWidth = TextBox.MIN_WIDTH;
     this.minHeight = TextBox.MIN_HEIGHT;
@@ -79,6 +79,22 @@ class TextBox {
       { key: 'orange', color: { r: 255, g: 200, b: 140 } },
       { key: 'red', color: { r: 255, g: 140, b: 140 } }
     ];
+  }
+  
+  // Sanitize text to normalize line endings and remove problematic invisible characters
+  static sanitizeText(text) {
+    if (text == null) return '';
+    text = String(text);
+    
+    // Normalize line endings: convert \r\n and \r to \n
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
+    // Remove other invisible/control characters except newlines and tabs
+    // Keep: \n (newline), \t (tab), and printable characters
+    // Remove: control characters (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F-0x9F)
+    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+    
+    return text;
   }
   
   updateDimensions() {
@@ -718,6 +734,9 @@ class TextBox {
       return;
     }
     
+    // Sanitize the character being added
+    char = TextBox.sanitizeText(char);
+    
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       this.deleteSelection();
@@ -902,7 +921,8 @@ class TextBox {
       this.text = '';
     }
     
-    pastedText = String(pastedText);
+    // Sanitize pasted text to normalize line endings and remove invisible characters
+    pastedText = TextBox.sanitizeText(pastedText);
     
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
@@ -1142,7 +1162,7 @@ class TextBox {
     // Validate required fields with defaults
     let x = (data.x != null && !isNaN(data.x)) ? data.x : 100;
     let y = (data.y != null && !isNaN(data.y)) ? data.y : 100;
-    let text = data.text != null ? String(data.text) : 'New Node';
+    let text = data.text != null ? TextBox.sanitizeText(String(data.text)) : 'New Node';
     
     let box = new TextBox(x, y, text);
     
