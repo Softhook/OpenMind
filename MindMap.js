@@ -220,8 +220,8 @@ class MindMap {
   }
   
   // Navigate between boxes using arrow keys
-  // Priority: red boxes first, then their connected boxes, then orange, then their connected boxes, etc.
-  // Traverses depth-first through connections before moving to next priority group
+  // UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
+  // LEFT/RIGHT: Move between boxes at same hierarchy level (siblings)
   navigateBoxes(keyCode) {
     if (!this.boxes || this.boxes.length === 0) return;
     
@@ -240,128 +240,180 @@ class MindMap {
       return 999;
     };
     
-    // Build navigation order: for each priority group, traverse connected boxes depth-first
-    const buildNavigationOrder = () => {
-      const visited = new Set();
-      const orderedBoxes = [];
-      
-      // Get connected boxes for a given box (both directions)
-      const getConnectedBoxes = (box) => {
-        const connected = [];
-        for (const conn of this.connections) {
-          if (conn.fromBox === box && !visited.has(conn.toBox)) {
-            connected.push(conn.toBox);
-          }
-          if (conn.toBox === box && !visited.has(conn.fromBox)) {
-            connected.push(conn.fromBox);
-          }
-        }
-        // Sort connected boxes by position: top-to-bottom, left-to-right
-        return connected.sort((a, b) => {
-          const yDiff = a.y - b.y;
-          if (Math.abs(yDiff) > 10) return yDiff;
-          return a.x - b.x;
-        });
-      };
-      
-      // Depth-first traversal starting from a root box
-      const traverse = (box) => {
-        if (visited.has(box)) return;
-        visited.add(box);
-        orderedBoxes.push(box);
+    if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+      // UP/DOWN: Navigate through depth-first traversal
+      const buildNavigationOrder = () => {
+        const visited = new Set();
+        const orderedBoxes = [];
         
-        const connected = getConnectedBoxes(box);
-        for (const connectedBox of connected) {
-          traverse(connectedBox);
+        // Get connected boxes for a given box (both directions)
+        const getConnectedBoxes = (box) => {
+          const connected = [];
+          for (const conn of this.connections) {
+            if (conn.fromBox === box && !visited.has(conn.toBox)) {
+              connected.push(conn.toBox);
+            }
+            if (conn.toBox === box && !visited.has(conn.fromBox)) {
+              connected.push(conn.fromBox);
+            }
+          }
+          // Sort connected boxes by position: top-to-bottom, left-to-right
+          return connected.sort((a, b) => {
+            const yDiff = a.y - b.y;
+            if (Math.abs(yDiff) > 10) return yDiff;
+            return a.x - b.x;
+          });
+        };
+        
+        // Depth-first traversal starting from a root box
+        const traverse = (box) => {
+          if (visited.has(box)) return;
+          visited.add(box);
+          orderedBoxes.push(box);
+          
+          const connected = getConnectedBoxes(box);
+          for (const connectedBox of connected) {
+            traverse(connectedBox);
+          }
+        };
+        
+        // Group boxes by priority
+        const priorityGroups = new Map();
+        for (const box of this.boxes) {
+          const priority = getColorPriority(box);
+          if (!priorityGroups.has(priority)) {
+            priorityGroups.set(priority, []);
+          }
+          priorityGroups.get(priority).push(box);
         }
+        
+        // Sort each priority group by position
+        for (const [priority, boxes] of priorityGroups) {
+          boxes.sort((a, b) => {
+            const yDiff = a.y - b.y;
+            if (Math.abs(yDiff) > 10) return yDiff;
+            return a.x - b.x;
+          });
+        }
+        
+        // Process each priority group in order
+        const sortedPriorities = Array.from(priorityGroups.keys()).sort((a, b) => a - b);
+        for (const priority of sortedPriorities) {
+          const boxes = priorityGroups.get(priority);
+          for (const box of boxes) {
+            if (!visited.has(box)) {
+              traverse(box);
+            }
+          }
+        }
+        
+        return orderedBoxes;
       };
       
-      // Group boxes by priority
-      const priorityGroups = new Map();
-      for (const box of this.boxes) {
-        const priority = getColorPriority(box);
-        if (!priorityGroups.has(priority)) {
-          priorityGroups.set(priority, []);
-        }
-        priorityGroups.get(priority).push(box);
+      const sortedBoxes = buildNavigationOrder();
+      
+      // Find current box in sorted list
+      let currentIndex = -1;
+      if (this.selectedBox) {
+        currentIndex = sortedBoxes.indexOf(this.selectedBox);
       }
       
-      // Sort each priority group by position
-      for (const [priority, boxes] of priorityGroups) {
-        boxes.sort((a, b) => {
+      // Calculate next box based on arrow key
+      let nextIndex = -1;
+      
+      if (keyCode === UP_ARROW) {
+        // Move to previous box
+        if (currentIndex === -1) {
+          nextIndex = sortedBoxes.length - 1;
+        } else {
+          nextIndex = (currentIndex - 1 + sortedBoxes.length) % sortedBoxes.length;
+        }
+      } else if (keyCode === DOWN_ARROW) {
+        // Move to next box
+        if (currentIndex === -1) {
+          nextIndex = 0;
+        } else {
+          nextIndex = (currentIndex + 1) % sortedBoxes.length;
+        }
+      }
+      
+      // Select the next box
+      if (nextIndex >= 0 && nextIndex < sortedBoxes.length) {
+        this.selectAndPanToBox(sortedBoxes[nextIndex]);
+      }
+      
+    } else if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
+      // LEFT/RIGHT: Navigate between siblings (same hierarchy level)
+      
+      // Get all boxes at the same priority level as current
+      const currentPriority = this.selectedBox ? getColorPriority(this.selectedBox) : 999;
+      
+      // Get all boxes with same priority, sorted by position
+      const samePriorityBoxes = this.boxes
+        .filter(box => getColorPriority(box) === currentPriority)
+        .sort((a, b) => {
           const yDiff = a.y - b.y;
           if (Math.abs(yDiff) > 10) return yDiff;
           return a.x - b.x;
         });
+      
+      if (samePriorityBoxes.length === 0) return;
+      
+      // Find current box in same-priority list
+      let currentIndex = -1;
+      if (this.selectedBox) {
+        currentIndex = samePriorityBoxes.indexOf(this.selectedBox);
       }
       
-      // Process each priority group in order
-      const sortedPriorities = Array.from(priorityGroups.keys()).sort((a, b) => a - b);
-      for (const priority of sortedPriorities) {
-        const boxes = priorityGroups.get(priority);
-        for (const box of boxes) {
-          if (!visited.has(box)) {
-            traverse(box);
-          }
+      // Calculate next box
+      let nextIndex = -1;
+      
+      if (keyCode === LEFT_ARROW) {
+        if (currentIndex === -1) {
+          nextIndex = samePriorityBoxes.length - 1;
+        } else {
+          nextIndex = (currentIndex - 1 + samePriorityBoxes.length) % samePriorityBoxes.length;
+        }
+      } else if (keyCode === RIGHT_ARROW) {
+        if (currentIndex === -1) {
+          nextIndex = 0;
+        } else {
+          nextIndex = (currentIndex + 1) % samePriorityBoxes.length;
         }
       }
       
-      return orderedBoxes;
-    };
-    
-    const sortedBoxes = buildNavigationOrder();
-    
-    // Find current box in sorted list
-    let currentIndex = -1;
-    if (this.selectedBox) {
-      currentIndex = sortedBoxes.indexOf(this.selectedBox);
-    }
-    
-    // Calculate next box based on arrow key
-    let nextIndex = -1;
-    
-    if (keyCode === UP_ARROW || keyCode === LEFT_ARROW) {
-      // Move to previous box
-      if (currentIndex === -1) {
-        nextIndex = sortedBoxes.length - 1; // No selection, go to last
-      } else {
-        nextIndex = (currentIndex - 1 + sortedBoxes.length) % sortedBoxes.length;
-      }
-    } else if (keyCode === DOWN_ARROW || keyCode === RIGHT_ARROW) {
-      // Move to next box
-      if (currentIndex === -1) {
-        nextIndex = 0; // No selection, go to first
-      } else {
-        nextIndex = (currentIndex + 1) % sortedBoxes.length;
+      // Select the next box
+      if (nextIndex >= 0 && nextIndex < samePriorityBoxes.length) {
+        this.selectAndPanToBox(samePriorityBoxes[nextIndex]);
       }
     }
+  }
+  
+  // Helper to select a box and pan camera to it
+  selectAndPanToBox(box) {
+    if (!box) return;
     
-    // Select the next box
-    if (nextIndex >= 0 && nextIndex < sortedBoxes.length) {
-      const nextBox = sortedBoxes[nextIndex];
-      
-      // Stop editing current box
-      if (this.selectedBox && this.selectedBox.isEditing) {
-        this.selectedBox.stopEditing();
-      }
-      
-      // Clear all selections
-      this.clearBoxSelection();
-      if (this.selectedConnection) {
-        this.selectedConnection.selected = false;
-        this.selectedConnection = null;
-      }
-      if (this.clearConnectionSelection) {
-        this.clearConnectionSelection();
-      }
-      
-      // Select the new box
-      this.selectedBox = nextBox;
-      this.addBoxToSelection(nextBox);
-      
-      // Pan camera to show the selected box
-      this.panToBox(nextBox);
+    // Stop editing current box
+    if (this.selectedBox && this.selectedBox.isEditing) {
+      this.selectedBox.stopEditing();
     }
+    
+    // Clear all selections
+    this.clearBoxSelection();
+    if (this.selectedConnection) {
+      this.selectedConnection.selected = false;
+      this.selectedConnection = null;
+    }
+    if (this.clearConnectionSelection) {
+      this.clearConnectionSelection();
+    }
+    
+    // Select the new box
+    this.selectedBox = box;
+    this.addBoxToSelection(box);
+    
+    // Pan camera to show the selected box
+    this.panToBox(box);
   }
   
   // Helper method to pan camera to center a box
