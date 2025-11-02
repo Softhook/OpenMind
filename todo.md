@@ -7,7 +7,6 @@ new button create blank layout
 
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
-It'd be nice if the boxes shrank automatically to the minimum size needed horizontally when there is  only a single line of text
 
 add a dashed line connection
 
@@ -18,8 +17,6 @@ Center a loaded file after load
 Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
 
 pressing s key make all the selected boxes an average same width
-
-While typing or coppying text in once is get over 10 words then do the line break
 
 
 detect hyperlinks or local file links - colour them blue and clicking on them opens the link in another window

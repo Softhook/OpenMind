@@ -7,7 +7,7 @@ class TextBox {
   static PADDING = 12;
   static MIN_WIDTH = 150;
   static MIN_HEIGHT = 40;
-  static MAX_WIDTH = 400;
+  static MAX_WIDTH = 280;
   static FONT_SIZE = 14;
   static CORNER_RADIUS = 6;
   static RESIZE_HANDLE_SIZE = 18;
