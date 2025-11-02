@@ -1,3 +1,7 @@
+/**
+ * TextBox class - represents a text node in the mind map with editing capabilities,
+ * resizing, text wrapping, and visual styling.
+ */
 class TextBox {
   // Constants
   static PADDING = 12;
@@ -13,6 +17,12 @@ class TextBox {
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
+  /**
+   * Creates a new TextBox
+   * @param {number} x - Center X coordinate
+   * @param {number} y - Center Y coordinate
+   * @param {string} text - Initial text content
+   */
   constructor(x, y, text = "") {
     this.x = x;
     this.y = y;
@@ -74,6 +84,10 @@ class TextBox {
     this.updateDimensions();
   }
   
+  /**
+   * Gets the default color palette for boxes
+   * @returns {Array<Object>} Array of color palette entries with key and color
+   */
   static getColorPalette() {
     return [
       { key: 'white', color: { r: 255, g: 255, b: 255 } },
@@ -82,7 +96,11 @@ class TextBox {
     ];
   }
   
-  // Sanitize text to normalize line endings and remove problematic invisible characters
+  /**
+   * Sanitizes text to normalize line endings and remove problematic invisible characters
+   * @param {string} text - Text to sanitize
+   * @returns {string} Sanitized text
+   */
   static sanitizeText(text) {
     if (text === null || text === undefined) return '';
     text = String(text);
@@ -98,6 +116,9 @@ class TextBox {
     return text;
   }
   
+  /**
+   * Recalculates box dimensions based on text content
+   */
   updateDimensions() {
     if (this.text == null) this.text = '';
     
@@ -128,6 +149,15 @@ class TextBox {
     this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
   }
   
+  // ============================================================================
+  // TEXT WRAPPING AND LAYOUT
+  // ============================================================================
+  
+  /**
+   * Wraps text to fit within the box width
+   * @param {string} text - Text to wrap
+   * @returns {Array<string>} Array of wrapped text lines
+   */
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
@@ -241,6 +271,14 @@ class TextBox {
     return result;
   }
   
+  // ============================================================================
+  // DRAWING AND RENDERING
+  // ============================================================================
+  
+  /**
+   * Draws the text box with its content, selection, cursor, and UI elements
+   * @param {boolean} shouldDim - Whether to dim this box (for navigation focus)
+   */
   draw(shouldDim = false) {
     push();
     
@@ -588,6 +626,25 @@ class TextBox {
     return min(this.text.length, lineStartPos + closestPos);
   }
   
+  // ============================================================================
+  // TEXT EDITING AND MANIPULATION
+  // ============================================================================
+  
+  /**
+   * Helper: Checks if a character is whitespace
+   * @param {string} ch - Character to check
+   * @returns {boolean} true if whitespace
+   * @private
+   */
+  static isWhitespace(ch) {
+    return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+  }
+  
+  /**
+   * Starts editing mode at the given mouse position
+   * @param {number} mx - Mouse X in world coordinates (optional)
+   * @param {number} my - Mouse Y in world coordinates (optional)
+   */
   startEditing(mx = null, my = null) {
     this.isEditing = true;
     
@@ -763,6 +820,10 @@ class TextBox {
     this.selectionEnd = end;
   }
   
+  /**
+   * Adds a character at the cursor position
+   * @param {string} char - Character to add
+   */
   addChar(char) {
     // Ensure text is defined
     if (this.text === null || this.text === undefined) {
@@ -791,6 +852,9 @@ class TextBox {
     this.resetCursorBlink();
   }
   
+  /**
+   * Removes the character before the cursor (Backspace)
+   */
   removeChar() {
     if (this.text.length > 0) {
       // If there's a selection, delete it
@@ -806,7 +870,9 @@ class TextBox {
     this.resetCursorBlink();
   }
 
-  // Forward delete (Fn+Backspace on macOS / Delete key)
+  /**
+   * Forward delete - removes the character after the cursor (Delete key)
+   */
   removeForwardChar() {
     if (!this.text || this.text.length === 0) {
       this.resetCursorBlink();
@@ -824,7 +890,9 @@ class TextBox {
     this.resetCursorBlink();
   }
 
-  // Delete the previous word (Alt/Option+Backspace or Ctrl+Backspace)
+  /**
+   * Deletes the previous word (Alt/Ctrl+Backspace)
+   */
   deleteWordLeft() {
     if (!this.text) {
       this.text = '';
@@ -840,12 +908,11 @@ class TextBox {
       this.resetCursorBlink();
       return;
     }
-    const isWs = (ch) => ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
     let i = pos;
     // Skip whitespace directly left of cursor
-    while (i > 0 && isWs(this.text[i - 1])) i--;
+    while (i > 0 && TextBox.isWhitespace(this.text[i - 1])) i--;
     // Then skip non-whitespace (the word)
-    while (i > 0 && !isWs(this.text[i - 1])) i--;
+    while (i > 0 && !TextBox.isWhitespace(this.text[i - 1])) i--;
     if (i < pos) {
       this.text = this.text.slice(0, i) + this.text.slice(pos);
       this.cursorPosition = i;
@@ -854,7 +921,9 @@ class TextBox {
     this.resetCursorBlink();
   }
 
-  // Delete the next word (Alt/Option+Delete or Ctrl+Delete)
+  /**
+   * Deletes the next word (Alt/Ctrl+Delete)
+   */
   deleteWordRight() {
     if (!this.text) {
       this.text = '';
@@ -870,12 +939,11 @@ class TextBox {
       this.resetCursorBlink();
       return;
     }
-    const isWs = (ch) => ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
     let i = pos;
     // Skip whitespace directly right of cursor
-    while (i < this.text.length && isWs(this.text[i])) i++;
+    while (i < this.text.length && TextBox.isWhitespace(this.text[i])) i++;
     // Then skip non-whitespace (the word)
-    while (i < this.text.length && !isWs(this.text[i])) i++;
+    while (i < this.text.length && !TextBox.isWhitespace(this.text[i])) i++;
     if (i > pos) {
       this.text = this.text.slice(0, pos) + this.text.slice(i);
       // cursorPosition unchanged
@@ -884,7 +952,9 @@ class TextBox {
     this.resetCursorBlink();
   }
 
-  // Delete to start of logical line (up to previous \n)
+  /**
+   * Deletes from cursor to start of current line (Cmd+Backspace)
+   */
   deleteToLineStart() {
     if (!this.text) this.text = '';
     // If there's a selection, delete it
@@ -904,7 +974,9 @@ class TextBox {
     this.resetCursorBlink();
   }
 
-  // Delete to end of logical line (to next \n or end)
+  /**
+   * Deletes from cursor to end of current line (Cmd+Delete)
+   */
   deleteToLineEnd() {
     if (!this.text) this.text = '';
     // If there's a selection, delete it
@@ -924,11 +996,18 @@ class TextBox {
     this.resetCursorBlink();
   }
   
+  /**
+   * Selects all text in the box
+   */
   selectAll() {
     this.selectionStart = 0;
     this.selectionEnd = this.text.length;
   }
   
+  /**
+   * Gets the currently selected text
+   * @returns {string} Selected text or empty string
+   */
   getSelectedText() {
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
@@ -938,6 +1017,9 @@ class TextBox {
     return '';
   }
   
+  /**
+   * Deletes the currently selected text
+   */
   deleteSelection() {
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
@@ -950,6 +1032,10 @@ class TextBox {
     }
   }
   
+  /**
+   * Pastes text at the cursor position
+   * @param {string} pastedText - Text to paste
+   */
   pasteText(pastedText) {
     // Validate pasted text
     if (pastedText === null || pastedText === undefined) {
@@ -983,12 +1069,26 @@ class TextBox {
     this.updateDimensions();
   }
   
+  // ============================================================================
+  // DRAGGING AND RESIZING
+  // ============================================================================
+  
+  /**
+   * Starts dragging the box
+   * @param {number} mx - Mouse X in world coordinates
+   * @param {number} my - Mouse Y in world coordinates
+   */
   startDrag(mx, my) {
     this.isDragging = true;
     this.dragOffsetX = this.x - mx;
     this.dragOffsetY = this.y - my;
   }
   
+  /**
+   * Updates box position while dragging
+   * @param {number} mx - Mouse X in world coordinates
+   * @param {number} my - Mouse Y in world coordinates
+   */
   drag(mx, my) {
     if (this.isDragging) {
       // Validate mouse coordinates
@@ -1002,10 +1102,18 @@ class TextBox {
     }
   }
   
+  /**
+   * Stops dragging the box
+   */
   stopDrag() {
     this.isDragging = false;
   }
   
+  /**
+   * Starts resizing the box
+   * @param {number} mx - Mouse X in world coordinates
+   * @param {number} my - Mouse Y in world coordinates
+   */
   startResize(mx, my) {
     this.isResizing = true;
     this.userResized = true; // mark that the user has manually resized the box
@@ -1018,6 +1126,11 @@ class TextBox {
     this.resizeStartTop = this.y - this.height / 2;
   }
   
+  /**
+   * Updates box size while resizing
+   * @param {number} mx - Mouse X in world coordinates
+   * @param {number} my - Mouse Y in world coordinates
+   */
   resize(mx, my) {
     if (this.isResizing) {
       // Validate mouse coordinates
@@ -1120,6 +1233,9 @@ class TextBox {
     return wrappedLines.length > 0 ? wrappedLines : [''];
   }
   
+  /**
+   * Stops resizing the box
+   */
   stopResize() {
     this.isResizing = false;
     // Preserve the top edge when reflowing dimensions after resize
@@ -1130,7 +1246,15 @@ class TextBox {
     this.y = prevTop + this.height / 2;
   }
   
-  // Get connection point on the edge of the box
+  // ============================================================================
+  // CONNECTIONS AND GEOMETRY
+  // ============================================================================
+  
+  /**
+   * Gets the connection point on the edge of the box nearest to another box
+   * @param {TextBox} otherBox - The target box
+   * @returns {Object} Point with x and y coordinates
+   */
   getConnectionPoint(otherBox) {
     // Validate other box
     if (!otherBox || otherBox.x == null || otherBox.y == null) {
@@ -1181,6 +1305,14 @@ class TextBox {
     return { x: px, y: py };
   }
   
+  // ============================================================================
+  // SERIALIZATION
+  // ============================================================================
+  
+  /**
+   * Serializes the text box to JSON
+   * @returns {Object} JSON representation
+   */
   toJSON() {
     return {
       x: this.x,
@@ -1192,6 +1324,11 @@ class TextBox {
     };
   }
   
+  /**
+   * Creates a TextBox from JSON data
+   * @param {Object} data - JSON data to load from
+   * @returns {TextBox|null} New TextBox instance or null if invalid
+   */
   static fromJSON(data) {
     // Validate input data
     if (!data || typeof data !== 'object') {
@@ -1228,7 +1365,13 @@ class TextBox {
     return box;
   }
   
-  // Helper methods for cursor
+  // ============================================================================
+  // CURSOR HELPERS
+  // ============================================================================
+  
+  /**
+   * Resets cursor blink state (makes cursor visible)
+   */
   resetCursorBlink() {
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
