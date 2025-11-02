@@ -89,10 +89,10 @@ class TextBox {
     // Normalize line endings: convert \r\n and \r to \n
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // Remove other invisible/control characters except newlines and tabs
-    // Keep: \n (newline), \t (tab), and printable characters
-    // Remove: control characters (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F-0x9F)
-    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+    // Remove invisible/control characters except newlines and tabs
+    // Keep: \n (newline at 0x0A), \t (tab at 0x09), and printable characters (0x20+)
+    // Remove: C0 controls (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F), DEL (0x7F), and C1 controls (0x80-0x9F)
+    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F\x80-\x9F]/g, '');
     
     return text;
   }
