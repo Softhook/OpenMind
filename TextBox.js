@@ -43,6 +43,7 @@ class TextBox {
     // Cache for wrapped text lines
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
+    this.cachedLineCharMap = null; // Maps wrapped line index to character start position in original text
     
     // Text selection state
     this.isSelecting = false;
@@ -103,6 +104,7 @@ class TextBox {
     // Invalidate cache
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
+    this.cachedLineCharMap = null;
     
     textSize(this.fontSize);
     let wrappedLines = this.wrapText(this.text);
@@ -138,43 +140,72 @@ class TextBox {
     
     let lines = text.split('\n');
     let wrappedLines = [];
+    let lineCharMap = []; // Maps each wrapped line index to its start position in original text
     let maxTextWidth = max(10, currentWidth - this.padding * 2);
+    let charPos = 0; // Current position in original text
     
     textSize(this.fontSize);
     
-    for (let line of lines) {
-      // Handle empty lines
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      let line = lines[lineIdx];
+      let lineStartPos = charPos; // Remember where this logical line starts
+      
+      // Handle empty lines (from explicit newlines)
       if (line === '') {
         wrappedLines.push('');
+        lineCharMap.push(charPos);
+        // Advance only if this empty line is not the last logical line (i.e., there is a newline here)
+        if (lineIdx < lines.length - 1) {
+          charPos++;
+        }
         continue;
       }
       
       if (textWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
+        lineCharMap.push(charPos);
+        // Advance by the line length; only add +1 for the newline if this isn't the last logical line
+        if (lineIdx < lines.length - 1) {
+          charPos += line.length + 1; // include newline between logical lines
+        } else {
+          charPos += line.length; // last line may have no trailing newline
+        }
       } else {
         // Break line into words
         let words = line.split(' ');
         let currentLine = '';
+        let currentLineStartInOriginal = lineStartPos; // Track start position of current wrapped line
+        let processedChars = 0; // How many chars of the original line we've processed
         
         for (let i = 0; i < words.length; i++) {
-          let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+          let word = words[i];
+          let testLine = currentLine + (currentLine ? ' ' : '') + word;
           
           if (textWidth(testLine) <= maxTextWidth) {
             currentLine = testLine;
           } else {
-            // If current line is not empty, push it
+            // Current line is full, push it
             if (currentLine) {
               wrappedLines.push(currentLine);
-              currentLine = words[i];
+              lineCharMap.push(currentLineStartInOriginal);
+              
+              // Update position tracking
+              processedChars += currentLine.length + 1; // +1 for space after this wrapped line
+              currentLineStartInOriginal = lineStartPos + processedChars;
+              currentLine = word;
             } else {
               // Single word is too long, break it by characters
-              let word = words[i];
               let charLine = '';
               for (let char of word) {
                 if (textWidth(charLine + char) <= maxTextWidth) {
                   charLine += char;
                 } else {
-                  if (charLine) wrappedLines.push(charLine);
+                  if (charLine) {
+                    wrappedLines.push(charLine);
+                    lineCharMap.push(currentLineStartInOriginal);
+                    processedChars += charLine.length;
+                    currentLineStartInOriginal = lineStartPos + processedChars;
+                  }
                   charLine = char;
                 }
               }
@@ -183,17 +214,30 @@ class TextBox {
           }
         }
         
-        // Push the last line
+        // Push the last line of this paragraph
         if (currentLine) {
           wrappedLines.push(currentLine);
+          lineCharMap.push(currentLineStartInOriginal);
+        }
+        
+        // Move to next logical line (past newline if not last logical line)
+        if (lineIdx < lines.length - 1) {
+          charPos += line.length + 1;
+        } else {
+          charPos += line.length;
         }
       }
     }
     
     const result = wrappedLines.length > 0 ? wrappedLines : [''];
-    // Cache the result
+    if (result.length === 1 && result[0] === '') {
+      lineCharMap = [0];
+    }
+    
+    // Cache the results
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
+    this.cachedLineCharMap = lineCharMap;
     return result;
   }
   
@@ -537,21 +581,14 @@ class TextBox {
       }
     }
     
-    // Convert line position to absolute text position
-    let charCount = 0;
-    for (let i = 0; i < clickedLine; i++) {
-      charCount += wrappedLines[i].length;
-      // Account for spaces/newlines between wrapped lines
-      if (charCount < this.text.length) {
-        if (this.text[charCount] === '\n') {
-          charCount++;
-        } else if (this.text[charCount] === ' ') {
-          charCount++;
-        }
-      }
+    // Use character map to convert wrapped line position to absolute text position
+    if (!this.cachedLineCharMap || clickedLine >= this.cachedLineCharMap.length) {
+      // Fallback if map is not available
+      return min(this.text.length, closestPos);
     }
     
-    return charCount + closestPos;
+    let lineStartPos = this.cachedLineCharMap[clickedLine];
+    return min(this.text.length, lineStartPos + closestPos);
   }
   
   startEditing(mx = null, my = null) {
@@ -617,8 +654,14 @@ class TextBox {
     if (my < lineTop - marginY || my > lineBottom + marginY) return false;
     
     const lineText = wrappedLines[lineIndex] || '';
-    const lineWidth = textWidth(lineText);
-    if (lineWidth <= 0) return false;
+    let lineWidth = textWidth(lineText);
+    
+    // For empty visual lines, allow clicks anywhere within the inner padded area
+    const innerLeft = this.x - this.width / 2 + this.padding;
+    const innerRight = this.x + this.width / 2 - this.padding;
+    if (lineWidth <= 0) {
+      return mx >= innerLeft - marginX && mx <= innerRight + marginX;
+    }
     
     const lineLeft = textX;
     const lineRight = textX + lineWidth;
@@ -1218,24 +1261,14 @@ class TextBox {
     let wrappedLines = this.wrapText(this.text);
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
     
-    if (lineIndex > 0) {
+    if (lineIndex > 0 && this.cachedLineCharMap) {
       // Move to previous line, same position or end of line
       let prevLineLength = wrappedLines[lineIndex - 1].length;
       let newPosInLine = min(posInLine, prevLineLength);
       
-      // Calculate character position in original text
-      let charCount = 0;
-      for (let i = 0; i < lineIndex - 1; i++) {
-        charCount += wrappedLines[i].length;
-        // Account for spaces that were consumed during wrapping
-        if (i < wrappedLines.length - 1 && !this.text[charCount]) {
-          // No newline at this position means it was wrapped
-          if (this.text[charCount] !== '\n') {
-            charCount++; // Skip the space
-          }
-        }
-      }
-      this.cursorPosition = charCount + newPosInLine;
+      // Use character map to get the absolute position
+      let prevLineStart = this.cachedLineCharMap[lineIndex - 1];
+      this.cursorPosition = prevLineStart + newPosInLine;
       this.resetCursorBlink();
     }
   }
@@ -1244,25 +1277,14 @@ class TextBox {
     let wrappedLines = this.wrapText(this.text);
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
     
-    if (lineIndex < wrappedLines.length - 1) {
+    if (lineIndex < wrappedLines.length - 1 && this.cachedLineCharMap) {
       // Move to next line, same position or end of line
       let nextLineLength = wrappedLines[lineIndex + 1].length;
       let newPosInLine = min(posInLine, nextLineLength);
       
-      // Calculate character position in original text
-      let charCount = 0;
-      for (let i = 0; i < lineIndex + 1; i++) {
-        charCount += wrappedLines[i].length;
-        // Account for spaces that were consumed during wrapping
-        if (i < wrappedLines.length - 1 && charCount < this.text.length) {
-          if (this.text[charCount] === '\n') {
-            charCount++; // Skip newline
-          } else if (this.text[charCount] === ' ') {
-            charCount++; // Skip space
-          }
-        }
-      }
-      this.cursorPosition = charCount + newPosInLine;
+      // Use character map to get the absolute position
+      let nextLineStart = this.cachedLineCharMap[lineIndex + 1];
+      this.cursorPosition = nextLineStart + newPosInLine;
       this.resetCursorBlink();
     }
   }
@@ -1280,34 +1302,40 @@ class TextBox {
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
     
-    let charCount = 0;
-    let lineIndex = 0;
-    let posInLine = 0;
+    // Use character map for precise mapping
+    if (!this.cachedLineCharMap || this.cachedLineCharMap.length === 0) {
+      return { lineIndex: 0, posInLine: 0 };
+    }
     
-    for (let i = 0; i < wrappedLines.length; i++) {
-      let lineLength = wrappedLines[i] ? wrappedLines[i].length : 0;
+    // Find which wrapped line contains the cursor position
+    let lineIndex = 0;
+    for (let i = 0; i < this.cachedLineCharMap.length; i++) {
+      let lineStart = this.cachedLineCharMap[i];
+      let lineEnd = (i < this.cachedLineCharMap.length - 1) 
+        ? this.cachedLineCharMap[i + 1] 
+        : this.text.length;
+      const isLast = (i === this.cachedLineCharMap.length - 1);
       
-      if (charCount + lineLength >= this.cursorPosition) {
+      // Use half-open intervals [start, end) except on the last line where end is inclusive
+      if ((this.cursorPosition >= lineStart && this.cursorPosition < lineEnd) ||
+          (isLast && this.cursorPosition >= lineStart && this.cursorPosition <= lineEnd)) {
         lineIndex = i;
-        posInLine = this.cursorPosition - charCount;
         break;
       }
       
-      charCount += lineLength;
-      
-      // Account for wrapped spaces and newlines
-      if (charCount < this.text.length) {
-        if (this.text[charCount] === '\n') {
-          charCount++;
-        } else if (this.text[charCount] === ' ') {
-          charCount++;
-        }
-      }
-      
-      if (i === wrappedLines.length - 1) {
+      // If cursor is past all mapped positions, it's on the last line
+      if (isLast) {
         lineIndex = i;
-        posInLine = this.cursorPosition - charCount;
       }
+    }
+    
+    // Calculate position within the wrapped line
+    let lineStartPos = this.cachedLineCharMap[lineIndex];
+    let posInLine = this.cursorPosition - lineStartPos;
+    
+    // Ensure posInLine doesn't exceed the wrapped line length
+    if (wrappedLines[lineIndex]) {
+      posInLine = min(posInLine, wrappedLines[lineIndex].length);
     }
     
     return { lineIndex, posInLine };
@@ -1432,34 +1460,40 @@ class TextBox {
   }
   
   getLineAndPositionFromChar(charPos, wrappedLines) {
-    let charCount = 0;
-    let lineIndex = 0;
-    let posInLine = 0;
+    // Use character map for precise mapping
+    if (!this.cachedLineCharMap || this.cachedLineCharMap.length === 0) {
+      return { lineIndex: 0, posInLine: 0 };
+    }
     
-    for (let i = 0; i < wrappedLines.length; i++) {
-      let lineLength = wrappedLines[i].length;
+    // Find which wrapped line contains the character position
+    let lineIndex = 0;
+    for (let i = 0; i < this.cachedLineCharMap.length; i++) {
+      let lineStart = this.cachedLineCharMap[i];
+      let lineEnd = (i < this.cachedLineCharMap.length - 1) 
+        ? this.cachedLineCharMap[i + 1] 
+        : this.text.length;
+      const isLast = (i === this.cachedLineCharMap.length - 1);
       
-      if (charCount + lineLength >= charPos) {
+      // Use half-open intervals [start, end) except on the last line where end is inclusive
+      if ((charPos >= lineStart && charPos < lineEnd) ||
+          (isLast && charPos >= lineStart && charPos <= lineEnd)) {
         lineIndex = i;
-        posInLine = charPos - charCount;
         break;
       }
       
-      charCount += lineLength;
-      
-      // Account for wrapped spaces and newlines
-      if (charCount < this.text.length) {
-        if (this.text[charCount] === '\n') {
-          charCount++;
-        } else if (this.text[charCount] === ' ') {
-          charCount++;
-        }
-      }
-      
-      if (i === wrappedLines.length - 1) {
+      // If charPos is past all mapped positions, it's on the last line
+      if (isLast) {
         lineIndex = i;
-        posInLine = charPos - charCount;
       }
+    }
+    
+    // Calculate position within the wrapped line
+    let lineStartPos = this.cachedLineCharMap[lineIndex];
+    let posInLine = charPos - lineStartPos;
+    
+    // Ensure posInLine doesn't exceed the wrapped line length
+    if (wrappedLines[lineIndex]) {
+      posInLine = min(posInLine, wrappedLines[lineIndex].length);
     }
     
     return { lineIndex, posInLine };

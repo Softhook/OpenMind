@@ -1,4 +1,6 @@
-I discovered a problem with the text box fields. Soft returns and hard returns and perhaps some other invisible characters are throwing off the text selection and cursor position. We need to be able to use returns so I can just sanitise them.
+I still get an strange problem where sometimes pressing enter multiple seem to create problems with the text selection. At that point doing CMD + A doesnt visually include all the text. When I examine what is copied and pasted though it is compple. this is a disconnect between what is visuallu displayed vs what is programmatically slected.
+
+It is related to text wrapping. Please analyse how the text wrapping works in p5.js
 
 
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
