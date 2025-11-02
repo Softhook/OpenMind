@@ -83,7 +83,7 @@ class TextBox {
   
   // Sanitize text to normalize line endings and remove problematic invisible characters
   static sanitizeText(text) {
-    if (text == null) return '';
+    if (text === null || text === undefined) return '';
     text = String(text);
     
     // Normalize line endings: convert \r\n and \r to \n
@@ -725,16 +725,16 @@ class TextBox {
   
   addChar(char) {
     // Ensure text is defined
-    if (this.text == null) {
+    if (this.text === null || this.text === undefined) {
       this.text = '';
     }
     
     // Validate char
-    if (char == null) {
+    if (char === null || char === undefined) {
       return;
     }
     
-    // Sanitize the character being added
+    // Sanitize the character being added (necessary for Enter key which can produce \r on some platforms)
     char = TextBox.sanitizeText(char);
     
     // If there's a selection, replace it
@@ -912,12 +912,12 @@ class TextBox {
   
   pasteText(pastedText) {
     // Validate pasted text
-    if (pastedText == null) {
+    if (pastedText === null || pastedText === undefined) {
       return;
     }
     
     // Ensure text is defined
-    if (this.text == null) {
+    if (this.text === null || this.text === undefined) {
       this.text = '';
     }
     
