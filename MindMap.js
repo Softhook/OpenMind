@@ -1,8 +1,15 @@
+/**
+ * MindMap class - manages the entire mind map including boxes, connections,
+ * selection state, undo/redo, and navigation.
+ */
 class MindMap {
   // Constants for configuration
   static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
   static ALIGN_TOLERANCE = 12;
   
+  /**
+   * Initializes a new MindMap with default state
+   */
   constructor() {
     this.boxes = [];
     this.connections = [];
@@ -39,12 +46,21 @@ class MindMap {
     this.panTargetY = 0;
   }
   
+  /**
+   * Adds a new box to the mind map
+   * @param {TextBox} box - The box to add
+   */
   addBox(box) {
     this.pushUndo();
     this.boxes.push(box);
     this.isDirty = true;
   }
   
+  /**
+   * Adds a connection between two boxes
+   * @param {TextBox} fromBox - Source box
+   * @param {TextBox} toBox - Target box
+   */
   addConnection(fromBox, toBox) {
     // Validate inputs
     if (!fromBox || !toBox) {
@@ -71,7 +87,9 @@ class MindMap {
     this.isDirty = true;
   }
 
-  // Push current state to undo stack (before making a change)
+  /**
+   * Pushes current state to undo stack before making a change
+   */
   pushUndo() {
     try {
       const snap = this.toJSON();
@@ -91,7 +109,9 @@ class MindMap {
     }
   }
 
-  // Revert to the most recent snapshot
+  /**
+   * Reverts to the most recent snapshot from undo stack
+   */
   undo() {
     if (!this.undoStack || this.undoStack.length === 0) return;
     const snap = this.undoStack.pop();
@@ -101,7 +121,29 @@ class MindMap {
     this.isSaved = false;
   }
   
-  // Update animation states (call this every frame)
+  /**
+   * Gets the color priority for a box (lower number = higher priority)
+   * Red: priority 1, Orange: priority 2, White/other: priority 999
+   * @param {TextBox} box - The box to check
+   * @returns {number} Priority value
+   */
+  getBoxColorPriority(box) {
+    if (!box || !box.backgroundColor) return 999; // white/default gets lowest priority
+    const { r, g, b } = box.backgroundColor;
+    
+    // Red: r=255, g=140, b=140
+    if (r === 255 && g === 140 && b === 140) return 1;
+    
+    // Orange: r=255, g=200, b=140
+    if (r === 255 && g === 200 && b === 140) return 2;
+    
+    // White or other: lowest priority
+    return 999;
+  }
+  
+  /**
+   * Updates animation states (call this every frame)
+   */
   update() {
     // Handle pan animation
     if (this.isPanAnimating && typeof centerCameraOn === 'function') {
@@ -131,6 +173,9 @@ class MindMap {
     }
   }
   
+  /**
+   * Draws the mind map (connections and boxes)
+   */
   draw() {
     // Update animations
     this.update();
@@ -211,8 +256,11 @@ class MindMap {
     }
   }
   
-  // Align boxes' x and y positions when they are within a tolerance.
-  // Groups nearby coordinates into clusters and snaps each cluster to its average.
+  /**
+   * Aligns boxes' x and y positions when they are within a tolerance.
+   * Groups nearby coordinates into clusters and snaps each cluster to its average.
+   * @param {number} tolerance - Distance threshold for alignment (default: ALIGN_TOLERANCE)
+   */
   alignBoxes(tolerance = MindMap.ALIGN_TOLERANCE) {
     const tol = Math.max(0, Number.isFinite(tolerance) ? tolerance : MindMap.ALIGN_TOLERANCE);
     if (!this.boxes || this.boxes.length < 2) return;
@@ -264,26 +312,14 @@ class MindMap {
     }
   }
   
-  // Navigate between boxes using arrow keys
-  // UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
-  // LEFT/RIGHT: Move between boxes at same hierarchy level (siblings)
+  /**
+   * Navigates between boxes using arrow keys
+   * UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
+   * LEFT/RIGHT: Move between boxes at same hierarchy level (siblings)
+   * @param {number} keyCode - The key code of the pressed arrow key
+   */
   navigateBoxes(keyCode) {
     if (!this.boxes || this.boxes.length === 0) return;
-    
-    // Get color priority for a box
-    const getColorPriority = (box) => {
-      if (!box || !box.backgroundColor) return 999; // white/default gets lowest priority
-      const { r, g, b } = box.backgroundColor;
-      
-      // Red: r=255, g=140, b=140
-      if (r === 255 && g === 140 && b === 140) return 1;
-      
-      // Orange: r=255, g=200, b=140
-      if (r === 255 && g === 200 && b === 140) return 2;
-      
-      // White or other: lowest priority
-      return 999;
-    };
     
     if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
       // UP/DOWN: Navigate through depth-first traversal
@@ -325,7 +361,7 @@ class MindMap {
         // Group boxes by priority
         const priorityGroups = new Map();
         for (const box of this.boxes) {
-          const priority = getColorPriority(box);
+          const priority = this.getBoxColorPriority(box);
           if (!priorityGroups.has(priority)) {
             priorityGroups.set(priority, []);
           }
@@ -391,11 +427,11 @@ class MindMap {
       // LEFT/RIGHT: Navigate between siblings (same hierarchy level)
       
       // Get all boxes at the same priority level as current
-      const currentPriority = this.selectedBox ? getColorPriority(this.selectedBox) : 999;
+      const currentPriority = this.selectedBox ? this.getBoxColorPriority(this.selectedBox) : 999;
       
       // Get all boxes with same priority, sorted by position
       const samePriorityBoxes = this.boxes
-        .filter(box => getColorPriority(box) === currentPriority)
+        .filter(box => this.getBoxColorPriority(box) === currentPriority)
         .sort((a, b) => {
           const yDiff = a.y - b.y;
           if (Math.abs(yDiff) > 10) return yDiff;
@@ -434,7 +470,10 @@ class MindMap {
     }
   }
   
-  // Helper to select a box and pan camera to it
+  /**
+   * Selects a box and pans camera to it
+   * @param {TextBox} box - The box to select
+   */
   selectAndPanToBox(box) {
     if (!box) return;
     
@@ -464,7 +503,11 @@ class MindMap {
     this.panToBox(box);
   }
   
-  // Helper method to pan camera to center a box
+  /**
+   * Pans camera to center a box
+   * @param {TextBox} box - The box to pan to
+   * @param {boolean} animated - Whether to animate the pan (default: true)
+   */
   panToBox(box, animated = true) {
     if (!box) return;
     
@@ -481,6 +524,9 @@ class MindMap {
     }
   }
   
+  /**
+   * Handles mouse press events
+   */
   handleMousePressed() {
     // Clear arrow key navigation flag when mouse is used
     this.isArrowKeyNavigating = false;
@@ -662,6 +708,9 @@ class MindMap {
     if (this.clearConnectionSelection) this.clearConnectionSelection();
   }
   
+  /**
+   * Handles mouse release events
+   */
   handleMouseReleased() {
     // Complete reattachment if dragging an existing connection
     if (this.draggingConnection && this.draggingConnection.conn) {
@@ -712,6 +761,9 @@ class MindMap {
     }
   }
   
+  /**
+   * Handles mouse drag events
+   */
   handleMouseDragged() {
     // Validate mouse coordinates
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -743,6 +795,12 @@ class MindMap {
     }
   }
   
+  /**
+   * Handles key press events
+   * @param {string} key - The key that was pressed
+   * @param {number} keyCode - The key code
+   * @param {boolean} isRepeat - Whether this is a repeated key press
+   */
   handleKeyPressed(key, keyCode, isRepeat = false) {
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
@@ -943,6 +1001,10 @@ class MindMap {
     }
   }
 
+  /**
+   * Serializes the mind map to JSON
+   * @returns {Object} JSON representation of the mind map
+   */
   toJSON() {
     return {
       boxes: this.boxes.map(box => box.toJSON()),
@@ -950,6 +1012,10 @@ class MindMap {
     };
   }
   
+  /**
+   * Loads mind map from JSON data
+   * @param {Object} data - JSON data to load from
+   */
   fromJSON(data) {
     // Validate input data
     if (!data || typeof data !== 'object') {
@@ -1009,6 +1075,10 @@ class MindMap {
     this.isDirty = true;
   }
   
+  /**
+   * Saves the mind map to a JSON file
+   * Uses File System Access API on supported browsers, falls back to download
+   */
   async save() {
     const data = this.toJSON();
     try {
@@ -1042,6 +1112,10 @@ class MindMap {
     }
   }
   
+  /**
+   * Loads mind map from external JSON data
+   * @param {Object} data - The JSON data to load
+   */
   load(data) {
     this.fromJSON(data);
     // Seed autosave immediately after loading external data so the indicator shows saved
@@ -1049,7 +1123,13 @@ class MindMap {
     this.isSaved = true;
   }
 
-  // Selection helpers
+  // ============================================================================
+  // BOX SELECTION HELPERS
+  // ============================================================================
+  
+  /**
+   * Clears all box selections
+   */
   clearBoxSelection() {
     if (!this.selectedBoxes) this.selectedBoxes = new Set();
     for (const b of this.selectedBoxes) {
@@ -1058,6 +1138,10 @@ class MindMap {
     this.selectedBoxes.clear();
   }
 
+  /**
+   * Adds a box to the current selection
+   * @param {TextBox} box - The box to add to selection
+   */
   addBoxToSelection(box) {
     if (!box) return;
     if (!this.selectedBoxes) this.selectedBoxes = new Set();
@@ -1065,12 +1149,20 @@ class MindMap {
     box.selected = true;
   }
 
+  /**
+   * Removes a box from the current selection
+   * @param {TextBox} box - The box to remove from selection
+   */
   removeBoxFromSelection(box) {
     if (!box || !this.selectedBoxes) return;
     if (this.selectedBoxes.has(box)) this.selectedBoxes.delete(box);
     box.selected = false;
   }
 
+  /**
+   * Toggles a box's selection state
+   * @param {TextBox} box - The box to toggle
+   */
   toggleBoxSelection(box) {
     if (!box) return;
     if (!this.selectedBoxes) this.selectedBoxes = new Set();
@@ -1083,7 +1175,13 @@ class MindMap {
     }
   }
 
-  // --- Connection multi-selection helpers ---
+  // ============================================================================
+  // CONNECTION SELECTION HELPERS
+  // ============================================================================
+  
+  /**
+   * Clears all connection selections
+   */
   clearConnectionSelection() {
     if (!this.selectedConnections) this.selectedConnections = new Set();
     for (const c of this.selectedConnections) {
@@ -1098,6 +1196,10 @@ class MindMap {
     }
   }
 
+  /**
+   * Adds a connection to the current selection
+   * @param {Connection} conn - The connection to add
+   */
   addConnectionToSelection(conn) {
     if (!conn) return;
     if (!this.selectedConnections) this.selectedConnections = new Set();
@@ -1105,12 +1207,20 @@ class MindMap {
     conn.selected = true;
   }
 
+  /**
+   * Removes a connection from the current selection
+   * @param {Connection} conn - The connection to remove
+   */
   removeConnectionFromSelection(conn) {
     if (!conn || !this.selectedConnections) return;
     if (this.selectedConnections.has(conn)) this.selectedConnections.delete(conn);
     conn.selected = false;
   }
 
+  /**
+   * Toggles a connection's selection state
+   * @param {Connection} conn - The connection to toggle
+   */
   toggleConnectionSelection(conn) {
     if (!conn) return;
     if (!this.selectedConnections) this.selectedConnections = new Set();
@@ -1121,7 +1231,14 @@ class MindMap {
     }
   }
 
-  // Autosave to localStorage
+  // ============================================================================
+  // LOCAL STORAGE / AUTOSAVE
+  // ============================================================================
+  
+  /**
+   * Saves current state to localStorage
+   * @returns {boolean} true if successful
+   */
   saveToLocalStorage() {
     try {
       const data = this.toJSON();
@@ -1134,7 +1251,10 @@ class MindMap {
     }
   }
 
-  // Load from localStorage
+  /**
+   * Loads state from localStorage
+   * @returns {boolean} true if successful
+   */
   loadFromLocalStorage() {
     try {
       const saved = localStorage.getItem('openmind_autosave');
@@ -1155,7 +1275,10 @@ class MindMap {
     }
   }
 
-  // Check if there's a saved state in localStorage
+  /**
+   * Checks if there's a saved state in localStorage
+   * @returns {boolean} true if autosave data exists
+   */
   hasLocalStorageData() {
     try {
       return localStorage.getItem('openmind_autosave') !== null;
