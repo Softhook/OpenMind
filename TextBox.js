@@ -555,15 +555,12 @@ class TextBox {
     let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
     
-    // Find which line was clicked
-    let clickedLine = 0;
-    for (let i = 0; i < wrappedLines.length; i++) {
-      let lineY = startY + i * lineHeight;
-      if (i === wrappedLines.length - 1 || my < lineY + lineHeight / 2) {
-        clickedLine = i;
-        break;
-      }
-    }
+    // Find which visual line was clicked using a stable rounding strategy
+    // This avoids off-by-one cases near the midline between rows
+    let relativeY = (my - startY) / lineHeight;
+    let clickedLine = Math.round(relativeY);
+    if (!Number.isFinite(clickedLine)) clickedLine = 0;
+    clickedLine = constrain(clickedLine, 0, wrappedLines.length - 1);
     
     // Find position within the line
     let lineText = wrappedLines[clickedLine];
