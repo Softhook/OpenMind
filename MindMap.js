@@ -148,7 +148,10 @@ class MindMap {
     if (this.boxes) {
       for (let box of this.boxes) {
         if (!box) continue;
-        try { box.draw(); } catch (e) { console.error('Error drawing box:', e); }
+        try { 
+          // Pass navigation state to box for dimming effect
+          box.draw(this.isArrowKeyNavigating && this.selectedBox !== box); 
+        } catch (e) { console.error('Error drawing box:', e); }
       }
     }
 

@@ -181,7 +181,7 @@ class TextBox {
     return result;
   }
   
-  draw() {
+  draw(shouldDim = false) {
     push();
     
     // Get current zoom level from global scope
@@ -232,6 +232,14 @@ class TextBox {
     
     for (let i = 0; i < wrappedLines.length; i++) {
       text(wrappedLines[i], textX, startY + i * lineHeight);
+    }
+    
+    // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
+    if (shouldDim) {
+      fill(255, 255, 255, 150); // White overlay with transparency to lighten/dim
+      noStroke();
+      rect(this.x - this.width/2, this.y - this.height/2, 
+           this.width, this.height, this.cornerRadius);
     }
     
     // Draw cursor when editing
