@@ -2,6 +2,8 @@ I still get an strange problem where sometimes pressing enter multiple seem to c
 
 It is related to text wrapping. Please analyse how the text wrapping works in p5.js
 
+new button create blank layout
+
 
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
@@ -15,7 +17,7 @@ Center a loaded file after load
 
 Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
 
-pressing s key make all the selected boxes the same width of possible
+pressing s key make all the selected boxes an average same width
 
 While typing or coppying text in once is get over 10 words then do the line break
 
