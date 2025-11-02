@@ -27,7 +27,7 @@ class TextBox {
     this.dragOffsetX = 0;
     this.dragOffsetY = 0;
     this.cornerRadius = TextBox.CORNER_RADIUS;
-    this.cursorPosition = text.length;
+    this.cursorPosition = this.text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
     this.resizeHandleSize = TextBox.RESIZE_HANDLE_SIZE;
