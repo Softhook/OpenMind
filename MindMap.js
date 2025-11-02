@@ -220,8 +220,8 @@ class MindMap {
   }
   
   // Navigate between boxes using arrow keys
-  // Priority: red boxes first, then orange, then white
-  // Within same color: top-to-bottom, then left-to-right
+  // Priority: red boxes first, then their connected boxes, then orange, then their connected boxes, etc.
+  // Traverses depth-first through connections before moving to next priority group
   navigateBoxes(keyCode) {
     if (!this.boxes || this.boxes.length === 0) return;
     
@@ -240,17 +240,76 @@ class MindMap {
       return 999;
     };
     
-    // Sort boxes by color priority, then position
-    const sortedBoxes = [...this.boxes].sort((a, b) => {
-      // First by color priority
-      const colorDiff = getColorPriority(a) - getColorPriority(b);
-      if (colorDiff !== 0) return colorDiff;
+    // Build navigation order: for each priority group, traverse connected boxes depth-first
+    const buildNavigationOrder = () => {
+      const visited = new Set();
+      const orderedBoxes = [];
       
-      // Then by position: top-to-bottom (y), then left-to-right (x)
-      const yDiff = a.y - b.y;
-      if (Math.abs(yDiff) > 10) return yDiff; // Different rows
-      return a.x - b.x; // Same row, sort by x
-    });
+      // Get connected boxes for a given box (both directions)
+      const getConnectedBoxes = (box) => {
+        const connected = [];
+        for (const conn of this.connections) {
+          if (conn.fromBox === box && !visited.has(conn.toBox)) {
+            connected.push(conn.toBox);
+          }
+          if (conn.toBox === box && !visited.has(conn.fromBox)) {
+            connected.push(conn.fromBox);
+          }
+        }
+        // Sort connected boxes by position: top-to-bottom, left-to-right
+        return connected.sort((a, b) => {
+          const yDiff = a.y - b.y;
+          if (Math.abs(yDiff) > 10) return yDiff;
+          return a.x - b.x;
+        });
+      };
+      
+      // Depth-first traversal starting from a root box
+      const traverse = (box) => {
+        if (visited.has(box)) return;
+        visited.add(box);
+        orderedBoxes.push(box);
+        
+        const connected = getConnectedBoxes(box);
+        for (const connectedBox of connected) {
+          traverse(connectedBox);
+        }
+      };
+      
+      // Group boxes by priority
+      const priorityGroups = new Map();
+      for (const box of this.boxes) {
+        const priority = getColorPriority(box);
+        if (!priorityGroups.has(priority)) {
+          priorityGroups.set(priority, []);
+        }
+        priorityGroups.get(priority).push(box);
+      }
+      
+      // Sort each priority group by position
+      for (const [priority, boxes] of priorityGroups) {
+        boxes.sort((a, b) => {
+          const yDiff = a.y - b.y;
+          if (Math.abs(yDiff) > 10) return yDiff;
+          return a.x - b.x;
+        });
+      }
+      
+      // Process each priority group in order
+      const sortedPriorities = Array.from(priorityGroups.keys()).sort((a, b) => a - b);
+      for (const priority of sortedPriorities) {
+        const boxes = priorityGroups.get(priority);
+        for (const box of boxes) {
+          if (!visited.has(box)) {
+            traverse(box);
+          }
+        }
+      }
+      
+      return orderedBoxes;
+    };
+    
+    const sortedBoxes = buildNavigationOrder();
     
     // Find current box in sorted list
     let currentIndex = -1;
@@ -300,7 +359,7 @@ class MindMap {
       this.selectedBox = nextBox;
       this.addBoxToSelection(nextBox);
       
-      // Optionally: pan camera to show the selected box
+      // Pan camera to show the selected box
       this.panToBox(nextBox);
     }
   }
