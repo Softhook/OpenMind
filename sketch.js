@@ -522,21 +522,21 @@ function populateKeyboardControlsOverlay() {
   hint.style('color', '#555555');
 
   const shortcuts = [
+    { keys: 'N', description: 'Create new box' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Space (tap)', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
-    { keys: 'N', description: 'Create a new box' },
     { keys: 'A', description: 'Align boxes' },
-    { keys: '-', description: 'Fit and center the entire mind map' },
-    { keys: '=', description: 'Zoom to the maximum level' },
+    { keys: 'F', description: 'Toggle fullscreen view' },
+    { keys: '-', description: 'Fit and center the entire map' },
+    { keys: '+', description: 'Zoom to selected elements' },
     { keys: 'Backspace / Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
-    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' },
-    { keys: 'F', description: 'Toggle fullscreen view' }
+    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
   ];
 
   for (const item of shortcuts) {
@@ -1008,6 +1008,67 @@ function getContentBounds() {
   return { minX, maxX, minY, maxY };
 }
 
+function getSelectionBounds() {
+  if (!mindMap) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  const considerPoint = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  };
+
+  const considerBox = (box) => {
+    if (!box || !Number.isFinite(box.x) || !Number.isFinite(box.y)) return;
+    const halfW = Number.isFinite(box.width) ? box.width / 2 : 0;
+    const halfH = Number.isFinite(box.height) ? box.height / 2 : 0;
+    considerPoint(box.x - halfW, box.y - halfH);
+    considerPoint(box.x + halfW, box.y + halfH);
+  };
+
+  const considerConnection = (conn) => {
+    if (!conn) return;
+    if (conn.fromBox) considerBox(conn.fromBox);
+    if (conn.toBox) considerBox(conn.toBox);
+    const start = (conn.fromBox && typeof conn.fromBox.getConnectionPoint === 'function')
+      ? conn.fromBox.getConnectionPoint(conn.toBox)
+      : null;
+    const end = (conn.toBox && typeof conn.toBox.getConnectionPoint === 'function')
+      ? conn.toBox.getConnectionPoint(conn.fromBox)
+      : null;
+    if (start) considerPoint(start.x, start.y);
+    if (end) considerPoint(end.x, end.y);
+  };
+
+  if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
+    for (const box of mindMap.selectedBoxes) {
+      considerBox(box);
+    }
+  } else if (mindMap.selectedBox) {
+    considerBox(mindMap.selectedBox);
+  }
+
+  if (mindMap.selectedConnections && mindMap.selectedConnections.size > 0) {
+    for (const conn of mindMap.selectedConnections) {
+      considerConnection(conn);
+    }
+  } else if (mindMap.selectedConnection) {
+    considerConnection(mindMap.selectedConnection);
+  }
+
+  if (minX === Infinity || minY === Infinity) {
+    return null;
+  }
+
+  return { minX, maxX, minY, maxY };
+}
+
 function applyCameraSoftBounds() {
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) return;
 
@@ -1070,8 +1131,17 @@ function setMaxZoom() {
   if (mindMap) {
     mindMap.isPanAnimating = false;
   }
-  const worldCenterX = (width / 2 - camX) / zoom;
-  const worldCenterY = (height / 2 - camY) / zoom;
+  const selectionBounds = getSelectionBounds();
+  if (selectionBounds) {
+    zoom = CONFIG.ZOOM.MAX;
+    const centerX = (selectionBounds.minX + selectionBounds.maxX) / 2;
+    const centerY = (selectionBounds.minY + selectionBounds.maxY) / 2;
+    centerCameraOn(centerX, centerY);
+    return;
+  }
+  const prevZoom = zoom || 1;
+  const worldCenterX = (width / 2 - camX) / prevZoom;
+  const worldCenterY = (height / 2 - camY) / prevZoom;
   zoom = CONFIG.ZOOM.MAX;
   centerCameraOn(worldCenterX, worldCenterY);
 }
