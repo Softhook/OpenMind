@@ -1099,9 +1099,17 @@ function createNewMap() {
   
   // Save current state to localStorage before clearing
   try {
-    mindMap.saveToLocalStorage();
+    const saved = mindMap.saveToLocalStorage();
+    if (!saved) {
+      console.warn('Failed to auto-save current map before creating new map');
+      // Continue anyway since user confirmed the action
+    }
   } catch (e) {
-    console.warn('Failed to save current state before creating new map:', e);
+    console.error('Error saving current state before creating new map:', e);
+    // Alert user but allow them to proceed since they confirmed
+    if (!confirm('Warning: Could not auto-save your current map. Continue creating new map anyway?')) {
+      return;
+    }
   }
   
   // Clear undo stack
