@@ -46,7 +46,10 @@ let exportPNGButton;
 let exportPDFButton;
 let exportTextButton;
 let menuIsVisible = false;
-let fullScreenButton;
+let keyboardControlsButton;
+let keyboardOverlay = null;
+let keyboardOverlayContent = null;
+let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
 
 // Autosave state
@@ -285,9 +288,12 @@ function setupUIButtons() {
   exportTextButton.position(430, 10);
   exportTextButton.mousePressed(exportText);
   
-  fullScreenButton = createButton('Full Screen');
-  fullScreenButton.position(530, 10);
-  fullScreenButton.mousePressed(toggleFullScreen);
+  keyboardControlsButton = createButton('Keyboard Controls');
+  keyboardControlsButton.position(530, 10);
+  keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
+  keyboardControlsButton.attribute('aria-expanded', 'false');
+  
+  setupKeyboardControlsOverlay();
   
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
@@ -408,7 +414,7 @@ function showMenuButtons() {
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
-  if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'inline-block');
+  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
 }
 
 function hideMenuButtons() {
@@ -417,10 +423,10 @@ function hideMenuButtons() {
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
-  if (fullScreenButton && fullScreenButton.style) fullScreenButton.style('display', 'none');
+  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
 }
 
-// Arrange buttons: Load, Save, Export PNG, Export PDF, Export Text, Full Screen
+// Arrange buttons: Load, Save, Export PNG, Export PDF, Export Text, Keyboard Controls
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
   const y = CONFIG.UI.BUTTON_Y;
@@ -432,7 +438,7 @@ function layoutMenuButtons() {
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   exportTextButton.style('display', 'inline-block');
-  fullScreenButton.style('display', 'inline-block');
+  keyboardControlsButton.style('display', 'inline-block');
 
   const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
 
@@ -442,10 +448,152 @@ function layoutMenuButtons() {
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
-  fullScreenButton.position(x, y); x += w(fullScreenButton) + gap;
+  keyboardControlsButton.position(x, y); x += w(keyboardControlsButton) + gap;
 
   // Update the hover band to cover to the right of the last button
   menuRightEdge = x + 10;
+}
+
+function setupKeyboardControlsOverlay() {
+  if (keyboardOverlay) return;
+
+  keyboardOverlay = createDiv();
+  keyboardOverlay.id('keyboard-controls-overlay');
+  keyboardOverlay.style('position', 'fixed');
+  keyboardOverlay.style('top', '0');
+  keyboardOverlay.style('left', '0');
+  keyboardOverlay.style('width', '100%');
+  keyboardOverlay.style('height', '100%');
+  keyboardOverlay.style('padding', '24px');
+  keyboardOverlay.style('background', 'rgba(0, 0, 0, 0.55)');
+  keyboardOverlay.style('display', 'none');
+  keyboardOverlay.style('align-items', 'center');
+  keyboardOverlay.style('justify-content', 'center');
+  keyboardOverlay.style('z-index', '1000');
+  keyboardOverlay.style('box-sizing', 'border-box');
+
+  if (keyboardOverlay.elt) {
+    keyboardOverlay.elt.addEventListener('click', (event) => {
+      if (event.target === keyboardOverlay.elt) {
+        hideKeyboardControlsOverlay();
+      }
+    });
+  }
+
+  keyboardOverlayContent = createDiv();
+  keyboardOverlayContent.parent(keyboardOverlay);
+  keyboardOverlayContent.id('keyboard-controls-overlay-content');
+  keyboardOverlayContent.style('background', '#ffffff');
+  keyboardOverlayContent.style('padding', '24px 32px');
+  keyboardOverlayContent.style('border-radius', '8px');
+  keyboardOverlayContent.style('max-width', '520px');
+  keyboardOverlayContent.style('width', '100%');
+  keyboardOverlayContent.style('max-height', '80vh');
+  keyboardOverlayContent.style('overflow-y', 'auto');
+  keyboardOverlayContent.style('color', '#222222');
+  keyboardOverlayContent.style('box-shadow', '0 16px 40px rgba(0, 0, 0, 0.35)');
+  keyboardOverlayContent.style('box-sizing', 'border-box');
+  keyboardOverlayContent.style('font-family', 'sans-serif');
+
+  if (keyboardOverlayContent.elt) {
+    keyboardOverlayContent.elt.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  populateKeyboardControlsOverlay();
+}
+
+function populateKeyboardControlsOverlay() {
+  if (!keyboardOverlayContent) return;
+
+  keyboardOverlayContent.html('');
+
+  const title = createElement('h2', 'Keyboard Controls');
+  title.parent(keyboardOverlayContent);
+  title.style('margin', '0 0 12px 0');
+  title.style('font-size', '24px');
+  title.style('font-weight', '600');
+
+  const hint = createElement('p', 'Press Esc or click outside this panel to close.');
+  hint.parent(keyboardOverlayContent);
+  hint.style('margin', '0 0 18px 0');
+  hint.style('font-size', '14px');
+  hint.style('color', '#555555');
+
+  const shortcuts = [
+    { keys: 'Arrow Keys', description: 'Navigate between boxes' },
+    { keys: 'Space + Drag / Right Mouse Drag', description: 'Pan the canvas' },
+    { keys: 'Space (tap)', description: 'Reverse the selected connection' },
+    { keys: 'Shift + Click', description: 'Add or remove boxes from the current selection' },
+    { keys: 'N', description: 'Create a new box' },
+    { keys: 'A', description: 'Align nearby boxes' },
+    { keys: '-', description: 'Fit and center the entire mind map' },
+    { keys: '=', description: 'Zoom to the maximum level' },
+    { keys: 'Backspace / Delete', description: 'Delete selected boxes or connections' },
+    { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste boxes' },
+    { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
+    { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
+    { keys: 'Cmd/Ctrl + S', description: 'Save the mind map' },
+    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' },
+    { keys: 'F', description: 'Toggle fullscreen view' }
+  ];
+
+  for (const item of shortcuts) {
+    const row = createDiv();
+    row.parent(keyboardOverlayContent);
+    row.style('display', 'flex');
+    row.style('align-items', 'flex-start');
+    row.style('gap', '16px');
+    row.style('margin-bottom', '10px');
+    row.style('font-size', '15px');
+
+    const keyLabel = createSpan(item.keys);
+    keyLabel.parent(row);
+    keyLabel.style('font-family', 'monospace');
+    keyLabel.style('font-weight', '600');
+    keyLabel.style('min-width', '160px');
+    keyLabel.style('white-space', 'nowrap');
+
+    const description = createSpan(item.description);
+    description.parent(row);
+    description.style('flex', '1');
+  }
+
+  const closeButton = createButton('Close');
+  closeButton.parent(keyboardOverlayContent);
+  closeButton.style('margin-top', '20px');
+  closeButton.style('align-self', 'flex-end');
+  closeButton.style('padding', '6px 14px');
+  closeButton.style('font-size', '14px');
+  closeButton.style('cursor', 'pointer');
+  closeButton.mousePressed(hideKeyboardControlsOverlay);
+}
+
+function showKeyboardControlsOverlay() {
+  if (!keyboardOverlay) return;
+  keyboardOverlay.style('display', 'flex');
+  keyboardOverlayVisible = true;
+  if (keyboardControlsButton && keyboardControlsButton.attribute) {
+    keyboardControlsButton.attribute('aria-expanded', 'true');
+  }
+}
+
+function hideKeyboardControlsOverlay() {
+  if (!keyboardOverlay) return;
+  keyboardOverlay.style('display', 'none');
+  keyboardOverlayVisible = false;
+  if (keyboardControlsButton && keyboardControlsButton.attribute) {
+    keyboardControlsButton.attribute('aria-expanded', 'false');
+  }
+}
+
+function toggleKeyboardControlsOverlay() {
+  if (keyboardOverlayVisible) {
+    hideKeyboardControlsOverlay();
+  } else {
+    showKeyboardControlsOverlay();
+  }
 }
 
 // ============================================================================
@@ -456,6 +604,7 @@ function layoutMenuButtons() {
  * Handles mouse press events
  */
 function mousePressed() {
+  if (keyboardOverlayVisible) return false;
   // Prevent interaction with canvas when clicking on UI buttons
   if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mindMap) {
     try {
@@ -498,6 +647,7 @@ function mousePressed() {
  * Handles mouse release events
  */
 function mouseReleased() {
+  if (keyboardOverlayVisible) return false;
   if (isPanning) {
     // If we were panning with right mouse, suppress the subsequent right-click action if it moved
     if (rightPanActive) {
@@ -532,23 +682,12 @@ function mouseReleased() {
  * Handles mouse drag events
  */
 function mouseDragged() {
+  if (keyboardOverlayVisible) return false;
   if (isPanning) {
     // Screen-space pan with soft limits
     camX = panStartCamX + (mouseX - panStartMouseX);
     camY = panStartCamY + (mouseY - panStartMouseY);
-    
-    // Apply soft pan limits based on content bounds
-    if (mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
-      const bounds = getContentBounds();
-      const margin = CONFIG.CAMERA.PAN_MARGIN;
-      const minCamX = -bounds.maxX * zoom - margin;
-      const maxCamX = -bounds.minX * zoom + width + margin;
-      const minCamY = -bounds.maxY * zoom - margin;
-      const maxCamY = -bounds.minY * zoom + height + margin;
-      
-      camX = constrain(camX, minCamX, maxCamX);
-      camY = constrain(camY, minCamY, maxCamY);
-    }
+    applyCameraSoftBounds();
     return false;
   }
   
@@ -572,6 +711,13 @@ function mouseDragged() {
  * Handles key press events
  */
 function keyPressed() {
+  if (keyboardOverlayVisible) {
+    const escapeCode = (typeof ESCAPE !== 'undefined') ? ESCAPE : 27;
+    if (keyCode === escapeCode || key === 'Escape') {
+      hideKeyboardControlsOverlay();
+    }
+    return false;
+  }
   if (mindMap) {
     try {
       // Handle CMD/CTRL modifier key
@@ -659,9 +805,14 @@ function keyPressed() {
       createNewBox();
       return false;
     }
-    // Reset view: press 0 or Home key
-    if (!hasModifier && (key === '0' || keyCode === 36)) {
+    // Reset view: press - (or _) or Home key
+    if (!hasModifier && (key === '-' || key === '_' || keyCode === 36)) {
       resetView();
+      return false;
+    }
+    // Maximum zoom: press = (or +)
+    if (!hasModifier && (key === '=' || key === '+')) {
+      setMaxZoom();
       return false;
     }
     // Align boxes: press A key
@@ -805,6 +956,7 @@ function windowResized() {
  * @returns {boolean} false to prevent default browser behavior
  */
 function mouseWheel(event) {
+  if (keyboardOverlayVisible) return false;
   // Only when over the canvas area
   const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
   if (!overCanvas) return;
@@ -856,6 +1008,20 @@ function getContentBounds() {
   return { minX, maxX, minY, maxY };
 }
 
+function applyCameraSoftBounds() {
+  if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) return;
+
+  const bounds = getContentBounds();
+  const margin = CONFIG.CAMERA.PAN_MARGIN;
+  const minCamX = -bounds.maxX * zoom - margin;
+  const maxCamX = -bounds.minX * zoom + width + margin;
+  const minCamY = -bounds.maxY * zoom - margin;
+  const maxCamY = -bounds.minY * zoom + height + margin;
+
+  camX = constrain(camX, minCamX, maxCamX);
+  camY = constrain(camY, minCamY, maxCamY);
+}
+
 /**
  * Centers the camera on a specific world position without changing zoom
  * @param {number} worldX - World X coordinate
@@ -864,12 +1030,16 @@ function getContentBounds() {
 function centerCameraOn(worldX, worldY) {
   camX = width / 2 - worldX * zoom;
   camY = height / 2 - worldY * zoom;
+  applyCameraSoftBounds();
 }
 
 /**
  * Resets camera to fit all content in view or default view if empty
  */
 function resetView() {
+  if (mindMap) {
+    mindMap.isPanAnimating = false;
+  }
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
     // No content - reset to default
     camX = 0;
@@ -893,6 +1063,17 @@ function resetView() {
   // Center the content in viewport
   camX = width / 2 - centerX * zoom;
   camY = height / 2 - centerY * zoom;
+  applyCameraSoftBounds();
+}
+
+function setMaxZoom() {
+  if (mindMap) {
+    mindMap.isPanAnimating = false;
+  }
+  const worldCenterX = (width / 2 - camX) / zoom;
+  const worldCenterY = (height / 2 - camY) / zoom;
+  zoom = CONFIG.ZOOM.MAX;
+  centerCameraOn(worldCenterX, worldCenterY);
 }
 
 // Determine if the mouse is over any interactive object (box or connection)

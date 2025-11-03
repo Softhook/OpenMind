@@ -4,7 +4,7 @@
       "x": -816.4248854546752,
       "y": 994.933811186599,
       "text": "From Object to Parable: Revisiting Latour’s Berlin Key to call for Reflexive Storytelling in Actor-Network Theory",
-      "width": 365.4477736577271,
+      "width": 280,
       "height": 87,
       "backgroundColor": {
         "r": 255,
@@ -13,20 +13,8 @@
       }
     },
     {
-      "x": -962.2003316500928,
-      "y": 1564.5507178709922,
-      "text": "Lots of focus on recent work\n\nBut little examinations of Latours early texts that have more to tell us about the fundmental nature of ANT",
-      "width": 254.91469055521088,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -961.3225306451005,
-      "y": 1760.619942513351,
+      "x": -961.6040257357287,
+      "y": 1834.6777394855917,
       "text": "there is room for improvement in Latour's account of the Berlin key: \n\nfirst, at an empirical level due to the methods Latour used in the study and second, \n\nat a meta-conceptual level in its elevation of a priori arguments over situated stories. ",
       "width": 292.5736572692923,
       "height": 213,
@@ -37,11 +25,11 @@
       }
     },
     {
-      "x": -967.4662682170359,
-      "y": 2027.495038726101,
+      "x": -961.6040257357287,
+      "y": 2133.052835698342,
       "text": "Annemarie Mol and Helen Verran that foreground the author as a reflexive participant, while distinguishing between the empirical component and the narrative element, offers a way for ANT theorists to assume responsibility for their accounts. We argue that this these approaches towards storytelling point the way towards more engaged, situated, and reflexive orientation for ANT in the 21st century",
-      "width": 352.2691316544025,
-      "height": 192,
+      "width": 280,
+      "height": 255,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -49,22 +37,10 @@
       }
     },
     {
-      "x": -963.278385434457,
-      "y": 1239.1768556475877,
+      "x": -961.6040257357287,
+      "y": 1249.533416028857,
       "text": "Introduction",
-      "width": 175.72111718750006,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -654.4409188453985,
-      "y": 1247.5487155417873,
-      "text": "Context of the Paper",
-      "width": 175.72111718750006,
+      "width": 150,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -74,10 +50,10 @@
     },
     {
       "x": 7.039608153488494,
-      "y": 1251.3809942252408,
+      "y": 1249.533416028857,
       "text": "Observations about key as object and text",
-      "width": 323.82595078417353,
-      "height": 45,
+      "width": 280,
+      "height": 66,
       "backgroundColor": {
         "r": 255,
         "g": 200,
@@ -86,9 +62,9 @@
     },
     {
       "x": -346.1781489818395,
-      "y": 1245.836144598101,
+      "y": 1249.533416028857,
       "text": "Methodology",
-      "width": 175.72111718750006,
+      "width": 150,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -98,9 +74,9 @@
     },
     {
       "x": 363.68250717618946,
-      "y": 1248.4050010136307,
+      "y": 1249.533416028857,
       "text": "Discussion",
-      "width": 175.72111718750006,
+      "width": 150,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -110,9 +86,9 @@
     },
     {
       "x": 705.3756046345228,
-      "y": 1254.3527851467932,
+      "y": 1249.533416028857,
       "text": "Conclusion How ANT should tell stories for the future",
-      "width": 297.96156958644315,
+      "width": 280,
       "height": 66,
       "backgroundColor": {
         "r": 255,
@@ -124,7 +100,7 @@
       "x": 705.3756046345228,
       "y": 1492.6413995112339,
       "text": "",
-      "width": 407.6764768337023,
+      "width": 150,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -133,11 +109,23 @@
       }
     },
     {
-      "x": -957.2655566577628,
-      "y": 1444.1386531918833,
-      "text": "Latour dead time to review what ANT is. Other special issues that have been created. ",
-      "width": 363.10796519027224,
-      "height": 66,
+      "x": -654.4409188453985,
+      "y": 1249.533416028857,
+      "text": "Context of the Paper",
+      "width": 152.4130859375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -961.6040257357287,
+      "y": 1473.6567857904847,
+      "text": "Latour dead time to review what ANT is. Why does this matter? Because we are defining the future of ANT. ",
+      "width": 280,
+      "height": 87,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -145,8 +133,20 @@
       }
     },
     {
-      "x": -960.734262631618,
-      "y": 1338.4321653345164,
+      "x": -961.6040257357287,
+      "y": 1623.7073103148623,
+      "text": "Other special issues that have been created. Lots of focus on recent work\n\nBut little examinations of Latours early texts that have more to tell us about the fundmental nature of ANT",
+      "width": 254.91469055521088,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -961.6040257357287,
+      "y": 1357.4502979331178,
       "text": "Key important paper cited by man in fields beyond ANT, design archeology, became iconic for defining materility",
       "width": 228.68601791640822,
       "height": 108,
@@ -159,15 +159,19 @@
   ],
   "connections": [
     {
-      "from": 9,
-      "to": 10
+      "from": 7,
+      "to": 8
     },
     {
-      "from": 4,
+      "from": 3,
       "to": 12
     },
     {
       "from": 12,
+      "to": 10
+    },
+    {
+      "from": 10,
       "to": 11
     },
     {
@@ -177,10 +181,6 @@
     {
       "from": 1,
       "to": 2
-    },
-    {
-      "from": 2,
-      "to": 3
     }
   ]
 }
