@@ -30,6 +30,9 @@ const CONFIG = {
   },
   AUTOSAVE: {
     INTERVAL: 30000        // Autosave interval in milliseconds (30 seconds)
+  },
+  VISIBILITY: {
+    DEBOUNCE_MS: 50        // Debounce time for duplicate visibility events (milliseconds)
   }
 };
 
@@ -456,7 +459,7 @@ function handleVisibilityChange() {
   
   // Use a setTimeout to reset the flag after a short delay
   // This prevents duplicate handling while still allowing rapid visibility changes
-  setTimeout(() => { visibilityChangeInProgress = false; }, 50);
+  setTimeout(() => { visibilityChangeInProgress = false; }, CONFIG.VISIBILITY.DEBOUNCE_MS);
   
   // Check visibility using the available API
   let isHidden = false;
@@ -539,13 +542,13 @@ function handlePageBecameVisible() {
       
       // Reset any box states
       if (mindMap.boxes) {
-        for (let box of mindMap.boxes) {
+        mindMap.boxes.forEach(box => {
           if (box) {
             box.isDragging = false;
             box.isResizing = false;
             box.isSelecting = false;
           }
-        }
+        });
       }
     }
     
