@@ -1133,7 +1133,16 @@ function setMaxZoom() {
   }
   const selectionBounds = getSelectionBounds();
   if (selectionBounds) {
-    zoom = CONFIG.ZOOM.MAX;
+    const margin = 1.1;
+    const widthWorld = Math.max(selectionBounds.maxX - selectionBounds.minX, 1);
+    const heightWorld = Math.max(selectionBounds.maxY - selectionBounds.minY, 1);
+    const fitZoomX = widthWorld > 0 ? width / (widthWorld * margin) : CONFIG.ZOOM.MAX;
+    const fitZoomY = heightWorld > 0 ? height / (heightWorld * margin) : CONFIG.ZOOM.MAX;
+    let targetZoom = Math.min(CONFIG.ZOOM.MAX, fitZoomX, fitZoomY);
+    if (!Number.isFinite(targetZoom) || targetZoom <= 0) {
+      targetZoom = CONFIG.ZOOM.MAX;
+    }
+    zoom = constrain(targetZoom, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
     const centerX = (selectionBounds.minX + selectionBounds.maxX) / 2;
     const centerY = (selectionBounds.minY + selectionBounds.maxY) / 2;
     centerCameraOn(centerX, centerY);
