@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenMind Text Editing Tests</title>
+    <script src="../p5.js"></script>
+    <script src="../TextBox.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .test-pass {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .test-fail {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .test-warn {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        #summary {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>OpenMind Text Editing Cursor Tests</h1>
+    <p>This page runs comprehensive tests on the TextBox cursor positioning logic to detect edge cases and potential issues.</p>
+    
+    <button class="button" onclick="runAllTests()">Run All Tests</button>
+    <button class="button" onclick="runStressTests()">Run Stress Tests</button>
+    
+    <div id="summary"></div>
+    <div id="test-results"></div>
+    
+    <script>
+        let testResults = [];
+        let passCount = 0;
+        let failCount = 0;
+        let warnCount = 0;
+        
+        // Helper function to log test results
+        function logTest(name, passed, message, isWarning = false) {
+            testResults.push({
+                name: name,
+                passed: passed,
+                message: message,
+                isWarning: isWarning
+            });
+            
+            if (isWarning) {
+                warnCount++;
+            } else if (passed) {
+                passCount++;
+            } else {
+                failCount++;
+            }
+        }
+        
+        // Helper to create a TextBox for testing
+        function createTestBox(text = "") {
+            return new TextBox(100, 100, text);
+        }
+        
+        // Test 1: Basic cursor positioning
+        function testBasicCursorPositioning() {
+            const box = createTestBox("Hello World");
+            
+            // Test initial cursor position
+            box.startEditing();
+            logTest(
+                "Test 1.1: Initial cursor position at end",
+                box.cursorPosition === box.text.length,
+                `Expected ${box.text.length}, got ${box.cursorPosition}`
+            );
+            
+            // Test cursor movement left
+            box.moveCursorLeft();
+            logTest(
+                "Test 1.2: Cursor moves left",
+                box.cursorPosition === box.text.length - 1,
+                `Expected ${box.text.length - 1}, got ${box.cursorPosition}`
+            );
+            
+            // Test cursor movement right
+            box.moveCursorRight();
+            logTest(
+                "Test 1.3: Cursor moves right",
+                box.cursorPosition === box.text.length,
+                `Expected ${box.text.length}, got ${box.cursorPosition}`
+            );
+            
+            // Test cursor at start
+            box.cursorPosition = 0;
+            box.moveCursorLeft();
+            logTest(
+                "Test 1.4: Cursor stays at start when moving left",
+                box.cursorPosition === 0,
+                `Expected 0, got ${box.cursorPosition}`
+            );
+        }
+        
+        // Test 2: Character insertion and cursor position
+        function testCharacterInsertion() {
+            const box = createTestBox("Test");
+            box.startEditing();
+            
+            // Insert at end
+            box.addChar('!');
+            logTest(
+                "Test 2.1: Character insertion at end",
+                box.text === "Test!" && box.cursorPosition === 5,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+            
+            // Insert in middle
+            box.cursorPosition = 2;
+            box.addChar('X');
+            logTest(
+                "Test 2.2: Character insertion in middle",
+                box.text === "TeXst!" && box.cursorPosition === 3,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+            
+            // Insert at start
+            box.cursorPosition = 0;
+            box.addChar('A');
+            logTest(
+                "Test 2.3: Character insertion at start",
+                box.text === "ATeXst!" && box.cursorPosition === 1,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+        }
+        
+        // Test 3: Newline handling
+        function testNewlineHandling() {
+            const box = createTestBox("Line1");
+            box.startEditing();
+            
+            box.addChar('\n');
+            box.addChar('L');
+            box.addChar('i');
+            box.addChar('n');
+            box.addChar('e');
+            box.addChar('2');
+            
+            logTest(
+                "Test 3.1: Newline creates multi-line text",
+                box.text === "Line1\nLine2",
+                `Text: "${box.text.replace(/\n/g, '\\n')}"`
+            );
+            
+            logTest(
+                "Test 3.2: Cursor position after newlines",
+                box.cursorPosition === 11,
+                `Expected 11, got ${box.cursorPosition}`
+            );
+        }
+        
+        // Test 4: Text wrapping and cursor positioning
+        function testTextWrapping() {
+            const box = createTestBox("This is a very long line that should wrap to multiple visual lines when displayed in the text box");
+            box.startEditing();
+            
+            const wrappedLines = box.wrapText(box.text);
+            
+            logTest(
+                "Test 4.1: Long text wraps to multiple lines",
+                wrappedLines.length > 1,
+                `Got ${wrappedLines.length} wrapped lines`
+            );
+            
+            // Test cursor position mapping
+            if (box.cachedLineCharMap) {
+                const lineMapValid = box.cachedLineCharMap.length === wrappedLines.length;
+                logTest(
+                    "Test 4.2: Line character map matches wrapped lines",
+                    lineMapValid,
+                    `Map length: ${box.cachedLineCharMap ? box.cachedLineCharMap.length : 'undefined'}, Wrapped lines: ${wrappedLines.length}`
+                );
+                
+                // Test that line map is monotonically increasing
+                if (lineMapValid && box.cachedLineCharMap.length > 1) {
+                    let isMonotonic = true;
+                    for (let i = 1; i < box.cachedLineCharMap.length; i++) {
+                        if (box.cachedLineCharMap[i] < box.cachedLineCharMap[i-1]) {
+                            isMonotonic = false;
+                            break;
+                        }
+                    }
+                    logTest(
+                        "Test 4.3: Line character map is monotonically increasing",
+                        isMonotonic,
+                        `Map: [${box.cachedLineCharMap.join(', ')}]`
+                    );
+                }
+            }
+        }
+        
+        // Test 5: Special characters and edge cases
+        function testSpecialCharacters() {
+            const specialChars = [
+                { char: '\t', name: 'Tab' },
+                { char: '\n', name: 'Newline' },
+                { char: '🎉', name: 'Emoji' },
+                { char: '你好', name: 'Chinese characters' },
+                { char: '\'', name: 'Single quote' },
+                { char: '"', name: 'Double quote' },
+                { char: '\\', name: 'Backslash' }
+            ];
+            
+            for (const test of specialChars) {
+                const box = createTestBox("");
+                box.startEditing();
+                
+                const initialLength = box.text.length;
+                box.addChar(test.char);
+                const finalLength = box.text.length;
+                
+                logTest(
+                    `Test 5.${specialChars.indexOf(test) + 1}: ${test.name} insertion`,
+                    finalLength > initialLength && box.cursorPosition === finalLength,
+                    `Char: "${test.char}", text length: ${finalLength}, cursor: ${box.cursorPosition}`
+                );
+            }
+        }
+        
+        // Test 6: Deletion operations
+        function testDeletion() {
+            const box = createTestBox("Hello World");
+            box.startEditing();
+            
+            // Backspace from end
+            const origLength = box.text.length;
+            box.removeChar();
+            logTest(
+                "Test 6.1: Backspace removes character",
+                box.text.length === origLength - 1 && box.text === "Hello Worl",
+                `Text: "${box.text}", length: ${box.text.length}`
+            );
+            
+            // Forward delete
+            box.cursorPosition = 5;  // After "Hello"
+            box.removeForwardChar();
+            logTest(
+                "Test 6.2: Forward delete removes character",
+                box.text === "HelloWorl" && box.cursorPosition === 5,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+            
+            // Delete at boundaries
+            box.cursorPosition = 0;
+            box.removeChar();  // Should do nothing
+            logTest(
+                "Test 6.3: Backspace at start does nothing",
+                box.text === "HelloWorl" && box.cursorPosition === 0,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+            
+            box.cursorPosition = box.text.length;
+            box.removeForwardChar();  // Should do nothing
+            logTest(
+                "Test 6.4: Forward delete at end does nothing",
+                box.text === "HelloWorl" && box.cursorPosition === box.text.length,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+        }
+        
+        // Test 7: Text selection
+        function testTextSelection() {
+            const box = createTestBox("Select This Text");
+            box.startEditing();
+            
+            // Select all
+            box.selectAll();
+            logTest(
+                "Test 7.1: Select all text",
+                box.selectionStart === 0 && box.selectionEnd === box.text.length,
+                `Selection: ${box.selectionStart} to ${box.selectionEnd}`
+            );
+            
+            // Get selected text
+            const selected = box.getSelectedText();
+            logTest(
+                "Test 7.2: Get selected text",
+                selected === box.text,
+                `Selected: "${selected}"`
+            );
+            
+            // Delete selection
+            box.deleteSelection();
+            logTest(
+                "Test 7.3: Delete selected text",
+                box.text === "" && box.cursorPosition === 0,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+        }
+        
+        // Test 8: Cursor position with wrapped text navigation
+        function testWrappedTextNavigation() {
+            const box = createTestBox("Short line\nThis is a very long line that will definitely wrap to multiple visual lines in the text box display\nAnother short line");
+            box.startEditing();
+            
+            const wrappedLines = box.wrapText(box.text);
+            
+            // Test moving up and down through wrapped lines
+            box.cursorPosition = box.text.length;  // End of text
+            const endInfo = box.getCursorLineAndPosition(wrappedLines);
+            
+            logTest(
+                "Test 8.1: Cursor at end is on last wrapped line",
+                endInfo.lineIndex === wrappedLines.length - 1,
+                `Line index: ${endInfo.lineIndex}, total lines: ${wrappedLines.length}`
+            );
+            
+            // Move cursor up
+            box.moveCursorUp();
+            const upInfo = box.getCursorLineAndPosition(wrappedLines);
+            
+            logTest(
+                "Test 8.2: Move cursor up decreases line index",
+                upInfo.lineIndex < endInfo.lineIndex,
+                `Before: ${endInfo.lineIndex}, After: ${upInfo.lineIndex}`
+            );
+            
+            // Move cursor down
+            box.moveCursorDown();
+            const downInfo = box.getCursorLineAndPosition(wrappedLines);
+            
+            logTest(
+                "Test 8.3: Move cursor down increases line index",
+                downInfo.lineIndex > upInfo.lineIndex,
+                `Before: ${upInfo.lineIndex}, After: ${downInfo.lineIndex}`
+            );
+        }
+        
+        // Test 9: Edge cases with empty and very long text
+        function testEdgeCases() {
+            // Empty text
+            const emptyBox = createTestBox("");
+            emptyBox.startEditing();
+            
+            logTest(
+                "Test 9.1: Empty text cursor position is 0",
+                emptyBox.cursorPosition === 0,
+                `Cursor: ${emptyBox.cursorPosition}`
+            );
+            
+            emptyBox.addChar('A');
+            logTest(
+                "Test 9.2: Adding to empty text works",
+                emptyBox.text === "A" && emptyBox.cursorPosition === 1,
+                `Text: "${emptyBox.text}", cursor: ${emptyBox.cursorPosition}`
+            );
+            
+            // Very long text
+            const longText = "A".repeat(1000);
+            const longBox = createTestBox(longText);
+            longBox.startEditing();
+            
+            logTest(
+                "Test 9.3: Very long text cursor position is correct",
+                longBox.cursorPosition === 1000,
+                `Text length: ${longBox.text.length}, cursor: ${longBox.cursorPosition}`
+            );
+            
+            // Whitespace only
+            const wsBox = createTestBox("   ");
+            wsBox.startEditing();
+            
+            logTest(
+                "Test 9.4: Whitespace-only text preserves spaces",
+                wsBox.text === "   " && wsBox.cursorPosition === 3,
+                `Text: "${wsBox.text}", length: ${wsBox.text.length}`
+            );
+        }
+        
+        // Test 10: Rapid character insertion (stress test for cursor tracking)
+        function testRapidInsertion() {
+            const box = createTestBox("");
+            box.startEditing();
+            
+            const testString = "The quick brown fox jumps over the lazy dog";
+            let allCorrect = true;
+            let errorMsg = "";
+            
+            for (let i = 0; i < testString.length; i++) {
+                const expectedPos = i + 1;
+                box.addChar(testString[i]);
+                
+                if (box.cursorPosition !== expectedPos) {
+                    allCorrect = false;
+                    errorMsg = `Char ${i} ('${testString[i]}'): expected cursor ${expectedPos}, got ${box.cursorPosition}`;
+                    break;
+                }
+            }
+            
+            logTest(
+                "Test 10.1: Rapid character insertion maintains correct cursor",
+                allCorrect && box.text === testString,
+                errorMsg || `Successfully inserted ${testString.length} characters`
+            );
+        }
+        
+        // Test 11: Text sanitization
+        function testTextSanitization() {
+            // Test carriage return handling
+            const box1 = createTestBox("Line1\r\nLine2\rLine3");
+            logTest(
+                "Test 11.1: Carriage returns are normalized to newlines",
+                box1.text === "Line1\nLine2\nLine3",
+                `Text: "${box1.text.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
+            );
+            
+            // Test control character removal
+            const box2 = createTestBox("Normal\x00Text\x1fHere");
+            const hasNoControlChars = !/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(box2.text);
+            logTest(
+                "Test 11.2: Control characters are removed",
+                hasNoControlChars,
+                `Text: "${box2.text}"`
+            );
+        }
+        
+        // Test 12: Cursor position after paste
+        function testPasteOperation() {
+            const box = createTestBox("Initial");
+            box.startEditing();
+            box.cursorPosition = 7;  // At end
+            
+            box.pasteText(" Pasted");
+            logTest(
+                "Test 12.1: Paste at end updates cursor correctly",
+                box.text === "Initial Pasted" && box.cursorPosition === 14,
+                `Text: "${box.text}", cursor: ${box.cursorPosition}`
+            );
+            
+            // Paste with selection
+            const box2 = createTestBox("Replace this");
+            box2.startEditing();
+            box2.selectionStart = 8;
+            box2.selectionEnd = 12;  // Select "this"
+            box2.pasteText("that");
+            
+            logTest(
+                "Test 12.2: Paste replaces selection and updates cursor",
+                box2.text === "Replace that" && box2.cursorPosition === 12,
+                `Text: "${box2.text}", cursor: ${box2.cursorPosition}`
+            );
+        }
+        
+        // Stress test: Many operations in sequence
+        function stressTestSequentialOperations() {
+            const box = createTestBox("Start");
+            box.startEditing();
+            
+            let operations = 0;
+            let errors = [];
+            
+            try {
+                // Insert characters
+                for (let i = 0; i < 100; i++) {
+                    box.addChar('A');
+                    operations++;
+                }
+                
+                // Move cursor randomly
+                for (let i = 0; i < 50; i++) {
+                    box.cursorPosition = Math.floor(Math.random() * box.text.length);
+                    operations++;
+                }
+                
+                // Delete characters
+                for (let i = 0; i < 30; i++) {
+                    box.removeChar();
+                    operations++;
+                    if (box.cursorPosition < 0 || box.cursorPosition > box.text.length) {
+                        errors.push(`Invalid cursor after delete: ${box.cursorPosition}`);
+                    }
+                }
+                
+                // Insert more
+                for (let i = 0; i < 20; i++) {
+                    box.addChar(String.fromCharCode(65 + (i % 26)));
+                    operations++;
+                }
+                
+            } catch (e) {
+                errors.push(e.message);
+            }
+            
+            logTest(
+                "Stress Test: Sequential operations maintain valid state",
+                errors.length === 0,
+                errors.length > 0 ? errors.join('; ') : `Completed ${operations} operations successfully`,
+                false
+            );
+        }
+        
+        // Display results
+        function displayResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '';
+            
+            // Group by test section
+            const sections = {};
+            testResults.forEach(result => {
+                const sectionName = result.name.split(':')[0];
+                if (!sections[sectionName]) {
+                    sections[sectionName] = [];
+                }
+                sections[sectionName].push(result);
+            });
+            
+            // Display each section
+            Object.keys(sections).forEach(sectionName => {
+                const section = document.createElement('div');
+                section.className = 'test-section';
+                section.innerHTML = `<h2>${sectionName}</h2>`;
+                
+                sections[sectionName].forEach(result => {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'test-result ' + (result.isWarning ? 'test-warn' : (result.passed ? 'test-pass' : 'test-fail'));
+                    resultDiv.innerHTML = `
+                        <strong>${result.name}</strong><br>
+                        ${result.message}
+                    `;
+                    section.appendChild(resultDiv);
+                });
+                
+                resultsDiv.appendChild(section);
+            });
+            
+            // Display summary
+            const summary = document.getElementById('summary');
+            const total = passCount + failCount + warnCount;
+            const passRate = total > 0 ? ((passCount / total) * 100).toFixed(1) : 0;
+            
+            summary.innerHTML = `
+                Total Tests: ${total} |
+                Passed: <span style="color: #28a745">${passCount}</span> |
+                Failed: <span style="color: #dc3545">${failCount}</span> |
+                Warnings: <span style="color: #ffc107">${warnCount}</span> |
+                Pass Rate: ${passRate}%
+            `;
+            summary.style.background = failCount === 0 ? '#d4edda' : '#f8d7da';
+        }
+        
+        // Run all tests
+        function runAllTests() {
+            testResults = [];
+            passCount = 0;
+            failCount = 0;
+            warnCount = 0;
+            
+            console.log("Running all tests...");
+            
+            testBasicCursorPositioning();
+            testCharacterInsertion();
+            testNewlineHandling();
+            testTextWrapping();
+            testSpecialCharacters();
+            testDeletion();
+            testTextSelection();
+            testWrappedTextNavigation();
+            testEdgeCases();
+            testRapidInsertion();
+            testTextSanitization();
+            testPasteOperation();
+            
+            displayResults();
+            
+            console.log(`Tests complete: ${passCount} passed, ${failCount} failed, ${warnCount} warnings`);
+        }
+        
+        // Run stress tests
+        function runStressTests() {
+            testResults = [];
+            passCount = 0;
+            failCount = 0;
+            warnCount = 0;
+            
+            console.log("Running stress tests...");
+            
+            stressTestSequentialOperations();
+            
+            displayResults();
+            
+            console.log(`Stress tests complete: ${passCount} passed, ${failCount} failed, ${warnCount} warnings`);
+        }
+        
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            console.log("Page loaded, ready to run tests");
+        });
+    </script>
+</body>
+</html>
