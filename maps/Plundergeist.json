@@ -26,7 +26,7 @@
     },
     {
       "x": -963.2783854344569,
-      "y": 1817.5784484909773,
+      "y": 1818.6302493964079,
       "text": "2 This position is dangerously normative: it assumes there is a “proper” or “real” state of things against which AI’s behaviour should be judged, reinforcing rigid distinctions rather than exploring how new kinds of design are produced through human–AI interaction.",
       "width": 280,
       "height": 171,
@@ -73,22 +73,10 @@
       }
     },
     {
-      "x": 805.735872615019,
+      "x": 805.322850555107,
       "y": 1239.6168404474631,
       "text": "5. Findings",
       "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -548.459964131337,
-      "y": 1239.6168404474631,
-      "text": "2.\tHow is design engaging with gen AI?",
-      "width": 273.046875,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -134,22 +122,10 @@
     },
     {
       "x": -548.459964131337,
-      "y": 1817.5784484909773,
+      "y": 1818.6302493964079,
       "text": "To Become an Object Among Objects:\nGenerative Artificial “Intelligence,”\nWriting, and Linguistic White 0Supremacy",
       "width": 321.51331156524714,
       "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.735872615019,
-      "y": 1508.1252170824107,
-      "text": "5.1 Designing with an unstable Agent",
-      "width": 200.5927734375,
-      "height": 66,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -194,7 +170,7 @@
     },
     {
       "x": 373.22294311306956,
-      "y": 1954.829527964617,
+      "y": 1960.0067425657849,
       "text": "Boundedness\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
       "width": 308.1928361406251,
       "height": 108,
@@ -217,18 +193,6 @@
       }
     },
     {
-      "x": 805.735872615019,
-      "y": 1706.0710949572692,
-      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
-      "width": 243.9306640625,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": 1309.3775987028982,
       "y": 1475.1298461126594,
       "text": "Plundergeist proposes a practice of engaging with AI that treats it not as something radically new, but as a medium \nthat can be interrogated using established methods native to art and design.\n\nThe paper has argued for self-reflective practice as a productive method for investigating AI in design. It identifies generative AI as introducing distinctive affordances that disrupt and reconfigure design practice, highlighting its world-making potential. \n\nMy suggestion is that this kind of pragmatically focused, self-reflective engagement with gen AI is particularly valuable in design education. ",
@@ -241,19 +205,7 @@
       }
     },
     {
-      "x": 805.735872615019,
-      "y": 1850.5212009169527,
-      "text": "Plundergeist requires openess and looseness to go with it. Different attitude than a normative reading of AI or a efficency one",
-      "width": 257.6667684453904,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.735872615019,
+      "x": 805.322850555107,
       "y": 1371.512976406508,
       "text": "Plundergeist - Plunderphonic Give some of the history and effect of plunderphonics \n\nwhat does it do? always awarness of working in relation to others ",
       "width": 218.63226562499995,
@@ -293,18 +245,6 @@
       "y": 2128.3116998599985,
       "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.",
       "width": 328.3583984375,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 373.22294311306956,
-      "y": 1635.7915138314788,
-      "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
-      "width": 295.38941406250024,
       "height": 129,
       "backgroundColor": {
         "r": 255,
@@ -397,30 +337,6 @@
       }
     },
     {
-      "x": -53.67986687065167,
-      "y": 1239.6168404474631,
-      "text": "3.\tMy method",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 805.735872615019,
-      "y": 1587.7665225064575,
-      "text": "5.2 Designing through archetypes",
-      "width": 200.5927734375,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": 373.22294311306956,
       "y": 1348.371619055343,
       "text": "Nonlinear [Flow?]\nDesigning without a plan surprise. change direction. but not being in control",
@@ -467,6 +383,78 @@
         "g": 200,
         "b": 140
       }
+    },
+    {
+      "x": 373.22294311306956,
+      "y": 1635.7915138314788,
+      "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
+      "width": 295.38941406250024,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -53.67986687065167,
+      "y": 1239.6168404474631,
+      "text": "3.\tMy method",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -548.459964131337,
+      "y": 1239.6168404474631,
+      "text": "2.\tHow is design engaging with gen AI?",
+      "width": 273.046875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 808.6227365541727,
+      "y": 1813.4825090229153,
+      "text": "5.2 Designing through archetypes\n\ncritically generative — exposing the constructedness of design languages, creating new meanings through juxtaposition, and making visible the politics of media reuse",
+      "width": 234.5742486446485,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 811.2626453534252,
+      "y": 1990.5122761826037,
+      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
+      "width": 243.9306640625,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 806.229070328885,
+      "y": 1573.7779619522366,
+      "text": "5.1 Designing with an unstable Agent\n\nPlundergeist requires openess and looseness to go with it. Different attitude than a normative reading of AI or a efficency approach",
+      "width": 233.5892783487891,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
@@ -479,16 +467,16 @@
       "to": 2
     },
     {
-      "from": 7,
-      "to": 29
+      "from": 34,
+      "to": 24
     },
     {
-      "from": 13,
-      "to": 22
+      "from": 11,
+      "to": 18
     },
     {
-      "from": 9,
-      "to": 35
+      "from": 8,
+      "to": 28
     },
     {
       "from": 2,
@@ -500,99 +488,99 @@
     },
     {
       "from": 1,
-      "to": 36
+      "to": 29
     },
     {
-      "from": 38,
-      "to": 30
+      "from": 31,
+      "to": 25
     },
     {
-      "from": 12,
-      "to": 34
+      "from": 37,
+      "to": 35
     },
     {
-      "from": 29,
-      "to": 13
+      "from": 24,
+      "to": 11
     },
     {
       "from": 3,
       "to": 5
     },
     {
-      "from": 30,
+      "from": 25,
       "to": 4
     },
     {
-      "from": 22,
-      "to": 11
+      "from": 18,
+      "to": 10
     },
     {
       "from": 33,
-      "to": 32
-    },
-    {
-      "from": 32,
-      "to": 31
-    },
-    {
-      "from": 31,
-      "to": 26
-    },
-    {
-      "from": 26,
-      "to": 23
-    },
-    {
-      "from": 23,
       "to": 27
     },
     {
       "from": 27,
-      "to": 10
+      "to": 26
     },
     {
-      "from": 10,
-      "to": 15
-    },
-    {
-      "from": 35,
-      "to": 28
-    },
-    {
-      "from": 28,
-      "to": 25
-    },
-    {
-      "from": 25,
-      "to": 17
-    },
-    {
-      "from": 17,
-      "to": 16
-    },
-    {
-      "from": 16,
-      "to": 24
-    },
-    {
-      "from": 21,
-      "to": 12
-    },
-    {
-      "from": 6,
+      "from": 26,
       "to": 21
     },
     {
-      "from": 34,
-      "to": 18
+      "from": 21,
+      "to": 19
     },
     {
-      "from": 18,
+      "from": 19,
+      "to": 22
+    },
+    {
+      "from": 22,
+      "to": 9
+    },
+    {
+      "from": 9,
+      "to": 13
+    },
+    {
+      "from": 28,
+      "to": 23
+    },
+    {
+      "from": 23,
+      "to": 32
+    },
+    {
+      "from": 32,
+      "to": 15
+    },
+    {
+      "from": 15,
+      "to": 14
+    },
+    {
+      "from": 14,
       "to": 20
     },
     {
-      "from": 8,
-      "to": 19
+      "from": 17,
+      "to": 37
+    },
+    {
+      "from": 6,
+      "to": 17
+    },
+    {
+      "from": 35,
+      "to": 36
+    },
+    {
+      "from": 7,
+      "to": 16
+    },
+    {
+      "from": 33,
+      "to": 8
     }
   ]
 }

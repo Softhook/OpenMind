@@ -706,13 +706,14 @@ function populateKeyboardControlsOverlay() {
 
   keyboardOverlayContent.html('');
 
-  const title = createElement('h2', 'Open Mind');
+  const title = createElement('h2', 'Open Mind    <span style="font-size: 0.5em; color: lightgrey;">Christian Nold, 2025</span>');
   title.parent(keyboardOverlayContent);
   title.style('margin', '0 0 12px 0');
   title.style('font-size', '24px');
   title.style('font-weight', '600');
 
-  const hint = createElement('p', 'Timed autosaves to browser. Hierachy: Red > Orange > White');
+  const hint = createElement('p');
+  hint.html('Timed autosaves to browser. Box hierarchy: <span style="color: red;">Red</span> > <span style="color: orange;">Orange</span> > White');
   hint.parent(keyboardOverlayContent);
   hint.style('margin', '0 0 18px 0');
   hint.style('font-size', '14px');
