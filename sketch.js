@@ -735,6 +735,7 @@ function populateKeyboardControlsOverlay() {
     { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
+    { keys: 'Cmd/Ctrl + N', description: 'Create new map with default boxes' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
     { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
   ];
@@ -942,6 +943,12 @@ function keyPressed() {
         return false; // prevent browser default
       }
       
+      // Handle CMD/CTRL+N for new map
+      if (isCmd && (key === 'n' || key === 'N')) {
+        createNewMap();
+        return false; // prevent browser default
+      }
+      
       // Handle F key for fullscreen toggle (only when not editing)
       if (!isEditing && !isCmd && (key === 'f' || key === 'F')) {
         toggleFullScreen();
@@ -1073,6 +1080,58 @@ function createNewBox() {
   }
 
   mindMap.addBox(new TextBox(x, y, ""));
+}
+
+function createNewMap() {
+  // Ensure mindMap exists
+  if (!mindMap) {
+    console.error('MindMap not initialized');
+    return;
+  }
+  
+  // Ask for confirmation since this will clear the current map
+  if (mindMap.boxes && mindMap.boxes.length > 0) {
+    const confirmed = confirm('Create a new map? This will clear the current map. (Your current map is auto-saved to browser storage)');
+    if (!confirmed) {
+      return;
+    }
+  }
+  
+  // Save current state to localStorage before clearing
+  try {
+    mindMap.saveToLocalStorage();
+  } catch (e) {
+    console.warn('Failed to save current state before creating new map:', e);
+  }
+  
+  // Clear undo stack
+  mindMap.undoStack = [];
+  
+  // Reset camera and zoom
+  camX = 0;
+  camY = 0;
+  zoom = 1;
+  
+  // Clear all boxes and connections
+  mindMap.boxes = [];
+  mindMap.connections = [];
+  mindMap.selectedBox = null;
+  mindMap.selectedConnection = null;
+  mindMap.connectingFrom = null;
+  if (mindMap.selectedBoxes) {
+    mindMap.selectedBoxes.clear();
+  }
+  if (mindMap.selectedConnections) {
+    mindMap.selectedConnections.clear();
+  }
+  
+  // Create the 3 default boxes as specified in the issue
+  mindMap.addBox(new TextBox(300, 200, "Idea"));
+  mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+  mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+  
+  // Mark as unsaved
+  mindMap.isSaved = false;
 }
 
 function triggerFileLoad() {
