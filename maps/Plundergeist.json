@@ -25,119 +25,11 @@
       }
     },
     {
-      "x": 373.3127359293707,
-      "y": 1789.5301540127125,
-      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
-      "width": 304.4459375000001,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 373.3127359293707,
-      "y": 1478.7854244116547,
-      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
-      "width": 310.6827734374999,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 373.3127359293707,
-      "y": 2128.3116998599985,
-      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.",
-      "width": 328.3583984375,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 373.3127359293707,
-      "y": 1954.829527964617,
-      "text": "Boundedness\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
-      "width": 308.1928361406251,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -53.67986687065167,
-      "y": 1306.9147978149113,
-      "text": "Lev Manocich langauge of new media.  Trying to idetify the core principles of new media",
-      "width": 290.7669921875,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -53.67986687065167,
-      "y": 1422.7475563637684,
+      "x": -53.679866870651665,
+      "y": 1465.4830656152994,
       "text": "text diary. the mthod itself with 5 steps in a table",
-      "width": 304.65157487513767,
+      "width": 280,
       "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.1247615039078,
-      "y": 1694.4586685918234,
-      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
-      "width": 243.9306640625,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -548.3342541885154,
-      "y": 1377.1645749057404,
-      "text": "Surveys, interview some practice observations of studetns \n\nlots of arguments on copyright\n\n>>> little reflection of professional designers.",
-      "width": 300.19075724364336,
-      "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -548.3342541885154,
-      "y": 1530.4248168360407,
-      "text": "Reflective Practice. Not schoen's reflective practice but more person centred ",
-      "width": 300.19075724364336,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -548.3342541885154,
-      "y": 1661.0735274651997,
-      "text": "A few examples of reflective ethnograohic inflected studies:\nVisual Intelligence in Design and Art – An Experimentation Handbook with Artificial Intelligence ",
-      "width": 305.76503906250014,
-      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -148,20 +40,8 @@
       "x": -963.278385434457,
       "y": 1822.6704386544802,
       "text": "2 This position is dangerously normative: it assumes there is a “proper” or “real” state of things against which AI’s behaviour should be judged, reinforcing rigid distinctions rather than exploring how new kinds of design are produced through human–AI interaction.",
-      "width": 300.19075724364336,
+      "width": 280,
       "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.1247615039078,
-      "y": 1837.1282849264212,
-      "text": "Plundergeist requires openess and looseness to go with it. Different attitude than a normative reading of AI or a efficency one",
-      "width": 257.6667684453904,
-      "height": 108,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -217,11 +97,155 @@
       }
     },
     {
+      "x": 805.1247615039078,
+      "y": 1588.1536596818537,
+      "text": "5.2 Designing through archetypes",
+      "width": 200.5927734375,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -963.278385434457,
+      "y": 1635.7915138314788,
+      "text": "1  For example design tends to use existing metaphors such as “hallucinations,” which are inaccurate and overlooking the\n nuanced ways AI systems actually operate. ",
+      "width": 245.99114613982863,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 805.1247615039078,
+      "y": 1239.836832847401,
+      "text": "5. Findings",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -548.3342541885154,
+      "y": 1242.831835445232,
+      "text": "2.\tHow is design engaging with gen AI?",
+      "width": 273.046875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
       "x": -53.67986687065167,
-      "y": 1704.6770619852925,
-      "text": "2.\tGenerate Haunted Prototype\nUse gen AI to rapidly produce a playable artefact. This is “haunted” by plundered cultural traces and echoes.\n",
-      "width": 413.5620312500001,
-      "height": 108,
+      "y": 1236.84183024957,
+      "text": "3.\tMy method",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 1309.3775987028982,
+      "y": 1238.5168784477746,
+      "text": "6. Conclusion",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 373.3127359293707,
+      "y": 1239.836832847401,
+      "text": "4.\tObservations",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -53.67986687065167,
+      "y": 2007.7088293225258,
+      "text": "4.\tRe-prompt to hone\nCraft a new prompt that builds on these insights. The aim is to hone or intensify the haunted aspects by deliberately reworking fragments drawn from the prototype.\n",
+      "width": 422.7189062500001,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -548.3342541885154,
+      "y": 1812.4864583274746,
+      "text": "To Become an Object Among Objects:\nGenerative Artificial “Intelligence,”\nWriting, and Linguistic White 0Supremacy",
+      "width": 321.51331156524714,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 805.1247615039078,
+      "y": 1508.1252170824107,
+      "text": "5.1 Designing with an unstable Agent",
+      "width": 200.5927734375,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -963.278385434457,
+      "y": 1239.836832847401,
+      "text": "Introduction",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -548.3342541885154,
+      "y": 1540.9248168360407,
+      "text": "Reflective Practice. Not schoen's reflective practice but more person centred ",
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -53.67986687065167,
+      "y": 1587.3793853310615,
+      "text": "1  Prompt for Archetype\nEstablish an entry point to anchor the process in a recognisable form.",
+      "width": 414.4766796875001,
+      "height": 87,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -241,10 +265,10 @@
       }
     },
     {
-      "x": -53.67986687065167,
-      "y": 2007.7088293225258,
-      "text": "4.\tRe-prompt to hone\nCraft a new prompt that builds on these insights. The aim is to hone or intensify the haunted aspects by deliberately reworking fragments drawn from the prototype.\n",
-      "width": 422.7189062500001,
+      "x": 373.3127359293707,
+      "y": 2128.3116998599985,
+      "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.",
+      "width": 328.3583984375,
       "height": 129,
       "backgroundColor": {
         "r": 255,
@@ -253,10 +277,82 @@
       }
     },
     {
+      "x": -816.4248854546752,
+      "y": 1005.433811186599,
+      "text": "Plundergeist: Exploring Generative AI through Vibe Coding as Reflective Design Practice",
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
       "x": -53.67986687065167,
       "y": 2143.236287781829,
       "text": "5 Saturation and Boredom\nIdentify when no more novelty emerges and stop.\n",
       "width": 422.7189062500001,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -561.2346539633702,
+      "y": 2142.702832266736,
+      "text": ">>> the lit review last it doesnt need to be long. \n\n>>> make the argument about lack of practice research\n\n>>>> maybe take some of the intro and move into the lit review section. Need to find halucination refernces\n\n>> the key points are the observations and 2 points about differnt and derivative",
+      "width": 219.85780831267908,
+      "height": 318,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 373.3127359293707,
+      "y": 1954.829527964617,
+      "text": "Boundedness\nVibe coding is limited. The significance of the complexity limit is that it highlights that this is not solution but a form of prototyping. ",
+      "width": 308.1928361406251,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -548.3342541885154,
+      "y": 1377.1645749057404,
+      "text": "Surveys, interview some practice observations of studetns \n\nlots of arguments on copyright\n\n>>> little reflection of professional designers.",
+      "width": 300.19075724364336,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 373.3127359293707,
+      "y": 1789.5301540127125,
+      "text": "Abundance\nWhat's interesting about abundance is that it offers very different constraints and limits. This presents new possibilities for designers who tend to work in relation to constraints.  ",
+      "width": 304.4459375000001,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 373.3127359293707,
+      "y": 1337.0361356185197,
+      "text": "Nonlinear [Flow?]\nDesigning without a plan surprise. change direction. but not being in control",
+      "width": 310.6827734374999,
       "height": 87,
       "backgroundColor": {
         "r": 255,
@@ -278,22 +374,10 @@
     },
     {
       "x": 805.1247615039078,
-      "y": 1575.1472003444312,
-      "text": "5.2 Designing through archetypes",
-      "width": 200.5927734375,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -548.3342541885154,
-      "y": 1812.4864583274746,
-      "text": "To Become an Object Among Objects:\nGenerative Artificial “Intelligence,”\nWriting, and Linguistic White 0Supremacy",
-      "width": 321.51331156524714,
-      "height": 87,
+      "y": 1707.465127929246,
+      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
+      "width": 243.9306640625,
+      "height": 108,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -302,58 +386,10 @@
     },
     {
       "x": 373.3127359293707,
-      "y": 1337.0361356185197,
-      "text": "Nonlinear [Flow?]\nDesigning without a plan surprise. change direction. but not being in control",
+      "y": 1478.7854244116547,
+      "text": "Forgetting\nWhat's interesting about forgetting is that it introduces subtle change over time and forces a focus on what matters in a situation.\n",
       "width": 310.6827734374999,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -963.278385434457,
-      "y": 1635.7915138314788,
-      "text": "1  For example design tends to use existing metaphors such as “hallucinations,” which are inaccurate and overlooking the\n nuanced ways AI systems actually operate. ",
-      "width": 245.99114613982863,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.1247615039078,
-      "y": 1495.1187577449882,
-      "text": "5.1 Designing with an unstable Agent",
-      "width": 200.5927734375,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 808.7914281705746,
-      "y": 1358.369468951853,
-      "text": "Plundergeist - Plunderphonic Give some of the history and effect of plunderphonics \n\nwhat does it do? always awarness of working in relation to others ",
-      "width": 218.63226562499995,
-      "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -53.67986687065167,
-      "y": 1587.3793853310615,
-      "text": "1  Prompt for Archetype\nEstablish an entry point to anchor the process in a recognisable form.",
-      "width": 414.4766796875001,
-      "height": 87,
+      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -373,95 +409,59 @@
       }
     },
     {
-      "x": -816.4248854546752,
-      "y": 994.933811186599,
-      "text": "Plundergeist: Exploring Generative AI through Vibe Coding as Reflective Design Practice",
-      "width": 365.4477736577271,
-      "height": 66,
+      "x": 805.1247615039078,
+      "y": 1850.1347442638437,
+      "text": "Plundergeist requires openess and looseness to go with it. Different attitude than a normative reading of AI or a efficency one",
+      "width": 257.6667684453904,
+      "height": 108,
       "backgroundColor": {
         "r": 255,
-        "g": 140,
-        "b": 140
+        "g": 255,
+        "b": 255
       }
     },
     {
-      "x": 805.1247615039078,
-      "y": 1239.836832847401,
-      "text": "5. Findings",
-      "width": 297.96156958644315,
-      "height": 45,
+      "x": -53.679866870651665,
+      "y": 1349.6503070664423,
+      "text": "Lev Manocich langauge of new media.  Trying to idetify the core principles of new media",
+      "width": 280,
+      "height": 87,
       "backgroundColor": {
         "r": 255,
-        "g": 200,
-        "b": 140
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 808.7914281705746,
+      "y": 1371.3759282892754,
+      "text": "Plundergeist - Plunderphonic Give some of the history and effect of plunderphonics \n\nwhat does it do? always awarness of working in relation to others ",
+      "width": 218.63226562499995,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -53.679866870651665,
+      "y": 1704.6770619852925,
+      "text": "2.\tGenerate Haunted Prototype\nUse gen AI to rapidly produce a playable artefact. This is “haunted” by plundered cultural traces and echoes.\n",
+      "width": 413.5620312500001,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
       }
     },
     {
       "x": -548.3342541885154,
-      "y": 1242.831835445232,
-      "text": "2.\tHow is design engaging with gen AI?",
-      "width": 315.1919514109377,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -53.67986687065167,
-      "y": 1236.84183024957,
-      "text": "3.\tMy method",
-      "width": 297.96156958644315,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 1309.3775987028982,
-      "y": 1238.5168784477746,
-      "text": "6. Conclusion",
-      "width": 297.96156958644315,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 373.3127359293707,
-      "y": 1239.836832847401,
-      "text": "4.\tObservations",
-      "width": 297.96156958644315,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -963.278385434457,
-      "y": 1239.836832847401,
-      "text": "Introduction",
-      "width": 175.72111718750006,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -561.2346539633702,
-      "y": 2142.702832266736,
-      "text": ">>> the lit review last it doesnt need to be long. \n\n>>> make the argument about lack of practice research\n\n>>>> maybe take some of the intro and move into the lit review section. Need to find halucination refernces\n\n>> the key points are the observations and 2 points about differnt and derivative",
-      "width": 219.85780831267908,
-      "height": 318,
+      "y": 1661.0735274651997,
+      "text": "A few examples of reflective ethnographic inflected studies:\nVisual Intelligence in Design and Art – An Experimentation Handbook with Artificial Intelligence ",
+      "width": 305.76503906250014,
+      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -471,27 +471,27 @@
   ],
   "connections": [
     {
-      "from": 16,
-      "to": 14
+      "from": 6,
+      "to": 4
     },
     {
-      "from": 26,
-      "to": 12
+      "from": 9,
+      "to": 3
     },
     {
-      "from": 33,
-      "to": 9
+      "from": 11,
+      "to": 27
     },
     {
-      "from": 10,
-      "to": 11
+      "from": 19,
+      "to": 38
     },
     {
-      "from": 36,
-      "to": 25
+      "from": 14,
+      "to": 29
     },
     {
-      "from": 12,
+      "from": 3,
       "to": 0
     },
     {
@@ -500,99 +500,99 @@
     },
     {
       "from": 1,
-      "to": 15
-    },
-    {
-      "from": 37,
-      "to": 17
-    },
-    {
-      "from": 27,
-      "to": 23
-    },
-    {
-      "from": 9,
-      "to": 10
-    },
-    {
-      "from": 14,
-      "to": 26
-    },
-    {
-      "from": 17,
-      "to": 16
-    },
-    {
-      "from": 11,
-      "to": 24
-    },
-    {
-      "from": 34,
-      "to": 6
-    },
-    {
-      "from": 6,
-      "to": 7
-    },
-    {
-      "from": 7,
-      "to": 29
-    },
-    {
-      "from": 29,
-      "to": 18
+      "to": 5
     },
     {
       "from": 18,
+      "to": 7
+    },
+    {
+      "from": 17,
+      "to": 8
+    },
+    {
+      "from": 27,
       "to": 19
     },
     {
-      "from": 19,
-      "to": 20
+      "from": 4,
+      "to": 9
     },
     {
-      "from": 20,
-      "to": 21
+      "from": 7,
+      "to": 6
     },
     {
-      "from": 25,
-      "to": 3
+      "from": 38,
+      "to": 16
     },
     {
-      "from": 3,
-      "to": 22
+      "from": 12,
+      "to": 35
     },
     {
-      "from": 22,
+      "from": 35,
       "to": 2
     },
     {
       "from": 2,
-      "to": 5
+      "to": 20
     },
     {
-      "from": 5,
-      "to": 4
+      "from": 20,
+      "to": 37
     },
     {
-      "from": 28,
-      "to": 27
+      "from": 37,
+      "to": 21
+    },
+    {
+      "from": 21,
+      "to": 15
+    },
+    {
+      "from": 15,
+      "to": 24
+    },
+    {
+      "from": 29,
+      "to": 32
     },
     {
       "from": 32,
+      "to": 30
+    },
+    {
+      "from": 30,
       "to": 28
     },
     {
-      "from": 23,
-      "to": 8
+      "from": 28,
+      "to": 26
+    },
+    {
+      "from": 26,
+      "to": 22
+    },
+    {
+      "from": 36,
+      "to": 17
+    },
+    {
+      "from": 10,
+      "to": 36
     },
     {
       "from": 8,
-      "to": 13
+      "to": 31
     },
     {
-      "from": 35,
-      "to": 30
+      "from": 31,
+      "to": 34
+    },
+    {
+      "from": 13,
+      "to": 33
     }
   ]
 }
