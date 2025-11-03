@@ -86,7 +86,7 @@ const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 // Page visibility tracking to prevent freezing when tab is hidden
 let isPageVisible = true;
 let wasPageHidden = false;
-let visibilityChangeInProgress = false; // Prevent duplicate handling
+let visibilityChangeInProgress = 0; // Timestamp of last visibility change for debouncing
 
 // ============================================================================
 // KEY REPEAT MANAGER
@@ -453,14 +453,12 @@ function setupVisibilityHandling() {
  */
 function handleVisibilityChange() {
   // Prevent duplicate handling if both standard and webkit events fire
-  if (visibilityChangeInProgress) {
+  // Use a timestamp-based debounce instead of a flag to handle rapid changes better
+  const now = Date.now();
+  if (visibilityChangeInProgress && (now - visibilityChangeInProgress) < CONFIG.VISIBILITY.DEBOUNCE_MS) {
     return;
   }
-  visibilityChangeInProgress = true;
-  
-  // Use a setTimeout to reset the flag after a short delay
-  // This prevents duplicate handling while still allowing rapid visibility changes
-  setTimeout(() => { visibilityChangeInProgress = false; }, CONFIG.VISIBILITY.DEBOUNCE_MS);
+  visibilityChangeInProgress = now;
   
   // Check visibility using the available API
   let isHidden = false;
@@ -528,7 +526,11 @@ function handlePageBecameHidden() {
 function handlePageBecameVisible() {
   try {
     // Reset key repeat state to clear any stuck keys
-    KeyRepeat.reset();
+    try {
+      KeyRepeat.reset();
+    } catch (e) {
+      console.error('Failed to reset key repeat:', e);
+    }
     
     // Reset any drag/pan states that might be stuck
     isPanning = false;
@@ -556,7 +558,11 @@ function handlePageBecameVisible() {
     
     // Force a redraw
     if (typeof redraw === 'function') {
-      redraw();
+      try {
+        redraw();
+      } catch (e) {
+        console.error('Failed to redraw:', e);
+      }
     }
   } catch (e) {
     console.error('Error handling page visible:', e);
