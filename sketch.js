@@ -312,12 +312,6 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
-  // If page was hidden and is now visible, reset state to prevent freezing
-  if (wasPageHidden && isPageVisible) {
-    handlePageBecameVisible();
-    wasPageHidden = false;
-  }
-  
   background(240);
   updateMenuVisibility();
   
@@ -417,17 +411,23 @@ function updateCursorForHover() {
  * Sets up page visibility event listeners to handle background/foreground transitions
  */
 function setupVisibilityHandling() {
+  // Track if Page Visibility API is supported
+  const hasVisibilityAPI = typeof document.hidden !== 'undefined' || typeof document.webkitHidden !== 'undefined';
+  
   // Use the Page Visibility API to detect when tab is hidden/visible
   if (typeof document.hidden !== 'undefined') {
     document.addEventListener('visibilitychange', handleVisibilityChange);
-  } else if (typeof document.webkitHidden !== 'undefined') {
-    // Webkit prefix for older browsers
+  }
+  if (typeof document.webkitHidden !== 'undefined') {
+    // Also listen for webkit event (some browsers support both)
     document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
   }
   
-  // Also handle window blur/focus as a fallback
-  window.addEventListener('blur', handleWindowBlur);
-  window.addEventListener('focus', handleWindowFocus);
+  // Only use window blur/focus as fallback if Page Visibility API is not available
+  if (!hasVisibilityAPI) {
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+  }
   
   // Set initial state (check both standard and webkit-prefixed properties)
   isPageVisible = !(document.hidden || document.webkitHidden);
@@ -445,9 +445,12 @@ function handleVisibilityChange() {
     wasPageHidden = true;
     handlePageBecameHidden();
   } else {
-    // Page is now visible
+    // Page is now visible - trigger recovery immediately
     isPageVisible = true;
-    // The actual recovery will happen in the draw loop
+    if (wasPageHidden) {
+      handlePageBecameVisible();
+      wasPageHidden = false;
+    }
   }
 }
 
@@ -465,7 +468,10 @@ function handleWindowBlur() {
  */
 function handleWindowFocus() {
   isPageVisible = true;
-  // The actual recovery will happen in the draw loop
+  if (wasPageHidden) {
+    handlePageBecameVisible();
+    wasPageHidden = false;
+  }
 }
 
 /**
