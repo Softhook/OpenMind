@@ -16,6 +16,7 @@ class MindMap {
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
+    this.connectingFromInitiatedByKeyboard = false;
     this.draggingConnection = null; // { conn, originalTo }
 
     // Undo history - optimized with larger stack
@@ -523,6 +524,103 @@ class MindMap {
       }
     }
   }
+
+  /**
+   * Returns the top-most box under the current mouse position, if any
+   * @returns {TextBox|null}
+   */
+  getTopMostBoxUnderMouse() {
+    if (!this.boxes || this.boxes.length === 0) return null;
+    for (let i = this.boxes.length - 1; i >= 0; i--) {
+      const box = this.boxes[i];
+      if (!box || typeof box.isMouseOver !== 'function') continue;
+      try {
+        if (box.isMouseOver()) {
+          return box;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /**
+   * Initiates a connection from the provided box using the connector closest to the mouse
+   * @param {TextBox} box - Source box to start the connection from
+   */
+  startConnectionFromBox(box) {
+    if (!box || typeof box.getConnectorPoints !== 'function') return;
+
+    // Default target to box center if mouse coordinates are unavailable
+    const hasWorldMouse = typeof worldMouseX === 'function' && typeof worldMouseY === 'function';
+    const mx = hasWorldMouse ? worldMouseX() : NaN;
+    const my = hasWorldMouse ? worldMouseY() : NaN;
+    const mouseXWorld = Number.isFinite(mx) ? mx : box.x;
+    const mouseYWorld = Number.isFinite(my) ? my : box.y;
+
+    const points = box.getConnectorPoints();
+    if (!points || typeof points !== 'object') return;
+
+    let nearestSide = null;
+    let nearestDistSq = Infinity;
+    for (const [side, point] of Object.entries(points)) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+      const dx = point.x - mouseXWorld;
+      const dy = point.y - mouseYWorld;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearestSide = side;
+      }
+    }
+
+    if (!nearestSide) {
+      nearestSide = 'right';
+    }
+
+    this.isArrowKeyNavigating = false;
+    this.connectingFrom = { box, side: nearestSide };
+    this.connectingFromInitiatedByKeyboard = true;
+  }
+
+  /**
+   * Completes the pending connection if a valid target is provided or under the mouse
+   * @param {TextBox|null} targetBox - Optional target box to connect to
+   * @returns {boolean} true if a connection was created
+   */
+  completeConnection(targetBox = null) {
+    if (!this.connectingFrom || !this.connectingFrom.box) {
+      this.connectingFrom = null;
+      this.connectingFromInitiatedByKeyboard = false;
+      return false;
+    }
+
+    const sourceBox = this.connectingFrom.box;
+    let destination = targetBox;
+
+    if (!destination) {
+      if (this.boxes) {
+        for (const box of this.boxes) {
+          if (!box || box === sourceBox || typeof box.isMouseOver !== 'function') continue;
+          try {
+            if (box.isMouseOver()) {
+              destination = box;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    let connected = false;
+    if (destination && destination !== sourceBox) {
+      this.addConnection(sourceBox, destination);
+      connected = true;
+    }
+
+    this.connectingFrom = null;
+    this.connectingFromInitiatedByKeyboard = false;
+    return connected;
+  }
   
   /**
    * Handles mouse press events
@@ -539,6 +637,17 @@ class MindMap {
     }
     const shiftDown = keyIsDown(16); // SHIFT
     
+    if (this.connectingFrom && this.connectingFromInitiatedByKeyboard) {
+      const hoveredBox = this.getTopMostBoxUnderMouse();
+      if (hoveredBox && hoveredBox !== this.connectingFrom.box) {
+        this.completeConnection(hoveredBox);
+      } else {
+        this.connectingFrom = null;
+        this.connectingFromInitiatedByKeyboard = false;
+      }
+      return;
+    }
+
     // (connection deselection centralized in clearConnectionSelection())
     
     // Check if clicking on a background color circle of any selected box (top-most first)
@@ -600,6 +709,7 @@ class MindMap {
       const side = box.getConnectorUnderMouse();
       if (side) {
         this.connectingFrom = { box, side };
+        this.connectingFromInitiatedByKeyboard = false;
         return;
       }
     }
@@ -742,14 +852,7 @@ class MindMap {
 
     // Complete connection if in connection mode
     if (this.connectingFrom) {
-      for (let box of this.boxes) {
-        if (!box) continue;
-        if (box !== this.connectingFrom.box && box.isMouseOver()) {
-          this.addConnection(this.connectingFrom.box, box);
-          break;
-        }
-      }
-      this.connectingFrom = null;
+      this.completeConnection();
     }
     
     // Stop dragging and resizing all boxes
@@ -948,6 +1051,22 @@ class MindMap {
           }
         }
         return;
+      }
+    } else if (key === 'c' || key === 'C') {
+      const hasModifier = keyIsDown(16) || keyIsDown(18) || keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
+      if (!hasModifier) {
+        let sourceBox = this.selectedBox;
+        if (!sourceBox && this.selectedBoxes && this.selectedBoxes.size === 1) {
+          sourceBox = this.selectedBoxes.values().next().value;
+        }
+        if (sourceBox && !sourceBox.isEditing) {
+          if (this.connectingFrom && this.connectingFrom.box === sourceBox && this.connectingFromInitiatedByKeyboard) {
+            this.connectingFrom = null;
+            this.connectingFromInitiatedByKeyboard = false;
+          } else {
+            this.startConnectionFromBox(sourceBox);
+          }
+        }
       }
     } else if ((key === ' ' || keyCode === 32)) {
       // Space: reverse selected connection when not editing

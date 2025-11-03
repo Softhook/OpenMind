@@ -523,6 +523,7 @@ function populateKeyboardControlsOverlay() {
 
   const shortcuts = [
     { keys: 'N', description: 'Create new box' },
+    { keys: 'C', description: 'Create connection from selected box' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Space (tap)', description: 'Reverse the selected connection' },
