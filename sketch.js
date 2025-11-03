@@ -421,7 +421,8 @@ function setupVisibilityHandling() {
   
   // Use the Page Visibility API to detect when tab is hidden/visible
   // Note: Some browsers support both standard and webkit, so we listen to both
-  // but use a flag to prevent duplicate handling
+  // but use a flag to prevent duplicate handling. The same handler works for both
+  // because it checks which API is available at runtime (standard first, then webkit).
   if (hasStandardVisibility) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
   }
@@ -541,6 +542,7 @@ function handlePageBecameVisible() {
       }
       
       // Reset any box states
+      // Note: Check for null boxes as array may contain nulls during deletion/modification
       if (mindMap.boxes) {
         mindMap.boxes.forEach(box => {
           if (box) {
