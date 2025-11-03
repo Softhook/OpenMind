@@ -515,7 +515,7 @@ function populateKeyboardControlsOverlay() {
   title.style('font-size', '24px');
   title.style('font-weight', '600');
 
-  const hint = createElement('p', 'Christian Nold, 2025');
+  const hint = createElement('p', 'Red > Orange > White hierachy for box navigation');
   hint.parent(keyboardOverlayContent);
   hint.style('margin', '0 0 18px 0');
   hint.style('font-size', '14px');
