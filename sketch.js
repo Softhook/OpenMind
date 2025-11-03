@@ -728,6 +728,7 @@ function populateKeyboardControlsOverlay() {
     { keys: 'A', description: 'Align boxes' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
+    { keys: 'Scroll Wheel', description: 'Zoom in and out' },
     { keys: 'F', description: 'Toggle fullscreen view' },
     { keys: '-', description: 'Fit and center the entire map' },
     { keys: '+', description: 'Zoom to selected elements' },
