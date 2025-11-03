@@ -509,13 +509,13 @@ function populateKeyboardControlsOverlay() {
 
   keyboardOverlayContent.html('');
 
-  const title = createElement('h2', 'Keyboard Controls');
+  const title = createElement('h2', 'Open Mind');
   title.parent(keyboardOverlayContent);
   title.style('margin', '0 0 12px 0');
   title.style('font-size', '24px');
   title.style('font-weight', '600');
 
-  const hint = createElement('p', 'Press Esc or click outside this panel to close.');
+  const hint = createElement('p', 'Christian Nold, 2025');
   hint.parent(keyboardOverlayContent);
   hint.style('margin', '0 0 18px 0');
   hint.style('font-size', '14px');
@@ -523,18 +523,18 @@ function populateKeyboardControlsOverlay() {
 
   const shortcuts = [
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
-    { keys: 'Space + Drag / Right Mouse Drag', description: 'Pan the canvas' },
+    { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Space (tap)', description: 'Reverse the selected connection' },
-    { keys: 'Shift + Click', description: 'Add or remove boxes from the current selection' },
+    { keys: 'Shift + Click', description: 'Add and remove from selection' },
     { keys: 'N', description: 'Create a new box' },
-    { keys: 'A', description: 'Align nearby boxes' },
+    { keys: 'A', description: 'Align boxes' },
     { keys: '-', description: 'Fit and center the entire mind map' },
     { keys: '=', description: 'Zoom to the maximum level' },
     { keys: 'Backspace / Delete', description: 'Delete selected boxes or connections' },
-    { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste boxes' },
+    { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
-    { keys: 'Cmd/Ctrl + S', description: 'Save the mind map' },
+    { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
     { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' },
     { keys: 'F', description: 'Toggle fullscreen view' }
   ];
