@@ -80,6 +80,10 @@ let selectionCurrentY = 0;
 let lastResizeTime = 0;
 const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 
+// Page visibility tracking to prevent freezing when tab is hidden
+let isPageVisible = true;
+let wasPageHidden = false;
+
 // ============================================================================
 // KEY REPEAT MANAGER
 // ============================================================================
@@ -254,6 +258,9 @@ function setup() {
     
     // Start autosave timer
     startAutosave();
+    
+    // Set up page visibility handling to prevent freezing when tab is hidden
+    setupVisibilityHandling();
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -305,6 +312,12 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
+  // If page was hidden and is now visible, reset state to prevent freezing
+  if (wasPageHidden && isPageVisible) {
+    handlePageBecameVisible();
+    wasPageHidden = false;
+  }
+  
   background(240);
   updateMenuVisibility();
   
@@ -335,9 +348,12 @@ function draw() {
       // Non-fatal
     }
     // Drive fallback key repeat after draw so we don't block rendering
-    try {
-      KeyRepeat.update();
-    } catch (_) {}
+    // Only update when page is visible to avoid issues with background throttling
+    if (isPageVisible) {
+      try {
+        KeyRepeat.update();
+      } catch (_) {}
+    }
   }
 }
 
@@ -390,6 +406,125 @@ function updateCursorForHover() {
     return;
   }
   cursor('default');
+}
+
+// ============================================================================
+// PAGE VISIBILITY HANDLING
+// ============================================================================
+// Detects when the browser tab is hidden/visible to prevent freezing issues
+
+/**
+ * Sets up page visibility event listeners to handle background/foreground transitions
+ */
+function setupVisibilityHandling() {
+  // Use the Page Visibility API to detect when tab is hidden/visible
+  if (typeof document.hidden !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  } else if (typeof document.webkitHidden !== 'undefined') {
+    // Webkit prefix for older browsers
+    document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
+  }
+  
+  // Also handle window blur/focus as a fallback
+  window.addEventListener('blur', handleWindowBlur);
+  window.addEventListener('focus', handleWindowFocus);
+  
+  // Set initial state
+  isPageVisible = !document.hidden;
+}
+
+/**
+ * Handles visibility change events from the Page Visibility API
+ */
+function handleVisibilityChange() {
+  const isHidden = document.hidden || document.webkitHidden;
+  
+  if (isHidden) {
+    // Page is now hidden
+    isPageVisible = false;
+    wasPageHidden = true;
+    handlePageBecameHidden();
+  } else {
+    // Page is now visible
+    isPageVisible = true;
+    // The actual recovery will happen in the draw loop
+  }
+}
+
+/**
+ * Handles window blur events (backup for visibility API)
+ */
+function handleWindowBlur() {
+  if (isPageVisible) {
+    wasPageHidden = true;
+  }
+  isPageVisible = false;
+  handlePageBecameHidden();
+}
+
+/**
+ * Handles window focus events (backup for visibility API)
+ */
+function handleWindowFocus() {
+  isPageVisible = true;
+  // The actual recovery will happen in the draw loop
+}
+
+/**
+ * Called when the page becomes hidden - pause non-essential operations
+ */
+function handlePageBecameHidden() {
+  try {
+    // Stop key repeat to avoid stuck states
+    KeyRepeat.reset();
+    
+    // Save current state to localStorage before going to background
+    if (mindMap && !mindMap.isSaved) {
+      mindMap.saveToLocalStorage();
+    }
+  } catch (e) {
+    console.error('Error handling page hidden:', e);
+  }
+}
+
+/**
+ * Called when the page becomes visible again - resume operations and reset state
+ */
+function handlePageBecameVisible() {
+  try {
+    // Reset key repeat state to clear any stuck keys
+    KeyRepeat.reset();
+    
+    // Reset any drag/pan states that might be stuck
+    isPanning = false;
+    rightPanActive = false;
+    isSelectingMultiple = false;
+    
+    // Reset interaction states in mindMap
+    if (mindMap) {
+      if (mindMap.draggingConnection) {
+        mindMap.draggingConnection = null;
+      }
+      
+      // Reset any box states
+      if (mindMap.boxes) {
+        for (let box of mindMap.boxes) {
+          if (box) {
+            box.isDragging = false;
+            box.isResizing = false;
+            box.isSelecting = false;
+          }
+        }
+      }
+    }
+    
+    // Force a redraw
+    if (typeof redraw === 'function') {
+      redraw();
+    }
+  } catch (e) {
+    console.error('Error handling page visible:', e);
+  }
 }
 
 // Show or hide the top-left menu based on cursor position
@@ -1821,7 +1956,8 @@ function startAutosave() {
   
   // Set up periodic autosave
   autosaveTimer = setInterval(() => {
-    if (mindMap && !mindMap.isSaved) {
+    // Only autosave when page is visible to avoid issues with background throttling
+    if (mindMap && !mindMap.isSaved && isPageVisible) {
       mindMap.saveToLocalStorage();
     }
   }, CONFIG.AUTOSAVE.INTERVAL);
