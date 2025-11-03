@@ -1195,16 +1195,45 @@ class MindMap {
   }
   
   /**
+   * Gets the last used filename from localStorage
+   * @returns {string} The last used filename or default
+   */
+  getLastUsedFilename() {
+    try {
+      const saved = localStorage.getItem('openmind_last_filename');
+      return saved || 'openmind.json';
+    } catch (e) {
+      return 'openmind.json';
+    }
+  }
+
+  /**
+   * Saves the last used filename to localStorage
+   * @param {string} filename - The filename to remember
+   */
+  setLastUsedFilename(filename) {
+    try {
+      if (filename && typeof filename === 'string') {
+        localStorage.setItem('openmind_last_filename', filename);
+      }
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
+  }
+
+  /**
    * Saves the mind map to a JSON file
    * Uses File System Access API on supported browsers, falls back to download
    */
   async save() {
     const data = this.toJSON();
+    const defaultFilename = this.getLastUsedFilename();
+    
     try {
       // Use the File System Access API when available to let the user choose a location
       if (typeof window !== 'undefined' && window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
-          suggestedName: 'openmind.json',
+          suggestedName: defaultFilename,
           types: [
             {
               description: 'JSON Files',
@@ -1216,9 +1245,13 @@ class MindMap {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         await writable.write(blob);
         await writable.close();
+        
+        // Remember the filename for next time
+        this.setLastUsedFilename(handle.name);
       } else {
         // Fallback: regular download (browser chooses default Downloads location)
-        saveJSON(data, 'openmind.json');
+        saveJSON(data, defaultFilename);
+        // Note: In fallback mode, we keep using the same filename since we can't detect what the user named it
       }
       // Mark as saved regardless of localStorage outcome; seed localStorage best-effort
       this.isSaved = true;

@@ -1118,6 +1118,11 @@ function handleFileLoad(file) {
     }
     
     mindMap.load(data);
+    
+    // Remember the loaded filename for next time
+    if (file.name) {
+      mindMap.setLastUsedFilename(file.name);
+    }
 
     // Ensure the hidden file input is reset so selecting the same file again
     // will fire a change event in the browser and allow reloading the same file.
