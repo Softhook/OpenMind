@@ -1361,11 +1361,28 @@ class MindMap {
   saveToLocalStorage() {
     try {
       const data = this.toJSON();
-      localStorage.setItem('openmind_autosave', JSON.stringify(data));
+      const jsonString = JSON.stringify(data);
+      
+      // Check localStorage availability and quota
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage is not available');
+        return false;
+      }
+      
+      localStorage.setItem('openmind_autosave', jsonString);
       this.isSaved = true;
       return true;
     } catch (e) {
-      console.error('Failed to autosave to localStorage:', e);
+      // Handle quota exceeded errors specifically
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        console.error('localStorage quota exceeded. Unable to autosave. Consider exporting your work.');
+        // Try to show user-friendly error
+        if (typeof alert !== 'undefined') {
+          alert('Storage quota exceeded. Please export your mind map to save your work.');
+        }
+      } else {
+        console.error('Failed to autosave to localStorage:', e);
+      }
       return false;
     }
   }

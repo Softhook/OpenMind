@@ -88,6 +88,13 @@ let isPageVisible = true;
 let wasPageHidden = false;
 let visibilityChangeInProgress = 0; // Timestamp of last visibility change for debouncing
 
+// Event listener cleanup tracking
+let eventListeners = [];
+
+// Store references to overlay event listeners for cleanup
+let overlayClickHandler = null;
+let overlayContentClickHandler = null;
+
 // ============================================================================
 // KEY REPEAT MANAGER
 // ============================================================================
@@ -412,6 +419,17 @@ function updateCursorForHover() {
 // Detects when the browser tab is hidden/visible to prevent freezing issues
 
 /**
+ * Adds an event listener and tracks it for cleanup
+ * @param {Object} target - The event target (document, window, etc.)
+ * @param {string} event - The event name
+ * @param {Function} handler - The event handler function
+ */
+function addTrackedEventListener(target, event, handler) {
+  target.addEventListener(event, handler);
+  eventListeners.push({ target, event, handler });
+}
+
+/**
  * Sets up page visibility event listeners to handle background/foreground transitions
  */
 function setupVisibilityHandling() {
@@ -424,17 +442,17 @@ function setupVisibilityHandling() {
   // but use a flag to prevent duplicate handling. The same handler works for both
   // because it checks which API is available at runtime (standard first, then webkit).
   if (hasStandardVisibility) {
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    addTrackedEventListener(document, 'visibilitychange', handleVisibilityChange);
   }
   if (hasWebkitVisibility) {
-    document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
+    addTrackedEventListener(document, 'webkitvisibilitychange', handleVisibilityChange);
   }
   
   // Only use window blur/focus as fallback if no Page Visibility API is available
   const hasAnyVisibilityAPI = hasStandardVisibility || hasWebkitVisibility;
   if (!hasAnyVisibilityAPI) {
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
+    addTrackedEventListener(window, 'blur', handleWindowBlur);
+    addTrackedEventListener(window, 'focus', handleWindowFocus);
   }
   
   // Set initial state (check both standard and webkit-prefixed properties)
@@ -650,11 +668,12 @@ function setupKeyboardControlsOverlay() {
   keyboardOverlay.style('box-sizing', 'border-box');
 
   if (keyboardOverlay.elt) {
-    keyboardOverlay.elt.addEventListener('click', (event) => {
+    overlayClickHandler = (event) => {
       if (event.target === keyboardOverlay.elt) {
         hideKeyboardControlsOverlay();
       }
-    });
+    };
+    keyboardOverlay.elt.addEventListener('click', overlayClickHandler);
   }
 
   keyboardOverlayContent = createDiv();
@@ -673,9 +692,10 @@ function setupKeyboardControlsOverlay() {
   keyboardOverlayContent.style('font-family', 'sans-serif');
 
   if (keyboardOverlayContent.elt) {
-    keyboardOverlayContent.elt.addEventListener('click', (event) => {
+    overlayContentClickHandler = (event) => {
       event.stopPropagation();
-    });
+    };
+    keyboardOverlayContent.elt.addEventListener('click', overlayContentClickHandler);
   }
 
   populateKeyboardControlsOverlay();
@@ -692,7 +712,7 @@ function populateKeyboardControlsOverlay() {
   title.style('font-size', '24px');
   title.style('font-weight', '600');
 
-  const hint = createElement('p', 'Red > Orange > White hierachy for box navigation');
+  const hint = createElement('p', 'Timed autosaves to browser. Hierachy: Red > Orange > White');
   hint.parent(keyboardOverlayContent);
   hint.style('margin', '0 0 18px 0');
   hint.style('font-size', '14px');
@@ -1012,17 +1032,19 @@ function keyReleased() {
   KeyRepeat.stop(keyCode);
 }
 
-// Ensure repeats stop if the window loses focus
+// Ensure repeats stop if the window loses focus (redundant with visibility handling but kept as extra safeguard)
 if (typeof window !== 'undefined') {
-  window.addEventListener('blur', () => {
+  const handleWindowBlurForKeyRepeat = () => {
     try { KeyRepeat.reset(); } catch (_) {}
-  });
+  };
+  addTrackedEventListener(window, 'blur', handleWindowBlurForKeyRepeat);
 }
 
 // Note: Right-click no longer triggers any connection action; context menu is prevented below.
 
 // Prevent default context menu
-document.addEventListener('contextmenu', event => event.preventDefault());
+const preventContextMenu = (event) => event.preventDefault();
+addTrackedEventListener(document, 'contextmenu', preventContextMenu);
 
 function createNewBox() {
   // Ensure mindMap exists
@@ -1981,6 +2003,74 @@ function completeMultiBoxSelection() {
       }
     }
   }
+}
+
+// ============================================================================
+// CLEANUP AND TEARDOWN
+// ============================================================================
+
+/**
+ * Cleans up all event listeners and timers
+ * Call this function before unloading or when resetting the application
+ */
+function cleanup() {
+  try {
+    // Remove all tracked event listeners
+    for (const { target, event, handler } of eventListeners) {
+      try {
+        target.removeEventListener(event, handler);
+      } catch (e) {
+        console.warn('Failed to remove event listener:', event, e);
+      }
+    }
+    eventListeners = [];
+    
+    // Remove overlay event listeners
+    if (keyboardOverlay && keyboardOverlay.elt && overlayClickHandler) {
+      try {
+        keyboardOverlay.elt.removeEventListener('click', overlayClickHandler);
+      } catch (e) {
+        console.warn('Failed to remove overlay click listener:', e);
+      }
+    }
+    
+    if (keyboardOverlayContent && keyboardOverlayContent.elt && overlayContentClickHandler) {
+      try {
+        keyboardOverlayContent.elt.removeEventListener('click', overlayContentClickHandler);
+      } catch (e) {
+        console.warn('Failed to remove overlay content click listener:', e);
+      }
+    }
+    
+    // Clear autosave timer
+    if (autosaveTimer) {
+      clearInterval(autosaveTimer);
+      autosaveTimer = null;
+    }
+    
+    // Reset key repeat state
+    try {
+      KeyRepeat.reset();
+    } catch (e) {
+      console.warn('Failed to reset key repeat:', e);
+    }
+    
+    // Save final state before cleanup
+    if (mindMap && !mindMap.isSaved) {
+      try {
+        mindMap.saveToLocalStorage();
+      } catch (e) {
+        console.warn('Failed to save on cleanup:', e);
+      }
+    }
+  } catch (e) {
+    console.error('Error during cleanup:', e);
+  }
+}
+
+// Register cleanup on page unload
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', cleanup);
 }
 
 // ============================================================================
