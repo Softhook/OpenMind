@@ -429,8 +429,8 @@ function setupVisibilityHandling() {
   window.addEventListener('blur', handleWindowBlur);
   window.addEventListener('focus', handleWindowFocus);
   
-  // Set initial state
-  isPageVisible = !document.hidden;
+  // Set initial state (check both standard and webkit-prefixed properties)
+  isPageVisible = !(document.hidden || document.webkitHidden);
 }
 
 /**
@@ -455,9 +455,7 @@ function handleVisibilityChange() {
  * Handles window blur events (backup for visibility API)
  */
 function handleWindowBlur() {
-  if (isPageVisible) {
-    wasPageHidden = true;
-  }
+  wasPageHidden = true;
   isPageVisible = false;
   handlePageBecameHidden();
 }
