@@ -83,6 +83,7 @@ const RESIZE_DEBOUNCE_MS = 16; // ~60fps
 // Page visibility tracking to prevent freezing when tab is hidden
 let isPageVisible = true;
 let wasPageHidden = false;
+let visibilityChangeInProgress = false; // Prevent duplicate handling
 
 // ============================================================================
 // KEY REPEAT MANAGER
@@ -411,33 +412,59 @@ function updateCursorForHover() {
  * Sets up page visibility event listeners to handle background/foreground transitions
  */
 function setupVisibilityHandling() {
-  // Track if Page Visibility API is supported
-  const hasVisibilityAPI = typeof document.hidden !== 'undefined' || typeof document.webkitHidden !== 'undefined';
+  // Determine which Page Visibility API properties are supported
+  const hasStandardVisibility = typeof document.hidden !== 'undefined';
+  const hasWebkitVisibility = typeof document.webkitHidden !== 'undefined';
   
   // Use the Page Visibility API to detect when tab is hidden/visible
-  if (typeof document.hidden !== 'undefined') {
+  // Note: Some browsers support both standard and webkit, so we listen to both
+  // but use a flag to prevent duplicate handling
+  if (hasStandardVisibility) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
   }
-  if (typeof document.webkitHidden !== 'undefined') {
-    // Also listen for webkit event (some browsers support both)
+  if (hasWebkitVisibility) {
     document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
   }
   
-  // Only use window blur/focus as fallback if Page Visibility API is not available
-  if (!hasVisibilityAPI) {
+  // Only use window blur/focus as fallback if no Page Visibility API is available
+  const hasAnyVisibilityAPI = hasStandardVisibility || hasWebkitVisibility;
+  if (!hasAnyVisibilityAPI) {
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
   }
   
   // Set initial state (check both standard and webkit-prefixed properties)
-  isPageVisible = !(document.hidden || document.webkitHidden);
+  // Use the available API to determine initial visibility
+  if (hasStandardVisibility) {
+    isPageVisible = !document.hidden;
+  } else if (hasWebkitVisibility) {
+    isPageVisible = !document.webkitHidden;
+  } else {
+    isPageVisible = true; // Default to visible if no API available
+  }
 }
 
 /**
  * Handles visibility change events from the Page Visibility API
  */
 function handleVisibilityChange() {
-  const isHidden = document.hidden || document.webkitHidden;
+  // Prevent duplicate handling if both standard and webkit events fire
+  if (visibilityChangeInProgress) {
+    return;
+  }
+  visibilityChangeInProgress = true;
+  
+  // Use a setTimeout to reset the flag after a short delay
+  // This prevents duplicate handling while still allowing rapid visibility changes
+  setTimeout(() => { visibilityChangeInProgress = false; }, 50);
+  
+  // Check visibility using the available API
+  let isHidden = false;
+  if (typeof document.hidden !== 'undefined') {
+    isHidden = document.hidden;
+  } else if (typeof document.webkitHidden !== 'undefined') {
+    isHidden = document.webkitHidden;
+  }
   
   if (isHidden) {
     // Page is now hidden
