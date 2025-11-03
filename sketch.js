@@ -706,7 +706,7 @@ function populateKeyboardControlsOverlay() {
 
   keyboardOverlayContent.html('');
 
-  const title = createElement('h2', 'Open Mind    <span style="font-size: 0.5em; color: lightgrey;">Christian Nold, 2025</span>');
+  const title = createElement('h2', 'Open Mind    <span style="font-size: 0.6em; color: grey;">Christian Nold, 2025</span>');
   title.parent(keyboardOverlayContent);
   title.style('margin', '0 0 12px 0');
   title.style('font-size', '24px');
@@ -722,8 +722,8 @@ function populateKeyboardControlsOverlay() {
   const shortcuts = [
     { keys: 'N', description: 'Create new box' },
     { keys: 'C', description: 'Create connection from selected box' },
-    { keys: 'Backspace / Delete', description: 'Delete selected boxes or connections' },
-    { keys: 'Space (tap)', description: 'Reverse the selected connection' },
+    { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
+    { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
     { keys: 'A', description: 'Align boxes' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
