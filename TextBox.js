@@ -220,45 +220,61 @@ class TextBox {
           charPos += line.length; // last line may have no trailing newline
         }
       } else {
-        // Break line into words
+        // Break line into words - but we need to track positions in the original line
+        // We must find each word's actual position in the original line, not rely on split
+        let wordPositions = [];
         let words = line.split(' ');
-        let currentLine = '';
-        let currentLineStartInOriginal = lineStartPos; // Track start position of current wrapped line
-        let processedChars = 0; // How many chars of the original line we've processed
+        let searchPos = 0;
         
-        for (let i = 0; i < words.length; i++) {
-          let word = words[i];
-          let testLine = currentLine + (currentLine ? ' ' : '') + word;
+        for (let w of words) {
+          if (w.length > 0) {
+            // Find where this word actually appears in the line starting from searchPos
+            let wordStart = line.indexOf(w, searchPos);
+            if (wordStart !== -1) {
+              wordPositions.push({ word: w, start: wordStart });
+              searchPos = wordStart + w.length;
+            }
+          }
+        }
+        
+        let currentLine = '';
+        let currentLineStartPos = 0;
+        
+        for (let i = 0; i < wordPositions.length; i++) {
+          let wp = wordPositions[i];
+          let testLine = currentLine + (currentLine ? ' ' : '') + wp.word;
           
           if (textWidth(testLine) <= maxTextWidth) {
+            if (!currentLine) {
+              currentLineStartPos = wp.start; // First word sets the start position
+            }
             currentLine = testLine;
           } else {
             // Current line is full, push it
             if (currentLine) {
               wrappedLines.push(currentLine);
-              lineCharMap.push(currentLineStartInOriginal);
-              
-              // Update position tracking
-              processedChars += currentLine.length + 1; // +1 for space after this wrapped line
-              currentLineStartInOriginal = lineStartPos + processedChars;
-              currentLine = word;
+              lineCharMap.push(lineStartPos + currentLineStartPos);
+              currentLine = wp.word;
+              currentLineStartPos = wp.start;
             } else {
               // Single word is too long, break it by characters
               let charLine = '';
-              for (let char of word) {
+              let charStartPos = wp.start;
+              for (let charIdx = 0; charIdx < wp.word.length; charIdx++) {
+                let char = wp.word[charIdx];
                 if (textWidth(charLine + char) <= maxTextWidth) {
                   charLine += char;
                 } else {
                   if (charLine) {
                     wrappedLines.push(charLine);
-                    lineCharMap.push(currentLineStartInOriginal);
-                    processedChars += charLine.length;
-                    currentLineStartInOriginal = lineStartPos + processedChars;
+                    lineCharMap.push(lineStartPos + charStartPos);
+                    charStartPos += charLine.length;
                   }
                   charLine = char;
                 }
               }
               currentLine = charLine;
+              currentLineStartPos = charStartPos;
             }
           }
         }
@@ -266,7 +282,7 @@ class TextBox {
         // Push the last line of this paragraph
         if (currentLine) {
           wrappedLines.push(currentLine);
-          lineCharMap.push(currentLineStartInOriginal);
+          lineCharMap.push(lineStartPos + currentLineStartPos);
         }
         
         // Move to next logical line (past newline if not last logical line)
@@ -1402,6 +1418,8 @@ class TextBox {
     }
     if (this.cursorPosition > 0) {
       this.cursorPosition--;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
       this.resetCursorBlink();
     }
   }
@@ -1412,6 +1430,8 @@ class TextBox {
     }
     if (this.cursorPosition < this.text.length) {
       this.cursorPosition++;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
       this.resetCursorBlink();
     }
   }
@@ -1428,6 +1448,8 @@ class TextBox {
       // Use character map to get the absolute position
       let prevLineStart = this.cachedLineCharMap[lineIndex - 1];
       this.cursorPosition = prevLineStart + newPosInLine;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
       this.resetCursorBlink();
     }
   }
@@ -1444,6 +1466,8 @@ class TextBox {
       // Use character map to get the absolute position
       let nextLineStart = this.cachedLineCharMap[lineIndex + 1];
       this.cursorPosition = nextLineStart + newPosInLine;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
       this.resetCursorBlink();
     }
   }
