@@ -464,6 +464,12 @@ function setupVisibilityHandling() {
   } else {
     isPageVisible = true; // Default to visible if no API available
   }
+
+  // Clipboard integration: handle native copy/cut/paste so OS and dictation tools work
+  // Listen on document to catch events even when canvas has focus
+  addTrackedEventListener(document, 'paste', handleNativePaste);
+  addTrackedEventListener(document, 'copy', handleNativeCopy);
+  addTrackedEventListener(document, 'cut', handleNativeCut);
 }
 
 /**
@@ -499,6 +505,66 @@ function handleVisibilityChange() {
       wasPageHidden = false;
     }
   }
+}
+
+// ============================================================================
+// CLIPBOARD HANDLERS (native events)
+// ============================================================================
+
+function handleNativePaste(e) {
+  try {
+    if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
+    let data = e && e.clipboardData ? e.clipboardData.getData('text/plain') : null;
+    const doPaste = (text) => {
+      if (!text) return;
+      if (typeof mindMap.pushUndo !== 'function') return;
+      mindMap.pushUndo();
+      // If a stray 'v' character was inserted just before paste, remove it deterministically
+      try {
+        const box = mindMap.selectedBox;
+        const hasSelection = (box.selectionStart !== -1 && box.selectionEnd !== -1 && box.selectionStart !== box.selectionEnd);
+        if (!hasSelection && box.cursorPosition > 0 && box.text && (box.text[box.cursorPosition - 1] === 'v' || box.text[box.cursorPosition - 1] === 'V')) {
+          box.removeChar();
+        }
+      } catch (_) {}
+      mindMap.selectedBox.pasteText(text);
+      // Prevent the browser from attempting to paste into a non-editable canvas
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    };
+
+    if (data && data.length > 0) {
+      doPaste(data);
+    } else if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+      // Fallback for browsers that don't populate event.clipboardData
+      navigator.clipboard.readText().then(txt => doPaste(txt)).catch(() => {
+        // As a last resort, do nothing and allow default (though canvas has no default target)
+      });
+    }
+  } catch (_) {}
+}
+
+function handleNativeCopy(e) {
+  try {
+    if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
+    const text = mindMap.selectedBox.getSelectedText ? mindMap.selectedBox.getSelectedText() : '';
+    if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+      e.clipboardData.setData('text/plain', text);
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+  } catch (_) {}
+}
+
+function handleNativeCut(e) {
+  try {
+    if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
+    const text = mindMap.selectedBox.getSelectedText ? mindMap.selectedBox.getSelectedText() : '';
+    if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+      e.clipboardData.setData('text/plain', text);
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof mindMap.pushUndo === 'function') mindMap.pushUndo();
+      if (typeof mindMap.selectedBox.deleteSelection === 'function') mindMap.selectedBox.deleteSelection();
+    }
+  } catch (_) {}
 }
 
 /**
@@ -923,6 +989,20 @@ function keyPressed() {
       // Handle CMD/CTRL modifier key
       const isCmd = keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
+
+      // When editing text, rely on native clipboard events for C/X/V to avoid duplicates.
+      // Do NOT preventDefault here so the browser dispatches the paste/copy/cut events.
+      if (isEditing && isCmd && (key === 'c' || key === 'C' || key === 'x' || key === 'X' || key === 'v' || key === 'V')) {
+        return; // let native clipboard event fire; do not cancel keydown
+      }
+
+      // While editing, still handle Cmd/Ctrl+A for select-all ourselves
+      if (isEditing && isCmd && (key === 'a' || key === 'A')) {
+        if (typeof mindMap.handleKeyPressed === 'function') {
+          mindMap.handleKeyPressed(key, keyCode);
+        }
+        return false; // prevent page-level select-all
+      }
       
       // Handle CMD/CTRL+Z for undo at the top level
       if (isCmd && (key === 'z' || key === 'Z')) {
@@ -991,10 +1071,20 @@ function keyPressed() {
     }
   }
   
-  // Prevent default behavior for CMD+A/C/V/X/Z when editing or when we handle undo
+  // Prevent default behavior for some CMD/CTRL keys when appropriate.
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
-    if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z') {
-      return false;
+    const editing = mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing;
+    if (editing) {
+      // When editing, do NOT block C/X/V so native clipboard events can fire.
+      // We already handled A above. Block Z/S/L which we handle explicitly.
+      if (key === 'z' || key === 'Z' || key === 's' || key === 'S' || key === 'l' || key === 'L') {
+        return false;
+      }
+    } else {
+      // When not editing, block common shortcuts we handle ourselves
+      if (key === 'a' || key === 'A' || key === 'c' || key === 'C' || key === 'v' || key === 'V' || key === 'x' || key === 'X' || key === 'z' || key === 'Z' || key === 's' || key === 'S' || key === 'l' || key === 'L') {
+        return false;
+      }
     }
   }
 

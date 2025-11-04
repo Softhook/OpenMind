@@ -53,6 +53,11 @@ While editing a text box:
   - Cmd/Ctrl+V: paste
 - Arrow keys move the caret; Up/Down move between wrapped lines
 
+Clipboard notes:
+
+- Native OS paste and voice dictation: You can paste via the Edit menu, right-click menu, or dictation tools. The app listens for the browser's native paste/copy/cut events and inserts text into the focused box while editing.
+- Permissions: Browser clipboard APIs (navigator.clipboard) work best on HTTPS or localhost. If you open this app from a `file://` URL, native paste events still work, but programmatic clipboard reads may be blocked by the browser.
+
 Note on key repeat:
 
 - Holding Backspace/Delete will continuously delete. The app includes a fallback key-repeat if your browser/OS doesn’t auto-repeat these keys.
