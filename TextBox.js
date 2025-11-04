@@ -246,16 +246,24 @@ class TextBox {
         
         for (let i = 0; i < wordPositions.length; i++) {
           let wp = wordPositions[i];
-          // Build the test line with the actual number of spaces from the original
-          // Always include the inter-word spaces; when starting a wrapped visual line,
-          // we want those leading spaces to be visible and to keep mapping stable
-          let spacer = ' '.repeat(wp.spacesBefore);
+          // Build the test line with the correct number of spaces
+          // Rules:
+          // - At the start of a visual line:
+          //   * If it's the first word of the logical line (i === 0), include all leading spaces
+          //   * Else (wrapped line), drop exactly one separator space but preserve any extra spaces
+          // - In the middle of a visual line: include all inter-word spaces
+          const isStartOfVisualLine = !currentLine;
+          const isFirstWordOfLogicalLine = (i === 0);
+          const spacerCount = isStartOfVisualLine
+            ? (isFirstWordOfLogicalLine ? wp.spacesBefore : Math.max(0, wp.spacesBefore - 1))
+            : wp.spacesBefore;
+          const spacer = ' '.repeat(spacerCount);
           let testLine = currentLine + spacer + wp.word;
           
           if (textWidth(testLine) <= maxTextWidth) {
             if (!currentLine) {
-              // First content on this visual line: include leading spaces in the mapping
-              currentLineStartPos = wp.start - wp.spacesBefore;
+              // First content on this visual line maps to the start of the rendered spaces
+              currentLineStartPos = wp.start - spacerCount;
             }
             currentLine = testLine;
           } else {
@@ -263,16 +271,17 @@ class TextBox {
             if (currentLine) {
               wrappedLines.push(currentLine);
               lineCharMap.push(lineStartPos + currentLineStartPos);
-              // Start a new line carrying leading spaces for this word
-              currentLine = spacer + wp.word;
-              currentLineStartPos = wp.start - wp.spacesBefore;
+              // Start a new visual line for this word applying wrapped-line leading-space rule
+              const newSpacerCount = Math.max(0, wp.spacesBefore - 1);
+              currentLine = ' '.repeat(newSpacerCount) + wp.word;
+              currentLineStartPos = wp.start - newSpacerCount;
             } else {
               // Single word is too long, break it by characters
               let charLine = '';
-              // If there are leading spaces before this very long word at the beginning of a visual line,
-              // try to include as many as fit before breaking the word
-              let charStartPos = wp.start - wp.spacesBefore;
-              for (let s = 0; s < wp.spacesBefore; s++) {
+              // At start of visual line: include appropriate leading spaces (apply wrapped rule)
+              const leadCount = isFirstWordOfLogicalLine ? wp.spacesBefore : Math.max(0, wp.spacesBefore - 1);
+              let charStartPos = wp.start - leadCount;
+              for (let s = 0; s < leadCount; s++) {
                 if (textWidth(charLine + ' ') <= maxTextWidth) {
                   charLine += ' ';
                 } else {
