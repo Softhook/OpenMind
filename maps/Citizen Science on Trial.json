@@ -25,18 +25,6 @@
       }
     },
     {
-      "x": 805.322850555107,
-      "y": 1239.6168404474631,
-      "text": "",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
       "x": 1309.3775987028982,
       "y": 1239.6168404474631,
       "text": "",
@@ -61,18 +49,6 @@
       }
     },
     {
-      "x": 373.22294311306956,
-      "y": 1239.6168404474631,
-      "text": "",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
       "x": -963.2783854344569,
       "y": 1239.6168404474631,
       "text": "Introduction",
@@ -85,8 +61,56 @@
       }
     },
     {
-      "x": -952.9771151081438,
-      "y": 1335.8453854693162,
+      "x": 373.22294311306956,
+      "y": 1239.6168404474631,
+      "text": "Trying to dictate now ",
+      "width": 150,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 805.322850555107,
+      "y": 1239.6168404474631,
+      "text": "sdfsd dsfdfsg ",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -1445.2119415453158,
+      "y": 1097.5913237616664,
+      "text": "Well I'm clearly addressing the STS audience around expertise ",
+      "width": 150,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1194.6153468299544,
+      "y": 1091.3506480913898,
+      "text": "I'm also addressing the citizen science people The key contribution is that citizen science is being used in court. That's a real contribution. ",
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1273.9631925642934,
+      "y": 966.7715061470761,
       "text": "Who is it for?",
       "width": 150,
       "height": 45,
@@ -97,11 +121,11 @@
       }
     },
     {
-      "x": -937.81541393589,
-      "y": 1402.3884072808746,
-      "text": "What is the point of this paper?",
-      "width": 216.9990234375,
-      "height": 45,
+      "x": -1527.6233747526273,
+      "y": 949.4916325864247,
+      "text": "the legal scholars about public data, public information.  ",
+      "width": 280,
+      "height": 66,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -109,23 +133,23 @@
       }
     },
     {
-      "x": -1013.6239197971593,
-      "y": 1488.304713923647,
-      "text": "orgiginality",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -803.4201996463908,
-      "y": 1095.032874559754,
+      "x": -780.4201996463908,
+      "y": 1139.032874559754,
       "text": "Public Understanding of Science",
       "width": 216.9990234375,
       "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -966.6094644285006,
+      "y": 794.9960561553714,
+      "text": "What is the point of this paper?",
+      "width": 216.9990234375,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -136,10 +160,18 @@
   "connections": [
     {
       "from": 9,
-      "to": 8
+      "to": 7
     },
     {
       "from": 0,
+      "to": 11
+    },
+    {
+      "from": 9,
+      "to": 8
+    },
+    {
+      "from": 9,
       "to": 10
     }
   ]
