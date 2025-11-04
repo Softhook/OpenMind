@@ -1,0 +1,146 @@
+{
+  "boxes": [
+    {
+      "x": -816.4248854546752,
+      "y": 1005.433811186599,
+      "text": "Citizen Science on Trial: Lay Expertise and the Disconcertment of Legal Epistemologies",
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": -548.459964131337,
+      "y": 1239.6168404474631,
+      "text": "Lit review",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 805.322850555107,
+      "y": 1239.6168404474631,
+      "text": "",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 1309.3775987028982,
+      "y": 1239.6168404474631,
+      "text": "",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -53.67986687065167,
+      "y": 1239.6168404474631,
+      "text": "Methodology",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 373.22294311306956,
+      "y": 1239.6168404474631,
+      "text": "",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -963.2783854344569,
+      "y": 1239.6168404474631,
+      "text": "Introduction",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -952.9771151081438,
+      "y": 1335.8453854693162,
+      "text": "Who is it for?",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -937.81541393589,
+      "y": 1402.3884072808746,
+      "text": "What is the point of this paper?",
+      "width": 216.9990234375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1013.6239197971593,
+      "y": 1488.304713923647,
+      "text": "orgiginality",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -803.4201996463908,
+      "y": 1095.032874559754,
+      "text": "Public Understanding of Science",
+      "width": 216.9990234375,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": 9,
+      "to": 8
+    },
+    {
+      "from": 0,
+      "to": 10
+    }
+  ]
+}
