@@ -247,12 +247,15 @@ class TextBox {
         for (let i = 0; i < wordPositions.length; i++) {
           let wp = wordPositions[i];
           // Build the test line with the actual number of spaces from the original
-          let spacer = currentLine ? ' '.repeat(wp.spacesBefore) : '';
+          // Always include the inter-word spaces; when starting a wrapped visual line,
+          // we want those leading spaces to be visible and to keep mapping stable
+          let spacer = ' '.repeat(wp.spacesBefore);
           let testLine = currentLine + spacer + wp.word;
           
           if (textWidth(testLine) <= maxTextWidth) {
             if (!currentLine) {
-              currentLineStartPos = wp.start; // First word sets the start position
+              // First content on this visual line: include leading spaces in the mapping
+              currentLineStartPos = wp.start - wp.spacesBefore;
             }
             currentLine = testLine;
           } else {
@@ -260,12 +263,22 @@ class TextBox {
             if (currentLine) {
               wrappedLines.push(currentLine);
               lineCharMap.push(lineStartPos + currentLineStartPos);
-              currentLine = wp.word;
-              currentLineStartPos = wp.start;
+              // Start a new line carrying leading spaces for this word
+              currentLine = spacer + wp.word;
+              currentLineStartPos = wp.start - wp.spacesBefore;
             } else {
               // Single word is too long, break it by characters
               let charLine = '';
-              let charStartPos = wp.start;
+              // If there are leading spaces before this very long word at the beginning of a visual line,
+              // try to include as many as fit before breaking the word
+              let charStartPos = wp.start - wp.spacesBefore;
+              for (let s = 0; s < wp.spacesBefore; s++) {
+                if (textWidth(charLine + ' ') <= maxTextWidth) {
+                  charLine += ' ';
+                } else {
+                  break;
+                }
+              }
               for (let charIdx = 0; charIdx < wp.word.length; charIdx++) {
                 let char = wp.word[charIdx];
                 if (textWidth(charLine + char) <= maxTextWidth) {
@@ -281,6 +294,51 @@ class TextBox {
               }
               currentLine = charLine;
               currentLineStartPos = charStartPos;
+            }
+          }
+        }
+        
+        // Handle trailing spaces after the last word, or a line with only spaces
+        if (wordPositions.length > 0) {
+          // There are words - check for trailing spaces after the last word
+          if (currentLine) {
+            let lastWord = wordPositions[wordPositions.length - 1];
+            let lastWordEnd = lastWord.start + lastWord.word.length;
+            if (lastWordEnd < line.length) {
+              // There are trailing spaces - add them one by one, checking if we overflow
+              let trailingSpaces = line.substring(lastWordEnd);
+              for (let i = 0; i < trailingSpaces.length; i++) {
+                let testLine = currentLine + ' ';
+                if (textWidth(testLine) <= maxTextWidth) {
+                  currentLine = testLine;
+                } else {
+                  // Line is full, push it and start a new line with remaining spaces
+                  wrappedLines.push(currentLine);
+                  lineCharMap.push(lineStartPos + currentLineStartPos);
+                  currentLine = trailingSpaces.substring(i);
+                  currentLineStartPos = lastWordEnd + i;
+                }
+              }
+            }
+          }
+        } else if (line.length > 0) {
+          // Line contains only spaces (no words found by regex)
+          // Add spaces one by one, wrapping as needed
+          for (let i = 0; i < line.length; i++) {
+            let testLine = currentLine + ' ';
+            if (textWidth(testLine) <= maxTextWidth) {
+              if (!currentLine) {
+                currentLineStartPos = i;
+              }
+              currentLine = testLine;
+            } else {
+              // Line is full, push it and start a new line
+              if (currentLine) {
+                wrappedLines.push(currentLine);
+                lineCharMap.push(lineStartPos + currentLineStartPos);
+              }
+              currentLine = ' ';
+              currentLineStartPos = i;
             }
           }
         }
