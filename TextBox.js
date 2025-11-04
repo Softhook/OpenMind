@@ -220,29 +220,35 @@ class TextBox {
           charPos += line.length; // last line may have no trailing newline
         }
       } else {
-        // Break line into words - but we need to track positions in the original line
-        // We must find each word's actual position in the original line, not rely on split
+        // Break line into words while preserving spaces
+        // We need to track both words and the spaces between them
         let wordPositions = [];
-        let words = line.split(' ');
-        let searchPos = 0;
+        let regex = /\S+/g; // Match sequences of non-whitespace
+        let match;
+        let prevEnd = 0;
         
-        for (let w of words) {
-          if (w.length > 0) {
-            // Find where this word actually appears in the line starting from searchPos
-            let wordStart = line.indexOf(w, searchPos);
-            if (wordStart !== -1) {
-              wordPositions.push({ word: w, start: wordStart });
-              searchPos = wordStart + w.length;
-            }
-          }
+        while ((match = regex.exec(line)) !== null) {
+          // Calculate how many spaces before this word
+          let spacesBefore = match.index - prevEnd;
+          wordPositions.push({ 
+            word: match[0], 
+            start: match.index,
+            spacesBefore: spacesBefore
+          });
+          prevEnd = match.index + match[0].length;
         }
+        
+        // If line ends with spaces, we still need to handle it
+        let hasTrailingSpace = line.length > 0 && line[line.length - 1] === ' ';
         
         let currentLine = '';
         let currentLineStartPos = 0;
         
         for (let i = 0; i < wordPositions.length; i++) {
           let wp = wordPositions[i];
-          let testLine = currentLine + (currentLine ? ' ' : '') + wp.word;
+          // Build the test line with the actual number of spaces from the original
+          let spacer = currentLine ? ' '.repeat(wp.spacesBefore) : '';
+          let testLine = currentLine + spacer + wp.word;
           
           if (textWidth(testLine) <= maxTextWidth) {
             if (!currentLine) {
@@ -364,7 +370,22 @@ class TextBox {
     }
     
     for (let i = 0; i < wrappedLines.length; i++) {
-      text(wrappedLines[i], textX, startY + i * lineHeight);
+      let lineText = wrappedLines[i];
+      
+      // Always render character by character for precise spacing control
+      // This ensures multiple spaces are visible
+      let xPos = textX;
+      for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
+        let char = lineText[charIdx];
+        // For spaces, use measured width to ensure they take up space
+        if (char === ' ') {
+          // Draw a space by moving position (p5 text(' ') might collapse)
+          xPos += textWidth(' ');
+        } else {
+          text(char, xPos, startY + i * lineHeight);
+          xPos += textWidth(char);
+        }
+      }
     }
     
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
