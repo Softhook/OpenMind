@@ -61,30 +61,6 @@
       }
     },
     {
-      "x": -963.2783854344569,
-      "y": 1635.7915138314788,
-      "text": "1  For example design tends to use existing metaphors such as “hallucinations,” which are inaccurate and overlooking the\n nuanced ways AI systems actually operate. ",
-      "width": 245.99114613982863,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.322850555107,
-      "y": 1239.6168404474631,
-      "text": "5. Findings",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
       "x": 1309.3775987028982,
       "y": 1239.6168404474631,
       "text": "6. Conclusion",
@@ -158,7 +134,7 @@
     },
     {
       "x": -53.67986687065167,
-      "y": 2142.9695600242826,
+      "y": 2138.4701361352368,
       "text": "5 Saturation and Boredom\nIdentify when no more novelty emerges and stop.\n",
       "width": 422.7189062500001,
       "height": 87,
@@ -193,30 +169,6 @@
       }
     },
     {
-      "x": 1309.3775987028982,
-      "y": 1475.1298461126594,
-      "text": "Plundergeist proposes a practice of engaging with AI that treats it not as something radically new, but as a medium \nthat can be interrogated using established methods native to art and design.\n\nThe paper has argued for self-reflective practice as a productive method for investigating AI in design. It identifies generative AI as introducing distinctive affordances that disrupt and reconfigure design practice, highlighting its world-making potential. \n\nMy suggestion is that this kind of pragmatically focused, self-reflective engagement with gen AI is particularly valuable in design education. ",
-      "width": 407.6764768337023,
-      "height": 318,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 805.322850555107,
-      "y": 1371.512976406508,
-      "text": "Plundergeist - Plunderphonic Give some of the history and effect of plunderphonics \n\nwhat does it do? always awarness of working in relation to others ",
-      "width": 218.63226562499995,
-      "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -548.459964131337,
       "y": 1661.0735274651997,
       "text": "A few examples of reflective ethnographic inflected studies:\nVisual Intelligence in Design and Art – An Experimentation Handbook with Artificial Intelligence ",
@@ -242,7 +194,7 @@
     },
     {
       "x": 373.22294311306956,
-      "y": 2128.3116998599985,
+      "y": 2138.4701361352368,
       "text": "These qualities are new and different not good or bad\n\nEven future vast improvment will not remove these inherant qualities of gen AI.",
       "width": 328.3583984375,
       "height": 129,
@@ -266,7 +218,7 @@
     },
     {
       "x": -53.67986687065167,
-      "y": 1850.5212009169527,
+      "y": 1850.8583463931666,
       "text": "3.\tPlay and Reflect\nEngage critically and emotively with the prototype. Attend to what it evokes, how it assembles or unsettles cultural contexts, and the tensions or resonances that surface.\n",
       "width": 422.7189062500001,
       "height": 129,
@@ -337,18 +289,6 @@
       }
     },
     {
-      "x": 373.22294311306956,
-      "y": 1348.371619055343,
-      "text": "Nonlinear [Flow?]\nDesigning without a plan surprise. change direction. but not being in control",
-      "width": 310.6827734374999,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -963.2783854344569,
       "y": 2257.921814675438,
       "text": "Both the method and the idetified qualities provide designers with tools for engaging with AI.\n\nUseful for designers and pedagogy",
@@ -362,7 +302,7 @@
     },
     {
       "x": -561.2346539633702,
-      "y": 2142.9695600242826,
+      "y": 2138.4701361352368,
       "text": ">>> the lit review last it doesnt need to be long. \n\n>>> make the argument about lack of practice research\n\n>>>> maybe take some of the intro and move into the lit review section. Need to find halucination refernces\n\n>> the key points are the observations and 2 points about differnt and derivative",
       "width": 219.85780831267908,
       "height": 318,
@@ -382,18 +322,6 @@
         "r": 255,
         "g": 200,
         "b": 140
-      }
-    },
-    {
-      "x": 373.22294311306956,
-      "y": 1635.7915138314788,
-      "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
-      "width": 295.38941406250024,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
       }
     },
     {
@@ -421,11 +349,11 @@
       }
     },
     {
-      "x": 808.6227365541727,
-      "y": 1813.4825090229153,
-      "text": "5.2 Designing through archetypes\n\ncritically generative — exposing the constructedness of design languages, creating new meanings through juxtaposition, and making visible the politics of media reuse",
-      "width": 234.5742486446485,
-      "height": 192,
+      "x": 373.22294311306956,
+      "y": 1635.1627175304245,
+      "text": "Genre Invention\nWhat's interesting about invention is that it moves beyond what could be conceptualized by the designer and creates difference. ",
+      "width": 295.38941406250024,
+      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -433,11 +361,71 @@
       }
     },
     {
-      "x": 811.2626453534252,
-      "y": 1990.5122761826037,
-      "text": "This paper raises questions about the focus placed on protecting authorship and copyright. Maybe they are not the key!",
+      "x": -963.2783854344569,
+      "y": 1635.1627175304245,
+      "text": "1 For example design tends to use existing metaphors such as “hallucinations,” which are inaccurate and overlooking the nuanced ways AI systems actually operate. ",
+      "width": 245.99114613982863,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 373.22294311306956,
+      "y": 1348.371619055343,
+      "text": "Nonlinear\nDesigning without a plan surprise. change direction. but not being in control",
+      "width": 310.6827734374999,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1309.3775987028982,
+      "y": 1475.1298461126594,
+      "text": "The paper has argues for self-reflective practice as a productive method for investigating AI in design. Plundergeist proposes a practice of engaging with AI that treats it not as something radically new, but as a medium that can be interrogated using established methods native to art and design.\n\n2 Findings \n\nIt identifies generative AI as introducing distinctive unstable that disrupt and reconfigure design practice, \n\nas well as the need to desing through archetypes that bring significant world-making potential. \n\nMy suggestion is that this kind of pragmatically focused, self-reflective engagement with gen AI is particularly valuable in design education. ",
+      "width": 407.6764768337023,
+      "height": 402,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 814.3354974928093,
+      "y": 1239.6168404474631,
+      "text": "5. Findings",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 814.3354974928093,
+      "y": 1408.3038596584242,
+      "text": "How to understand the properties?\n\nPlunderphonic provides historical pespective practical method for how to do plundering in the age of AI \n\n",
+      "width": 270.63226562499995,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 814.3354974928093,
+      "y": 2190.859126256403,
+      "text": "Designing with AI is ontologically different from an efficency or normative approach\n\nRaises questions about the focus on protecting authorship and copyright in the literture.",
       "width": 243.9306640625,
-      "height": 108,
+      "height": 171,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -445,11 +433,23 @@
       }
     },
     {
-      "x": 806.229070328885,
-      "y": 1573.7779619522366,
-      "text": "5.1 Designing with an unstable Agent\n\nPlundergeist requires openess and looseness to go with it. Different attitude than a normative reading of AI or a efficency approach",
+      "x": 814.3354974928093,
+      "y": 1896.7998337702127,
+      "text": "5.2 Designing through archetypes\n\nwhat does it do? \n> Provides an awareness of being in relation to others.\n\n> play with genre to exposing the constructedness of design norms and creating new meanings within them. The abundance of AI is good for world making\n\n> critically generative  through juxtaposition to address wider world ",
+      "width": 289.1461133541969,
+      "height": 297,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 814.3354974928093,
+      "y": 1635.1627175304245,
+      "text": "5.1 Designing with an unstable Agent\n\n> Nonlinearity and Forgetting provide srusprise but require openess and felxibility to go with 'it' not work against it ",
       "width": 233.5892783487891,
-      "height": 192,
+      "height": 171,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -463,20 +463,20 @@
       "to": 3
     },
     {
-      "from": 5,
+      "from": 30,
       "to": 2
     },
     {
-      "from": 34,
-      "to": 24
+      "from": 28,
+      "to": 20
     },
     {
-      "from": 11,
-      "to": 18
+      "from": 9,
+      "to": 14
     },
     {
-      "from": 8,
-      "to": 28
+      "from": 6,
+      "to": 31
     },
     {
       "from": 2,
@@ -488,95 +488,95 @@
     },
     {
       "from": 1,
-      "to": 29
-    },
-    {
-      "from": 31,
-      "to": 25
-    },
-    {
-      "from": 37,
-      "to": 35
-    },
-    {
-      "from": 24,
-      "to": 11
-    },
-    {
-      "from": 3,
-      "to": 5
-    },
-    {
-      "from": 25,
-      "to": 4
-    },
-    {
-      "from": 18,
-      "to": 10
-    },
-    {
-      "from": 33,
-      "to": 27
-    },
-    {
-      "from": 27,
-      "to": 26
+      "to": 24
     },
     {
       "from": 26,
       "to": 21
     },
     {
-      "from": 21,
-      "to": 19
+      "from": 37,
+      "to": 36
     },
     {
-      "from": 19,
-      "to": 22
-    },
-    {
-      "from": 22,
+      "from": 20,
       "to": 9
     },
     {
-      "from": 9,
-      "to": 13
+      "from": 3,
+      "to": 30
     },
     {
-      "from": 28,
+      "from": 21,
+      "to": 4
+    },
+    {
+      "from": 14,
+      "to": 8
+    },
+    {
+      "from": 27,
       "to": 23
     },
     {
       "from": 23,
-      "to": 32
+      "to": 22
     },
     {
-      "from": 32,
+      "from": 22,
+      "to": 17
+    },
+    {
+      "from": 17,
       "to": 15
     },
     {
       "from": 15,
-      "to": 14
+      "to": 18
     },
     {
-      "from": 14,
-      "to": 20
-    },
-    {
-      "from": 17,
-      "to": 37
-    },
-    {
-      "from": 6,
-      "to": 17
-    },
-    {
-      "from": 35,
-      "to": 36
+      "from": 18,
+      "to": 7
     },
     {
       "from": 7,
+      "to": 11
+    },
+    {
+      "from": 31,
+      "to": 19
+    },
+    {
+      "from": 19,
+      "to": 29
+    },
+    {
+      "from": 29,
+      "to": 13
+    },
+    {
+      "from": 13,
+      "to": 12
+    },
+    {
+      "from": 12,
       "to": 16
+    },
+    {
+      "from": 34,
+      "to": 37
+    },
+    {
+      "from": 33,
+      "to": 34
+    },
+    {
+      "from": 36,
+      "to": 35
+    },
+    {
+      "from": 5,
+      "to": 32
     }
   ]
 }
