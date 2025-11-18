@@ -27,6 +27,11 @@ class TextBox {
     this.x = x;
     this.y = y;
     this.text = TextBox.sanitizeText(text);
+    // Optional image support: URL string for an image to display instead of text
+    this.imageUrl = null;
+    this.img = null; // p5.Image instance when loaded
+    this.imageLoaded = false;
+    this.imageLoadError = false;
     this.padding = TextBox.PADDING;
     this.minWidth = TextBox.MIN_WIDTH;
     this.minHeight = TextBox.MIN_HEIGHT;
@@ -82,6 +87,50 @@ class TextBox {
     
     // Calculate initial dimensions
     this.updateDimensions();
+  }
+
+  /**
+   * Load an image from a URL and attach it to this box.
+   * Uses p5.loadImage (async). When loaded, sets width/height to image size (clamped).
+   */
+  setImageFromUrl(url) {
+    try {
+      if (!url) return;
+      this.imageUrl = url;
+      this.imageLoaded = false;
+      this.imageLoadError = false;
+      // Use p5's loadImage to take advantage of caching
+      loadImage(url,
+        (img) => {
+          try {
+            this.img = img;
+            this.imageLoaded = true;
+            this.imageLoadError = false;
+            // store natural size for aspect-ratio calculations
+            this.naturalImageWidth = img.width;
+            this.naturalImageHeight = img.height;
+            // Fit image into reasonable default size while preserving aspect ratio
+            const maxW = 400;
+            const maxH = 300;
+            let w = img.width;
+            let h = img.height;
+            const scale = Math.min(1, maxW / w, maxH / h);
+            if (scale < 1) { w = w * scale; h = h * scale; }
+            this.width = max(this.minWidth, w);
+            this.height = max(this.minHeight, h);
+          } catch (e) { console.warn('Image load handler error', e); }
+        },
+        (err) => {
+          console.warn('Failed to load image:', url, err);
+          this.imageLoaded = false;
+          this.imageLoadError = true;
+        }
+      );
+    } catch (e) {
+      console.warn('setImageFromUrl failed', e);
+      this.imageLoaded = false;
+      this.imageLoadError = true;
+    }
   }
   
   /**
@@ -141,6 +190,17 @@ class TextBox {
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
     this.cachedLineCharMap = null;
+    // If this box is an image, keep current width/height (do not reflow based on text)
+    if (this.imageUrl) {
+      // Ensure sensible defaults
+      if (!(this.width != null && isFinite(this.width))) this.width = this.minWidth;
+      if (!(this.height != null && isFinite(this.height))) this.height = this.minHeight;
+      // No wrapped text
+      this.cachedWrappedLines = [''];
+      this.cachedWidth = this.width;
+      this.cachedLineCharMap = [0];
+      return;
+    }
     
     textSize(this.fontSize);
     
@@ -418,39 +478,81 @@ class TextBox {
     
     rect(this.x - this.width/2, this.y - this.height/2, 
          this.width, this.height, this.cornerRadius);
-    
-    // Draw text with wrapping
-    fill(0);
-    noStroke();
-    textAlign(LEFT, CENTER);
-    textSize(this.fontSize);
-    
-    let wrappedLines = this.wrapText(this.text);
-    let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
-    // Top-anchored text: start at top padding of the box
-    let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
-    let textX = this.x - this.width / 2 + this.padding;
-    
-    // Draw selection highlight if there's a selection
-    if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
-      this.drawSelection(wrappedLines, textX, startY, lineHeight);
-    }
-    
-    for (let i = 0; i < wrappedLines.length; i++) {
-      let lineText = wrappedLines[i];
+    // If this box holds an image, draw the image inside the box instead of text
+    if (this.imageUrl) {
+      if (this.imageLoaded && this.img) {
+        // Draw the image centered while preserving its aspect ratio.
+        try {
+          imageMode(CENTER);
+          const iw = (this.naturalImageWidth && this.naturalImageWidth > 0) ? this.naturalImageWidth : this.img.width;
+          const ih = (this.naturalImageHeight && this.naturalImageHeight > 0) ? this.naturalImageHeight : this.img.height;
+          // Fit the image inside the box while preserving aspect ratio (do not distort)
+          const scale = Math.min(this.width / iw, this.height / ih);
+          const drawW = iw * scale;
+          const drawH = ih * scale;
+          image(this.img, this.x, this.y, drawW, drawH);
+        } catch (e) {
+          // fallback: draw placeholder
+          fill(220);
+          noStroke();
+          rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+          fill(80);
+          textAlign(CENTER, CENTER);
+          textSize(12);
+          text('Image', this.x, this.y);
+        }
+      } else if (this.imageLoadError) {
+        fill(240);
+        noStroke();
+        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+        fill(120);
+        textAlign(CENTER, CENTER);
+        textSize(12);
+        text('Failed to load image', this.x, this.y);
+      } else {
+        // Loading placeholder
+        fill(240);
+        noStroke();
+        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+        fill(100);
+        textAlign(CENTER, CENTER);
+        textSize(12);
+        text('Loading image...', this.x, this.y);
+      }
+    } else {
+      // Draw text with wrapping
+      fill(0);
+      noStroke();
+      textAlign(LEFT, CENTER);
+      textSize(this.fontSize);
       
-      // Always render character by character for precise spacing control
-      // This ensures multiple spaces are visible
-      let xPos = textX;
-      for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
-        let char = lineText[charIdx];
-        // For spaces, use measured width to ensure they take up space
-        if (char === ' ') {
-          // Draw a space by moving position (p5 text(' ') might collapse)
-          xPos += textWidth(' ');
-        } else {
-          text(char, xPos, startY + i * lineHeight);
-          xPos += textWidth(char);
+      let wrappedLines = this.wrapText(this.text);
+      let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
+      // Top-anchored text: start at top padding of the box
+      let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
+      let textX = this.x - this.width / 2 + this.padding;
+      
+      // Draw selection highlight if there's a selection
+      if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
+        this.drawSelection(wrappedLines, textX, startY, lineHeight);
+      }
+      
+      for (let i = 0; i < wrappedLines.length; i++) {
+        let lineText = wrappedLines[i];
+        
+        // Always render character by character for precise spacing control
+        // This ensures multiple spaces are visible
+        let xPos = textX;
+        for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
+          let char = lineText[charIdx];
+          // For spaces, use measured width to ensure they take up space
+          if (char === ' ') {
+            // Draw a space by moving position (p5 text(' ') might collapse)
+            xPos += textWidth(' ');
+          } else {
+            text(char, xPos, startY + i * lineHeight);
+            xPos += textWidth(char);
+          }
         }
       }
     }
@@ -1273,6 +1375,30 @@ class TextBox {
       let rawWidth = this.resizeStartWidth + deltaX;   // right edge shifts by deltaX
       let rawHeight = this.resizeStartHeight + deltaY; // bottom edge shifts by deltaY
 
+      // If this box contains an image, preserve its aspect ratio during resize
+      if (this.imageUrl) {
+        // Determine aspect ratio (width/height). Prefer natural image size if available
+        let aspect = null;
+        if (this.naturalImageWidth && this.naturalImageHeight) {
+          aspect = this.naturalImageWidth / this.naturalImageHeight;
+        } else if (this.img && this.img.width && this.img.height) {
+          aspect = this.img.width / this.img.height;
+        } else if (this.resizeStartWidth && this.resizeStartHeight) {
+          aspect = this.resizeStartWidth / this.resizeStartHeight;
+        }
+        if (aspect && isFinite(aspect) && aspect > 0) {
+          // Base new width on horizontal drag (rawWidth), clamp min size
+          let newWidth = max(this.minWidth, rawWidth);
+          let newHeight = max(this.minHeight, newWidth / aspect);
+          this.width = newWidth;
+          this.height = newHeight;
+          // Recompute center so left/top remain fixed while bottom-right moves
+          this.x = this.resizeStartLeft + this.width / 2;
+          this.y = this.resizeStartTop + this.height / 2;
+          return;
+        }
+      }
+
       // Minimum width to fit the longest word (so words don't overflow)
       let minRequiredWidth = this.minWidth;
       textSize(this.fontSize);
@@ -1441,6 +1567,7 @@ class TextBox {
       x: this.x,
       y: this.y,
       text: this.text,
+      imageUrl: this.imageUrl || null,
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor
@@ -1483,6 +1610,14 @@ class TextBox {
       const g = Number.isFinite(c.g) ? c.g : 255;
       const b = Number.isFinite(c.b) ? c.b : 255;
       box.backgroundColor = { r, g, b };
+    }
+    // Load image URL if present
+    if (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
+      try {
+        box.setImageFromUrl(data.imageUrl);
+      } catch (e) {
+        console.warn('Failed to set image from JSON', e);
+      }
     }
     
     return box;

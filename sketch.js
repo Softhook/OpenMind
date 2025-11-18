@@ -272,6 +272,19 @@ function setup() {
     
     // Set up page visibility handling to prevent freezing when tab is hidden
     setupVisibilityHandling();
+    
+      // Enable drag-and-drop of image files or image URLs onto the canvas
+      try {
+        const canvasElt = document.querySelector('canvas');
+        if (canvasElt) {
+          addTrackedEventListener(canvasElt, 'dragover', (e) => {
+            e.preventDefault();
+          });
+          addTrackedEventListener(canvasElt, 'drop', handleCanvasDrop);
+        }
+      } catch (e) {
+        console.warn('Failed to setup drag/drop handlers:', e);
+      }
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -1232,6 +1245,81 @@ function handleFileLoad(file) {
   } catch (e) {
     console.error('Failed to load file:', e);
     alert('Failed to load file: ' + e.message);
+  }
+}
+
+/**
+ * Handle files/URLs dropped onto the canvas. Supports image files and image URLs.
+ */
+function handleCanvasDrop(e) {
+  try {
+    e.preventDefault();
+    const dt = e.dataTransfer;
+    if (!dt) return;
+
+    // Determine drop position relative to canvas and convert to world coords
+    const canvasElt = document.querySelector('canvas');
+    let sx = 0, sy = 0;
+    if (canvasElt) {
+      const rect = canvasElt.getBoundingClientRect();
+      sx = e.clientX - rect.left;
+      sy = e.clientY - rect.top;
+    } else {
+      sx = e.clientX;
+      sy = e.clientY;
+    }
+    const wx = (sx - camX) / zoom;
+    const wy = (sy - camY) / zoom;
+
+    // Priority: image files
+    if (dt.files && dt.files.length > 0) {
+      for (let i = 0; i < dt.files.length; i++) {
+        const f = dt.files[i];
+        if (f && f.type && f.type.startsWith('image/')) {
+          // Read image file as DataURL so it persists across page reloads
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const dataUrl = ev.target.result;
+              createImageBox(dataUrl, wx, wy);
+            } catch (e) { console.warn('Failed to create image from file', e); }
+          };
+          reader.onerror = (err) => {
+            console.warn('Failed to read dropped image file', err);
+          };
+          reader.readAsDataURL(f);
+          return;
+        }
+      }
+    }
+
+    // Next: text/uri-list or plain text that may contain a URL
+    let url = dt.getData('text/uri-list') || dt.getData('text/plain') || '';
+    if (url && typeof url === 'string') {
+      url = url.split('\n')[0].trim();
+      if (url) {
+        createImageBox(url, wx, wy);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Drop handler error', err);
+  }
+}
+
+function createImageBox(url, worldX, worldY) {
+  try {
+    if (!mindMap) return;
+    mindMap.pushUndo();
+    const box = new TextBox(worldX, worldY, '');
+    box.setImageFromUrl(url);
+    mindMap.addBox(box);
+    // Select and pan to it
+    mindMap.clearBoxSelection();
+    mindMap.addBoxToSelection(box);
+    mindMap.selectedBox = box;
+  } catch (e) {
+    console.warn('Failed to create image box', e);
   }
 }
 
