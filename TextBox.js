@@ -146,18 +146,18 @@ class TextBox {
     
     // Compute natural width of logical lines (no wrapping)
     const naturalWidth = this.getNaturalMaxLineWidth() + this.padding * 2;
-    const clampedNatural = max(this.minWidth, min(this.maxWidth, naturalWidth));
     const isSingleLogicalLine = this.text.indexOf('\n') === -1;
 
     // Width behavior:
-    // - If user hasn't manually resized: fully auto-size to natural width (clamped)
-    // - If user HAS resized but content is a single logical line: allow SHRINKING
-    //   down to the natural width (but never expanding beyond user's width)
+    // - If the user hasn't manually resized: auto-size to natural width, but cap with maxWidth.
+    // - If the user HAS manually resized: preserve the user's width (do not auto-shrink),
+    //   unless the width is not yet defined.
     if (!this.userResized) {
-      this.width = clampedNatural;
-    } else if (isSingleLogicalLine && Number.isFinite(this.width)) {
-      if (clampedNatural < this.width) {
-        this.width = clampedNatural;
+      this.width = max(this.minWidth, min(this.maxWidth, naturalWidth));
+    } else {
+      if (!(this.width != null && isFinite(this.width))) {
+        // Ensure we have a valid width if userResized was set but width is undefined
+        this.width = max(this.minWidth, naturalWidth);
       }
     }
 

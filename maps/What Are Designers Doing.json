@@ -1,0 +1,101 @@
+{
+  "boxes": [
+    {
+      "x": 1309.3775987028982,
+      "y": 1239.6168404474631,
+      "text": "6. Conclusion",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 373.22294311306956,
+      "y": 1239.6168404474631,
+      "text": "4.\tObservations",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -962.389496545568,
+      "y": 1239.6168404474631,
+      "text": "1. Introduction",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -53.67986687065167,
+      "y": 1239.6168404474631,
+      "text": "3.\tMy method",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 814.3354974928093,
+      "y": 1239.6168404474631,
+      "text": "5. Findings",
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -548.8873703533426,
+      "y": 1239.6168404474631,
+      "text": "2.\tHow is design engaging with gen AI?",
+      "width": 273.046875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -1314.1605953462274,
+      "y": 1070.6297459809593,
+      "text": "The widescale adoption of generative AI tools since 2022 has sparked widespread speculation about their impact on design. Yet little empirical research examines how designers are actually using these tools in practice. This paper addresses that gap through a practice-based analysis of 50 short-form social media videos. Grounded in a materialist, practice theory perspective, the study treats social media not only as a window into design practices but also as an active agent in shaping them. The paper identifies a spectrum of emerging practices, from rapid content generation to complex, curated workflows, and show how AI integration is shifting the role of the designer from maker to curator. The paper finds that there is not a just a single ‘Design & AI’ practice but many different workflows that have emerged that vary dramatically in complexity and design skill levels involved. The paper proposes the study method as a repeatable methodological framework for studying design through publicly shared media. This paper contributes to current debates on design and technology by offering a grounded, real-time account of how AI tools are configuring design practice today.",
+      "width": 280,
+      "height": 675,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -816.4248854546752,
+      "y": 1005.433811186599,
+      "text": "What Are Designers Doing with Generative AI? Mapping a  Spectrum of Practices through Social Media Videos",
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    }
+  ],
+  "connections": []
+}
