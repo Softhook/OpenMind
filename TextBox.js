@@ -476,8 +476,8 @@ class TextBox {
       strokeWeight(1 / zoomFactor);
     }
     
-    rect(this.x - this.width/2, this.y - this.height/2, 
-         this.width, this.height, this.cornerRadius);
+        rect(this.x - this.width/2, this.y - this.height/2, 
+          this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     // If this box holds an image, draw the image inside the box instead of text
     if (this.imageUrl) {
       if (this.imageLoaded && this.img) {
@@ -491,11 +491,11 @@ class TextBox {
           const drawW = iw * scale;
           const drawH = ih * scale;
           image(this.img, this.x, this.y, drawW, drawH);
-        } catch (e) {
+          } catch (e) {
           // fallback: draw placeholder
           fill(220);
           noStroke();
-          rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+          rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
           fill(80);
           textAlign(CENTER, CENTER);
           textSize(12);
@@ -504,7 +504,7 @@ class TextBox {
       } else if (this.imageLoadError) {
         fill(240);
         noStroke();
-        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
         fill(120);
         textAlign(CENTER, CENTER);
         textSize(12);
@@ -513,7 +513,7 @@ class TextBox {
         // Loading placeholder
         fill(240);
         noStroke();
-        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, this.cornerRadius);
+        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
         fill(100);
         textAlign(CENTER, CENTER);
         textSize(12);
@@ -561,8 +561,8 @@ class TextBox {
     if (shouldDim) {
       fill(255, 255, 255, 150); // White overlay with transparency to lighten/dim
       noStroke();
-      rect(this.x - this.width/2, this.y - this.height/2, 
-           this.width, this.height, this.cornerRadius);
+       rect(this.x - this.width/2, this.y - this.height/2, 
+         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     }
     
     // Draw cursor when editing
@@ -783,6 +783,12 @@ class TextBox {
 
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+
+    // For image boxes, the entire interior should behave like the edge-draggable area
+    if (this.imageUrl) {
+      return mx > this.x - this.width/2 && mx < this.x + this.width/2 &&
+             my > this.y - this.height/2 && my < this.y + this.height/2;
+    }
     let distFromLeft = abs(mx - (this.x - this.width/2));
     let distFromRight = abs(mx - (this.x + this.width/2));
     let distFromTop = abs(my - (this.y - this.height/2));
@@ -871,23 +877,29 @@ class TextBox {
    * @param {number} my - Mouse Y in world coordinates (optional)
    */
   startEditing(mx = null, my = null) {
+    // Do not enter text-edit mode for image boxes
+    if (this.imageUrl) {
+      this.isEditing = false;
+      return;
+    }
+
     this.isEditing = true;
-    
+
     // Ensure text is defined
     if (this.text == null) {
       this.text = '';
     }
-    
+
     // If mouse coordinates provided, position cursor at click location
     if (mx !== null && my !== null && !isNaN(mx) && !isNaN(my)) {
       this.cursorPosition = this.getCursorPositionFromMouse(mx, my);
     } else {
       this.cursorPosition = this.text.length;
     }
-    
+
     // Clamp cursor position to valid range
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
-    
+
     this.selectionStart = -1;
     this.selectionEnd = -1;
     this.cursorBlinkTime = millis();
@@ -902,6 +914,8 @@ class TextBox {
 
   // Determine if the given point is within the inner text area (excludes padding)
   isPointInTextArea(mx, my) {
+    // Image boxes are not editable — clicking them should select the node instead.
+    if (this.imageUrl) return false;
     // If no text yet, allow clicking inside the padded inner box to start editing
     if (!this.text || this.text.length === 0) {
       const left = this.x - this.width / 2 + this.padding;
@@ -998,13 +1012,28 @@ class TextBox {
 
   // Handle mouse down inside the box; supports single and double-click
   handleMouseDown(mx, my) {
+    // If this is an image box, clicking anywhere should select it and allow dragging (like edge area)
+    if (this.imageUrl) {
+      this.selected = true;
+      this.isEditing = false;
+      this.isSelecting = false;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
+      this.resetCursorBlink();
+      // Start dragging when user clicks inside the image (but don't start drag if over resize handle)
+      if (!this.isMouseOverResizeHandle()) {
+        this.startDrag(mx, my);
+      }
+      return;
+    }
+
     const now = millis();
     const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
                      dist(mx, my, this.lastClickX, this.lastClickY) < 6;
     this.lastClickTime = now;
     this.lastClickX = mx;
     this.lastClickY = my;
-    
+
     if (isDouble) {
       // Double-click: select word under cursor
       this.isEditing = true;
