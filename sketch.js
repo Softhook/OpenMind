@@ -1756,18 +1756,60 @@ function exportPNG() {
       pg.stroke(100);
       pg.strokeWeight(1);
       pg.rect(box.x - box.width/2, box.y - box.height/2, box.width, box.height, box.cornerRadius);
-      
+
+      // If this box contains an image, draw the image into the export buffer
+      if (box.imageUrl) {
+        try {
+          if (box.imageLoaded && box.img) {
+            // Preserve aspect ratio and center the image inside the box
+            const iw = (box.naturalImageWidth && box.naturalImageWidth > 0) ? box.naturalImageWidth : box.img.width;
+            const ih = (box.naturalImageHeight && box.naturalImageHeight > 0) ? box.naturalImageHeight : box.img.height;
+            const scale = Math.min(box.width / iw, box.height / ih);
+            const drawW = iw * scale;
+            const drawH = ih * scale;
+            pg.imageMode(CENTER);
+            pg.image(box.img, box.x, box.y, drawW, drawH);
+          } else if (box.imageLoadError) {
+            pg.fill(240);
+            pg.noStroke();
+            pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+            pg.fill(120);
+            pg.textAlign(CENTER, CENTER);
+            pg.textSize(12);
+            pg.text('Failed to load image', box.x, box.y);
+          } else {
+            pg.fill(240);
+            pg.noStroke();
+            pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+            pg.fill(100);
+            pg.textAlign(CENTER, CENTER);
+            pg.textSize(12);
+            pg.text('Loading image...', box.x, box.y);
+          }
+        } catch (e) {
+          // Fallback placeholder on any drawing error
+          pg.fill(220);
+          pg.noStroke();
+          pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+          pg.fill(80);
+          pg.textAlign(CENTER, CENTER);
+          pg.textSize(12);
+          pg.text('Image', box.x, box.y);
+        }
+        continue; // skip text drawing for image boxes
+      }
+
       // Draw text
       pg.fill(0);
       pg.noStroke();
       pg.textAlign(LEFT, CENTER);
       pg.textSize(box.fontSize);
-      
+
       let wrappedLines = getWrappedLines(box);
       let lineHeight = box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5);
       let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
       let textX = box.x - box.width / 2 + box.padding;
-      
+
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
           pg.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
@@ -1863,7 +1905,7 @@ function getWrappedLines(box) {
 /**
  * Exports the mind map as a PDF document
  */
-function exportPDF() {
+async function exportPDF() {
   try {
     // Validate dependencies
     if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -1928,6 +1970,26 @@ function exportPDF() {
     function tx(worldX) { return offsetX + worldX * scale; }
     function ty(worldY) { return offsetY + worldY * scale; }
     function ts(size) { return size * scale; }
+
+    // Preload/convert images for PDF export (convert to JPEG where possible so jsPDF accepts them)
+    const imageDataMap = new Map();
+    try {
+      const imageBoxes = mindMap.boxes.filter(b => b && b.imageUrl);
+      if (imageBoxes.length > 0) {
+        const imgPromises = imageBoxes.map(async (b) => {
+          try {
+            // Force JPEG output to maximise compatibility with jsPDF
+            const dataUrl = await convertDataUrlToWebP(b.imageUrl, { maxWidth: 1600, maxHeight: 1600, quality: 0.85, mimeType: 'image/jpeg' });
+            if (dataUrl) imageDataMap.set(b, dataUrl);
+          } catch (e) {
+            console.warn('Failed to prepare image for PDF export', e);
+          }
+        });
+        await Promise.all(imgPromises);
+      }
+    } catch (e) {
+      console.warn('Image prefetch for PDF failed', e);
+    }
     
     // Draw connections first (behind boxes)
     pdf.setLineWidth(ts(2));
@@ -2007,7 +2069,42 @@ function exportPDF() {
       // Draw rounded rectangle
       pdf.roundedRect(boxX, boxY, boxW, boxH, ts(box.cornerRadius), ts(box.cornerRadius), 'FD');
       
-      // Draw text
+      // If this box contains an image and we have a prepared data URL, embed it into the PDF
+      if (box.imageUrl) {
+        const dataUrl = imageDataMap.get(box);
+        if (dataUrl) {
+          try {
+            const format = dataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
+            // Compute draw size preserving aspect ratio
+            const imgWpx = box.naturalImageWidth || box.width || 1;
+            const imgHpx = box.naturalImageHeight || box.height || 1;
+            let drawW = boxW;
+            let drawH = boxH;
+            if (imgWpx && imgHpx) {
+              const aspect = imgWpx / imgHpx;
+              if ((boxW / boxH) > aspect) {
+                drawW = boxH * aspect;
+              } else {
+                drawH = boxW / aspect;
+              }
+            }
+            const imgX = boxX + (boxW - drawW) / 2;
+            const imgY = boxY + (boxH - drawH) / 2;
+            pdf.addImage(dataUrl, format, imgX, imgY, drawW, drawH);
+            // skip text rendering for image boxes
+            continue;
+          } catch (e) {
+            console.warn('Failed to add image to PDF for box', e);
+            // fall back to text rendering placeholder below
+          }
+        }
+        // If we couldn't add the image, draw a light placeholder inside the box
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setFillColor(245, 245, 245);
+        pdf.rect(boxX + ts(4), boxY + ts(4), boxW - ts(8), boxH - ts(8), 'F');
+      }
+      
+      // Draw text (for non-image boxes and fallbacks)
       pdf.setFontSize(ts(box.fontSize));
       pdf.setTextColor(0, 0, 0);
       
