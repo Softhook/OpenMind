@@ -1268,7 +1268,40 @@ class MindMap {
    * Loads mind map from external JSON data
    * @param {Object} data - The JSON data to load
    */
-  load(data) {
+  async load(data) {
+    // Before loading, attempt to convert any embedded data-URL images to downscaled WebP
+    try {
+      if (data && Array.isArray(data.boxes)) {
+        for (let i = 0; i < data.boxes.length; i++) {
+          const box = data.boxes[i];
+          try {
+            if (box && box.imageUrl && typeof box.imageUrl === 'string' && box.imageUrl.startsWith('data:image/')) {
+              // Skip if already webp
+              if (!box.imageUrl.startsWith('data:image/webp')) {
+                if (typeof convertDataUrlToWebP === 'function') {
+                  try {
+                    // Perform conversion sequentially to avoid memory spikes
+                    const converted = await convertDataUrlToWebP(box.imageUrl, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 });
+                    if (converted && typeof converted === 'string') {
+                      box.imageUrl = converted;
+                    }
+                  } catch (e) {
+                    console.warn('Failed to convert embedded image to WebP:', e);
+                    // leave original imageUrl if conversion fails
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // per-box errors shouldn't abort loading
+            console.warn('Error processing box image during load:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Pre-load image conversion failed:', e);
+    }
+
     this.fromJSON(data);
     // Seed autosave immediately after loading external data so the indicator shows saved
     try { this.saveToLocalStorage(); } catch (_) {}

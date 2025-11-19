@@ -567,6 +567,105 @@ function handleNativeCopy(e) {
   } catch (_) {}
 }
 
+/**
+ * Compress and downscale an image File to a DataURL.
+ * Returns a Promise<string> that resolves to a data URL (e.g. "data:image/webp;base64,...").
+ * Uses createImageBitmap + canvas drawing to avoid creating a DOM Image element.
+ */
+async function compressImageFile(file, {
+  maxWidth = 1600,
+  maxHeight = 1600,
+  quality = 0.75,
+  mimeType = 'image/webp'
+} = {}) {
+  if (!file) throw new Error('No file');
+
+  // Determine supported output type
+  try {
+    const testCanvas = document.createElement('canvas');
+    const webpSupported = testCanvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+    if (!webpSupported && mimeType === 'image/webp') mimeType = 'image/jpeg';
+  } catch (_) { if (mimeType === 'image/webp') mimeType = 'image/jpeg'; }
+
+  // Use createImageBitmap where available (more efficient and avoids layout)
+  const bitmap = await createImageBitmap(file);
+  try {
+    let w = bitmap.width;
+    let h = bitmap.height;
+    const ratio = Math.min(1, maxWidth / w, maxHeight / h);
+    const targetW = Math.max(1, Math.round(w * ratio));
+    const targetH = Math.max(1, Math.round(h * ratio));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+
+    // Return data URL (base64).
+    return canvas.toDataURL(mimeType, quality);
+  } finally {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+  }
+}
+
+/**
+ * Convert a data: URL (PNG/JPEG/etc) to a downscaled WebP data URL.
+ * Returns Promise<string> data URL.
+ */
+async function convertDataUrlToWebP(dataUrl, {
+  maxWidth = 1600,
+  maxHeight = 1600,
+  quality = 0.75,
+  mimeType = 'image/webp'
+} = {}) {
+  if (!dataUrl || typeof dataUrl !== 'string') throw new Error('Invalid dataUrl');
+
+  // If already webp, optionally still downscale; but skip quick-convert if already webp
+  if (dataUrl.startsWith('data:image/webp')) {
+    // Still attempt to downscale if huge by decoding the blob
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      return await _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType);
+    } catch (e) {
+      return dataUrl;
+    }
+  }
+
+  // Convert data URL to blob via fetch (works for data: URLs)
+  const resp = await fetch(dataUrl);
+  const blob = await resp.blob();
+  return await _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType);
+}
+
+async function _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType) {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    let w = bitmap.width;
+    let h = bitmap.height;
+    const ratio = Math.min(1, maxWidth / w, maxHeight / h);
+    const targetW = Math.max(1, Math.round(w * ratio));
+    const targetH = Math.max(1, Math.round(h * ratio));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+
+    // Ensure webp support, otherwise fall back to jpeg
+    try {
+      const test = canvas.toDataURL('image/webp');
+      if (test.indexOf('data:image/webp') !== 0) mimeType = 'image/jpeg';
+    } catch (_) { mimeType = 'image/jpeg'; }
+
+    return canvas.toDataURL(mimeType, quality);
+  } finally {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+  }
+}
+
 function handleNativeCut(e) {
   try {
     if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
@@ -1183,7 +1282,7 @@ function triggerFileLoad() {
   fileInput.elt.click();
 }
 
-function handleFileLoad(file) {
+async function handleFileLoad(file) {
   if (!file) {
     console.error('No file provided');
     alert('Please select a valid file');
@@ -1222,7 +1321,14 @@ function handleFileLoad(file) {
       throw new Error('Missing or invalid boxes data');
     }
     
-    mindMap.load(data);
+    // Load the mindMap; MindMap.load may perform async image conversions
+    if (mindMap && typeof mindMap.load === 'function') {
+      try {
+        await mindMap.load(data);
+      } catch (e) {
+        throw e;
+      }
+    }
     
     // Remember the loaded filename for next time
     if (file.name) {
@@ -1276,18 +1382,24 @@ function handleCanvasDrop(e) {
       for (let i = 0; i < dt.files.length; i++) {
         const f = dt.files[i];
         if (f && f.type && f.type.startsWith('image/')) {
-          // Read image file as DataURL so it persists across page reloads
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            try {
-              const dataUrl = ev.target.result;
-              createImageBox(dataUrl, wx, wy);
-            } catch (e) { console.warn('Failed to create image from file', e); }
-          };
-          reader.onerror = (err) => {
-            console.warn('Failed to read dropped image file', err);
-          };
-          reader.readAsDataURL(f);
+          // Compress/resize image before embedding to reduce decoded memory and JSON size.
+          // Process sequentially to avoid memory spikes.
+          compressImageFile(f, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 })
+            .then((dataUrl) => {
+              try {
+                createImageBox(dataUrl, wx, wy);
+              } catch (e) { console.warn('Failed to create image from compressed file', e); }
+            })
+            .catch((err) => {
+              console.warn('Compression failed, falling back to original file read', err);
+              // Fallback: read original as DataURL
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                try { createImageBox(ev.target.result, wx, wy); } catch (e) { console.warn('Failed to create image from file', e); }
+              };
+              reader.onerror = (err2) => { console.warn('Failed to read dropped image file', err2); };
+              reader.readAsDataURL(f);
+            });
           return;
         }
       }
