@@ -45,6 +45,10 @@ class MindMap {
     this.isPanAnimating = false;
     this.panTargetX = 0;
     this.panTargetY = 0;
+    // Zoom animation settings (for arrow-key navigation)
+    this.zoomTarget = null;
+    this.isZoomAnimating = false;
+    this.zoomAnimationSpeed = 0.12; // separate speed for zoom interpolation
   }
   
   /**
@@ -147,30 +151,57 @@ class MindMap {
    */
   update() {
     // Handle pan animation
-    if (this.isPanAnimating && typeof centerCameraOn === 'function') {
+    if ((this.isPanAnimating || this.isZoomAnimating) && typeof centerCameraOn === 'function') {
       // Get current camera position in world space
-      const currentWorldX = typeof camX !== 'undefined' && typeof width !== 'undefined' && typeof zoom !== 'undefined' 
-        ? (width / 2 - camX) / zoom 
+      const currentWorldX = typeof camX !== 'undefined' && typeof width !== 'undefined' && typeof zoom !== 'undefined'
+        ? (width / 2 - camX) / zoom
         : 0;
       const currentWorldY = typeof camY !== 'undefined' && typeof height !== 'undefined' && typeof zoom !== 'undefined'
         ? (height / 2 - camY) / zoom
         : 0;
-      
-      // Calculate distance to target
+
+      // Determine pan interpolation
       const dx = this.panTargetX - currentWorldX;
       const dy = this.panTargetY - currentWorldY;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Stop animating if we're close enough
-      if (distance < 1) {
-        centerCameraOn(this.panTargetX, this.panTargetY);
-        this.isPanAnimating = false;
-      } else {
-        // Smoothly interpolate toward target
-        const newX = currentWorldX + dx * this.panAnimationSpeed;
-        const newY = currentWorldY + dy * this.panAnimationSpeed;
-        centerCameraOn(newX, newY);
+
+      // Determine zoom interpolation
+      const currentZoom = (typeof zoom !== 'undefined') ? zoom : 1;
+      const targetZoom = (this.zoomTarget != null) ? this.zoomTarget : currentZoom;
+      const dz = targetZoom - currentZoom;
+
+      // Compute new zoom value by easing
+      let newZoom = currentZoom;
+      if (this.isZoomAnimating) {
+        newZoom = currentZoom + dz * this.zoomAnimationSpeed;
+        // Stop zooming when close enough
+        if (Math.abs(targetZoom - newZoom) < 0.001) {
+          newZoom = targetZoom;
+        }
+        // Apply new zoom immediately so centerCameraOn uses correct scale
+        zoom = constrain(newZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
+                        (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
       }
+
+      // Compute new world center by easing
+      let newWorldX = currentWorldX;
+      let newWorldY = currentWorldY;
+      if (this.isPanAnimating) {
+        newWorldX = currentWorldX + dx * this.panAnimationSpeed;
+        newWorldY = currentWorldY + dy * this.panAnimationSpeed;
+        // If very close, snap to target
+        if (distance < 1) {
+          newWorldX = this.panTargetX;
+          newWorldY = this.panTargetY;
+        }
+      }
+
+      // Center camera on interpolated world point using the (possibly) updated zoom
+      centerCameraOn(newWorldX, newWorldY);
+
+      // Update animation flags
+      if (this.isPanAnimating && distance < 1) this.isPanAnimating = false;
+      if (this.isZoomAnimating && Math.abs(targetZoom - zoom) < 0.001) this.isZoomAnimating = false;
     }
   }
   
@@ -500,8 +531,24 @@ class MindMap {
     this.selectedBox = box;
     this.addBoxToSelection(box);
     
-    // Pan camera to show the selected box
-    this.panToBox(box);
+    // Compute target zoom using the same fit logic as the '+' key (setMaxZoom)
+    let targetZoom = null;
+    try {
+      if (typeof width !== 'undefined' && typeof height !== 'undefined' && box && box.width && box.height) {
+        const margin = 1.1; // same margin used in setMaxZoom
+        const widthWorld = Math.max(box.width, 1);
+        const heightWorld = Math.max(box.height, 1);
+        const fitZoomX = width / (widthWorld * margin);
+        const fitZoomY = height / (heightWorld * margin);
+        const candidate = Math.min(fitZoomX, fitZoomY);
+        const maxZ = (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0;
+        targetZoom = Math.min(maxZ, candidate);
+        if (!Number.isFinite(targetZoom) || targetZoom <= 0) targetZoom = null;
+      }
+    } catch (e) { targetZoom = null; }
+
+    // Pan and zoom camera to show the selected box
+    this.panToBox(box, true, targetZoom);
   }
   
   /**
@@ -509,7 +556,7 @@ class MindMap {
    * @param {TextBox} box - The box to pan to
    * @param {boolean} animated - Whether to animate the pan (default: true)
    */
-  panToBox(box, animated = true) {
+  panToBox(box, animated = true, targetZoom = null) {
     if (!box) return;
     
     if (animated) {
@@ -517,9 +564,21 @@ class MindMap {
       this.panTargetX = box.x;
       this.panTargetY = box.y;
       this.isPanAnimating = true;
+      // Set zoom target (explicitly clear if null) and enable zoom animation if valid
+      if (targetZoom != null && Number.isFinite(targetZoom)) {
+        this.zoomTarget = targetZoom;
+        this.isZoomAnimating = true;
+      } else {
+        this.zoomTarget = null;
+        this.isZoomAnimating = false;
+      }
     } else {
       // Instant pan
       if (typeof centerCameraOn === 'function') {
+        if (targetZoom != null && Number.isFinite(targetZoom)) {
+          zoom = constrain(targetZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
+                          (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
+        }
         centerCameraOn(box.x, box.y);
       }
     }
