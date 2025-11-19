@@ -1,0 +1,70 @@
+{
+  "boxes": [
+    {
+      "x": -1295.5852071382653,
+      "y": 706.3705758847811,
+      "text": "Define the  problem and how it might be modeleled.",
+      "imageUrl": null,
+      "width": 150,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -1295.5852071382653,
+      "y": 917.4049799514694,
+      "text": "Use P5.js within the VLE",
+      "imageUrl": null,
+      "width": 150,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1295.5852071382653,
+      "y": 811.1535578592193,
+      "text": "what are the metrics or paramters that could be articualted about the system?",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1295.5852071382653,
+      "y": 579.4417743539557,
+      "text": "Model and experiment with a system via GenAI in T370",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": 3,
+      "to": 0
+    },
+    {
+      "from": 2,
+      "to": 1
+    },
+    {
+      "from": 0,
+      "to": 2
+    }
+  ]
+}

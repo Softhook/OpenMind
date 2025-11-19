@@ -599,6 +599,10 @@ class TextBox {
           }
         }
       }
+      // Draw cursor when editing (cursor needs wrappedLines/textX/startY in scope)
+      if (this.isEditing) {
+        this.drawCursor(wrappedLines, textX, startY, lineHeight);
+      }
     }
     
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
@@ -609,10 +613,7 @@ class TextBox {
          this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     }
     
-    // Draw cursor when editing
-    if (this.isEditing) {
-      this.drawCursor(wrappedLines, textX, startY, lineHeight);
-    }
+    // (cursor drawn inside text branch where variables are defined)
     
     // Draw resize handle in bottom-right corner (only when not editing)
     if (!this.isEditing && (this.isMouseOver() || this.isResizing)) {
@@ -1157,14 +1158,25 @@ class TextBox {
    * Removes the character before the cursor (Backspace)
    */
   removeChar() {
+    if (this.text === null || this.text === undefined) this.text = '';
     if (this.text.length > 0) {
-      // If there's a selection, delete it
-      if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      // Only treat as a selection delete when the selection is non-empty.
+      // A zero-length selection (caret) should not be deleted as a selection
+      // because that would swallow the first Backspace after clicking to place
+      // the caret. Clear zero-length selection and fall through to remove
+      // the character before the caret.
+      if (this.selectionStart !== -1 && this.selectionEnd !== -1 && this.selectionStart !== this.selectionEnd) {
         this.deleteSelection();
-      } else if (this.cursorPosition > 0) {
-        // Delete character before cursor
-        this.text = this.text.slice(0, this.cursorPosition - 1) + this.text.slice(this.cursorPosition);
-        this.cursorPosition--;
+      } else {
+        // Clear any zero-length selection markers
+        if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+          this.selectionStart = -1;
+          this.selectionEnd = -1;
+        }
+        if (this.cursorPosition > 0) {
+          this.text = this.text.slice(0, this.cursorPosition - 1) + this.text.slice(this.cursorPosition);
+          this.cursorPosition--;
+        }
       }
       this.updateDimensions();
     }
@@ -1864,10 +1876,12 @@ class TextBox {
       return;
     }
     
-    // Draw cursor line
+    // Draw cursor line (blue) and scale stroke with global zoom for visibility
     push();
+    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
+    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
     stroke(0, 0, 255);
-    strokeWeight(2);
+    strokeWeight(2 / zoomFactor);
     line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
     pop();
   }
