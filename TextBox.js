@@ -16,7 +16,6 @@ class TextBox {
   static COLOR_CIRCLE_RADIUS = 8;
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
-  
   /**
    * Creates a new TextBox
    * @param {number} x - Center X coordinate
@@ -27,12 +26,8 @@ class TextBox {
     this.x = x;
     this.y = y;
     this.text = TextBox.sanitizeText(text);
-    // Optional image support: URL string for an image to display instead of text
     this.imageUrl = null;
-    // Optional PDF support: URL string for a PDF to open/preview
-    this.pdfUrl = null;
-    this.pdfName = null;
-    this.img = null; // p5.Image instance when loaded
+    this.img = null;
     this.imageLoaded = false;
     this.imageLoadError = false;
     this.padding = TextBox.PADDING;
@@ -57,38 +52,24 @@ class TextBox {
     this.resizeStartLeft = 0;
     this.resizeStartTop = 0;
     this.userResized = false;
-    
-    // Cache for wrapped text lines
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
-    this.cachedLineCharMap = null; // Maps wrapped line index to character start position in original text
-    
-    // Text selection state
+    this.cachedLineCharMap = null;
     this.isSelecting = false;
     this.selectionAnchor = -1;
     this.lastClickTime = 0;
     this.lastClickX = 0;
     this.lastClickY = 0;
     this.doubleClickThreshold = 300;
-    
-    // Cursor blinking
     this.cursorBlinkTime = 0;
     this.cursorVisible = true;
     this.cursorBlinkRate = TextBox.CURSOR_BLINK_RATE;
-    
-    // Interaction thickness for edge-drag zone
     this.dragEdgeThickness = TextBox.DRAG_EDGE_THICKNESS;
-    
-    // Selection (node-level, not text selection)
     this.selected = false;
-
-    // Background color and palette
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = TextBox.getColorPalette();
     this.colorCircleRadius = TextBox.COLOR_CIRCLE_RADIUS;
     this.colorCircleSpacing = TextBox.COLOR_CIRCLE_SPACING;
-    
-    // Calculate initial dimensions
     this.updateDimensions();
   }
 
@@ -102,17 +83,14 @@ class TextBox {
       this.imageUrl = url;
       this.imageLoaded = false;
       this.imageLoadError = false;
-      // Use p5's loadImage to take advantage of caching
       loadImage(url,
         (img) => {
           try {
             this.img = img;
             this.imageLoaded = true;
             this.imageLoadError = false;
-            // store natural size for aspect-ratio calculations
             this.naturalImageWidth = img.width;
             this.naturalImageHeight = img.height;
-            // Fit image into reasonable default size while preserving aspect ratio
             const maxW = 400;
             const maxH = 300;
             let w = img.width;
@@ -144,60 +122,37 @@ class TextBox {
   setPdfFromUrl(url, filename) {
     try {
       if (!url) return;
-      this.pdfUrl = url;
-      this.pdfName = filename || url.split('/').pop() || 'PDF';
-      // Make sure this box is treated as non-image by default
+      // Do not store the PDF URL — render a preview and treat as image-only
       this.imageUrl = null;
       this.imageLoaded = false;
       this.imageLoadError = false;
-      // Reasonable default size for PDF boxes
       this.width = Math.max(this.minWidth, 220);
       this.height = Math.max(this.minHeight, 90);
 
-      // Attempt to render first page preview using PDF.js if available
+      const src = url;
       (async () => {
         try {
           if (typeof window === 'undefined' || typeof pdfjsLib === 'undefined') return;
 
-          // Helper: get ArrayBuffer for various URL types
-          const fetchArrayBuffer = async (src) => {
-            if (typeof src === 'string') {
-              if (src.startsWith('data:') || src.startsWith('blob:')) {
-                const resp = await fetch(src);
-                return await resp.arrayBuffer();
-              }
-              // For http(s) URLs, try fetch (may be blocked by CORS)
-              const resp = await fetch(src);
+          const fetchArrayBuffer = async (s) => {
+            if (s instanceof ArrayBuffer) return s;
+            if (s instanceof Blob) return await s.arrayBuffer();
+            if (s instanceof File) return await s.arrayBuffer();
+            if (typeof s === 'string') {
+              const resp = await fetch(s);
               if (!resp.ok) throw new Error('Failed to fetch PDF');
               return await resp.arrayBuffer();
-            } else {
-              // Unknown type (e.g., File/Blob) - try to fetch by creating blob URL
-              try {
-                const resp = await fetch(src);
-                return await resp.arrayBuffer();
-              } catch (e) {
-                // Last resort: if it's a File/Blob, read via FileReader
-                if (src instanceof Blob) {
-                  return await new Promise((resolve, reject) => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(r.result);
-                    r.onerror = (err) => reject(err);
-                    r.readAsArrayBuffer(src);
-                  });
-                }
-                throw e;
-              }
             }
+            throw new Error('Unsupported PDF source');
           };
 
-          const arrayBuffer = await fetchArrayBuffer(this.pdfUrl);
+          const arrayBuffer = await fetchArrayBuffer(src);
           if (!arrayBuffer) return;
 
           const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
           const pdf = await loadingTask.promise;
           const page = await pdf.getPage(1);
 
-          // Render at a modest scale so previews are crisp but not huge
           const scale = 1.5;
           const viewport = page.getViewport({ scale });
 
@@ -208,25 +163,16 @@ class TextBox {
 
           await page.render({ canvasContext: ctx, viewport }).promise;
 
-          // Convert to data URL and set as image preview (keeps pdfUrl for opening)
           const dataUrl = canvas.toDataURL('image/png');
           if (dataUrl) {
-            try {
-              // Use image preview but preserve pdfUrl/pdfName so double-click still opens PDF
-              this.setImageFromUrl(dataUrl);
-            } catch (e) {
-              console.warn('Failed to set PDF preview image', e);
-            }
+            try { this.setImageFromUrl(dataUrl); } catch (e) { console.warn('Failed to set PDF preview image', e); }
           }
         } catch (e) {
-          // Silently fail - leave PDF box as icon
           console.warn('PDF preview render failed', e);
         }
       })();
     } catch (e) {
       console.warn('setPdfFromUrl failed', e);
-      this.pdfUrl = null;
-      this.pdfName = null;
     }
   }
   
@@ -618,35 +564,6 @@ class TextBox {
       }
       return; // rendered image box
     } else {
-      // If this box holds a PDF reference, draw a PDF label and icon
-      if (this.pdfUrl) {
-        try {
-          // Draw a simple PDF icon area
-          push();
-          noStroke();
-          fill(245);
-          rect(this.x - this.width/2 + 6, this.y - this.height/2 + 6, this.width - 12, this.height - 12, 2);
-          fill(40);
-          textAlign(LEFT, TOP);
-          textSize(14);
-          const name = this.pdfName || this.text || 'PDF Document';
-          // Draw filename (wrap if necessary)
-          const maxChars = 40;
-          let display = name;
-          if (display.length > maxChars) display = display.slice(0, maxChars - 1) + '…';
-          text('📄 ' + display, this.x - this.width/2 + 12, this.y - this.height/2 + 12);
-          pop();
-        } catch (e) {
-          // fallback to plain text
-          fill(0);
-          textAlign(CENTER, CENTER);
-          textSize(12);
-          text(this.pdfName || 'PDF', this.x, this.y);
-        }
-        // PDF box rendered; do not draw normal text
-        // Note: cursor/editing not allowed for PDF boxes
-        // Draw handles and color palette as usual below
-      }
       // Draw text with wrapping
       fill(0);
       noStroke();
@@ -1155,71 +1072,7 @@ class TextBox {
       return;
     }
 
-    // If this is a PDF box, single-click selects and allows dragging; double-click opens PDF in new tab
-    if (this.pdfUrl) {
-      this.selected = true;
-      this.isEditing = false;
-      this.isSelecting = false;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
-      this.resetCursorBlink();
-
-      const now = millis();
-      const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
-                       dist(mx, my, this.lastClickX, this.lastClickY) < 6;
-      this.lastClickTime = now;
-      this.lastClickX = mx;
-      this.lastClickY = my;
-
-      if (isDouble) {
-        try {
-          const url = this.pdfUrl;
-          if (typeof url === 'string' && url.startsWith('data:')) {
-            try {
-              // Convert data: URL to a Blob synchronously and open as blob URL
-              const comma = url.indexOf(',');
-              const header = url.substring(5, comma); // after 'data:' up to comma
-              const isBase64 = /;base64$/.test(header);
-              const mime = (header.split(';')[0]) || 'application/pdf';
-              const dataPart = url.substring(comma + 1);
-              let byteArray;
-              if (isBase64) {
-                const binary = atob(dataPart);
-                const len = binary.length;
-                byteArray = new Uint8Array(len);
-                for (let i = 0; i < len; i++) byteArray[i] = binary.charCodeAt(i);
-              } else {
-                // URL-encoded data
-                const decoded = decodeURIComponent(dataPart);
-                const len = decoded.length;
-                byteArray = new Uint8Array(len);
-                for (let i = 0; i < len; i++) byteArray[i] = decoded.charCodeAt(i);
-              }
-              const blob = new Blob([byteArray], { type: mime });
-              const blobUrl = URL.createObjectURL(blob);
-              // Open a blank window synchronously to avoid popup blocking, then set location
-              const w = window.open();
-              if (w) {
-                try { w.location = blobUrl; } catch (_) { w.location.href = blobUrl; }
-                // Revoke after a delay to allow the browser to load it
-                setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (_) {} }, 15000);
-              }
-            } catch (e) {
-              console.warn('Failed to open embedded PDF data URL', e);
-            }
-          } else {
-            window.open(this.pdfUrl, '_blank');
-          }
-        } catch (e) { console.warn('Failed to open PDF', e); }
-        return;
-      }
-
-      // Start dragging when user clicks inside the pdf box (but don't start drag if over resize handle)
-      if (!this.isMouseOverResizeHandle()) {
-        this.startDrag(mx, my);
-      }
-      return;
-    }
+    // (PDF handling removed) — PDFs are treated as images (preview) or normal text boxes.
 
     const now = millis();
     const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
@@ -1791,8 +1644,6 @@ class TextBox {
       y: this.y,
       text: this.text,
       imageUrl: this.imageUrl || null,
-      pdfUrl: this.pdfUrl || null,
-      pdfName: this.pdfName || null,
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor
@@ -1844,14 +1695,8 @@ class TextBox {
         console.warn('Failed to set image from JSON', e);
       }
     }
-    // Load PDF URL if present
-    if (data.pdfUrl && typeof data.pdfUrl === 'string' && data.pdfUrl.trim() !== '') {
-      try {
-        box.setPdfFromUrl(data.pdfUrl, data.pdfName || data.pdfUrl.split('/').pop());
-      } catch (e) {
-        console.warn('Failed to set PDF from JSON', e);
-      }
-    }
+    // PDF embedding removed: we no longer load or store PDF URLs. If a map
+    // contains a PDF URL, it will be ignored to avoid embedding binary data.
     
     return box;
   }

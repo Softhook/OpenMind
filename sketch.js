@@ -1492,11 +1492,9 @@ async function createPdfBox(urlOrFile, filename, worldX, worldY) {
 
         const dataUrl = canvas.toDataURL('image/png');
         if (dataUrl) {
-          try {
-            // Attach preview as an image and clear any PDF fields
+            try {
+            // Attach preview as an image
             box.setImageFromUrl(dataUrl);
-            box.pdfUrl = null;
-            box.pdfName = null;
           } catch (e) {
             console.warn('Failed to attach PDF preview image', e);
           }
