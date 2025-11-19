@@ -146,13 +146,83 @@ class TextBox {
       if (!url) return;
       this.pdfUrl = url;
       this.pdfName = filename || url.split('/').pop() || 'PDF';
-      // Make sure this box is treated as non-image
+      // Make sure this box is treated as non-image by default
       this.imageUrl = null;
       this.imageLoaded = false;
       this.imageLoadError = false;
       // Reasonable default size for PDF boxes
       this.width = Math.max(this.minWidth, 220);
       this.height = Math.max(this.minHeight, 90);
+
+      // Attempt to render first page preview using PDF.js if available
+      (async () => {
+        try {
+          if (typeof window === 'undefined' || typeof pdfjsLib === 'undefined') return;
+
+          // Helper: get ArrayBuffer for various URL types
+          const fetchArrayBuffer = async (src) => {
+            if (typeof src === 'string') {
+              if (src.startsWith('data:') || src.startsWith('blob:')) {
+                const resp = await fetch(src);
+                return await resp.arrayBuffer();
+              }
+              // For http(s) URLs, try fetch (may be blocked by CORS)
+              const resp = await fetch(src);
+              if (!resp.ok) throw new Error('Failed to fetch PDF');
+              return await resp.arrayBuffer();
+            } else {
+              // Unknown type (e.g., File/Blob) - try to fetch by creating blob URL
+              try {
+                const resp = await fetch(src);
+                return await resp.arrayBuffer();
+              } catch (e) {
+                // Last resort: if it's a File/Blob, read via FileReader
+                if (src instanceof Blob) {
+                  return await new Promise((resolve, reject) => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(r.result);
+                    r.onerror = (err) => reject(err);
+                    r.readAsArrayBuffer(src);
+                  });
+                }
+                throw e;
+              }
+            }
+          };
+
+          const arrayBuffer = await fetchArrayBuffer(this.pdfUrl);
+          if (!arrayBuffer) return;
+
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdf = await loadingTask.promise;
+          const page = await pdf.getPage(1);
+
+          // Render at a modest scale so previews are crisp but not huge
+          const scale = 1.5;
+          const viewport = page.getViewport({ scale });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const ctx = canvas.getContext('2d');
+
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          // Convert to data URL and set as image preview (keeps pdfUrl for opening)
+          const dataUrl = canvas.toDataURL('image/png');
+          if (dataUrl) {
+            try {
+              // Use image preview but preserve pdfUrl/pdfName so double-click still opens PDF
+              this.setImageFromUrl(dataUrl);
+            } catch (e) {
+              console.warn('Failed to set PDF preview image', e);
+            }
+          }
+        } catch (e) {
+          // Silently fail - leave PDF box as icon
+          console.warn('PDF preview render failed', e);
+        }
+      })();
     } catch (e) {
       console.warn('setPdfFromUrl failed', e);
       this.pdfUrl = null;

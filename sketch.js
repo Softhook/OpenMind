@@ -1444,110 +1444,68 @@ async function createPdfBox(urlOrFile, filename, worldX, worldY) {
     if (!mindMap) return;
     mindMap.pushUndo && mindMap.pushUndo();
     const box = new TextBox(worldX, worldY, filename || 'PDF');
-    // Add box immediately so user sees it while we embed/convert the PDF asynchronously
+    // Add box immediately so user sees it while we render a preview asynchronously
     mindMap.addBox(box);
     mindMap.clearBoxSelection && mindMap.clearBoxSelection();
     mindMap.addBoxToSelection && mindMap.addBoxToSelection(box);
     mindMap.selectedBox = box;
 
-    // Helper: convert Blob to data URL
-    const _blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    // Try to render first page as image using PDF.js. If successful, attach image and
+    // DO NOT store or embed the original PDF data — treat it purely as an image.
+    (async () => {
       try {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(blob);
-      } catch (e) { reject(e); }
-    });
+        if (typeof window === 'undefined' || typeof pdfjsLib === 'undefined') return;
 
-    // If a File was provided (local drop), create a temporary blob URL so
-    // the user can open the PDF immediately; concurrently read it as a
-    // data: URL and replace the blob URL with the embedded data URL when ready.
-    if (urlOrFile instanceof File) {
-      let blobUrl = null;
-      try {
-        blobUrl = URL.createObjectURL(urlOrFile);
-        if (typeof box.setPdfFromUrl === 'function') {
-          box.setPdfFromUrl(blobUrl, filename);
-        } else {
-          box.pdfUrl = blobUrl;
-          box.pdfName = filename || 'PDF';
-        }
-      } catch (e) {
-        console.warn('Failed to create temporary blob URL for PDF', e);
-      }
-
-      // Now read and embed the full data URL in background
-      (async () => {
-        try {
-          const dataUrl = await _blobToDataUrl(urlOrFile);
-          if (dataUrl) {
-            if (typeof box.setPdfFromUrl === 'function') {
-              box.setPdfFromUrl(dataUrl, filename);
-            } else {
-              box.pdfUrl = dataUrl;
-              box.pdfName = filename || 'PDF';
-            }
+        // Helper to get ArrayBuffer from File/Blob or URL string
+        const getArrayBuffer = async (src) => {
+          if (src instanceof ArrayBuffer) return src;
+          if (src instanceof Blob) return await src.arrayBuffer();
+          if (src instanceof File) return await src.arrayBuffer();
+          if (typeof src === 'string') {
+            // Use fetch for data:, blob:, http(s): etc. Might fail due to CORS for remote PDFs.
+            const resp = await fetch(src);
+            if (!resp.ok) throw new Error('Failed to fetch PDF: ' + resp.status);
+            return await resp.arrayBuffer();
           }
+          throw new Error('Unsupported PDF source');
+        };
+
+        let arrayBuffer = null;
+        try {
+          arrayBuffer = await getArrayBuffer(urlOrFile);
         } catch (e) {
-          console.warn('Failed to read local PDF file for embedding; keeping blob URL', e);
-        } finally {
-          // Revoke temp blob URL if we embedded the data URL
+          console.warn('Could not obtain PDF bytes for preview:', e);
+          return; // leave box as PDF icon
+        }
+
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+
+        const scale = 1.5; // moderate scale for preview
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const dataUrl = canvas.toDataURL('image/png');
+        if (dataUrl) {
           try {
-            if (blobUrl && box.pdfUrl && box.pdfUrl !== blobUrl) {
-              URL.revokeObjectURL(blobUrl);
-            }
-          } catch (_) {}
-        }
-      })();
-      return;
-    }
-
-    // If a remote URL string was provided, attempt to fetch and embed (CORS permitting)
-    if (typeof urlOrFile === 'string') {
-      const s = urlOrFile.trim();
-      // If it's an http(s) URL, try to fetch and convert to data URL for embedding
-      if (/^https?:\/\//i.test(s)) {
-        try {
-          const resp = await fetch(s, { mode: 'cors' });
-          if (resp.ok) {
-            const blob = await resp.blob();
-            // Only embed if it's PDF-like
-            if (blob && blob.type === 'application/pdf') {
-              try {
-                const dataUrl = await _blobToDataUrl(blob);
-                if (typeof box.setPdfFromUrl === 'function') {
-                  box.setPdfFromUrl(dataUrl, filename);
-                } else {
-                  box.pdfUrl = dataUrl;
-                  box.pdfName = filename || 'PDF';
-                }
-                return;
-              } catch (e) {
-                console.warn('Failed to convert fetched PDF to dataURL', e);
-                // fallthrough to storing remote URL
-              }
-            }
+            // Attach preview as an image and clear any PDF fields
+            box.setImageFromUrl(dataUrl);
+            box.pdfUrl = null;
+            box.pdfName = null;
+          } catch (e) {
+            console.warn('Failed to attach PDF preview image', e);
           }
-        } catch (e) {
-          console.warn('Failed to fetch remote PDF for embedding (CORS or network):', e);
         }
-        // Fallback: store remote URL as-is
-        try {
-          if (typeof box.setPdfFromUrl === 'function') box.setPdfFromUrl(s, filename);
-          else { box.pdfUrl = s; box.pdfName = filename || 'PDF'; }
-          return;
-        } catch (e) { console.warn('Failed to attach remote PDF URL', e); return; }
-      }
-
-      // For data: URLs or blob: URLs or other strings, attach directly
-      try {
-        if (typeof box.setPdfFromUrl === 'function') box.setPdfFromUrl(s, filename);
-        else { box.pdfUrl = s; box.pdfName = filename || 'PDF'; }
       } catch (e) {
-        console.warn('Failed to attach PDF URL', e);
+        console.warn('PDF preview generation failed', e);
+        // Leave the box as the simple PDF icon/text
       }
-    }
+    })();
   } catch (e) {
     console.warn('Failed to create PDF box', e);
   }
