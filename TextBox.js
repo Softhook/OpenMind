@@ -29,6 +29,9 @@ class TextBox {
     this.text = TextBox.sanitizeText(text);
     // Optional image support: URL string for an image to display instead of text
     this.imageUrl = null;
+    // Optional PDF support: URL string for a PDF to open/preview
+    this.pdfUrl = null;
+    this.pdfName = null;
     this.img = null; // p5.Image instance when loaded
     this.imageLoaded = false;
     this.imageLoadError = false;
@@ -130,6 +133,30 @@ class TextBox {
       console.warn('setImageFromUrl failed', e);
       this.imageLoaded = false;
       this.imageLoadError = true;
+    }
+  }
+
+  /**
+   * Attach a PDF URL (blob or remote) to this box. Double-clicking the box opens the PDF.
+   * @param {string} url - URL pointing to the PDF (blob: or https:)
+   * @param {string} [filename] - Optional display name
+   */
+  setPdfFromUrl(url, filename) {
+    try {
+      if (!url) return;
+      this.pdfUrl = url;
+      this.pdfName = filename || url.split('/').pop() || 'PDF';
+      // Make sure this box is treated as non-image
+      this.imageUrl = null;
+      this.imageLoaded = false;
+      this.imageLoadError = false;
+      // Reasonable default size for PDF boxes
+      this.width = Math.max(this.minWidth, 220);
+      this.height = Math.max(this.minHeight, 90);
+    } catch (e) {
+      console.warn('setPdfFromUrl failed', e);
+      this.pdfUrl = null;
+      this.pdfName = null;
     }
   }
   
@@ -519,7 +546,37 @@ class TextBox {
         textSize(12);
         text('Loading image...', this.x, this.y);
       }
+      return; // rendered image box
     } else {
+      // If this box holds a PDF reference, draw a PDF label and icon
+      if (this.pdfUrl) {
+        try {
+          // Draw a simple PDF icon area
+          push();
+          noStroke();
+          fill(245);
+          rect(this.x - this.width/2 + 6, this.y - this.height/2 + 6, this.width - 12, this.height - 12, 2);
+          fill(40);
+          textAlign(LEFT, TOP);
+          textSize(14);
+          const name = this.pdfName || this.text || 'PDF Document';
+          // Draw filename (wrap if necessary)
+          const maxChars = 40;
+          let display = name;
+          if (display.length > maxChars) display = display.slice(0, maxChars - 1) + '…';
+          text('📄 ' + display, this.x - this.width/2 + 12, this.y - this.height/2 + 12);
+          pop();
+        } catch (e) {
+          // fallback to plain text
+          fill(0);
+          textAlign(CENTER, CENTER);
+          textSize(12);
+          text(this.pdfName || 'PDF', this.x, this.y);
+        }
+        // PDF box rendered; do not draw normal text
+        // Note: cursor/editing not allowed for PDF boxes
+        // Draw handles and color palette as usual below
+      }
       // Draw text with wrapping
       fill(0);
       noStroke();
@@ -1022,6 +1079,72 @@ class TextBox {
       this.selectionEnd = -1;
       this.resetCursorBlink();
       // Start dragging when user clicks inside the image (but don't start drag if over resize handle)
+      if (!this.isMouseOverResizeHandle()) {
+        this.startDrag(mx, my);
+      }
+      return;
+    }
+
+    // If this is a PDF box, single-click selects and allows dragging; double-click opens PDF in new tab
+    if (this.pdfUrl) {
+      this.selected = true;
+      this.isEditing = false;
+      this.isSelecting = false;
+      this.selectionStart = -1;
+      this.selectionEnd = -1;
+      this.resetCursorBlink();
+
+      const now = millis();
+      const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
+                       dist(mx, my, this.lastClickX, this.lastClickY) < 6;
+      this.lastClickTime = now;
+      this.lastClickX = mx;
+      this.lastClickY = my;
+
+      if (isDouble) {
+        try {
+          const url = this.pdfUrl;
+          if (typeof url === 'string' && url.startsWith('data:')) {
+            try {
+              // Convert data: URL to a Blob synchronously and open as blob URL
+              const comma = url.indexOf(',');
+              const header = url.substring(5, comma); // after 'data:' up to comma
+              const isBase64 = /;base64$/.test(header);
+              const mime = (header.split(';')[0]) || 'application/pdf';
+              const dataPart = url.substring(comma + 1);
+              let byteArray;
+              if (isBase64) {
+                const binary = atob(dataPart);
+                const len = binary.length;
+                byteArray = new Uint8Array(len);
+                for (let i = 0; i < len; i++) byteArray[i] = binary.charCodeAt(i);
+              } else {
+                // URL-encoded data
+                const decoded = decodeURIComponent(dataPart);
+                const len = decoded.length;
+                byteArray = new Uint8Array(len);
+                for (let i = 0; i < len; i++) byteArray[i] = decoded.charCodeAt(i);
+              }
+              const blob = new Blob([byteArray], { type: mime });
+              const blobUrl = URL.createObjectURL(blob);
+              // Open a blank window synchronously to avoid popup blocking, then set location
+              const w = window.open();
+              if (w) {
+                try { w.location = blobUrl; } catch (_) { w.location.href = blobUrl; }
+                // Revoke after a delay to allow the browser to load it
+                setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (_) {} }, 15000);
+              }
+            } catch (e) {
+              console.warn('Failed to open embedded PDF data URL', e);
+            }
+          } else {
+            window.open(this.pdfUrl, '_blank');
+          }
+        } catch (e) { console.warn('Failed to open PDF', e); }
+        return;
+      }
+
+      // Start dragging when user clicks inside the pdf box (but don't start drag if over resize handle)
       if (!this.isMouseOverResizeHandle()) {
         this.startDrag(mx, my);
       }
@@ -1598,6 +1721,8 @@ class TextBox {
       y: this.y,
       text: this.text,
       imageUrl: this.imageUrl || null,
+      pdfUrl: this.pdfUrl || null,
+      pdfName: this.pdfName || null,
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor
@@ -1647,6 +1772,14 @@ class TextBox {
         box.setImageFromUrl(data.imageUrl);
       } catch (e) {
         console.warn('Failed to set image from JSON', e);
+      }
+    }
+    // Load PDF URL if present
+    if (data.pdfUrl && typeof data.pdfUrl === 'string' && data.pdfUrl.trim() !== '') {
+      try {
+        box.setPdfFromUrl(data.pdfUrl, data.pdfName || data.pdfUrl.split('/').pop());
+      } catch (e) {
+        console.warn('Failed to set PDF from JSON', e);
       }
     }
     
