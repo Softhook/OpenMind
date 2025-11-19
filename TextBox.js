@@ -623,7 +623,8 @@ class TextBox {
     // Draw background color palette only when selected and not editing, and not during arrow key navigation
     // Access mindMap from global scope to check navigation state
     const isArrowNav = (typeof mindMap !== 'undefined' && mindMap && mindMap.isArrowKeyNavigating);
-    if (this.selected && !this.isEditing && !isArrowNav) {
+    // Don't show color circles for image boxes
+    if (this.selected && !this.isEditing && !isArrowNav && !this.imageUrl) {
       this.drawColorPalette();
     }
 
