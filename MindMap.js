@@ -1019,6 +1019,15 @@ class MindMap {
             console.error('Clipboard paste not supported:', e);
           }
           return;
+        } else if (key === 'b' || key === 'B') {
+          // Highlight selected text (toggle)
+          try {
+            if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
+              this.pushUndo();
+              this.selectedBox.toggleHighlightOnSelection();
+            }
+          } catch (e) { console.error('Highlight toggle failed', e); }
+          return;
         }
       }
       

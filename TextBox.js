@@ -70,6 +70,8 @@ class TextBox {
     this.colorPalette = TextBox.getColorPalette();
     this.colorCircleRadius = TextBox.COLOR_CIRCLE_RADIUS;
     this.colorCircleSpacing = TextBox.COLOR_CIRCLE_SPACING;
+    // Persistent highlights: array of {start, end, color:{r,g,b,a?}}
+    this.highlights = [];
     this.updateDimensions();
   }
 
@@ -579,6 +581,11 @@ class TextBox {
       // Draw selection highlight if there's a selection
       if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
         this.drawSelection(wrappedLines, textX, startY, lineHeight);
+      }
+
+      // Draw persistent highlights (behind text)
+      if (this.highlights && this.highlights.length > 0) {
+        this.drawHighlights(wrappedLines, textX, startY, lineHeight);
       }
       
       for (let i = 0; i < wrappedLines.length; i++) {
@@ -1147,9 +1154,12 @@ class TextBox {
     
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
-    
-    this.text = this.text.slice(0, this.cursorPosition) + char + this.text.slice(this.cursorPosition);
-    this.cursorPosition += char.length;
+    // Prepare insertion
+    const insertPos = this.cursorPosition;
+    // Shift highlights to account for this insertion
+    this.applyEditDelta(insertPos, 0, char.length);
+    this.text = this.text.slice(0, insertPos) + char + this.text.slice(insertPos);
+    this.cursorPosition = insertPos + char.length;
     this.updateDimensions();
     this.resetCursorBlink();
   }
@@ -1174,10 +1184,13 @@ class TextBox {
           this.selectionEnd = -1;
         }
         if (this.cursorPosition > 0) {
-          this.text = this.text.slice(0, this.cursorPosition - 1) + this.text.slice(this.cursorPosition);
-          this.cursorPosition--;
+              const delPos = this.cursorPosition - 1;
+              this.applyEditDelta(delPos, 1, 0);
+              this.text = this.text.slice(0, delPos) + this.text.slice(this.cursorPosition);
+              this.cursorPosition--;
         }
       }
+          // highlights adjusted above via applyEditDelta
       this.updateDimensions();
     }
     this.resetCursorBlink();
@@ -1196,6 +1209,7 @@ class TextBox {
       this.deleteSelection();
     } else if (this.cursorPosition < this.text.length) {
       // Delete character after cursor
+      this.applyEditDelta(this.cursorPosition, 1, 0);
       this.text = this.text.slice(0, this.cursorPosition) + this.text.slice(this.cursorPosition + 1);
       // cursorPosition stays the same
       this.updateDimensions();
@@ -1227,6 +1241,8 @@ class TextBox {
     // Then skip non-whitespace (the word)
     while (i > 0 && !TextBox.isWhitespace(this.text[i - 1])) i--;
     if (i < pos) {
+      const removedLen = pos - i;
+      this.applyEditDelta(i, removedLen, 0);
       this.text = this.text.slice(0, i) + this.text.slice(pos);
       this.cursorPosition = i;
       this.updateDimensions();
@@ -1258,6 +1274,8 @@ class TextBox {
     // Then skip non-whitespace (the word)
     while (i < this.text.length && !TextBox.isWhitespace(this.text[i])) i++;
     if (i > pos) {
+      const removedLen = i - pos;
+      this.applyEditDelta(pos, removedLen, 0);
       this.text = this.text.slice(0, pos) + this.text.slice(i);
       // cursorPosition unchanged
       this.updateDimensions();
@@ -1280,6 +1298,8 @@ class TextBox {
     let nl = this.text.lastIndexOf('\n', max(0, pos - 1));
     let start = nl === -1 ? 0 : nl + 1;
     if (start < pos) {
+      const removedLen = pos - start;
+      this.applyEditDelta(start, removedLen, 0);
       this.text = this.text.slice(0, start) + this.text.slice(pos);
       this.cursorPosition = start;
       this.updateDimensions();
@@ -1302,6 +1322,8 @@ class TextBox {
     let nl = this.text.indexOf('\n', pos);
     let end = nl === -1 ? this.text.length : nl;
     if (end > pos) {
+      const removedLen = end - pos;
+      this.applyEditDelta(pos, removedLen, 0);
       this.text = this.text.slice(0, pos) + this.text.slice(end);
       // cursor stays at pos
       this.updateDimensions();
@@ -1337,6 +1359,8 @@ class TextBox {
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
       let end = max(this.selectionStart, this.selectionEnd);
+      const removedLen = end - start;
+      this.applyEditDelta(start, removedLen, 0);
       this.text = this.text.slice(0, start) + this.text.slice(end);
       this.cursorPosition = start;
       this.selectionStart = -1;
@@ -1370,16 +1394,106 @@ class TextBox {
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
       let end = max(this.selectionStart, this.selectionEnd);
+      const removedLen = end - start;
+      const addedLen = pastedText.length;
+      this.applyEditDelta(start, removedLen, addedLen);
       this.text = this.text.slice(0, start) + pastedText + this.text.slice(end);
       this.cursorPosition = start + pastedText.length;
       this.selectionStart = -1;
       this.selectionEnd = -1;
     } else {
       // No selection, insert at cursor position
-      this.text = this.text.slice(0, this.cursorPosition) + pastedText + this.text.slice(this.cursorPosition);
+      const insertPos = this.cursorPosition;
+      const addedLen = pastedText.length;
+      this.applyEditDelta(insertPos, 0, addedLen);
+      this.text = this.text.slice(0, insertPos) + pastedText + this.text.slice(insertPos);
       this.cursorPosition += pastedText.length;
     }
     this.updateDimensions();
+  }
+
+  // ==========================================================================
+  // HIGHLIGHTING
+  // ==========================================================================
+
+  /**
+   * Remove any highlights that overlap the given range [start,end)
+   */
+  removeHighlightsInRange(start, end) {
+    if (!this.highlights || this.highlights.length === 0) return;
+    this.highlights = this.highlights.filter(h => {
+      if (!h) return false;
+      const a = Math.max(0, Math.min(this.text.length, h.start));
+      const b = Math.max(0, Math.min(this.text.length, h.end));
+      // keep highlight if it does not overlap [start,end)
+      return (b <= start) || (a >= end);
+    });
+  }
+
+  /**
+   * Toggle highlight for the current selection. If any highlight overlaps the
+   * selection, overlapping highlights are removed. Otherwise a yellow highlight
+   * is added covering the selection.
+   */
+  toggleHighlightOnSelection(color = { r: 255, g: 255, b: 0, a: 180 }) {
+    if (this.selectionStart == null || this.selectionEnd == null) return;
+    let start = Math.min(this.selectionStart, this.selectionEnd);
+    let end = Math.max(this.selectionStart, this.selectionEnd);
+    if (start === end) return; // nothing selected
+
+    // If any existing highlight overlaps selection, remove overlapping highlights
+    let hadOverlap = false;
+    if (this.highlights && this.highlights.length > 0) {
+      for (const h of this.highlights) {
+        if (!h) continue;
+        if (!(h.end <= start || h.start >= end)) { hadOverlap = true; break; }
+      }
+    }
+
+    if (hadOverlap) {
+      this.removeHighlightsInRange(start, end);
+    } else {
+      // Add new highlight
+      if (!this.highlights) this.highlights = [];
+      this.highlights.push({ start, end, color });
+    }
+  }
+
+  /**
+   * Apply an edit delta to all highlights so they remain valid after text edits.
+   * editStart: index where edit begins (in pre-edit coordinates)
+   * removedLen: number of characters removed at editStart
+   * addedLen: number of characters inserted at editStart
+   */
+  applyEditDelta(editStart, removedLen, addedLen) {
+    if (!this.highlights || this.highlights.length === 0) return;
+    const textLen = (this.text != null) ? this.text.length : 0;
+    const removed = Math.max(0, Number.isFinite(removedLen) ? removedLen : 0);
+    const added = Math.max(0, Number.isFinite(addedLen) ? addedLen : 0);
+    const net = added - removed;
+
+    const mapPos = (pos) => {
+      if (!Number.isFinite(pos)) return pos;
+      if (pos < editStart) return pos;
+      if (pos >= editStart + removed) return pos + net;
+      // pos is inside removed region -> map to editStart
+      return editStart;
+    };
+
+    const newHighlights = [];
+    for (const h of this.highlights) {
+      if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') continue;
+      const s = Math.max(0, Math.min(textLen, Math.floor(h.start)));
+      const e = Math.max(0, Math.min(textLen, Math.floor(h.end)));
+      if (e <= s) continue;
+      const ns = mapPos(s);
+      const ne = mapPos(e);
+      if (ne > ns) {
+        newHighlights.push({ start: ns, end: ne, color: h.color });
+      }
+      // else drop empty/invalid highlight
+    }
+    this.highlights = newHighlights;
   }
   
   // ============================================================================
@@ -1659,6 +1773,7 @@ class TextBox {
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor
+      ,highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined
     };
   }
   
@@ -1705,6 +1820,18 @@ class TextBox {
         box.setImageFromUrl(data.imageUrl);
       } catch (e) {
         console.warn('Failed to set image from JSON', e);
+      }
+    }
+    // Load highlights if present
+    if (Array.isArray(data.highlights)) {
+      box.highlights = [];
+      for (const h of data.highlights) {
+        if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') continue;
+        const start = Math.max(0, Math.min(String(box.text || '').length, Math.floor(h.start)));
+        const end = Math.max(0, Math.min(String(box.text || '').length, Math.floor(h.end)));
+        if (start >= end) continue;
+        const color = (h.color && typeof h.color === 'object') ? h.color : { r: 255, g: 255, b: 0, a: 180 };
+        box.highlights.push({ start, end, color });
       }
     }
     // PDF embedding removed: we no longer load or store PDF URLs. If a map
@@ -1954,6 +2081,60 @@ class TextBox {
       }
     }
     
+    pop();
+  }
+
+  /**
+   * Draw persistent highlights stored in `this.highlights`.
+   */
+  drawHighlights(wrappedLines, textX, startY, lineHeight) {
+    if (!this.highlights || this.highlights.length === 0) return;
+    if (!wrappedLines || wrappedLines.length === 0) return;
+    textSize(this.fontSize);
+    push();
+    noStroke();
+    for (const hl of this.highlights) {
+      if (!hl || hl.start == null || hl.end == null) continue;
+      let start = Math.max(0, Math.min(this.text.length, hl.start));
+      let end = Math.max(0, Math.min(this.text.length, hl.end));
+      if (start >= end) continue;
+      let startInfo = this.getLineAndPositionFromChar(start, wrappedLines);
+      let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
+      // Use hl.color if present, else default yellow
+      const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
+      const alpha = (c.a != null) ? c.a : 180;
+      fill(c.r, c.g, c.b, alpha);
+
+      if (startInfo.lineIndex === endInfo.lineIndex) {
+        const lineText = wrappedLines[startInfo.lineIndex] || '';
+        const x1 = textX + textWidth(lineText.slice(0, Math.max(0, startInfo.posInLine)));
+        const x2 = textX + textWidth(lineText.slice(0, Math.max(0, endInfo.posInLine)));
+        const y = startY + startInfo.lineIndex * lineHeight;
+        if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
+          rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+        }
+      } else {
+        for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
+          if (i < 0 || i >= wrappedLines.length) continue;
+          const lineText = wrappedLines[i] || '';
+          const y = startY + i * lineHeight;
+          let x1, x2;
+          if (i === startInfo.lineIndex) {
+            x1 = textX + textWidth(lineText.slice(0, Math.max(0, startInfo.posInLine)));
+            x2 = textX + textWidth(lineText);
+          } else if (i === endInfo.lineIndex) {
+            x1 = textX;
+            x2 = textX + textWidth(lineText.slice(0, Math.max(0, endInfo.posInLine)));
+          } else {
+            x1 = textX;
+            x2 = textX + textWidth(lineText);
+          }
+          if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
+            rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+          }
+        }
+      }
+    }
     pop();
   }
   
