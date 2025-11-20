@@ -51,6 +51,7 @@ While editing a text box:
   - Cmd/Ctrl+C: copy selection
   - Cmd/Ctrl+X: cut selection
   - Cmd/Ctrl+V: paste
+  - Cmd/Ctrl+B: toggle highlight on the selected text (adds/removes persistent highlight)
 - Arrow keys move the caret; Up/Down move between wrapped lines
 
 Clipboard notes:

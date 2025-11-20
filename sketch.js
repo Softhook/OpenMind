@@ -912,6 +912,7 @@ function populateKeyboardControlsOverlay() {
     { keys: '+', description: 'Zoom to selected elements' },
     { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
+    { keys: 'Cmd/Ctrl + B', description: 'Highlight selected text' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
     { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
