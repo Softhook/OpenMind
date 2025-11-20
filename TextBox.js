@@ -505,8 +505,8 @@ class TextBox {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(120);
       strokeWeight(2 / zoomFactor);
-    } else if (this.selected) {
-      // Highlight selected boxes with a blue outline
+    } else if (this.selected && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
+      // Highlight selected boxes with a blue outline (skip when navigating via arrow keys)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(60, 120, 255);
       strokeWeight(2.5 / zoomFactor);
