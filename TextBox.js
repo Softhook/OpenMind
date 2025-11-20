@@ -564,7 +564,7 @@ class TextBox {
         textSize(12);
         text('Loading image...', this.x, this.y);
       }
-      return; // rendered image box
+      // Continue so dimming overlay and handles are applied to image boxes as well
     } else {
       // Draw text with wrapping
       fill(0);
