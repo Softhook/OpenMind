@@ -1,0 +1,467 @@
+{
+  "boxes": [
+    {
+      "x": 77.52339220753615,
+      "y": -350.4279829250929,
+      "text": "Okay, I need to include some more. Theory stuff from media studies about digital publics. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": -56.2036626923292,
+      "text": " Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie? The theoretical framing (p.5) suggests a significant gap, but this could be made more explicit for the reader. What is the nature of this gap, and how does the study aim to address it?",
+      "imageUrl": null,
+      "width": 280,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 171,
+          "end": 210,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 322,
+          "end": 395,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 393.7743106616613,
+      "text": "Moreover, the study’s scope and focus should be articulated more clearly—what exactly does it address, and what considerations were made in positioning the findings?",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 73,
+          "end": 101,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 140,
+          "end": 164,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 77.52339220753615,
+      "y": 245.68054320877872,
+      "text": "It's basically asking about the relationship between the study and the method. Well, the study simply. Complete illustrating a method? Not really ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 245.68054320877872,
+      "text": "From a methodological standpoint, the application of the hotspot method to publics per se requires further argumentation and reflection (p.6). Why was this method chosen, and how was it adapted for this particular study?",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 143,
+          "end": 220,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 823.1217877309424,
+      "text": "Furthermore, the rationale behind the selection of specific hotspots (p.10) is missing. Why were these particular hotspots chosen over others?.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 12,
+          "end": 87,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 55.86018884742277,
+      "y": 794.4986225929904,
+      "text": "Yes, that's an important point. And maybe I need to just show how the method identify the hotspots. I think that's doable. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 55.86018884742277,
+      "y": 621.5151463244973,
+      "text": "In medical anthropology, hotspots is more a sensitizing idea for narrating. A narrative bit like Latour's follow the actor. What I've done is turn it into a device for material. Material semiotic Intervention  ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 637.6934570546442,
+      "text": "It is also unclear whether the outlined hotspot method (p.9) is an adaptation of the method used in disease epistemology or a direct translation. If it is an adaptation, it would be helpful to explain how it was modified and why. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 61,
+          "end": 144,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 201,
+          "end": 228,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 940.1034191643118,
+      "text": " The discussion on the risk of hotspots being treated as personas (p.15) is ambiguous and would benefit from clarification",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 55.86018884742277,
+      "y": 940.1034191643118,
+      "text": "Yes, maybe I just removed this. I think it doesn't need to be there ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 108.63552822704929,
+      "y": 1206.9221333800701,
+      "text": "Yes, I think that's a fair point and valubale. Since indeed I don't demonstrate enough of the intervention of designing with ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": -316.139219259844,
+      "text": "Overall, the study is well anchored in desing theory. However, the concept of digital publics per se is somewhat overlooked. The framing would benefit from engaging more directly with literature from media studies and related fields.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 126,
+          "end": 232,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -952.0478958350681,
+      "y": -629.6771930397492,
+      "text": "Todo",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 55.86018884742277,
+      "y": -56.2036626923292,
+      "text": "I think that's easy to address just by clarifying the difference between A material and a discussive public. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 508.1232929356366,
+      "y": -370.0976387008223,
+      "text": "Find more of the theory of publics in media theory.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 543.746902962816,
+      "y": -86.09200037373381,
+      "text": "A small change in the text ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 543.746902962816,
+      "y": 227.03272470593217,
+      "text": "A small change in the text ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 543.746902962816,
+      "y": 593.101243881194,
+      "text": "A small change in the text ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 543.746902962816,
+      "y": 770.0847841436139,
+      "text": "Slightly bigger text explaining more about the methodology. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 543.746902962816,
+      "y": 1206.9221333800701,
+      "text": "This is mainly a removing and formatting ",
+      "imageUrl": null,
+      "width": 279.212890625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": -524.7316424058107,
+      "text": "The paper’s strongest contribution lies in its proposed methodological framework, which offers valuable insights into elusive publics—such as distributed, digitally mediated ones—and holds relevance beyond this specific context.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -313.8398473215728,
+      "y": 1263.5761307659716,
+      "text": "On p.16, the paper claims to propose a novel method for analysing and designing with distributed, digitally mediated publics. While the analytical aspect is indeed a strength, the “designing with” component is less convincing. This is especially evident in the vignette, which introduces another case to illustrate potential rather than actual application. The paper may be overstretched in its current form. Offering a method for analysing these publics is a significant contribution in itself, and the “designing with” aspect could be developed in a separate paper.This would call for a realignment of the paper’s framing—starting from the abstract—positioning it primarily as a methodological and analytical contribution based on a case study in distributed, digitally mediated publics, with potential relevance to other contexts.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 507,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 409,
+          "end": 494,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 651,
+          "end": 788,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 126,
+          "end": 225,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": 12,
+      "to": 0
+    },
+    {
+      "from": 1,
+      "to": 14
+    },
+    {
+      "from": 9,
+      "to": 10
+    },
+    {
+      "from": 5,
+      "to": 6
+    },
+    {
+      "from": 8,
+      "to": 7
+    },
+    {
+      "from": 4,
+      "to": 3
+    },
+    {
+      "from": 22,
+      "to": 11
+    }
+  ]
+}
