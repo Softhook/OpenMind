@@ -1082,6 +1082,18 @@ class TextBox {
 
     // (PDF handling removed) — PDFs are treated as images (preview) or normal text boxes.
 
+    let pos = this.getCursorPositionFromMouse(mx, my);
+
+    // If Shift is held and there's already a selection, extend it
+    if (keyIsDown(16)) { // Shift key
+      if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+        this.selectionEnd = pos;
+        this.cursorPosition = pos;
+        this.resetCursorBlink();
+        return;
+      }
+    }
+
     const now = millis();
     const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
                      dist(mx, my, this.lastClickX, this.lastClickY) < 6;
@@ -1092,7 +1104,6 @@ class TextBox {
     if (isDouble) {
       // Double-click: select word under cursor
       this.isEditing = true;
-      let pos = this.getCursorPositionFromMouse(mx, my);
       this.selectWordAt(pos);
       this.cursorPosition = this.selectionEnd;
       this.resetCursorBlink();
@@ -1431,9 +1442,7 @@ class TextBox {
   }
 
   /**
-   * Toggle highlight for the current selection. If any highlight overlaps the
-   * selection, overlapping highlights are removed. Otherwise a yellow highlight
-   * is added covering the selection.
+   * Add highlight for the current selection. Adds highlights only for the unhighlighted parts of the selection.
    */
   toggleHighlightOnSelection(color = { r: 255, g: 255, b: 0, a: 180 }) {
     if (this.selectionStart == null || this.selectionEnd == null) return;
@@ -1441,21 +1450,68 @@ class TextBox {
     let end = Math.max(this.selectionStart, this.selectionEnd);
     if (start === end) return; // nothing selected
 
-    // If any existing highlight overlaps selection, remove overlapping highlights
-    let hadOverlap = false;
-    if (this.highlights && this.highlights.length > 0) {
-      for (const h of this.highlights) {
-        if (!h) continue;
-        if (!(h.end <= start || h.start >= end)) { hadOverlap = true; break; }
+    if (!this.highlights) this.highlights = [];
+
+    // Determine whether the entire selection is already covered by existing highlights
+    const textLen = (this.text != null) ? this.text.length : 0;
+    const selStart = Math.max(0, Math.min(textLen, start));
+    const selEnd = Math.max(0, Math.min(textLen, end));
+
+    // Collect intersections of existing highlights with the selection
+    let pieces = [];
+    for (const h of this.highlights) {
+      if (!h) continue;
+      const a = Math.max(selStart, Math.max(0, Math.min(textLen, h.start)));
+      const b = Math.min(selEnd, Math.max(0, Math.min(textLen, h.end)));
+      if (a < b) pieces.push({ start: a, end: b });
+    }
+
+    // Merge pieces to detect gaps
+    pieces.sort((A, B) => A.start - B.start);
+    let merged = [];
+    for (const p of pieces) {
+      if (merged.length === 0 || merged[merged.length - 1].end < p.start) {
+        merged.push({ ...p });
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, p.end);
       }
     }
 
-    if (hadOverlap) {
-      this.removeHighlightsInRange(start, end);
+    // Check for full coverage (no gaps between selStart and selEnd)
+    let cur = selStart;
+    let fullyCovered = merged.length > 0;
+    for (const m of merged) {
+      if (m.start > cur) { fullyCovered = false; break; }
+      cur = Math.max(cur, m.end);
+    }
+    if (cur < selEnd) fullyCovered = false;
+
+    if (fullyCovered) {
+      // Remove selection range from highlights (trim/split as needed)
+      const newH = [];
+      for (const h of this.highlights) {
+        if (!h) continue;
+        const hStart = Math.max(0, Math.min(textLen, h.start));
+        const hEnd = Math.max(0, Math.min(textLen, h.end));
+        if (hEnd <= selStart || hStart >= selEnd) {
+          // no overlap
+          newH.push(h);
+        } else {
+          // overlap exists - keep left part if any
+          if (hStart < selStart) {
+            newH.push({ start: hStart, end: selStart, color: h.color });
+          }
+          // keep right part if any
+          if (hEnd > selEnd) {
+            newH.push({ start: selEnd, end: hEnd, color: h.color });
+          }
+          // middle part inside selection is removed
+        }
+      }
+      this.highlights = newH;
     } else {
-      // Add new highlight
-      if (!this.highlights) this.highlights = [];
-      this.highlights.push({ start, end, color });
+      // Not fully covered: add a highlight for the entire selection
+      this.highlights.push({ start: selStart, end: selEnd, color });
     }
   }
 
