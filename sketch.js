@@ -1290,11 +1290,19 @@ async function handleFileLoad(file) {
     return;
   }
   
-  // Validate file type
-  if (!file.type.includes('application') && !file.name.endsWith('.json')) {
-    console.error('Invalid file type:', file.type);
-    alert('Please load a JSON file');
-    return;
+  // Allow JSON and legacy `.canvas` files; be permissive if filename indicates supported format
+  try {
+    const name = (file.name || '').toLowerCase();
+    const mime = (file.type || '').toLowerCase();
+    const okByName = name.endsWith('.json') || name.endsWith('.canvas');
+    const okByMime = mime.includes('json') || mime.includes('application');
+    if (!okByName && !okByMime) {
+      console.error('Invalid file type or extension:', file.type, file.name);
+      alert('Please load a JSON or .canvas file');
+      return;
+    }
+  } catch (e) {
+    // Fall back to permissive path
   }
   
   try {
@@ -1303,16 +1311,84 @@ async function handleFileLoad(file) {
       throw new Error('File data is empty or invalid');
     }
     
-    // If data is a string, try to parse it
+    // If data is a string, try to parse it. Support data: URLs (p5.File sometimes
+    // provides file.data as a data URL) by fetching or decoding before parsing.
     let data = file.data;
     if (typeof data === 'string') {
       try {
-        data = JSON.parse(data);
+        if (data.startsWith('data:')) {
+          try {
+            // Try fetch first - browsers can fetch data: URLs and return decoded text
+            const resp = await fetch(data);
+            const text = await resp.text();
+            data = JSON.parse(text);
+          } catch (e) {
+            // Fallback: manually decode the data URL
+            try {
+              const comma = data.indexOf(',');
+              const meta = data.substring(0, comma);
+              const payload = data.substring(comma + 1);
+              let text = '';
+              if (meta.includes(';base64')) {
+                const bin = atob(payload);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                text = new TextDecoder().decode(bytes);
+              } else {
+                text = decodeURIComponent(payload);
+              }
+              data = JSON.parse(text);
+            } catch (e2) {
+              throw new Error('Failed to parse JSON from data URL: ' + e2.message);
+            }
+          }
+        } else {
+          data = JSON.parse(data);
+        }
       } catch (e) {
         throw new Error('Failed to parse JSON: ' + e.message);
       }
     }
     
+    // Convert legacy `nodes`/`edges` format (e.g. `paper.canvas`) to current `boxes`/`connections`
+    if (data && data.nodes && Array.isArray(data.nodes)) {
+      try {
+        const nodes = data.nodes;
+        const edges = Array.isArray(data.edges) ? data.edges : [];
+        const idToIndex = {};
+        const boxes = nodes.map((n, i) => {
+          if (n && n.id) idToIndex[n.id] = i;
+          const text = (n.type === 'text') ? (n.text || '') : ((n.type === 'file') ? (n.file || n.text || '') : (n.text || ''));
+          const box = {
+            x: (typeof n.x === 'number') ? n.x : 100,
+            y: (typeof n.y === 'number') ? n.y : 100,
+            text: text,
+            width: (typeof n.width === 'number') ? n.width : undefined,
+            height: (typeof n.height === 'number') ? n.height : undefined
+          };
+          // Map simple numeric color codes to backgroundColor when possible
+          try {
+            const c = n.color != null ? String(n.color) : null;
+            if (c === '1') box.backgroundColor = { r: 255, g: 140, b: 140 };
+            else if (c === '2') box.backgroundColor = { r: 255, g: 200, b: 140 };
+            // otherwise leave backgroundColor undefined (defaults to white)
+          } catch (_) {}
+          return box;
+        });
+
+        const connections = edges.map(e => {
+          const from = e.fromNode != null ? idToIndex[e.fromNode] : undefined;
+          const to = e.toNode != null ? idToIndex[e.toNode] : undefined;
+          return { from, to };
+        }).filter(c => Number.isFinite(c.from) && Number.isFinite(c.to));
+
+        data = { boxes, connections };
+      } catch (e) {
+        // If conversion fails, keep original data and let validation handle errors
+        console.warn('Failed to convert legacy nodes/edges format:', e);
+      }
+    }
+
     // Validate data structure
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid JSON structure');

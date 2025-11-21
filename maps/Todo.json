@@ -1,0 +1,18 @@
+{
+  "boxes": [
+    {
+      "x": -641.3071175661072,
+      "y": 256.19534283800243,
+      "text": "Todo",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    }
+  ],
+  "connections": []
+}
