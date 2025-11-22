@@ -1,8 +1,8 @@
 {
   "boxes": [
     {
-      "x": 848.0088453312569,
-      "y": 1850.5884174149114,
+      "x": 1011.352815940472,
+      "y": 2013.9323880241263,
       "text": "not so radically different from normal design",
       "imageUrl": null,
       "width": 280,
@@ -14,8 +14,8 @@
       }
     },
     {
-      "x": 1076.1002178485194,
-      "y": 1877.2405651385277,
+      "x": 1239.4441884577345,
+      "y": 2040.5845357477426,
       "text": "frugal realism",
       "imageUrl": null,
       "width": 150,
@@ -27,21 +27,8 @@
       }
     },
     {
-      "x": 1131.2313863172974,
-      "y": 1809.6778702104264,
-      "text": "students re-materilisng\nlocal, situated, do with whats at hand",
-      "imageUrl": null,
-      "width": 252.8056640625,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": 1023.4993058410448,
-      "y": 1744.295220882699,
+      "x": 1186.84327645026,
+      "y": 1907.6391914919138,
       "text": "skills - observable changes",
       "imageUrl": null,
       "width": 192.08203125,
@@ -65,8 +52,8 @@
       ]
     },
     {
-      "x": 823.8011310091912,
-      "y": 1768.0257224868099,
+      "x": 987.1451016184063,
+      "y": 1931.3696930960248,
       "text": "materiality at a distance",
       "imageUrl": null,
       "width": 171.068359375,
@@ -78,8 +65,8 @@
       }
     },
     {
-      "x": 935.2520247225298,
-      "y": 1576.7348059732851,
+      "x": 1281.9821709236858,
+      "y": 1555.690490741423,
       "text": "instead of this cognitiivist - desgin thingking, change makers etc.",
       "imageUrl": null,
       "width": 280,
@@ -91,8 +78,34 @@
       }
     },
     {
-      "x": 1194.4714079642872,
-      "y": 1544.4347102664867,
+      "x": 1519.3842991999688,
+      "y": 1585.9756480897051,
+      "text": "heavy languaging\nlots of meta",
+      "imageUrl": null,
+      "width": 150,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1294.5753569265125,
+      "y": 1973.0218408196413,
+      "text": "students re-materilisng\nlocal, situated, do with whats at hand",
+      "imageUrl": null,
+      "width": 252.8056640625,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1541.2015541654432,
+      "y": 1523.3903950346246,
       "text": "asipirational - immaterial",
       "imageUrl": null,
       "width": 175.716796875,
@@ -104,23 +117,142 @@
       }
     },
     {
-      "x": 1172.6541529988128,
-      "y": 1607.0199633215673,
-      "text": "heavy languaging\nlots of meta",
+      "x": 955.2364897469192,
+      "y": 1441.3260620803678,
+      "text": "danger of dematerilising design",
       "imageUrl": null,
-      "width": 150,
-      "height": 66,
+      "width": 218.564453125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": 989.4207647217863,
+      "y": 1564.0926045324902,
+      "text": "when 'meaning' in design is framed as a stand alone concept that is not emerging out of affordances and constrants of material. Then design become like many other discursuve disciplines, psyclogy, media theory, managament studies, advertising",
+      "imageUrl": null,
+      "width": 280,
+      "height": 171,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": 1705.8136033644726,
+      "y": 2353.2839945122455,
+      "text": "\t•\tTony Fry – Design Futuring (2009): design constructs futures through the way it talks about them; discourse precedes materialisation.\n\t•\tEzio Manzini – Design, When Everybody Designs (2015): design as a system of meanings, visions, and narratives that mobilise social innovation.\n\t•\tRichard Buchanan – “Wicked Problems in Design Thinking” (1992): design as argumentative and situated in discursive problem framing.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 276,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 990.021547480021,
+      "y": 1772.3791769236702,
+      "text": "rematerialising at a distance",
+      "imageUrl": null,
+      "width": 198.3095703125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": 1759.0542161133671,
+      "y": 1739.548624881273,
+      "text": "this apprach is response to design as just making products in service to capitalims. its na attempt for designers to leapfrog up to setting agendas and visision not just producing shit",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 2126.7658269070616,
+      "y": 1999.183979124691,
+      "text": "The contrasting position reasserts design as a materially grounded practice. Here knowledge is generated through embodied making, through the resistance and affordances of materials, and through the sociotechnical infrastructures that condition what is actually possible. Rather than treating discourse as primary, this view emphasises discourse as material like everything else. What matter are the specific crafting skills designers have for shaping infrascture of material and meaning togehter. Design becomes a practice of pragmatically negotiating reality itself as it pushes back against or redirect idealistic/fascistic narratives. What matters are empirical observational methods for evaluating real impacts in the world",
+      "imageUrl": null,
+      "width": 280,
+      "height": 444,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 272,
+          "end": 498,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 2088.7540121699167,
+      "y": 1739.1933888992426,
+      "text": "Materiality 2.0",
+      "imageUrl": null,
+      "width": 198.3095703125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": 1761.3906377815713,
+      "y": 2002.9562725166904,
+      "text": "One position understands design as a fundamentally discursive, language-centred practice. Here design’s power lies in the narratives, metaphors and vocabularies that organise attention and mobilise publics. Strategies, briefs, and visions function as rhetorical devices that construct problems and futures long before anything material is made. In this view, design operates by shaping meaning, aligning actors and projecting desirable horizons, with its effectiveness measured through persuasion, coherence and cultural traction rather than through material outcomes.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 339,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 51,
+          "end": 88,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 4,
+      "from": 3,
       "to": 0
+    },
+    {
+      "from": 10,
+      "to": 15
     }
   ]
 }
