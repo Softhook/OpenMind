@@ -1,0 +1,126 @@
+{
+  "boxes": [
+    {
+      "x": 848.0088453312569,
+      "y": 1850.5884174149114,
+      "text": "not so radically different from normal design",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1076.1002178485194,
+      "y": 1877.2405651385277,
+      "text": "frugal realism",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1131.2313863172974,
+      "y": 1809.6778702104264,
+      "text": "students re-materilisng\nlocal, situated, do with whats at hand",
+      "imageUrl": null,
+      "width": 252.8056640625,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1023.4993058410448,
+      "y": 1744.295220882699,
+      "text": "skills - observable changes",
+      "imageUrl": null,
+      "width": 192.08203125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 9,
+          "end": 19,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 823.8011310091912,
+      "y": 1768.0257224868099,
+      "text": "materiality at a distance",
+      "imageUrl": null,
+      "width": 171.068359375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 935.2520247225298,
+      "y": 1576.7348059732851,
+      "text": "instead of this cognitiivist - desgin thingking, change makers etc.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 1194.4714079642872,
+      "y": 1544.4347102664867,
+      "text": "asipirational - immaterial",
+      "imageUrl": null,
+      "width": 175.716796875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1172.6541529988128,
+      "y": 1607.0199633215673,
+      "text": "heavy languaging\nlots of meta",
+      "imageUrl": null,
+      "width": 150,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": 4,
+      "to": 0
+    }
+  ]
+}
