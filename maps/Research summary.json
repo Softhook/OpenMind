@@ -1,21 +1,58 @@
 {
   "boxes": [
     {
-      "x": -848.0568305910964,
-      "y": 1510.1742428243983,
-      "text": "Materiality",
+      "x": -1011.8687343158771,
+      "y": 1341.713309171932,
+      "text": "Designing with Publics\n\n1 Hotspots and COVID-Aware Publics\n\n2 Citizen Science epistemic friction with legal systems.",
       "imageUrl": null,
-      "width": 150,
-      "height": 45,
+      "width": 269.0582887841913,
+      "height": 150,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
-      }
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 22,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     },
     {
-      "x": -911.3354911087184,
-      "y": 1658.7148320901865,
+      "x": -567.5392930581934,
+      "y": 1456.55721236478,
+      "text": "Gen AI & Design in Practice\n\n1 Plundergeist - Playful design method\n\n2 Real AI-use in the world via social media videos",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 27,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -935.3441172818532,
+      "y": 1611.6853398721128,
       "text": "Ethnography of Objects\n\n1 Rethink classic Actor-Network Theory study",
       "imageUrl": null,
       "width": 228.6126299337626,
@@ -39,68 +76,31 @@
       ]
     },
     {
-      "x": -597.5534498801173,
-      "y": 1458.3876837856465,
-      "text": "Gen AI & Design in Practice\n\n1 Reflective, playful AI design methods\n\n2 Analysing AI design use in the world via social media videos",
+      "x": -841.76419048455,
+      "y": 1474.8118904785206,
+      "text": "Materiality",
       "imageUrl": null,
-      "width": 280,
-      "height": 150,
+      "width": 150,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 27,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -1035.1547531753904,
-      "y": 1374.9625922718428,
-      "text": "Designing with Publics\n\n1 Hotspots and COVID-Aware Publics\n\n2 Citizen Science creating friction with legal and scientific systems.",
-      "imageUrl": null,
-      "width": 269.0582887841913,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 22,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
+      }
     }
   ],
   "connections": [
     {
-      "from": 3,
-      "to": 2
-    },
-    {
-      "from": 2,
+      "from": 0,
       "to": 1
     },
     {
       "from": 1,
-      "to": 3
+      "to": 2
+    },
+    {
+      "from": 2,
+      "to": 0
     }
   ]
 }
