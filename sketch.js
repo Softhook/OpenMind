@@ -441,15 +441,13 @@ function addTrackedEventListener(target, event, handler) {
   target.addEventListener(event, handler);
   eventListeners.push({ target, event, handler });
 }
-
+          // Draw text
 /**
  * Sets up page visibility event listeners to handle background/foreground transitions
  */
 function setupVisibilityHandling() {
-  // Determine which Page Visibility API properties are supported
   const hasStandardVisibility = typeof document.hidden !== 'undefined';
   const hasWebkitVisibility = typeof document.webkitHidden !== 'undefined';
-  
   // Use the Page Visibility API to detect when tab is hidden/visible
   // Note: Some browsers support both standard and webkit, so we listen to both
   // but use a flag to prevent duplicate handling. The same handler works for both
@@ -1896,10 +1894,70 @@ function exportPNG() {
       pg.textAlign(LEFT, CENTER);
       pg.textSize(box.fontSize);
 
-      let wrappedLines = getWrappedLines(box);
+      // Use TextBox's wrapText to populate cachedLineCharMap for highlight alignment
+      let wrappedLines = (typeof box.wrapText === 'function') ? box.wrapText(box.text || '') : getWrappedLines(box);
       let lineHeight = box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5);
       let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
       let textX = box.x - box.width / 2 + box.padding;
+
+      // Draw highlights behind text
+      try {
+        if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
+          const textStr = String(box.text || '');
+          const map = box.cachedLineCharMap || [];
+          const getLinePos = (absPos) => {
+            if (!map || map.length === 0) return { lineIndex: 0, posInLine: 0 };
+            let idx = 0;
+            for (let i = 0; i < map.length; i++) {
+              const s = map[i];
+              const e = (i < map.length - 1) ? map[i + 1] : textStr.length;
+              const last = (i === map.length - 1);
+              if ((absPos >= s && absPos < e) || (last && absPos >= s && absPos <= e)) { idx = i; break; }
+              if (last) idx = i;
+            }
+            const posInLine = Math.min(absPos - map[idx], (wrappedLines[idx] || '').length);
+            return { lineIndex: idx, posInLine };
+          };
+          pg.noStroke();
+          for (const hl of box.highlights) {
+            if (!hl || hl.start == null || hl.end == null) continue;
+            const start = Math.max(0, Math.min(textStr.length, Math.floor(hl.start)));
+            const end = Math.max(0, Math.min(textStr.length, Math.floor(hl.end)));
+            if (end <= start) continue;
+            const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
+            const alpha = (c.a != null) ? c.a : 180;
+            pg.fill(c.r, c.g, c.b, alpha);
+            const sInfo = getLinePos(start);
+            const eInfo = getLinePos(end);
+            if (sInfo.lineIndex === eInfo.lineIndex) {
+              const lineText = wrappedLines[sInfo.lineIndex] || '';
+              const x1 = textX + pg.textWidth(lineText.slice(0, Math.max(0, sInfo.posInLine)));
+              const x2 = textX + pg.textWidth(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+              const y = startY + sInfo.lineIndex * lineHeight;
+              pg.rect(x1, y - lineHeight / 3, Math.max(0, x2 - x1), lineHeight * 0.67);
+            } else {
+              for (let li = sInfo.lineIndex; li <= eInfo.lineIndex; li++) {
+                if (li < 0 || li >= wrappedLines.length) continue;
+                const lineText = wrappedLines[li] || '';
+                const y = startY + li * lineHeight;
+                let x1, x2;
+                if (li === sInfo.lineIndex) {
+                  x1 = textX + pg.textWidth(lineText.slice(0, Math.max(0, sInfo.posInLine)));
+                  x2 = textX + pg.textWidth(lineText);
+                } else if (li === eInfo.lineIndex) {
+                  x1 = textX;
+                  x2 = textX + pg.textWidth(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+                } else {
+                  x1 = textX;
+                  x2 = textX + pg.textWidth(lineText);
+                }
+                pg.rect(x1, y - lineHeight / 3, Math.max(0, x2 - x1), lineHeight * 0.67);
+              }
+            }
+          }
+          pg.fill(0);
+        }
+      } catch (_) {}
 
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
@@ -2199,15 +2257,78 @@ async function exportPDF() {
       pdf.setFontSize(ts(box.fontSize));
       pdf.setTextColor(0, 0, 0);
       
-      let wrappedLines = getWrappedLines(box);
+      // Prefer TextBox's wrapText to obtain line-to-absolute mapping for highlights
+      let wrappedLines = (typeof box.wrapText === 'function') ? box.wrapText(box.text || '') : getWrappedLines(box);
       let lineHeight = ts(box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5));
-      // Top-anchored text in PDF: start at box top + padding
-      let startY = ty(box.y - box.height / 2) + ts(box.padding) + lineHeight * 0.7;
+      // Top-anchored text in PDF: use top baseline and align highlights to the same top
+      let startY = ty(box.y - box.height / 2) + ts(box.padding);
       let textX = tx(box.x - box.width / 2 + box.padding);
+      
+      // Draw persistent highlights behind text using rectangles
+      try {
+        if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
+          const textStr = String(box.text || '');
+          const map = box.cachedLineCharMap || [];
+          const getLinePos = (absPos) => {
+            if (!map || map.length === 0) return { lineIndex: 0, posInLine: 0 };
+            let idx = 0;
+            for (let i = 0; i < map.length; i++) {
+              const startPos = map[i];
+              const endPos = (i < map.length - 1) ? map[i + 1] : textStr.length;
+              const isLast = (i === map.length - 1);
+              if ((absPos >= startPos && absPos < endPos) || (isLast && absPos >= startPos && absPos <= endPos)) { idx = i; break; }
+              if (isLast) idx = i;
+            }
+            const posInLine = Math.min(absPos - map[idx], (wrappedLines[idx] || '').length);
+            return { lineIndex: idx, posInLine };
+          };
+          // jsPDF lacks textWidth per font; approximate via splitting and measuring using pdf.getTextWidth
+          const textWidthPdf = (s) => {
+            try { return ts(pdf.getTextWidth(String(s))); } catch (_) { return ts(String(s).length * (box.fontSize * 0.6)); }
+          };
+          for (const hl of box.highlights) {
+            if (!hl || hl.start == null || hl.end == null) continue;
+            const start = Math.max(0, Math.min(textStr.length, Math.floor(hl.start)));
+            const end = Math.max(0, Math.min(textStr.length, Math.floor(hl.end)));
+            if (end <= start) continue;
+            const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
+            pdf.setFillColor(c.r || 255, c.g || 255, c.b || 0);
+            const sInfo = getLinePos(start);
+            const eInfo = getLinePos(end);
+            if (sInfo.lineIndex === eInfo.lineIndex) {
+              const lineText = wrappedLines[sInfo.lineIndex] || '';
+              const x1 = textX + textWidthPdf(lineText.slice(0, Math.max(0, sInfo.posInLine)));
+              const x2 = textX + textWidthPdf(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+              const yTop = startY + sInfo.lineIndex * lineHeight;
+              pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
+            } else {
+              for (let li = sInfo.lineIndex; li <= eInfo.lineIndex; li++) {
+                if (li < 0 || li >= wrappedLines.length) continue;
+                const lineText = wrappedLines[li] || '';
+                const yTop = startY + li * lineHeight;
+                let x1, x2;
+                if (li === sInfo.lineIndex) {
+                  x1 = textX + textWidthPdf(lineText.slice(0, Math.max(0, sInfo.posInLine)));
+                  x2 = textX + textWidthPdf(lineText);
+                } else if (li === eInfo.lineIndex) {
+                  x1 = textX;
+                  x2 = textX + textWidthPdf(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+                } else {
+                  x1 = textX;
+                  x2 = textX + textWidthPdf(lineText);
+                }
+                pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
+              }
+            }
+          }
+          // Restore text color after highlight rectangles
+          pdf.setTextColor(0, 0, 0);
+        }
+      } catch (_) {}
       
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
-          pdf.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
+          pdf.text(String(wrappedLines[i]), textX, startY + i * lineHeight, { baseline: 'top' });
         }
       }
     }
