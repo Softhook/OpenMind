@@ -1416,9 +1416,7 @@ function createNewBox() {
     y = worldMouseY();
   } else {
     // Mouse not over canvas - create at center of current viewport in world space
-    x = worldMouseX.call(null, width / 2);
-    y = worldMouseY.call(null, height / 2);
-    // Actually, we need to convert viewport center to world coords
+    // Convert viewport center to world coords
     x = (width / 2 - camX) / zoom;
     y = (height / 2 - camY) / zoom;
   }
@@ -1428,7 +1426,18 @@ function createNewBox() {
 
 function triggerFileLoad() {
   // Trigger the hidden file input
-  fileInput.elt.click();
+  try {
+    if (fileInput && fileInput.elt && typeof fileInput.elt.click === 'function') {
+      fileInput.elt.click();
+    } else if (fileInput && typeof fileInput.elt === 'undefined' && typeof fileInput.click === 'function') {
+      // p5.Element fallback
+      fileInput.click();
+    } else {
+      console.warn('File input not available to trigger file load');
+    }
+  } catch (e) {
+    console.warn('Failed to trigger file input:', e);
+  }
 }
 
 async function handleFileLoad(file) {
@@ -1948,8 +1957,10 @@ function exportPNG() {
     const totalWidth = contentWidth + padding * 2;
     const totalHeight = contentHeight + padding * 2;
     
-    // Create an offscreen graphics buffer at the content size
-    const pg = createGraphics(totalWidth, totalHeight);
+    // Create an offscreen graphics buffer at the content size (rounded to integers)
+    const bufW = Math.max(1, Math.ceil(totalWidth));
+    const bufH = Math.max(1, Math.ceil(totalHeight));
+    const pg = createGraphics(bufW, bufH);
     
     // Calculate the offset to map world space to buffer space
     const offsetX = padding - bounds.minX;
@@ -2129,8 +2140,26 @@ function exportPNG() {
     
     pg.pop();
     
-    // Save the buffer as PNG
-    save(pg, 'mindmap.png');
+    // Save the buffer as PNG by converting to a data URL and downloading
+    try {
+      const dataUrl = pg.canvas && pg.canvas.toDataURL ? pg.canvas.toDataURL('image/png') : null;
+      if (dataUrl) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'mindmap.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (typeof saveCanvas === 'function') {
+        // Fallback to p5 saveCanvas if available
+        saveCanvas(pg, 'mindmap', 'png');
+      } else {
+        throw new Error('Unable to generate PNG data');
+      }
+    } catch (e) {
+      console.error('Failed to save PNG:', e);
+      alert('Failed to save PNG: ' + e.message);
+    }
   } catch (e) {
     console.error('Failed to export PNG:', e);
     alert('Failed to export PNG: ' + e.message);
