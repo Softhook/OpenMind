@@ -88,6 +88,10 @@ let isPageVisible = true;
 let wasPageHidden = false;
 let visibilityChangeInProgress = 0; // Timestamp of last visibility change for debouncing
 
+// Track last file loaded via URL so we don't ignore subsequent navigations
+let lastLoadedUrlFile = null;
+// Loading indicator state
+let isMapLoading = false;
 // Event listener cleanup tracking
 let eventListeners = [];
 
@@ -207,6 +211,69 @@ function worldMouseX() {
 }
 
 /**
+ * Parse the current window location to find a candidate JSON file path.
+ * Supports `?file=...`, `#hash` (auto-append .json) and direct pathname ending with .json
+ * @returns {string|null}
+ */
+function parseFileFromLocation() {
+  if (typeof window === 'undefined' || !window.location) return null;
+  const searchParams = window.location.search ? new URLSearchParams(window.location.search) : null;
+  const hash = window.location.hash || '';
+  const path = window.location.pathname || '';
+
+  if (searchParams && searchParams.get('file')) {
+    return decodeURIComponent(searchParams.get('file'));
+  }
+  if (hash && hash.length > 1) {
+    let h = decodeURIComponent(hash.substring(1));
+    if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
+    return h;
+  }
+  if (path && path.toLowerCase().endsWith('.json')) {
+    return path.startsWith('/') ? path : ('/' + path);
+  }
+  return null;
+}
+
+/**
+ * Fetch and load a JSON map from a given file path/URL.
+ * Updates `lastLoadedUrlFile` so repeat navigations can be detected.
+ */
+async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
+  if (!fileToFetch) return false;
+  // Show loading overlay while fetching
+  isMapLoading = true;
+  try {
+    // If already loaded the same URL and not forced, skip
+    if (!force && lastLoadedUrlFile && lastLoadedUrlFile === fileToFetch) return false;
+    const resp = await fetch(fileToFetch, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
+    const data = await resp.json();
+    if (mindMap && typeof mindMap.load === 'function') await mindMap.load(data);
+    if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
+    try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
+    lastLoadedUrlFile = fileToFetch;
+    return true;
+  } catch (e) {
+    console.warn('Failed to load map from URL "' + fileToFetch + '":', e);
+    return false;
+  } finally {
+    isMapLoading = false;
+  }
+}
+
+/**
+ * Handler to respond to URL changes (hash/popstate) and initial load.
+ */
+function handleUrlChange() {
+  const fileToFetch = parseFileFromLocation();
+  if (fileToFetch) {
+    // Load the map and don't fall back to localStorage when a URL is present
+    loadMapFromUrl(fileToFetch);
+  }
+}
+
+/**
  * Converts mouse Y position from screen space to world space
  * @returns {number} World Y coordinate
  */
@@ -255,46 +322,20 @@ function setup() {
       // ignore
     }
 
-    // Determine a JSON file to load from multiple URL locations:
-    // 1) query string: ?file=maps/Plundergeist.json
-    // 2) hash: #maps/Plundergeist.json
-    // 3) full pathname: #/maps/Plundergeist.json
-    // Note: if you open the raw JSON URL directly (e.g. /maps/Plundergeist.json) your server
-    // will typically return that JSON file instead of the app. Use a SPA-friendly server or
-    // the ?file= or hash approach when serving statically.
-    const searchParams = (typeof window !== 'undefined' && window.location && window.location.search) ? new URLSearchParams(window.location.search) : null;
-    const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
-    const path = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
-
-    let fileToFetch = null;
-    if (searchParams && searchParams.get('file')) {
-      fileToFetch = decodeURIComponent(searchParams.get('file'));
-    } else if (hash && hash.length > 1) {
-      // Support hashes with or without the .json extension. Examples:
-      //  #maps/Plundergeist.json  -> maps/Plundergeist.json
-      //  #maps/Plundergeist       -> maps/Plundergeist.json (auto-append)
-      let h = decodeURIComponent(hash.substring(1));
-      if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
-      fileToFetch = h;
-    } else if (path && path.toLowerCase().endsWith('.json')) {
-      // Use full pathname (strip leading slash to make it relative if needed)
-      fileToFetch = path.startsWith('/') ? path : ('/' + path);
+    // Handle initial URL-based loading and listen for future URL changes
+    // (supports ?file=, hash like #maps/Name or #maps/Name.json, and direct .json pathname)
+    // Parse synchronously to decide whether to skip localStorage fallback (avoid race).
+    const initialFile = parseFileFromLocation();
+    if (initialFile) {
+      // Mark immediately so the localStorage fallback doesn't overwrite the URL load
+      lastLoadedUrlFile = initialFile;
+      // Start loading asynchronously; no need to await during setup
+      loadMapFromUrl(initialFile);
     }
+    addTrackedEventListener(window, 'hashchange', handleUrlChange);
+    addTrackedEventListener(window, 'popstate', handleUrlChange);
 
-    if (fileToFetch) {
-      (async function() {
-        try {
-          const resp = await fetch(fileToFetch, { cache: 'no-cache' });
-          if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
-          const data = await resp.json();
-          if (mindMap && typeof mindMap.load === 'function') await mindMap.load(data);
-          if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
-          try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
-        } catch (e) {
-          console.warn('Failed to load map from URL "' + fileToFetch + '":', e);
-        }
-      })();
-    } else {
+    if (!lastLoadedUrlFile) {
       // Try to load from localStorage first
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
@@ -453,6 +494,34 @@ function draw() {
         KeyRepeat.update();
       } catch (_) {}
     }
+  }
+
+  // Draw loading overlay on top of everything when fetching/loading maps
+  if (isMapLoading) {
+    push();
+    // Screen-space overlay
+    resetMatrix && resetMatrix();
+    noStroke();
+    fill(0, 0, 0, 160);
+    rect(0, 0, width, height);
+
+    // Loading text
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(20);
+    text('Loading map...', width / 2, height / 2 - 10);
+
+    // Small spinner below the text
+    push();
+    translate(width / 2, height / 2 + 18);
+    rotate(frameCount * 0.08);
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+    arc(0, 0, 28, 28, 0, PI * 0.8);
+    pop();
+    pop();
+    cursor('wait');
   }
 }
 
@@ -1376,6 +1445,8 @@ async function handleFileLoad(file) {
     return;
   }
   
+  // Show loading overlay while processing the file
+  isMapLoading = true;
   try {
     // Validate file.data exists
     if (!file.data) {
@@ -1438,6 +1509,8 @@ async function handleFileLoad(file) {
   } catch (e) {
     console.error('Failed to load file:', e);
     alert('Failed to load file: ' + e.message);
+  } finally {
+    isMapLoading = false;
   }
 }
 

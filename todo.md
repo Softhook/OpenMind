@@ -1,18 +1,7 @@
-I still get an strange problem where sometimes pressing enter multiple seem to create problems with the text selection. At that point doing CMD + A doesnt visually include all the text. When I examine what is copied and pasted though it is compple. this is a disconnect between what is visuallu displayed vs what is programmatically slected.
-
-It is related to text wrapping. Please analyse how the text wrapping works in p5.js
-
-new button create blank layout
-
-
 When copying text into the application you need to sanitize it to remove strange characters or hidden characters. 
 
 
-add a dashed line connection
-
 reflow text boxes based on connections
-
-Center a loaded file after load 
 
 Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
 
@@ -21,23 +10,6 @@ pressing s key make all the selected boxes an average same width
 
 detect hyperlinks or local file links - colour them blue and clicking on them opens the link in another window
 
-
-
-Try and get the bold working :
-
-This is a p5.js mind map software. I would like to add Bold selecting text using CMD + B. The thing that is challenging is making it work when the bold text stretches across multiple lines. Try and use invisible ** markdown for the Bold formating. Think hard about this
-
-Key considerations:
-1. Store bold markers (**) invisibly in the text
-2. Parse and render bold segments during drawing
-3. Handle wrapping where bold text spans multiple lines
-4. Ensure cursor position accounts for invisible markers
-5. Make selection and editing work naturally
-Here's my approach:
-* Keep **bold** markers in the actual text string
-* During rendering, parse and hide markers while applying bold font
-* Track marker positions to adjust cursor/selection positions
-* Handle line wrapping by continuing bold state across wrapped lines
 
 
 Text Import
