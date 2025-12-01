@@ -259,8 +259,13 @@ function setup() {
     let fileToFetch = null;
     if (searchParams && searchParams.get('file')) {
       fileToFetch = decodeURIComponent(searchParams.get('file'));
-    } else if (hash && hash.length > 1 && hash.toLowerCase().endsWith('.json')) {
-      fileToFetch = decodeURIComponent(hash.substring(1));
+    } else if (hash && hash.length > 1) {
+      // Support hashes with or without the .json extension. Examples:
+      //  #maps/Plundergeist.json  -> maps/Plundergeist.json
+      //  #maps/Plundergeist       -> maps/Plundergeist.json (auto-append)
+      let h = decodeURIComponent(hash.substring(1));
+      if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
+      fileToFetch = h;
     } else if (path && path.toLowerCase().endsWith('.json')) {
       // Use full pathname (strip leading slash to make it relative if needed)
       fileToFetch = path.startsWith('/') ? path : ('/' + path);
