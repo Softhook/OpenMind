@@ -118,19 +118,6 @@
       }
     },
     {
-      "x": -1425.2826755940512,
-      "y": 688.562211888573,
-      "text": "ANT 1980s \nBruno Latour, Michelle Callon, John Law\n\nPostANT\nAnnemarie Moll, Helen Veran, Noortje Marres",
-      "imageUrl": null,
-      "width": 292.456761087829,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -970.2091475358525,
       "y": 1449.3773360519353,
       "text": "Latour is well known for his method: Follow the actors. Many early ANT studies are ethnographies Narrating what actors get up to and trying to map these events.\n\nMany of the classic ANT case studies are actually historical things. About transport systems, pasteur or the caravels. Shellfish, Berlin key",
@@ -256,31 +243,44 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -1425.2826755940512,
+      "y": 688.562211888573,
+      "text": "ANT 1980s \nBruno Latour, Michel Callon, John Law\n\nPostANT\nAnnemarie Moll, Helen Veran, Noortje Marres",
+      "imageUrl": null,
+      "width": 292.456761087829,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
     {
       "from": 3,
-      "to": 9
-    },
-    {
-      "from": 12,
-      "to": 10
+      "to": 16
     },
     {
       "from": 11,
+      "to": 9
+    },
+    {
+      "from": 10,
+      "to": 12
+    },
+    {
+      "from": 12,
+      "to": 11
+    },
+    {
+      "from": 7,
       "to": 13
     },
     {
       "from": 13,
-      "to": 12
-    },
-    {
-      "from": 7,
-      "to": 14
-    },
-    {
-      "from": 14,
       "to": 8
     }
   ]
