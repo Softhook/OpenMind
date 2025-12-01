@@ -1334,6 +1334,13 @@ async function handleFileLoad(file) {
       mindMap.setLastUsedFilename(file.name);
     }
 
+    // Fit the loaded content to the screen (same behavior as pressing '-' key)
+    try {
+      resetView();
+    } catch (e) {
+      console.warn('resetView failed after loading file:', e);
+    }
+
     // Ensure the hidden file input is reset so selecting the same file again
     // will fire a change event in the browser and allow reloading the same file.
     try {
