@@ -3,10 +3,6 @@
 // ============================================================================
 // Central configuration object for all app settings
 
-// Intro screen state
-let showIntro = true;
-let mavenFont = null;
-
 const CONFIG = {
   ZOOM: {
     MIN: 0.2,              // Minimum zoom level (20%)
@@ -247,17 +243,6 @@ function setup() {
   try {
     createCanvas(windowWidth, windowHeight);
     
-    // Load maven.ttf font (non-blocking)
-    loadFont('maven.ttf', 
-      function(font) {
-        mavenFont = font;
-      },
-      function(err) {
-        console.warn('maven.ttf font not found, using default font');
-        mavenFont = null;
-      }
-    );
-    
     mindMap = new MindMap();
     
     // Try to load from localStorage first
@@ -375,12 +360,6 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
-  // Show intro screen if active
-  if (showIntro) {
-    drawIntroScreen();
-    return;
-  }
-  
   background(240);
   updateMenuVisibility();
   
@@ -418,26 +397,6 @@ function draw() {
       } catch (_) {}
     }
   }
-}
-
-/**
- * Draws the intro screen with "OpenMind" centered
- */
-function drawIntroScreen() {
-  background(240);
-  
-  // Set font to maven if loaded, otherwise use default
-  if (mavenFont) {
-    textFont(mavenFont);
-  }
-  
-  // Draw "OpenMind" text large and centered
-  push();
-  fill(50);
-  textAlign(CENTER, CENTER);
-  textSize(min(width / 6, 120)); // Responsive font size
-  text('OpenMind', width / 2, height / 2);
-  pop();
 }
 
 // Set mouse cursor based on what the user is hovering over
@@ -830,15 +789,6 @@ function handlePageBecameVisible() {
 
 // Show or hide the top-left menu based on cursor position
 function updateMenuVisibility() {
-  // Don't show menu during intro screen
-  if (showIntro) {
-    if (menuIsVisible) {
-      hideMenuButtons();
-      menuIsVisible = false;
-    }
-    return;
-  }
-  
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && 
     mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
@@ -1055,12 +1005,6 @@ function toggleKeyboardControlsOverlay() {
  * Handles mouse press events
  */
 function mousePressed() {
-  // Handle intro screen - any click dismisses it
-  if (showIntro) {
-    showIntro = false;
-    return false;
-  }
-  
   if (keyboardOverlayVisible) return false;
   // Prevent interaction with canvas when clicking on UI buttons
   if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mindMap) {
@@ -1168,12 +1112,6 @@ function mouseDragged() {
  * Handles key press events
  */
 function keyPressed() {
-  // Handle intro screen - any key dismisses it
-  if (showIntro) {
-    showIntro = false;
-    return false;
-  }
-  
   if (keyboardOverlayVisible) {
     const escapeCode = (typeof ESCAPE !== 'undefined') ? ESCAPE : 27;
     if (keyCode === escapeCode || key === 'Escape') {
