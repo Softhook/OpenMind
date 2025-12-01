@@ -327,9 +327,8 @@ function setup() {
     // Parse synchronously to decide whether to skip localStorage fallback (avoid race).
     const initialFile = parseFileFromLocation();
     if (initialFile) {
-      // Mark immediately so the localStorage fallback doesn't overwrite the URL load
-      lastLoadedUrlFile = initialFile;
-      // Start loading asynchronously; no need to await during setup
+      // Start loading asynchronously; do NOT set `lastLoadedUrlFile` yet
+      // (it is set after a successful fetch inside `loadMapFromUrl`).
       loadMapFromUrl(initialFile);
     }
     addTrackedEventListener(window, 'hashchange', handleUrlChange);
