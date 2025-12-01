@@ -1550,6 +1550,28 @@ function handleCanvasDrop(e) {
     if (dt.files && dt.files.length > 0) {
       for (let i = 0; i < dt.files.length; i++) {
         const f = dt.files[i];
+        // JSON file support: merge map into current map at drop point
+        if (f && ((f.type && f.type === 'application/json') || (f.name && f.name.toLowerCase().endsWith('.json')))) {
+          try {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              try {
+                const text = ev.target.result;
+                const data = JSON.parse(text);
+                await mergeMapData(data, wx, wy);
+              } catch (e) {
+                console.warn('Failed to parse dropped JSON map', e);
+                alert('Failed to load JSON map: ' + (e && e.message ? e.message : String(e)));
+              }
+            };
+            reader.onerror = (err) => { console.warn('Failed reading dropped json', err); };
+            reader.readAsText(f);
+          } catch (e) {
+            console.warn('JSON drop handling failed', e);
+          }
+          return;
+        }
+
         if (f && f.type && f.type.startsWith('image/')) {
           // Compress/resize image before embedding to reduce decoded memory and JSON size.
           // Process sequentially to avoid memory spikes.
@@ -1691,6 +1713,92 @@ function createImageBox(url, worldX, worldY) {
     mindMap.selectedBox = box;
   } catch (e) {
     console.warn('Failed to create image box', e);
+  }
+}
+
+/**
+ * Merge an imported map JSON into the current mind map at world position (wx, wy).
+ * Preserves existing content and appends imported boxes/connections.
+ */
+async function mergeMapData(data, wx, wy) {
+  try {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.boxes)) {
+      throw new Error('Invalid map JSON: missing boxes array');
+    }
+    if (!mindMap) throw new Error('mindMap not initialized');
+
+    // Compute import center (average of box positions) to drop the map centered at drop point
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const b of data.boxes) {
+      if (!b) continue;
+      const bx = (b.x != null && isFinite(b.x)) ? b.x : 0;
+      const by = (b.y != null && isFinite(b.y)) ? b.y : 0;
+      minX = Math.min(minX, bx);
+      maxX = Math.max(maxX, bx);
+      minY = Math.min(minY, by);
+      maxY = Math.max(maxY, by);
+    }
+    if (!isFinite(minX) || !isFinite(minY)) {
+      minX = 0; minY = 0; maxX = 0; maxY = 0;
+    }
+    const importCenterX = (minX + maxX) / 2;
+    const importCenterY = (minY + maxY) / 2;
+
+    // Prepare to append boxes/connections
+    const baseIndex = mindMap.boxes ? mindMap.boxes.length : 0;
+    const newBoxes = [];
+
+    // Single undo snapshot for the merge
+    mindMap.pushUndo && mindMap.pushUndo();
+
+    // Create new boxes with positional offset so import center maps to drop point
+    const offsetX = wx - importCenterX;
+    const offsetY = wy - importCenterY;
+    for (const b of data.boxes) {
+      try {
+        const bcopy = Object.assign({}, b);
+        bcopy.x = (bcopy.x != null && isFinite(bcopy.x)) ? (bcopy.x + offsetX) : (wx + offsetX);
+        bcopy.y = (bcopy.y != null && isFinite(bcopy.y)) ? (bcopy.y + offsetY) : (wy + offsetY);
+        const newBox = TextBox.fromJSON(bcopy);
+        if (newBox) {
+          mindMap.boxes.push(newBox);
+          newBoxes.push(newBox);
+        }
+      } catch (e) {
+        console.warn('Failed to import box', e);
+      }
+    }
+
+    // Append connections, remapping indices
+    if (Array.isArray(data.connections)) {
+      for (const c of data.connections) {
+        try {
+          if (!c || typeof c !== 'object') continue;
+          const mapped = { from: (Number.isFinite(c.from) ? c.from : 0) + baseIndex, to: (Number.isFinite(c.to) ? c.to : 0) + baseIndex };
+          const conn = Connection.fromJSON(mapped, mindMap.boxes);
+          if (conn) mindMap.connections.push(conn);
+        } catch (e) {
+          console.warn('Failed to import connection', e);
+        }
+      }
+    }
+
+    // Clear selection and select the newly added boxes
+    try {
+      mindMap.clearBoxSelection && mindMap.clearBoxSelection();
+      for (const nb of newBoxes) mindMap.addBoxToSelection && mindMap.addBoxToSelection(nb);
+      if (newBoxes.length > 0) {
+        mindMap.selectedBox = newBoxes[0];
+        mindMap.panToBox && mindMap.panToBox(newBoxes[0], true);
+      }
+    } catch (_) {}
+
+    mindMap.isDirty = true;
+    mindMap.isSaved = false;
+    try { mindMap.saveToLocalStorage && mindMap.saveToLocalStorage(); } catch (_) {}
+  } catch (e) {
+    console.warn('mergeMapData failed', e);
+    throw e;
   }
 }
 
