@@ -6,7 +6,6 @@
 // Intro screen state
 let showIntro = true;
 let mavenFont = null;
-let fontLoadAttempted = false;
 
 const CONFIG = {
   ZOOM: {
@@ -248,6 +247,17 @@ function setup() {
   try {
     createCanvas(windowWidth, windowHeight);
     
+    // Load maven.ttf font (non-blocking)
+    loadFont('maven.ttf', 
+      function(font) {
+        mavenFont = font;
+      },
+      function(err) {
+        console.warn('maven.ttf font not found, using default font');
+        mavenFont = null;
+      }
+    );
+    
     mindMap = new MindMap();
     
     // Try to load from localStorage first
@@ -415,23 +425,6 @@ function draw() {
  */
 function drawIntroScreen() {
   background(240);
-  
-  // Ensure menu buttons are hidden during intro
-  updateMenuVisibility();
-  
-  // Attempt to load maven.ttf font once (non-blocking)
-  if (!fontLoadAttempted) {
-    fontLoadAttempted = true;
-    loadFont('maven.ttf', 
-      function(font) {
-        mavenFont = font;
-      },
-      function(err) {
-        console.warn('maven.ttf font not found, using default font');
-        mavenFont = null;
-      }
-    );
-  }
   
   // Set font to maven if loaded, otherwise use default
   if (mavenFont) {
