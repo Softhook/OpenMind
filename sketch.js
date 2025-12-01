@@ -244,42 +244,68 @@ function setup() {
     createCanvas(windowWidth, windowHeight);
     
     mindMap = new MindMap();
-    
-    // Try to load from localStorage first
-    const hasAutosave = mindMap.hasLocalStorageData();
-    if (hasAutosave) {
-      try {
-        // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
-        const maybePromise = mindMap.loadFromLocalStorage();
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          maybePromise.then(() => {
-            try {
-              // Fit loaded content to the screen (same behavior as pressing '-' key)
-              resetView();
-            } catch (e) {
-              console.warn('resetView failed after loading from localStorage:', e);
-            }
-          }).catch((e) => {
-            console.warn('Failed to load mindMap from localStorage:', e);
-          });
-        } else {
-          try {
-            // Synchronous load completed — fit view now
-            resetView();
-          } catch (e) {
-            console.warn('resetView failed after loading from localStorage:', e);
-          }
+
+    // Determine a JSON file to load from multiple URL locations:
+    // 1) query string: ?file=maps/Plundergeist.json
+    // 2) hash: #maps/Plundergeist.json
+    // 3) full pathname: #/maps/Plundergeist.json
+    // Note: if you open the raw JSON URL directly (e.g. /maps/Plundergeist.json) your server
+    // will typically return that JSON file instead of the app. Use a SPA-friendly server or
+    // the ?file= or hash approach when serving statically.
+    const searchParams = (typeof window !== 'undefined' && window.location && window.location.search) ? new URLSearchParams(window.location.search) : null;
+    const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
+    const path = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
+
+    let fileToFetch = null;
+    if (searchParams && searchParams.get('file')) {
+      fileToFetch = decodeURIComponent(searchParams.get('file'));
+    } else if (hash && hash.length > 1 && hash.toLowerCase().endsWith('.json')) {
+      fileToFetch = decodeURIComponent(hash.substring(1));
+    } else if (path && path.toLowerCase().endsWith('.json')) {
+      // Use full pathname (strip leading slash to make it relative if needed)
+      fileToFetch = path.startsWith('/') ? path : ('/' + path);
+    }
+
+    if (fileToFetch) {
+      (async function() {
+        try {
+          const resp = await fetch(fileToFetch, { cache: 'no-cache' });
+          if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
+          const data = await resp.json();
+          if (mindMap && typeof mindMap.load === 'function') await mindMap.load(data);
+          if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
+          try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
+        } catch (e) {
+          console.warn('Failed to load map from URL "' + fileToFetch + '":', e);
         }
-      } catch (e) {
-        console.warn('Error while loading from localStorage:', e);
-      }
+      })();
     } else {
-      // Create initial boxes as examples only if no autosave exists
-      mindMap.addBox(new TextBox(300, 200, "Idea"));
-      mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
-      mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
-      // Initial state is unsaved, will be autosaved on first interval
-      if (mindMap) mindMap.isSaved = false;
+      // Try to load from localStorage first
+      const hasAutosave = mindMap.hasLocalStorageData();
+      if (hasAutosave) {
+        try {
+          // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
+          const maybePromise = mindMap.loadFromLocalStorage();
+          if (maybePromise && typeof maybePromise.then === 'function') {
+            maybePromise.then(() => {
+              try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
+            }).catch((e) => {
+              console.warn('Failed to load mindMap from localStorage:', e);
+            });
+          } else {
+            try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
+          }
+        } catch (e) {
+          console.warn('Error while loading from localStorage:', e);
+        }
+      } else {
+        // Create initial boxes as examples only if no autosave exists
+        mindMap.addBox(new TextBox(300, 200, "Idea"));
+        mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+        mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+        // Initial state is unsaved, will be autosaved on first interval
+        if (mindMap) mindMap.isSaved = false;
+      }
     }
     
     // Create UI buttons
