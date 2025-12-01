@@ -1287,6 +1287,18 @@ class MindMap {
     } catch (e) {
       // Silently fail if localStorage is not available
     }
+    try {
+      if (typeof document !== 'undefined') {
+        // Show just the basename (without path or .json) in the tab title,
+        // appended with the app name as a suffix.
+        let name = filename || '';
+        name = name.split('/').pop().split('\\').pop();
+        name = name.replace(/\.json$/i, '').trim();
+        document.title = name ? (name + ' — OpenMind') : 'OpenMind';
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   /**

@@ -244,6 +244,16 @@ function setup() {
     createCanvas(windowWidth, windowHeight);
     
     mindMap = new MindMap();
+    try {
+      if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
+        let fname = mindMap.getLastUsedFilename() || '';
+        fname = fname.split('/').pop().split('\\').pop();
+        fname = fname.replace(/\.json$/i, '').trim();
+        document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
+      }
+    } catch (e) {
+      // ignore
+    }
 
     // Determine a JSON file to load from multiple URL locations:
     // 1) query string: ?file=maps/Plundergeist.json
@@ -294,11 +304,27 @@ function setup() {
           if (maybePromise && typeof maybePromise.then === 'function') {
             maybePromise.then(() => {
               try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
+              try {
+                if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
+                  let fname = mindMap.getLastUsedFilename() || '';
+                  fname = fname.split('/').pop().split('\\').pop();
+                  fname = fname.replace(/\.json$/i, '').trim();
+                  document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
+                }
+              } catch (_) {}
             }).catch((e) => {
               console.warn('Failed to load mindMap from localStorage:', e);
             });
           } else {
             try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
+            try {
+              if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
+                let fname = mindMap.getLastUsedFilename() || '';
+                fname = fname.split('/').pop().split('\\').pop();
+                fname = fname.replace(/\.json$/i, '').trim();
+                document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
+              }
+            } catch (_) {}
           }
         } catch (e) {
           console.warn('Error while loading from localStorage:', e);
