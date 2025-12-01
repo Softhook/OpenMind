@@ -1,61 +1,11 @@
 {
   "boxes": [
     {
-      "x": -1011.8687343158771,
-      "y": 1341.713309171932,
-      "text": "Designing with Publics\n\n1 Hotspots and COVID-Aware Publics\n\n2 Citizen Science epistemic friction with legal systems.",
+      "x": -551.930635261396,
+      "y": 1414.4343684310209,
+      "text": "Ethnography of Objects\n\nRe-materialising Actor-Network Theory methods",
       "imageUrl": null,
-      "width": 269.0582887841913,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 22,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -567.5392930581934,
-      "y": 1456.55721236478,
-      "text": "Gen AI & Design in Practice\n\n1 Plundergeist - Playful design method\n\n2 Real AI-use in the world via social media videos",
-      "imageUrl": null,
-      "width": 280,
-      "height": 150,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 27,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -935.3441172818532,
-      "y": 1611.6853398721128,
-      "text": "Ethnography of Objects\n\n1 Rethink classic Actor-Network Theory study",
-      "imageUrl": null,
-      "width": 228.6126299337626,
+      "width": 230.6126299337626,
       "height": 108,
       "backgroundColor": {
         "r": 255,
@@ -76,12 +26,62 @@
       ]
     },
     {
-      "x": -841.76419048455,
-      "y": 1474.8118904785206,
-      "text": "Materiality",
+      "x": -1101.288292210535,
+      "y": 1273.0479328915496,
+      "text": "Gen AI & Design\n\n1 Plundergeist - Playful design method\n\n2 Real world AI-practice via social media videos",
       "imageUrl": null,
-      "width": 150,
-      "height": 45,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 15,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -910.7833394981843,
+      "y": 1659.6941363868093,
+      "text": "Designing with Publics\n\n1 Hotspots and COVID-Aware Publics\n\n2 Citizen Science epistemic friction with legal systems.\n\nRef impact extension Drones & Noise",
+      "imageUrl": null,
+      "width": 269.0582887841913,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 22,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -844.6444468720985,
+      "y": 1459.2178268136588,
+      "text": "Materiality is \nLively & Ungovernable",
+      "imageUrl": null,
+      "width": 170.3341890070535,
+      "height": 66,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -91,16 +91,16 @@
   ],
   "connections": [
     {
-      "from": 0,
+      "from": 2,
       "to": 1
     },
     {
       "from": 1,
-      "to": 2
+      "to": 0
     },
     {
-      "from": 2,
-      "to": 0
+      "from": 0,
+      "to": 2
     }
   ]
 }
