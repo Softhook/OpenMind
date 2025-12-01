@@ -248,7 +248,31 @@ function setup() {
     // Try to load from localStorage first
     const hasAutosave = mindMap.hasLocalStorageData();
     if (hasAutosave) {
-      mindMap.loadFromLocalStorage();
+      try {
+        // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
+        const maybePromise = mindMap.loadFromLocalStorage();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.then(() => {
+            try {
+              // Fit loaded content to the screen (same behavior as pressing '-' key)
+              resetView();
+            } catch (e) {
+              console.warn('resetView failed after loading from localStorage:', e);
+            }
+          }).catch((e) => {
+            console.warn('Failed to load mindMap from localStorage:', e);
+          });
+        } else {
+          try {
+            // Synchronous load completed — fit view now
+            resetView();
+          } catch (e) {
+            console.warn('resetView failed after loading from localStorage:', e);
+          }
+        }
+      } catch (e) {
+        console.warn('Error while loading from localStorage:', e);
+      }
     } else {
       // Create initial boxes as examples only if no autosave exists
       mindMap.addBox(new TextBox(300, 200, "Idea"));
