@@ -1869,6 +1869,7 @@ class TextBox {
   
   /**
    * Creates a TextBox from JSON data
+   * Uses shared utilities for validation when available
    * @param {Object} data - JSON data to load from
    * @returns {TextBox|null} New TextBox instance or null if invalid
    */
@@ -1879,30 +1880,37 @@ class TextBox {
       return null;
     }
     
+    // Use shared utility for number validation if available
+    const isValid = TextBox._isValidNumber;
+    
     // Validate required fields with defaults
-    let x = (data.x != null && !isNaN(data.x)) ? data.x : 100;
-    let y = (data.y != null && !isNaN(data.y)) ? data.y : 100;
+    let x = isValid(data.x) ? data.x : 100;
+    let y = isValid(data.y) ? data.y : 100;
     let text = data.text != null ? TextBox.sanitizeText(String(data.text)) : 'New Node';
     
     let box = new TextBox(x, y, text);
     
     // Set optional dimensions if valid
-    if (data.width != null && !isNaN(data.width) && data.width > 0) {
+    if (isValid(data.width) && data.width > 0) {
       box.width = data.width;
       // Preserve loaded width as a manual setting so updates don't auto-shrink
       box.userResized = true;
     }
-    if (data.height != null && !isNaN(data.height) && data.height > 0) {
+    if (isValid(data.height) && data.height > 0) {
       box.height = data.height;
     }
 
-    // Load background color if present
+    // Load background color if present - use shared utility for color validation
     if (data.backgroundColor && typeof data.backgroundColor === 'object') {
       const c = data.backgroundColor;
-      const r = Number.isFinite(c.r) ? c.r : 255;
-      const g = Number.isFinite(c.g) ? c.g : 255;
-      const b = Number.isFinite(c.b) ? c.b : 255;
-      box.backgroundColor = { r, g, b };
+      if (typeof Utils !== 'undefined' && Utils.validateColor) {
+        box.backgroundColor = Utils.validateColor(c);
+      } else {
+        const r = Number.isFinite(c.r) ? c.r : 255;
+        const g = Number.isFinite(c.g) ? c.g : 255;
+        const b = Number.isFinite(c.b) ? c.b : 255;
+        box.backgroundColor = { r, g, b };
+      }
     }
     // Load image URL if present
     if (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
@@ -1915,12 +1923,15 @@ class TextBox {
     // Load highlights if present
     if (Array.isArray(data.highlights)) {
       box.highlights = [];
+      const textLen = String(box.text || '').length;
       for (const h of data.highlights) {
         if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') continue;
-        const start = Math.max(0, Math.min(String(box.text || '').length, Math.floor(h.start)));
-        const end = Math.max(0, Math.min(String(box.text || '').length, Math.floor(h.end)));
+        const start = Math.max(0, Math.min(textLen, Math.floor(h.start)));
+        const end = Math.max(0, Math.min(textLen, Math.floor(h.end)));
         if (start >= end) continue;
-        const color = (h.color && typeof h.color === 'object') ? h.color : { r: 255, g: 255, b: 0, a: 180 };
+        const color = (typeof Utils !== 'undefined' && Utils.validateColor) 
+          ? Utils.validateColor(h.color, { r: 255, g: 255, b: 0, a: 180 })
+          : ((h.color && typeof h.color === 'object') ? h.color : { r: 255, g: 255, b: 0, a: 180 });
         box.highlights.push({ start, end, color });
       }
     }

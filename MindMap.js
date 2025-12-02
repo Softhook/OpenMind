@@ -1234,6 +1234,7 @@ class MindMap {
   
   /**
    * Loads mind map from JSON data
+   * Uses shared utilities for safe iteration when available
    * @param {Object} data - JSON data to load from
    */
   fromJSON(data) {
@@ -1257,17 +1258,25 @@ class MindMap {
     }
     
     // Load boxes with error handling
+    // Use safe iteration utility if available
     if (Array.isArray(data.boxes)) {
-      for (let boxData of data.boxes) {
+      const loadBox = (boxData) => {
+        if (!boxData) return;
         try {
-          if (boxData) {
-            let box = TextBox.fromJSON(boxData);
-            if (box) {
-              this.boxes.push(box);
-            }
+          let box = TextBox.fromJSON(boxData);
+          if (box) {
+            this.boxes.push(box);
           }
         } catch (e) {
           console.error('Failed to load box:', e);
+        }
+      };
+      
+      if (typeof Utils !== 'undefined' && Utils.safeForEach) {
+        Utils.safeForEach(data.boxes, loadBox);
+      } else {
+        for (let boxData of data.boxes) {
+          loadBox(boxData);
         }
       }
     } else {
@@ -1276,16 +1285,23 @@ class MindMap {
     
     // Load connections with error handling
     if (Array.isArray(data.connections)) {
-      for (let connData of data.connections) {
+      const loadConnection = (connData) => {
+        if (!connData) return;
         try {
-          if (connData) {
-            let conn = Connection.fromJSON(connData, this.boxes);
-            if (conn && conn.fromBox && conn.toBox) {
-              this.connections.push(conn);
-            }
+          let conn = Connection.fromJSON(connData, this.boxes);
+          if (conn && conn.fromBox && conn.toBox) {
+            this.connections.push(conn);
           }
         } catch (e) {
           console.error('Failed to load connection:', e);
+        }
+      };
+      
+      if (typeof Utils !== 'undefined' && Utils.safeForEach) {
+        Utils.safeForEach(data.connections, loadConnection);
+      } else {
+        for (let connData of data.connections) {
+          loadConnection(connData);
         }
       }
     } else {

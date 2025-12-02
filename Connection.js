@@ -240,6 +240,7 @@ class Connection {
   
   /**
    * Creates a Connection from JSON data
+   * Uses shared utilities for validation when available
    * @param {Object} data - JSON data with from/to indices
    * @param {Array<TextBox>} boxes - Array of all boxes
    * @returns {Connection|null} New Connection instance or null if invalid
@@ -251,9 +252,11 @@ class Connection {
       return null;
     }
     
+    // Use shared validation if available
+    const isValidNum = Connection._isValidNumber;
+    
     // Validate indices
-    if (data.from == null || data.to == null || 
-        isNaN(data.from) || isNaN(data.to) ||
+    if (!isValidNum(data.from) || !isValidNum(data.to) ||
         data.from < 0 || data.to < 0 ||
         data.from >= boxes.length || data.to >= boxes.length) {
       console.warn('Invalid connection indices');
