@@ -1,17 +1,11 @@
 // ============================================================================
 // CONFIGURATION CONSTANTS
 // ============================================================================
-// Central configuration object for all app settings
+// Use centralized configuration from utils.js, with local alias for compatibility
 
-const CONFIG = {
-  ZOOM: {
-    MIN: 0.2,              // Minimum zoom level (20%)
-    MAX: 3.0,              // Maximum zoom level (300%)
-    STEP: 1.05             // Zoom factor per scroll step
-  },
-  CAMERA: {
-    PAN_MARGIN: 500        // Soft limit margin for panning (pixels)
-  },
+const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
+  ZOOM: { MIN: 0.2, MAX: 3.0, STEP: 1.05, DEFAULT: 1.0 },
+  CAMERA: { PAN_MARGIN: 500 },
   UI: {
     TOOLBAR_HEIGHT: 40,
     MENU_TRIGGER_X: 50,
@@ -24,16 +18,10 @@ const CONFIG = {
     SAVE_INDICATOR_X: 20,
     SAVE_INDICATOR_Y: 26
   },
-  EXPORT: {
-    PADDING: 50,           // Padding around content in exports
-    MARGIN: 20             // Page margins for PDF export
-  },
-  AUTOSAVE: {
-    INTERVAL: 30000        // Autosave interval in milliseconds (30 seconds)
-  },
-  VISIBILITY: {
-    DEBOUNCE_MS: 50        // Debounce time for duplicate visibility events (milliseconds)
-  }
+  EXPORT: { PADDING: 50, MARGIN: 20 },
+  AUTOSAVE: { INTERVAL: 30000 },
+  VISIBILITY: { DEBOUNCE_MS: 50 },
+  TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 }
 };
 
 // ============================================================================
@@ -81,7 +69,7 @@ let selectionCurrentY = 0;
 
 // Performance optimization: debounce expensive operations
 let lastResizeTime = 0;
-const RESIZE_DEBOUNCE_MS = 16; // ~60fps
+const RESIZE_DEBOUNCE_MS = CONFIG.TIMING ? CONFIG.TIMING.RESIZE_DEBOUNCE_MS : 16; // ~60fps
 
 // Page visibility tracking to prevent freezing when tab is hidden
 let isPageVisible = true;
@@ -207,7 +195,10 @@ const KeyRepeat = {
  * @returns {number} World X coordinate
  */
 function worldMouseX() {
-  return (mouseX - camX) / zoom;
+  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber) 
+    ? Utils.safePositiveNumber(zoom, 1) 
+    : (zoom > 0 ? zoom : 1);
+  return (mouseX - camX) / safeZoom;
 }
 
 /**
@@ -278,7 +269,10 @@ function handleUrlChange() {
  * @returns {number} World Y coordinate
  */
 function worldMouseY() {
-  return (mouseY - camY) / zoom;
+  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber) 
+    ? Utils.safePositiveNumber(zoom, 1) 
+    : (zoom > 0 ? zoom : 1);
+  return (mouseY - camY) / safeZoom;
 }
 
 /**
@@ -2787,6 +2781,7 @@ function drawSelectionRectangle() {
 
 /**
  * Checks if a line segment intersects an axis-aligned rectangle
+ * Uses shared utility from Utils if available
  * @param {number} x1 - Segment start X
  * @param {number} y1 - Segment start Y
  * @param {number} x2 - Segment end X
@@ -2798,6 +2793,12 @@ function drawSelectionRectangle() {
  * @returns {boolean} true if segment intersects rectangle
  */
 function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
+  // Use shared utility if available
+  if (typeof Utils !== 'undefined' && Utils.segmentIntersectsRect) {
+    return Utils.segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2);
+  }
+  
+  // Fallback implementation
   // Normalize rect coordinates
   const minRx = Math.min(rx1, rx2);
   const maxRx = Math.max(rx1, rx2);

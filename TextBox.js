@@ -1,6 +1,7 @@
 /**
  * TextBox class - represents a text node in the mind map with editing capabilities,
  * resizing, text wrapping, and visual styling.
+ * Uses shared utilities from utils.js when available.
  */
 class TextBox {
   // Constants
@@ -16,6 +17,28 @@ class TextBox {
   static COLOR_CIRCLE_RADIUS = 8;
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
+  
+  /**
+   * Helper to check if a number is valid (uses Utils if available)
+   * @private
+   */
+  static _isValidNumber(value) {
+    if (typeof Utils !== 'undefined' && Utils.isValidNumber) {
+      return Utils.isValidNumber(value);
+    }
+    return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
+  }
+  
+  /**
+   * Helper to safely get a positive number
+   * @private
+   */
+  static _safePositiveNumber(value, defaultValue = 1) {
+    if (typeof Utils !== 'undefined' && Utils.safePositiveNumber) {
+      return Utils.safePositiveNumber(value, defaultValue);
+    }
+    return TextBox._isValidNumber(value) && value > 0 ? value : defaultValue;
+  }
   /**
    * Creates a new TextBox
    * @param {number} x - Center X coordinate
@@ -192,10 +215,17 @@ class TextBox {
   
   /**
    * Sanitizes text to normalize line endings and remove problematic invisible characters
+   * Uses shared utility if available for consistency
    * @param {string} text - Text to sanitize
    * @returns {string} Sanitized text
    */
   static sanitizeText(text) {
+    // Use shared utility if available
+    if (typeof Utils !== 'undefined' && Utils.sanitizeText) {
+      return Utils.sanitizeText(text);
+    }
+    
+    // Fallback implementation
     if (text === null || text === undefined) return '';
     text = String(text);
     
@@ -916,11 +946,15 @@ class TextBox {
   
   /**
    * Helper: Checks if a character is whitespace
+   * Uses shared utility if available
    * @param {string} ch - Character to check
    * @returns {boolean} true if whitespace
    * @private
    */
   static isWhitespace(ch) {
+    if (typeof Utils !== 'undefined' && Utils.isWhitespace) {
+      return Utils.isWhitespace(ch);
+    }
     return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
   }
   
