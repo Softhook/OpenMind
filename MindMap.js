@@ -1,11 +1,39 @@
 /**
  * MindMap class - manages the entire mind map including boxes, connections,
  * selection state, undo/redo, and navigation.
+ * Uses shared utilities from utils.js when available.
  */
 class MindMap {
   // Constants for configuration
   static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
   static ALIGN_TOLERANCE = 12;
+  
+  /**
+   * Helper to check if a number is valid (uses Utils if available)
+   * @private
+   */
+  static _isValidNumber(value) {
+    if (typeof Utils !== 'undefined' && Utils.isValidNumber) {
+      return Utils.isValidNumber(value);
+    }
+    return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
+  }
+  
+  /**
+   * Helper to safely clone an object
+   * @private
+   */
+  static _deepClone(obj) {
+    if (typeof Utils !== 'undefined' && Utils.deepClone) {
+      return Utils.deepClone(obj);
+    }
+    try {
+      return JSON.parse(JSON.stringify(obj));
+    } catch (e) {
+      console.warn('deepClone failed:', e);
+      return obj;
+    }
+  }
   
   /**
    * Initializes a new MindMap with default state
@@ -94,12 +122,13 @@ class MindMap {
 
   /**
    * Pushes current state to undo stack before making a change
+   * Uses shared deep clone utility for reliable copying
    */
   pushUndo() {
     try {
       const snap = this.toJSON();
       // Deep clone to prevent reference issues
-      const clonedSnap = JSON.parse(JSON.stringify(snap));
+      const clonedSnap = MindMap._deepClone(snap);
       this.undoStack.push(clonedSnap);
       
       // Limit stack size for memory management
@@ -683,15 +712,19 @@ class MindMap {
   
   /**
    * Handles mouse press events
+   * Includes improved validation using shared utilities
    */
   handleMousePressed() {
     // Clear arrow key navigation flag when mouse is used
     this.isArrowKeyNavigating = false;
     
-    // Validate mouse coordinates
+    // Validate mouse coordinates using shared utility if available
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+    const validCoords = typeof Utils !== 'undefined' && Utils.areValidCoordinates
+      ? Utils.areValidCoordinates(mx, my)
+      : (mx != null && my != null && !isNaN(mx) && !isNaN(my));
+    if (!validCoords) {
       return;
     }
     const shiftDown = keyIsDown(16); // SHIFT
@@ -710,15 +743,15 @@ class MindMap {
     // (connection deselection centralized in clearConnectionSelection())
     
     // Check if clicking on a background color circle of any selected box (top-most first)
-      for (let i = this.boxes.length - 1; i >= 0; i--) {
-        const box = this.boxes[i];
-        if (!box || !box.selected || box.isEditing || typeof box.getColorCircleUnderMouse !== 'function') continue;
-        const key = box.getColorCircleUnderMouse();
-        if (key) {
-          this.pushUndo();
-          // Apply color to all selected boxes
-          if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-            for (const selectedBox of this.selectedBoxes) {
+    for (let i = this.boxes.length - 1; i >= 0; i--) {
+      const box = this.boxes[i];
+      if (!box || !box.selected || box.isEditing || typeof box.getColorCircleUnderMouse !== 'function') continue;
+      const key = box.getColorCircleUnderMouse();
+      if (key) {
+        this.pushUndo();
+        // Apply color to all selected boxes
+        if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+          for (const selectedBox of this.selectedBoxes) {
               if (selectedBox && typeof selectedBox.setBackgroundByKey === 'function') {
                 selectedBox.setBackgroundByKey(key);
               }
@@ -1201,6 +1234,7 @@ class MindMap {
   
   /**
    * Loads mind map from JSON data
+   * Uses shared utilities for safe iteration when available
    * @param {Object} data - JSON data to load from
    */
   fromJSON(data) {
@@ -1224,17 +1258,25 @@ class MindMap {
     }
     
     // Load boxes with error handling
+    // Use safe iteration utility if available
     if (Array.isArray(data.boxes)) {
-      for (let boxData of data.boxes) {
+      const loadBox = (boxData) => {
+        if (!boxData) return;
         try {
-          if (boxData) {
-            let box = TextBox.fromJSON(boxData);
-            if (box) {
-              this.boxes.push(box);
-            }
+          let box = TextBox.fromJSON(boxData);
+          if (box) {
+            this.boxes.push(box);
           }
         } catch (e) {
           console.error('Failed to load box:', e);
+        }
+      };
+      
+      if (typeof Utils !== 'undefined' && Utils.safeForEach) {
+        Utils.safeForEach(data.boxes, loadBox);
+      } else {
+        for (let boxData of data.boxes) {
+          loadBox(boxData);
         }
       }
     } else {
@@ -1243,16 +1285,23 @@ class MindMap {
     
     // Load connections with error handling
     if (Array.isArray(data.connections)) {
-      for (let connData of data.connections) {
+      const loadConnection = (connData) => {
+        if (!connData) return;
         try {
-          if (connData) {
-            let conn = Connection.fromJSON(connData, this.boxes);
-            if (conn && conn.fromBox && conn.toBox) {
-              this.connections.push(conn);
-            }
+          let conn = Connection.fromJSON(connData, this.boxes);
+          if (conn && conn.fromBox && conn.toBox) {
+            this.connections.push(conn);
           }
         } catch (e) {
           console.error('Failed to load connection:', e);
+        }
+      };
+      
+      if (typeof Utils !== 'undefined' && Utils.safeForEach) {
+        Utils.safeForEach(data.connections, loadConnection);
+      } else {
+        for (let connData of data.connections) {
+          loadConnection(connData);
         }
       }
     } else {
