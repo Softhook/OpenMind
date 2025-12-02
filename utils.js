@@ -503,16 +503,27 @@ function safeMap(array, transform) {
 }
 
 /**
- * Deep clones a simple object (no functions, no circular references)
- * @param {Object} obj - Object to clone
- * @returns {Object} Cloned object
+ * Deep clones a simple object using JSON serialization.
+ * 
+ * LIMITATIONS:
+ * - Does not handle functions (they will be omitted)
+ * - Does not handle Date objects (they become strings)
+ * - Does not handle RegExp (they become empty objects)
+ * - Does not handle undefined values (they will be omitted)
+ * - Does not handle circular references (will throw an error)
+ * - Does not handle Map, Set, or other special objects
+ * 
+ * This is suitable for cloning plain data objects like JSON-serializable state.
+ * 
+ * @param {Object} obj - Object to clone (should be JSON-serializable)
+ * @returns {Object} Cloned object, or original if cloning fails
  */
 function deepClone(obj) {
   if (obj === null || obj === undefined) return obj;
   try {
     return JSON.parse(JSON.stringify(obj));
   } catch (e) {
-    console.warn('deepClone failed:', e);
+    console.warn('deepClone failed (object may contain circular references or non-serializable values):', e);
     return obj;
   }
 }
@@ -560,10 +571,13 @@ function wrapWithErrorHandler(fn, context = '') {
 // EXPORT (for module systems, or attach to window for browser)
 // ============================================================================
 
-// Make utilities available globally for browser use
+// Make utilities available globally for browser use via a single namespace
 if (typeof window !== 'undefined') {
-  window.AppConfig = AppConfig;
-  window.Utils = {
+  // Attach all utilities to a single OpenMindUtils namespace to avoid global pollution
+  window.OpenMindUtils = {
+    // Configuration
+    AppConfig,
+    
     // Validation
     isValidNumber,
     areValidCoordinates,
@@ -601,4 +615,8 @@ if (typeof window !== 'undefined') {
     safeExecute,
     wrapWithErrorHandler
   };
+  
+  // Also expose commonly used utilities via simpler aliases for backward compatibility
+  window.AppConfig = AppConfig;
+  window.Utils = window.OpenMindUtils;
 }

@@ -1906,9 +1906,14 @@ class TextBox {
       if (typeof Utils !== 'undefined' && Utils.validateColor) {
         box.backgroundColor = Utils.validateColor(c);
       } else {
-        const r = Number.isFinite(c.r) ? c.r : 255;
-        const g = Number.isFinite(c.g) ? c.g : 255;
-        const b = Number.isFinite(c.b) ? c.b : 255;
+        // Fallback with proper clamping to valid ranges (0-255)
+        const clampColor = (val, def) => {
+          if (!Number.isFinite(val)) return def;
+          return Math.max(0, Math.min(255, val));
+        };
+        const r = clampColor(c.r, 255);
+        const g = clampColor(c.g, 255);
+        const b = clampColor(c.b, 255);
         box.backgroundColor = { r, g, b };
       }
     }
@@ -1929,9 +1934,25 @@ class TextBox {
         const start = Math.max(0, Math.min(textLen, Math.floor(h.start)));
         const end = Math.max(0, Math.min(textLen, Math.floor(h.end)));
         if (start >= end) continue;
-        const color = (typeof Utils !== 'undefined' && Utils.validateColor) 
-          ? Utils.validateColor(h.color, { r: 255, g: 255, b: 0, a: 180 })
-          : ((h.color && typeof h.color === 'object') ? h.color : { r: 255, g: 255, b: 0, a: 180 });
+        
+        // Validate highlight color with proper clamping
+        let color;
+        if (typeof Utils !== 'undefined' && Utils.validateColor) {
+          color = Utils.validateColor(h.color, { r: 255, g: 255, b: 0, a: 180 });
+        } else if (h.color && typeof h.color === 'object') {
+          const clampColor = (val, def) => {
+            if (!Number.isFinite(val)) return def;
+            return Math.max(0, Math.min(255, val));
+          };
+          color = {
+            r: clampColor(h.color.r, 255),
+            g: clampColor(h.color.g, 255),
+            b: clampColor(h.color.b, 0),
+            a: h.color.a !== undefined ? clampColor(h.color.a, 180) : 180
+          };
+        } else {
+          color = { r: 255, g: 255, b: 0, a: 180 };
+        }
         box.highlights.push({ start, end, color });
       }
     }

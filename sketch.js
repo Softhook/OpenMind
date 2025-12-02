@@ -69,7 +69,7 @@ let selectionCurrentY = 0;
 
 // Performance optimization: debounce expensive operations
 let lastResizeTime = 0;
-const RESIZE_DEBOUNCE_MS = CONFIG.TIMING ? CONFIG.TIMING.RESIZE_DEBOUNCE_MS : 16; // ~60fps
+// Use CONFIG.TIMING directly for consistency
 
 // Page visibility tracking to prevent freezing when tab is hidden
 let isPageVisible = true;
@@ -1801,7 +1801,8 @@ async function mergeMapData(data, wx, wy) {
 function windowResized() {
   const now = millis();
   // Debounce resize to avoid expensive recalculations
-  if (now - lastResizeTime > RESIZE_DEBOUNCE_MS) {
+  const debounceMs = CONFIG.TIMING ? CONFIG.TIMING.RESIZE_DEBOUNCE_MS : 16;
+  if (now - lastResizeTime > debounceMs) {
     resizeCanvas(windowWidth, windowHeight);
     lastResizeTime = now;
   }
