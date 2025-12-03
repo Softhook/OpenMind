@@ -19,7 +19,8 @@ class TextBox {
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
   // Regex pattern to detect URLs (http, https, file://, and local paths)
-  static URL_PATTERN = /(?:https?:\/\/|file:\/\/\/|\.{0,2}\/)[^\s<>\"\')\]]+/gi;
+  // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
+  static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
   
   /**
    * Helper to check if a number is valid (uses Utils if available)
@@ -286,24 +287,33 @@ class TextBox {
   
   /**
    * Opens a URL in a new browser window/tab
+   * For file:// URLs, attempts to open in the default application
    * @param {string} url - URL to open
    */
   static openLink(url) {
     if (!url) return;
     
-    // Handle relative paths and file:// URLs
     let targetUrl = url;
     
-    // If it's a relative path (starts with ./ or ../ or /)
-    if (url.match(/^\.{0,2}\//)) {
-      // For local files, try to open relative to current location
+    // Handle file:// URLs and local paths
+    if (url.startsWith('file://')) {
+      // Already a file:// URL, use as-is
+      targetUrl = url;
+    } else if (url.startsWith('/')) {
+      // Absolute local path (Unix/macOS) - convert to file:// URL
+      targetUrl = 'file://' + encodeURI(url).replace(/#/g, '%23');
+    } else if (url.match(/^[A-Za-z]:\\/)) {
+      // Windows absolute path - convert to file:// URL
+      targetUrl = 'file:///' + encodeURI(url.replace(/\\/g, '/')).replace(/#/g, '%23');
+    } else if (url.match(/^\.{0,2}\//)) {
+      // Relative path (starts with ./ or ../ or /)
       try {
         targetUrl = new URL(url, window.location.href).href;
       } catch (e) {
-        // If URL construction fails, use as-is
         targetUrl = url;
       }
     }
+    // else: http/https URLs - use as-is
     
     // Open in new tab/window
     try {

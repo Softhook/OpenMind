@@ -1549,12 +1549,23 @@ function handleCanvasDrop(e) {
     const wx = (sx - camX) / zoom;
     const wy = (sy - camY) / zoom;
 
-    // Priority: image files
+    // Get text data early (must be done synchronously in drop handler)
+    const textUriList = dt.getData('text/uri-list') || '';
+    const textPlain = dt.getData('text/plain') || '';
+    const droppedText = textUriList || textPlain;
+
+    // Priority: handle files
     if (dt.files && dt.files.length > 0) {
       for (let i = 0; i < dt.files.length; i++) {
         const f = dt.files[i];
+        if (!f) continue;
+        
+        const fileName = f.name || '';
+        const fileType = f.type || '';
+        const lowerName = fileName.toLowerCase();
+        
         // JSON file support: merge map into current map at drop point
-        if (f && ((f.type && f.type === 'application/json') || (f.name && f.name.toLowerCase().endsWith('.json')))) {
+        if (fileType === 'application/json' || lowerName.endsWith('.json')) {
           try {
             const reader = new FileReader();
             reader.onload = async (ev) => {
@@ -1575,9 +1586,9 @@ function handleCanvasDrop(e) {
           return;
         }
 
-        if (f && f.type && f.type.startsWith('image/')) {
+        // Image file support
+        if (fileType.startsWith('image/')) {
           // Compress/resize image before embedding to reduce decoded memory and JSON size.
-          // Process sequentially to avoid memory spikes.
           compressImageFile(f, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 })
             .then((dataUrl) => {
               try {
@@ -1586,7 +1597,6 @@ function handleCanvasDrop(e) {
             })
             .catch((err) => {
               console.warn('Compression failed, falling back to original file read', err);
-              // Fallback: read original as DataURL
               const reader = new FileReader();
               reader.onload = (ev) => {
                 try { createImageBox(ev.target.result, wx, wy); } catch (e) { console.warn('Failed to create image from file', e); }
@@ -1596,31 +1606,121 @@ function handleCanvasDrop(e) {
             });
           return;
         }
+        
         // PDF file support
-        if (f && (f.type === 'application/pdf' || (f.name && f.name.toLowerCase().endsWith('.pdf')))) {
-          // For local PDF files, read as data URL so the PDF is embedded in the map JSON.
+        if (fileType === 'application/pdf' || lowerName.endsWith('.pdf')) {
           try {
-            createPdfBox(f, f.name || 'document.pdf', wx, wy);
+            createPdfBox(f, fileName || 'document.pdf', wx, wy);
           } catch (e) {
             console.warn('Failed to create PDF box', e);
           }
           return;
         }
+        
+        // Unrecognized file type: create a text box with the file path as a clickable link
+        // Try to get the file path from various sources
+        let filePath = null;
+        
+        // Method 1: Check f.path (works in Electron and some environments)
+        if (f.path && typeof f.path === 'string') {
+          filePath = f.path;
+        }
+        
+        // Method 2: Check the text data from dataTransfer for file:// URL
+        if (!filePath && droppedText) {
+          const lines = droppedText.split('\n');
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('file://')) {
+              // Decode the file:// URL to get the path
+              try {
+                // file:// URLs have the path after file:// (may have 2 or 3 slashes)
+                let path = trimmed;
+                if (path.startsWith('file:///')) {
+                  path = path.substring(7); // Remove 'file://' keeping the leading /
+                } else if (path.startsWith('file://')) {
+                  path = path.substring(7);
+                }
+                filePath = decodeURIComponent(path);
+                break;
+              } catch (e) {
+                console.warn('Failed to decode file URL:', trimmed, e);
+              }
+            }
+          }
+        }
+        
+        // Method 3: If we still don't have a path, just use the filename
+        // (user can manually add the path if needed)
+        if (!filePath && fileName) {
+          // Create with just filename - user will see it's incomplete
+          filePath = fileName;
+        }
+        
+        if (filePath) {
+          createFilePathBox(filePath, wx, wy);
+          return;
+        }
       }
     }
 
-    // Next: text/uri-list or plain text that may contain a URL
-    let url = dt.getData('text/uri-list') || dt.getData('text/plain') || '';
-    if (url && typeof url === 'string') {
-      url = url.split('\n')[0].trim();
+    // Next: text/uri-list or plain text that may contain a URL or file path
+    if (droppedText) {
+      const url = droppedText.split('\n')[0].trim();
       if (url) {
-        // If URL looks like a PDF, create a PDF box; otherwise try image
         const lower = url.toLowerCase();
-        if (lower.endsWith('.pdf')) {
-          createPdfBox(url, url.split('/').pop(), wx, wy);
-        } else {
-          createImageBox(url, wx, wy);
+        
+        // Handle file:// URLs - create a text box with the path as a clickable link
+        if (url.startsWith('file://')) {
+          let filePath;
+          try {
+            if (url.startsWith('file:///')) {
+              filePath = decodeURIComponent(url.substring(7));
+            } else {
+              filePath = decodeURIComponent(url.substring(7));
+            }
+          } catch (e) {
+            filePath = url.substring(7);
+          }
+          
+          // Check if it's an image
+          if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(lower)) {
+            createImageBox(url, wx, wy);
+          } else if (lower.endsWith('.pdf')) {
+            createPdfBox(url, url.split('/').pop(), wx, wy);
+          } else if (lower.endsWith('.json')) {
+            // Try to load JSON map
+            loadMapFromUrl(url).catch(() => {
+              createFilePathBox(filePath, wx, wy);
+            });
+          } else {
+            // For other file types (docx, txt, etc.), create a text box with the path
+            createFilePathBox(filePath, wx, wy);
+          }
+          return;
         }
+        
+        // Handle http/https URLs
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          if (lower.endsWith('.pdf')) {
+            createPdfBox(url, url.split('/').pop(), wx, wy);
+          } else if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(lower)) {
+            createImageBox(url, wx, wy);
+          } else {
+            // For other URLs, create a text box with the URL as a clickable link
+            createFilePathBox(url, wx, wy);
+          }
+          return;
+        }
+        
+        // Fallback: if it looks like a path, create a path box
+        if (url.startsWith('/') || url.match(/^[A-Za-z]:\\/)) {
+          createFilePathBox(url, wx, wy);
+          return;
+        }
+        
+        // Default: try as image (original behavior)
+        createImageBox(url, wx, wy);
         return;
       }
     }
@@ -1716,6 +1816,45 @@ function createImageBox(url, worldX, worldY) {
     mindMap.selectedBox = box;
   } catch (e) {
     console.warn('Failed to create image box', e);
+  }
+}
+
+/**
+ * Create a text box containing a file path or URL as a clickable link.
+ * Used for files that can't be embedded (like .docx, .xlsx, etc.)
+ * Cmd/Ctrl+click will open the file in the default application.
+ */
+function createFilePathBox(pathOrUrl, worldX, worldY) {
+  try {
+    if (!mindMap) return;
+    mindMap.pushUndo();
+    
+    // Create the link text - use file:// protocol for local paths
+    let linkText = pathOrUrl;
+    
+    // If it's already a URL (http, https, file), use as-is
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('file://')) {
+      linkText = pathOrUrl;
+    } else if (pathOrUrl.startsWith('/')) {
+      // Unix/macOS absolute path - encode special characters but preserve slashes
+      linkText = 'file://' + encodeURI(pathOrUrl).replace(/#/g, '%23');
+    } else if (pathOrUrl.match(/^[A-Za-z]:\\/)) {
+      // Windows absolute path
+      linkText = 'file:///' + encodeURI(pathOrUrl.replace(/\\/g, '/')).replace(/#/g, '%23');
+    } else {
+      // Relative path or just filename - prepend file:// anyway
+      linkText = 'file://' + encodeURI(pathOrUrl).replace(/#/g, '%23');
+    }
+    
+    const box = new TextBox(worldX, worldY, linkText);
+    mindMap.addBox(box);
+    
+    // Select the new box
+    mindMap.clearBoxSelection();
+    mindMap.addBoxToSelection(box);
+    mindMap.selectedBox = box;
+  } catch (e) {
+    console.warn('Failed to create file path box', e);
   }
 }
 
