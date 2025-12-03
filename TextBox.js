@@ -18,6 +18,9 @@ class TextBox {
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
+  // Regex pattern to detect URLs (http, https, file://, and local paths)
+  static URL_PATTERN = /(?:https?:\/\/|file:\/\/\/|\.{0,2}\/)[^\s<>\"\')\]]+/gi;
+  
   /**
    * Helper to check if a number is valid (uses Utils if available)
    * @private
@@ -95,6 +98,8 @@ class TextBox {
     this.colorCircleSpacing = TextBox.COLOR_CIRCLE_SPACING;
     // Persistent highlights: array of {start, end, color:{r,g,b,a?}}
     this.highlights = [];
+    // Cache for detected links: array of {start, end, url}
+    this.cachedLinks = null;
     this.updateDimensions();
   }
 
@@ -214,6 +219,115 @@ class TextBox {
   }
   
   /**
+   * Detects all hyperlinks in the text
+   * @returns {Array<Object>} Array of {start, end, url} objects
+   */
+  detectLinks() {
+    if (this.cachedLinks !== null) {
+      return this.cachedLinks;
+    }
+    
+    const links = [];
+    if (!this.text || this.text.length === 0) {
+      this.cachedLinks = links;
+      return links;
+    }
+    
+    // Reset regex lastIndex for global pattern
+    TextBox.URL_PATTERN.lastIndex = 0;
+    
+    let match;
+    while ((match = TextBox.URL_PATTERN.exec(this.text)) !== null) {
+      let url = match[0];
+      // Clean up trailing punctuation that's likely not part of URL
+      while (url.length > 0 && /[.,;:!?)}\]'"]$/.test(url)) {
+        url = url.slice(0, -1);
+      }
+      if (url.length > 0) {
+        links.push({
+          start: match.index,
+          end: match.index + url.length,
+          url: url
+        });
+      }
+    }
+    
+    this.cachedLinks = links;
+    return links;
+  }
+  
+  /**
+   * Checks if a character position is within a link
+   * @param {number} charPos - Character position in text
+   * @returns {Object|null} Link object {start, end, url} or null
+   */
+  getLinkAtPosition(charPos) {
+    const links = this.detectLinks();
+    for (const link of links) {
+      if (charPos >= link.start && charPos < link.end) {
+        return link;
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Gets the link under the mouse cursor
+   * @param {number} mx - Mouse X in world coordinates
+   * @param {number} my - Mouse Y in world coordinates
+   * @returns {Object|null} Link object {start, end, url} or null
+   */
+  getLinkAtMouse(mx, my) {
+    if (this.imageUrl) return null; // No text links in image boxes
+    
+    const charPos = this.getCursorPositionFromMouse(mx, my);
+    return this.getLinkAtPosition(charPos);
+  }
+  
+  /**
+   * Opens a URL in a new browser window/tab
+   * @param {string} url - URL to open
+   */
+  static openLink(url) {
+    if (!url) return;
+    
+    // Handle relative paths and file:// URLs
+    let targetUrl = url;
+    
+    // If it's a relative path (starts with ./ or ../ or /)
+    if (url.match(/^\.{0,2}\//)) {
+      // For local files, try to open relative to current location
+      try {
+        targetUrl = new URL(url, window.location.href).href;
+      } catch (e) {
+        // If URL construction fails, use as-is
+        targetUrl = url;
+      }
+    }
+    
+    // Open in new tab/window
+    try {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      console.warn('Failed to open link:', url, e);
+    }
+  }
+  
+  /**
+   * Checks if the mouse is currently over a link
+   * @returns {boolean} true if mouse is over a link
+   */
+  isMouseOverLink() {
+    if (this.imageUrl) return false;
+    if (!this.isMouseOver()) return false;
+    
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    
+    return this.getLinkAtMouse(mx, my) !== null;
+  }
+  
+  /**
    * Sanitizes text to normalize line endings and remove problematic invisible characters
    * Uses shared utility if available for consistency
    * @param {string} text - Text to sanitize
@@ -265,6 +379,7 @@ class TextBox {
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
     this.cachedLineCharMap = null;
+    this.cachedLinks = null; // Invalidate links cache when text changes
     // If this box is an image, keep current width/height (do not reflow based on text)
     if (this.imageUrl) {
       // Ensure sensible defaults
@@ -621,11 +736,36 @@ class TextBox {
       for (let i = 0; i < wrappedLines.length; i++) {
         let lineText = wrappedLines[i];
         
+        // Get absolute character position for this line
+        let lineStartPos = (this.cachedLineCharMap && this.cachedLineCharMap[i] !== undefined) 
+          ? this.cachedLineCharMap[i] : 0;
+        
+        // Detect links for coloring
+        const links = this.detectLinks();
+        
         // Always render character by character for precise spacing control
         // This ensures multiple spaces are visible
         let xPos = textX;
         for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
           let char = lineText[charIdx];
+          let absCharPos = lineStartPos + charIdx;
+          
+          // Check if this character is part of a link
+          let isInLink = false;
+          for (const link of links) {
+            if (absCharPos >= link.start && absCharPos < link.end) {
+              isInLink = true;
+              break;
+            }
+          }
+          
+          // Set color based on whether character is in a link
+          if (isInLink) {
+            fill(0, 100, 220); // Blue for links
+          } else {
+            fill(0); // Black for regular text
+          }
+          
           // For spaces, use measured width to ensure they take up space
           if (char === ' ') {
             // Draw a space by moving position (p5 text(' ') might collapse)
@@ -1112,6 +1252,17 @@ class TextBox {
     // (PDF handling removed) — PDFs are treated as images (preview) or normal text boxes.
 
     let pos = this.getCursorPositionFromMouse(mx, my);
+    
+    // Check if clicking on a link (only when not already editing or when Cmd/Ctrl is held)
+    const isCmd = typeof keyIsDown === 'function' && (keyIsDown(91) || keyIsDown(93) || keyIsDown(17));
+    if (!this.isEditing || isCmd) {
+      const link = this.getLinkAtPosition(pos);
+      if (link && isCmd) {
+        // Cmd/Ctrl+click opens the link
+        TextBox.openLink(link.url);
+        return;
+      }
+    }
 
     // If Shift is held and there's already a selection, extend it
     if (keyIsDown(16)) { // Shift key

@@ -562,6 +562,12 @@ function updateCursorForHover() {
       cursor('move');
       return;
     }
+    // Check if hovering over a link (Cmd/Ctrl held shows pointer)
+    const isCmd = keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
+    if (isCmd && box.isMouseOverLink && box.isMouseOverLink()) {
+      cursor('pointer');
+      return;
+    }
     // Inside center area
     cursor('text');
     return;
@@ -1054,6 +1060,7 @@ function populateKeyboardControlsOverlay() {
     { keys: 'F', description: 'Toggle fullscreen view' },
     { keys: '-', description: 'Fit and center the entire map' },
     { keys: '+', description: 'Zoom to selected elements' },
+    { keys: 'Cmd/Ctrl + Click', description: 'Open hyperlink in new tab' },
     { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + B', description: 'Highlight selected text' },
