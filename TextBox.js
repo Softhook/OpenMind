@@ -986,21 +986,12 @@ class TextBox {
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
     
-    // Focus the spell check overlay for native spell checking
-    if (typeof focusSpellCheckOverlay === 'function') {
-      focusSpellCheckOverlay();
-    }
   }
   
   stopEditing() {
     this.isEditing = false;
     this.isSelecting = false;
     this.updateDimensions();
-    
-    // Hide spell check overlay when editing stops
-    if (typeof spellCheckOverlay !== 'undefined' && spellCheckOverlay) {
-      spellCheckOverlay.style.display = 'none';
-    }
   }
 
   // Determine if the given point is within the inner text area (excludes padding)
