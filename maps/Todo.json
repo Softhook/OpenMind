@@ -15,19 +15,6 @@
     },
     {
       "x": -1270.8573141135066,
-      "y": -718.2156556280597,
-      "text": "Todo",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      }
-    },
-    {
-      "x": -1270.8573141135066,
       "y": -620.6368861747576,
       "text": "find out about complaint figures on \nLevel 1 I need to get in touch with what's her name? The VR person ",
       "imageUrl": null,
@@ -79,6 +66,58 @@
       }
     },
     {
+      "x": -895.0991257458231,
+      "y": -285.8971416534297,
+      "text": "http://www.softhook.com this is a cool site Doesn't seem to be picking up a URL ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -599.400210873766,
+      "y": -462.718619431673,
+      "text": "Actually now its woring https://www.w3schools.com/tags/att_global_spellcheck.asp hehrwerw\n\nHre we go\n\n'/Users/cn4844/Library/CloudStorage/OneDrive-TheOpenUniversity/Research/Plundergeist/Plundergeist Exploring Generative AI through Vibe Coding as Reflective Design Practice.docx'\n",
+      "imageUrl": null,
+      "width": 389.75,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -575.8629405976957,
+      "y": -736.5211849127085,
+      "text": "https://softhook.github.io/OpenMind/#maps/ANTtalk.json",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1270.8573141135066,
+      "y": -718.2156556280597,
+      "text": "Todo",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
       "x": -942.8125904306041,
       "y": -693.8194206679599,
       "text": "Talk to Slav about the invoice change",
@@ -90,12 +129,55 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -631.5993105078899,
+      "y": -640.186718401262,
+      "text": "https://softhook.github.io/OpenMind/#maps/CovidPaperFeedback",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -195.27840979851754,
+      "y": -762.4089055166507,
+      "text": "file://Plundergeist%20Exploring%20Generative%20AI%20through%20Vibe%20Coding%20as%20Reflective%20Design%20Practice.docx",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -189.03467520418744,
+      "y": -611.7632904349749,
+      "text": "file://City_Airport_Study_Data.xlsx",
+      "imageUrl": null,
+      "width": 235.640625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
     {
-      "from": 6,
+      "from": 9,
       "to": 0
+    },
+    {
+      "from": 8,
+      "to": 1
     },
     {
       "from": 1,
@@ -108,10 +190,6 @@
     {
       "from": 3,
       "to": 4
-    },
-    {
-      "from": 4,
-      "to": 5
     }
   ]
 }
