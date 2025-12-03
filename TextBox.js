@@ -702,13 +702,7 @@ class TextBox {
       strokeCap(SQUARE); // Reset to default
     }
     
-    // Draw background color palette only when selected and not editing, and not during arrow key navigation
-    // Access mindMap from global scope to check navigation state
-    const isArrowNav = (typeof mindMap !== 'undefined' && mindMap && mindMap.isArrowKeyNavigating);
-    // Don't show color circles for image boxes
-    if (this.selected && !this.isEditing && !isArrowNav && !this.imageUrl) {
-      this.drawColorPalette();
-    }
+    // Color palette circles are no longer drawn - color is changed via keyboard shortcuts (1, 2, 3)
 
     pop();
   }
@@ -991,12 +985,22 @@ class TextBox {
     this.selectionEnd = -1;
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
+    
+    // Focus the spell check overlay for native spell checking
+    if (typeof focusSpellCheckOverlay === 'function') {
+      focusSpellCheckOverlay();
+    }
   }
   
   stopEditing() {
     this.isEditing = false;
     this.isSelecting = false;
     this.updateDimensions();
+    
+    // Hide spell check overlay when editing stops
+    if (typeof spellCheckOverlay !== 'undefined' && spellCheckOverlay) {
+      spellCheckOverlay.style.display = 'none';
+    }
   }
 
   // Determine if the given point is within the inner text area (excludes padding)

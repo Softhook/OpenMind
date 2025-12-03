@@ -87,6 +87,9 @@ let eventListeners = [];
 let overlayClickHandler = null;
 let overlayContentClickHandler = null;
 
+// Spell check overlay element for native browser spell checking
+let spellCheckOverlay = null;
+
 // ============================================================================
 // KEY REPEAT MANAGER
 // ============================================================================
@@ -388,6 +391,9 @@ function setup() {
     // Set up page visibility handling to prevent freezing when tab is hidden
     setupVisibilityHandling();
     
+    // Set up spell check overlay for native browser spell checking
+    setupSpellCheckOverlay();
+    
       // Enable drag-and-drop of image files or image URLs onto the canvas
       try {
         const canvasElt = document.querySelector('canvas');
@@ -473,6 +479,13 @@ function draw() {
     
     // Draw save indicator (in screen space, not world space)
     drawSaveIndicator();
+    
+    // Update spell check overlay position when editing
+    try {
+      updateSpellCheckOverlay();
+    } catch (e) {
+      // Non-fatal
+    }
     
     // Update mouse cursor based on hover context
     try {
@@ -624,6 +637,228 @@ function setupVisibilityHandling() {
   addTrackedEventListener(document, 'paste', handleNativePaste);
   addTrackedEventListener(document, 'copy', handleNativeCopy);
   addTrackedEventListener(document, 'cut', handleNativeCut);
+}
+
+// ============================================================================
+// SPELL CHECK OVERLAY
+// ============================================================================
+// Creates a hidden contenteditable element that enables native browser spell checking
+
+/**
+ * Sets up the spell check overlay element
+ */
+function setupSpellCheckOverlay() {
+  if (spellCheckOverlay) return;
+  
+  spellCheckOverlay = document.createElement('div');
+  spellCheckOverlay.id = 'spell-check-overlay';
+  spellCheckOverlay.contentEditable = 'true';
+  spellCheckOverlay.spellcheck = true;
+  spellCheckOverlay.setAttribute('lang', 'en');
+  
+  // Style the overlay to be positioned over the canvas
+  Object.assign(spellCheckOverlay.style, {
+    position: 'absolute',
+    display: 'none',
+    zIndex: '999',
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    overflow: 'hidden',
+    resize: 'none',
+    fontFamily: 'sans-serif',
+    lineHeight: String(TextBox.LINE_HEIGHT_MULTIPLIER),
+    color: 'transparent', // Text is invisible but still spell-checked
+    caretColor: 'blue', // Make the cursor visible
+    whiteSpace: 'pre-wrap',
+    wordWrap: 'break-word',
+    boxSizing: 'border-box'
+  });
+  
+  document.body.appendChild(spellCheckOverlay);
+  
+  // Handle input events to sync back to TextBox
+  spellCheckOverlay.addEventListener('input', handleSpellCheckInput);
+  spellCheckOverlay.addEventListener('keydown', handleSpellCheckKeyDown);
+  spellCheckOverlay.addEventListener('blur', handleSpellCheckBlur);
+  spellCheckOverlay.addEventListener('mousedown', handleSpellCheckMouseDown);
+}
+
+/**
+ * Updates the spell check overlay position and content based on the current editing box
+ */
+function updateSpellCheckOverlay() {
+  if (!spellCheckOverlay || !mindMap) return;
+  
+  const box = mindMap.selectedBox;
+  
+  // Hide overlay if no box is being edited
+  if (!box || !box.isEditing || box.imageUrl) {
+    spellCheckOverlay.style.display = 'none';
+    return;
+  }
+  
+  // Calculate screen position of the box
+  const boxLeft = box.x - box.width / 2;
+  const boxTop = box.y - box.height / 2;
+  
+  // Convert to screen coordinates
+  const screenLeft = boxLeft * zoom + camX;
+  const screenTop = boxTop * zoom + camY;
+  const screenWidth = box.width * zoom;
+  const screenHeight = box.height * zoom;
+  
+  // Position the overlay
+  Object.assign(spellCheckOverlay.style, {
+    display: 'block',
+    left: (screenLeft + box.padding * zoom) + 'px',
+    top: (screenTop + box.padding * zoom) + 'px',
+    width: (screenWidth - box.padding * 2 * zoom) + 'px',
+    height: (screenHeight - box.padding * 2 * zoom) + 'px',
+    fontSize: (box.fontSize * zoom) + 'px',
+    padding: '0'
+  });
+  
+  // Only sync content if it differs (to avoid losing cursor position)
+  const currentText = spellCheckOverlay.innerText || '';
+  const boxText = box.text || '';
+  
+  // Normalize both texts for comparison (handle trailing newlines)
+  const normalizedCurrent = currentText.replace(/\n$/, '');
+  const normalizedBox = boxText.replace(/\n$/, '');
+  
+  if (normalizedCurrent !== normalizedBox) {
+    // Save selection before updating
+    const selection = window.getSelection();
+    const hadFocus = document.activeElement === spellCheckOverlay;
+    
+    spellCheckOverlay.innerText = boxText;
+    
+    // Restore focus if it was focused
+    if (hadFocus) {
+      spellCheckOverlay.focus();
+      // Try to restore cursor position
+      try {
+        const range = document.createRange();
+        const textNode = spellCheckOverlay.firstChild || spellCheckOverlay;
+        const pos = Math.min(box.cursorPosition, textNode.textContent ? textNode.textContent.length : 0);
+        if (textNode.nodeType === Node.TEXT_NODE) {
+          range.setStart(textNode, pos);
+          range.setEnd(textNode, pos);
+        } else {
+          range.selectNodeContents(spellCheckOverlay);
+          range.collapse(false);
+        }
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } catch (e) {
+        // Ignore selection errors
+      }
+    }
+  }
+}
+
+/**
+ * Handles input events from the spell check overlay
+ */
+function handleSpellCheckInput(e) {
+  if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
+  
+  const box = mindMap.selectedBox;
+  const newText = spellCheckOverlay.innerText || '';
+  
+  // Only update if text actually changed (spell check correction)
+  if (newText !== box.text) {
+    mindMap.pushUndo();
+    
+    // Get cursor position from selection
+    const selection = window.getSelection();
+    let cursorPos = newText.length;
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      cursorPos = getTextOffset(spellCheckOverlay, range.startContainer, range.startOffset);
+    }
+    
+    box.text = TextBox.sanitizeText(newText);
+    box.cursorPosition = Math.min(cursorPos, box.text.length);
+    box.selectionStart = -1;
+    box.selectionEnd = -1;
+    box.updateDimensions();
+  }
+}
+
+/**
+ * Gets the text offset from the beginning of the container to the given node and offset
+ */
+function getTextOffset(container, node, offset) {
+  let textOffset = 0;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  let currentNode;
+  
+  while ((currentNode = walker.nextNode())) {
+    if (currentNode === node) {
+      return textOffset + offset;
+    }
+    textOffset += currentNode.textContent.length;
+  }
+  
+  // If node wasn't found, return the offset from container
+  if (container === node) {
+    return offset;
+  }
+  
+  return textOffset;
+}
+
+/**
+ * Handles keydown events in the spell check overlay
+ */
+function handleSpellCheckKeyDown(e) {
+  // Let the canvas handle most key events
+  // We only intercept arrow keys and some special keys here
+  
+  // Prevent default for Escape to stop editing
+  if (e.key === 'Escape') {
+    if (mindMap && mindMap.selectedBox) {
+      mindMap.selectedBox.stopEditing();
+      spellCheckOverlay.style.display = 'none';
+      spellCheckOverlay.blur();
+    }
+    e.preventDefault();
+    return;
+  }
+  
+  // For most keys, let the browser handle them for spell checking
+  // The input event will sync changes back to the TextBox
+}
+
+/**
+ * Handles blur events from the spell check overlay
+ */
+function handleSpellCheckBlur(e) {
+  // Don't hide immediately - let click handling decide
+}
+
+/**
+ * Handles mousedown in the spell check overlay to position cursor
+ */
+function handleSpellCheckMouseDown(e) {
+  // Allow normal text selection and cursor positioning in the overlay
+  // The contenteditable handles this naturally
+}
+
+/**
+ * Focuses the spell check overlay when editing starts
+ */
+function focusSpellCheckOverlay() {
+  if (!spellCheckOverlay) return;
+  
+  // Small delay to ensure overlay is positioned
+  setTimeout(() => {
+    if (spellCheckOverlay && mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing) {
+      spellCheckOverlay.focus();
+    }
+  }, 10);
 }
 
 /**
@@ -1041,6 +1276,7 @@ function populateKeyboardControlsOverlay() {
   const shortcuts = [
     { keys: 'N', description: 'Create new box' },
     { keys: 'C', description: 'Create connection from selected box' },
+    { keys: '1 / 2 / 3', description: 'Set box color (Red / Orange / White)' },
     { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },

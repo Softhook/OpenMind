@@ -741,27 +741,7 @@ class MindMap {
     }
 
     // (connection deselection centralized in clearConnectionSelection())
-    
-    // Check if clicking on a background color circle of any selected box (top-most first)
-    for (let i = this.boxes.length - 1; i >= 0; i--) {
-      const box = this.boxes[i];
-      if (!box || !box.selected || box.isEditing || typeof box.getColorCircleUnderMouse !== 'function') continue;
-      const key = box.getColorCircleUnderMouse();
-      if (key) {
-        this.pushUndo();
-        // Apply color to all selected boxes
-        if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-          for (const selectedBox of this.selectedBoxes) {
-              if (selectedBox && typeof selectedBox.setBackgroundByKey === 'function') {
-                selectedBox.setBackgroundByKey(key);
-              }
-            }
-          } else {
-            box.setBackgroundByKey(key);
-          }
-          return;
-        }
-      }
+    // Color circle clicks removed - colors are now changed via keyboard shortcuts (1, 2, 3)
     
     // Check if clicking on resize handle
     for (let box of this.boxes) {
@@ -1216,6 +1196,27 @@ class MindMap {
         if (index > -1) {
           this.connections.splice(index, 1);
           this.selectedConnection = null;
+        }
+      }
+    } else if (key === '1' || key === '2' || key === '3') {
+      // Number keys to change selected box colors (when not editing)
+      // 1 = red, 2 = orange, 3 = white
+      const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18) || keyIsDown(16);
+      if (!hasModifier) {
+        if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+          this.pushUndo();
+          const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
+          for (const box of this.selectedBoxes) {
+            if (box && typeof box.setBackgroundByKey === 'function') {
+              box.setBackgroundByKey(colorKey);
+            }
+          }
+        } else if (this.selectedBox && !this.selectedBox.isEditing) {
+          this.pushUndo();
+          const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
+          if (typeof this.selectedBox.setBackgroundByKey === 'function') {
+            this.selectedBox.setBackgroundByKey(colorKey);
+          }
         }
       }
     }
