@@ -157,6 +157,31 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Gets the current zoom level from the global scope.
+ * Returns 1 if zoom is not defined or invalid.
+ * @param {number} defaultZoom - Default zoom value if global is invalid
+ * @returns {number} Current zoom level
+ */
+function getCurrentZoom(defaultZoom = 1) {
+  if (typeof zoom !== 'undefined' && isValidNumber(zoom) && zoom > 0) {
+    return zoom;
+  }
+  return defaultZoom;
+}
+
+/**
+ * Gets a zoom factor clamped between min and max bounds.
+ * Useful for scaling UI elements that need to remain usable at different zoom levels.
+ * @param {number} minFactor - Minimum zoom factor (default: 0.5)
+ * @param {number} maxFactor - Maximum zoom factor (default: 2.0)
+ * @returns {number} Clamped zoom factor
+ */
+function getClampedZoomFactor(minFactor = 0.5, maxFactor = 2.0) {
+  const currentZoom = getCurrentZoom();
+  return Math.max(minFactor, Math.min(maxFactor, currentZoom));
+}
+
 // ============================================================================
 // STRING UTILITIES
 // ============================================================================
@@ -587,6 +612,8 @@ if (typeof window !== 'undefined') {
     safeNumber,
     safePositiveNumber,
     clamp,
+    getCurrentZoom,
+    getClampedZoomFactor,
     
     // String
     sanitizeText,
