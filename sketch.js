@@ -528,7 +528,10 @@ function draw() {
   }
 }
 
-// Set mouse cursor based on what the user is hovering over
+/**
+ * Updates the mouse cursor based on what the user is hovering over.
+ * Sets appropriate cursors for resizing, moving, editing, and other interactions.
+ */
 function updateCursorForHover() {
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
@@ -924,7 +927,10 @@ function handlePageBecameVisible() {
   }
 }
 
-// Show or hide the top-left menu based on cursor position
+/**
+ * Updates menu visibility based on mouse position.
+ * Shows menu when cursor is in trigger area or buttons band.
+ */
 function updateMenuVisibility() {
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && 
@@ -939,6 +945,9 @@ function updateMenuVisibility() {
   }
 }
 
+/**
+ * Shows all menu buttons by setting display style to inline-block
+ */
 function showMenuButtons() {
   // Guard if setup failed and buttons are not yet created
   if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
@@ -949,6 +958,9 @@ function showMenuButtons() {
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
 }
 
+/**
+ * Hides all menu buttons by setting display style to none
+ */
 function hideMenuButtons() {
   if (saveButton && saveButton.style) saveButton.style('display', 'none');
   if (loadButton && loadButton.style) loadButton.style('display', 'none');
@@ -958,7 +970,10 @@ function hideMenuButtons() {
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
 }
 
-// Arrange buttons: Load, Save, Export PNG, Export PDF, Export Text, Keyboard Controls
+/**
+ * Positions all menu buttons horizontally with proper spacing.
+ * Order: Load, Save, Export PNG, Export PDF, Export Text, Keyboard Controls
+ */
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
   const y = CONFIG.UI.BUTTON_Y;
@@ -1433,6 +1448,11 @@ if (typeof window !== 'undefined') {
 const preventContextMenu = (event) => event.preventDefault();
 addTrackedEventListener(document, 'contextmenu', preventContextMenu);
 
+/**
+ * Creates a new text box at the cursor position or viewport center.
+ * If cursor is over the canvas, box is created at mouse position.
+ * Otherwise, box is created at the center of the visible viewport.
+ */
 function createNewBox() {
   // Ensure mindMap exists
   if (!mindMap) {
@@ -1458,6 +1478,10 @@ function createNewBox() {
   mindMap.addBox(new TextBox(x, y, ""));
 }
 
+/**
+ * Triggers the hidden file input to open a file selection dialog.
+ * Used when the Load button is clicked.
+ */
 function triggerFileLoad() {
   // Trigger the hidden file input
   try {
@@ -1474,6 +1498,11 @@ function triggerFileLoad() {
   }
 }
 
+/**
+ * Handles loading a mind map from a selected JSON file.
+ * Validates the file type and content before loading.
+ * @param {Object} file - p5.js file object with data and metadata
+ */
 async function handleFileLoad(file) {
   if (!file) {
     console.error('No file provided');
