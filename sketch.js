@@ -24,6 +24,15 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
   TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 }
 };
 
+// UI Colors for consistent styling throughout the application
+const UI_COLORS = {
+  BACKGROUND: 240,
+  SELECTION_RECT: { fill: { r: 100, g: 150, b: 255, a: 50 }, stroke: { r: 100, g: 150, b: 255 } },
+  SAVE_INDICATOR: { saved: { r: 76, g: 175, b: 80 }, unsaved: { r: 244, g: 67, b: 54 } },
+  LOADING_OVERLAY: { bg: { r: 0, g: 0, b: 0, a: 160 }, text: 255, spinner: 255 },
+  CONNECTION: { normal: 80, selected: { r: 100, g: 150, b: 255 } }
+};
+
 // ============================================================================
 // GLOBAL STATE
 // ============================================================================
@@ -451,7 +460,7 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
-  background(240);
+  background(UI_COLORS.BACKGROUND);
   updateMenuVisibility();
   
   if (mindMap) {
@@ -491,15 +500,16 @@ function draw() {
 
   // Draw loading overlay on top of everything when fetching/loading maps
   if (isMapLoading) {
+    const overlay = UI_COLORS.LOADING_OVERLAY;
     push();
     // Screen-space overlay
     resetMatrix && resetMatrix();
     noStroke();
-    fill(0, 0, 0, 160);
+    fill(overlay.bg.r, overlay.bg.g, overlay.bg.b, overlay.bg.a);
     rect(0, 0, width, height);
 
     // Loading text
-    fill(255);
+    fill(overlay.text);
     textAlign(CENTER, CENTER);
     textSize(20);
     text('Loading map...', width / 2, height / 2 - 10);
@@ -508,7 +518,7 @@ function draw() {
     push();
     translate(width / 2, height / 2 + 18);
     rotate(frameCount * 0.08);
-    stroke(255);
+    stroke(overlay.spinner);
     strokeWeight(3);
     noFill();
     arc(0, 0, 28, 28, 0, PI * 0.8);
@@ -590,7 +600,7 @@ function addTrackedEventListener(target, event, handler) {
   target.addEventListener(event, handler);
   eventListeners.push({ target, event, handler });
 }
-          // Draw text
+
 /**
  * Sets up page visibility event listeners to handle background/foreground transitions
  */
@@ -2940,11 +2950,12 @@ function drawSelectionRectangle() {
   const x2 = max(selectionStartX, selectionCurrentX);
   const y2 = max(selectionStartY, selectionCurrentY);
   
+  const selColors = UI_COLORS.SELECTION_RECT;
   push();
-  // Semi-transparent blue fill
-  fill(100, 150, 255, 50);
-  // Blue border
-  stroke(100, 150, 255);
+  // Semi-transparent fill
+  fill(selColors.fill.r, selColors.fill.g, selColors.fill.b, selColors.fill.a);
+  // Border
+  stroke(selColors.stroke.r, selColors.stroke.g, selColors.stroke.b);
   strokeWeight(2 / zoom);
   rect(x1, y1, x2 - x1, y2 - y1);
   pop();
@@ -3177,16 +3188,17 @@ function drawSaveIndicator() {
   const size = CONFIG.UI.SAVE_INDICATOR_SIZE;
   const x = CONFIG.UI.SAVE_INDICATOR_X;
   const y = CONFIG.UI.SAVE_INDICATOR_Y;
+  const colors = UI_COLORS.SAVE_INDICATOR;
   
   push();
   // Draw circle
   noStroke();
   if (mindMap.isSaved) {
     // Green when saved
-    fill(76, 175, 80);
+    fill(colors.saved.r, colors.saved.g, colors.saved.b);
   } else {
     // Red when unsaved
-    fill(244, 67, 54);
+    fill(colors.unsaved.r, colors.unsaved.g, colors.unsaved.b);
   }
   circle(x, y, size);
   pop();

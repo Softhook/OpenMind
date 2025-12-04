@@ -18,6 +18,19 @@ class TextBox {
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
+  // Color constants for consistent styling
+  static COLORS = {
+    SELECTION_OUTLINE: { r: 60, g: 120, b: 255 },
+    HOVER_STROKE: 100,
+    EDITING_STROKE: 120,
+    NORMAL_STROKE: 100,
+    LINK_TEXT: { r: 0, g: 100, b: 220 },
+    CURSOR: { r: 0, g: 0, b: 255 },
+    SELECTION_HIGHLIGHT: { r: 255, g: 100, b: 100, a: 100 },
+    DIM_OVERLAY: { r: 255, g: 255, b: 255, a: 150 },
+    DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 }
+  };
+  
   // Regex pattern to detect URLs (http, https, file://, and local paths)
   // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
   static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
@@ -676,8 +689,8 @@ class TextBox {
       strokeWeight(1 / zoomFactor);
     }
     
-        rect(this.x - this.width/2, this.y - this.height/2, 
-          this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+    rect(this.x - this.width/2, this.y - this.height/2, 
+         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     // If this box holds an image, draw the image inside the box instead of text
     if (this.imageUrl) {
       if (this.imageLoaded && this.img) {
@@ -796,8 +809,8 @@ class TextBox {
     if (shouldDim) {
       fill(255, 255, 255, 150); // White overlay with transparency to lighten/dim
       noStroke();
-       rect(this.x - this.width/2, this.y - this.height/2, 
-         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+      rect(this.x - this.width/2, this.y - this.height/2, 
+           this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     }
     
     // (cursor drawn inside text branch where variables are defined)

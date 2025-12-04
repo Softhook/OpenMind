@@ -9,6 +9,12 @@ class Connection {
   static STROKE_WEIGHT_NORMAL = 2;
   static STROKE_WEIGHT_SELECTED = 3;
   
+  // Color constants for consistent styling
+  static COLORS = {
+    NORMAL: 80,
+    SELECTED: { r: 100, g: 150, b: 255 }
+  };
+  
   /**
    * Creates a new Connection between two boxes
    * @param {TextBox} fromBox - Source box
@@ -99,10 +105,11 @@ class Connection {
     
     // Draw line
     if (this.selected) {
-      stroke(100, 150, 255);
+      const c = Connection.COLORS.SELECTED;
+      stroke(c.r, c.g, c.b);
       strokeWeight(Connection.STROKE_WEIGHT_SELECTED);
     } else {
-      stroke(80);
+      stroke(Connection.COLORS.NORMAL);
       strokeWeight(Connection.STROKE_WEIGHT_NORMAL);
     }
     line(start.x, start.y, end.x, end.y);
@@ -117,9 +124,10 @@ class Connection {
     }
     
     if (this.selected) {
-      fill(100, 150, 255);
+      const c = Connection.COLORS.SELECTED;
+      fill(c.r, c.g, c.b);
     } else {
-      fill(80);
+      fill(Connection.COLORS.NORMAL);
     }
     noStroke();
     push();
