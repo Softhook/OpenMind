@@ -833,7 +833,8 @@ class TextBox {
     
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
     if (shouldDim) {
-      fill(255, 255, 255, 150); // White overlay with transparency to lighten/dim
+      const dimColor = TextBox.COLORS.DIM_OVERLAY;
+      fill(dimColor.r, dimColor.g, dimColor.b, dimColor.a);
       noStroke();
       rect(this.x - this.width/2, this.y - this.height/2, 
            this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));

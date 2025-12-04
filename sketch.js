@@ -501,11 +501,12 @@ function draw() {
   // Draw loading overlay on top of everything when fetching/loading maps
   if (isMapLoading) {
     const overlay = UI_COLORS.LOADING_OVERLAY;
+    const { r, g, b, a } = overlay.bg;
     push();
     // Screen-space overlay
     resetMatrix && resetMatrix();
     noStroke();
-    fill(overlay.bg.r, overlay.bg.g, overlay.bg.b, overlay.bg.a);
+    fill(r, g, b, a);
     rect(0, 0, width, height);
 
     // Loading text
