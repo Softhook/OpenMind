@@ -56,8 +56,9 @@ class MindMap {
     // Multi-selection of connections
     this.selectedConnections = new Set();
     
-    // Clipboard for copying/pasting boxes
+    // Clipboard for copying/pasting boxes and their connections
     this.copiedBoxes = [];
+    this.copiedConnections = [];
     
     // Performance optimization: track if content has changed
     this.isDirty = true;
@@ -1281,20 +1282,44 @@ class MindMap {
     } else if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
       // CMD/CTRL combinations when NOT editing text
       if (key === 'c' || key === 'C') {
-        // Copy selected box(es)
+        // Copy selected box(es) and their connections
+        let boxesToCopy = [];
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+          boxesToCopy = Array.from(this.selectedBoxes);
+        } else if (this.selectedBox) {
+          boxesToCopy = [this.selectedBox];
+        }
+        
+        if (boxesToCopy.length > 0) {
           this.copiedBoxes = [];
-          for (const box of this.selectedBoxes) {
+          const boxSet = new Set(boxesToCopy);
+          
+          // Copy box data
+          for (const box of boxesToCopy) {
             if (box) {
               this.copiedBoxes.push(box.toJSON());
             }
           }
-        } else if (this.selectedBox) {
-          this.copiedBoxes = [this.selectedBox.toJSON()];
+          
+          // Copy connections between the selected boxes
+          this.copiedConnections = [];
+          for (const conn of this.connections) {
+            if (conn && conn.fromBox && conn.toBox) {
+              // Only copy connections where both ends are in the selection
+              if (boxSet.has(conn.fromBox) && boxSet.has(conn.toBox)) {
+                // Store indices relative to the copied boxes array
+                const fromIndex = boxesToCopy.indexOf(conn.fromBox);
+                const toIndex = boxesToCopy.indexOf(conn.toBox);
+                if (fromIndex !== -1 && toIndex !== -1) {
+                  this.copiedConnections.push({ from: fromIndex, to: toIndex });
+                }
+              }
+            }
+          }
         }
         return;
       } else if (key === 'v' || key === 'V') {
-        // Paste copied box(es) at cursor position
+        // Paste copied box(es) and their connections at cursor position
         if (this.copiedBoxes && this.copiedBoxes.length > 0) {
           this.pushUndo();
           const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -1312,7 +1337,8 @@ class MindMap {
             this.selectedBox = null;
           }
           
-          // Paste all copied boxes with offset
+          // Paste all copied boxes with offset and track new boxes
+          const newBoxes = [];
           for (const boxData of this.copiedBoxes) {
             const newBoxData = {
               ...boxData,
@@ -1323,8 +1349,22 @@ class MindMap {
             if (newBox) {
               this.boxes.push(newBox);
               this.addBoxToSelection(newBox);
+              newBoxes.push(newBox);
             }
           }
+          
+          // Recreate connections between the pasted boxes
+          if (this.copiedConnections && this.copiedConnections.length > 0) {
+            for (const connData of this.copiedConnections) {
+              const fromBox = newBoxes[connData.from];
+              const toBox = newBoxes[connData.to];
+              if (fromBox && toBox) {
+                this.connections.push(new Connection(fromBox, toBox));
+              }
+            }
+          }
+          
+          this.isDirty = true;
         }
         return;
       }
