@@ -8,6 +8,20 @@ class MindMap {
   static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
   static ALIGN_TOLERANCE = 12;
   
+  // Layout constants
+  static LAYOUT = {
+    HORIZONTAL_SPACING: 200,
+    VERTICAL_SPACING: 120,
+    START_X: 100,
+    START_Y: 100
+  };
+  
+  // Color constants for consistent styling
+  static COLORS = {
+    CONNECTING_LINE: { r: 100, g: 100, b: 255 },
+    CONNECTOR_DOT: { r: 100, g: 150, b: 255 }
+  };
+  
   /**
    * Helper to check if a number is valid (uses Utils if available)
    * @private
@@ -280,12 +294,14 @@ class MindMap {
       const { box, side } = this.connectingFrom;
       const start = box.getConnectorCenter(side);
       if (start && !isNaN(start.x) && !isNaN(start.y)) {
+        const lineColor = MindMap.COLORS.CONNECTING_LINE;
+        const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
-        stroke(100, 100, 255);
+        stroke(lineColor.r, lineColor.g, lineColor.b);
         strokeWeight(2);
         line(start.x, start.y, worldMouseX(), worldMouseY());
         noStroke();
-        fill(100, 150, 255);
+        fill(dotColor.r, dotColor.g, dotColor.b);
         circle(start.x, start.y, 10);
         circle(worldMouseX(), worldMouseY(), 8);
         pop();
@@ -299,13 +315,15 @@ class MindMap {
       if (from && !isNaN(from.x) && !isNaN(from.y)) {
         const mx = worldMouseX();
         const my = worldMouseY();
+        const lineColor = MindMap.COLORS.CONNECTING_LINE;
+        const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
-        stroke(100, 100, 255);
+        stroke(lineColor.r, lineColor.g, lineColor.b);
         strokeWeight(2);
         line(from.x, from.y, mx, my);
         // Arrow head at mouse
         const angle = atan2(my - from.y, mx - from.x);
-        fill(100, 150, 255);
+        fill(dotColor.r, dotColor.g, dotColor.b);
         noStroke();
         push();
         translate(mx, my);
@@ -505,11 +523,11 @@ class MindMap {
       return priorityA - priorityB;
     });
     
-    // Layout configuration
-    const HORIZONTAL_SPACING = 200; // Space between siblings
-    const VERTICAL_SPACING = 120;   // Space between levels
-    const START_X = 100;            // Starting X position
-    const START_Y = 100;            // Starting Y position
+    // Layout configuration using class constants
+    const HORIZONTAL_SPACING = MindMap.LAYOUT.HORIZONTAL_SPACING;
+    const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
+    const START_X = MindMap.LAYOUT.START_X;
+    const START_Y = MindMap.LAYOUT.START_Y;
     
     // Assign levels using BFS from roots
     const levels = new Map(); // box -> level (0 = root)

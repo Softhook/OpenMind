@@ -18,6 +18,19 @@ class TextBox {
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
   
+  // Color constants for consistent styling
+  static COLORS = {
+    SELECTION_OUTLINE: { r: 60, g: 120, b: 255 },
+    HOVER_STROKE: 100,
+    EDITING_STROKE: 120,
+    NORMAL_STROKE: 100,
+    LINK_TEXT: { r: 0, g: 100, b: 220 },
+    CURSOR: { r: 0, g: 0, b: 255 },
+    SELECTION_HIGHLIGHT: { r: 255, g: 100, b: 100, a: 100 },
+    DIM_OVERLAY: { r: 255, g: 255, b: 255, a: 150 },
+    DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 }
+  };
+  
   // Regex pattern to detect URLs (http, https, file://, and local paths)
   // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
   static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
@@ -43,6 +56,32 @@ class TextBox {
     }
     return TextBox._isValidNumber(value) && value > 0 ? value : defaultValue;
   }
+  
+  /**
+   * Gets the current zoom level from global scope, with fallback.
+   * @private
+   * @returns {number} Current zoom level, defaults to 1
+   */
+  static _getCurrentZoom() {
+    if (typeof Utils !== 'undefined' && Utils.getCurrentZoom) {
+      return Utils.getCurrentZoom();
+    }
+    return typeof zoom !== 'undefined' && zoom > 0 ? zoom : 1;
+  }
+  
+  /**
+   * Gets a clamped zoom factor for UI scaling.
+   * @private
+   * @returns {number} Zoom factor between 0.5 and 2.0
+   */
+  static _getClampedZoomFactor() {
+    if (typeof Utils !== 'undefined' && Utils.getClampedZoomFactor) {
+      return Utils.getClampedZoomFactor();
+    }
+    const currentZoom = TextBox._getCurrentZoom();
+    return Math.max(0.5, Math.min(2.0, currentZoom));
+  }
+  
   /**
    * Creates a new TextBox
    * @param {number} x - Center X coordinate
@@ -650,34 +689,34 @@ class TextBox {
   draw(shouldDim = false) {
     push();
     
-    // Get current zoom level from global scope
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    // Get zoom factor for UI scaling
+    const zoomFactor = TextBox._getClampedZoomFactor();
     
     // Draw box
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(120);
+      stroke(TextBox.COLORS.EDITING_STROKE);
       strokeWeight(2 / zoomFactor);
     } else if (this.selected && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Highlight selected boxes with a blue outline (skip when navigating via arrow keys)
+      const selColor = TextBox.COLORS.SELECTION_OUTLINE;
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(60, 120, 255);
+      stroke(selColor.r, selColor.g, selColor.b);
       strokeWeight(2.5 / zoomFactor);
     } else if (this.isMouseOver()) {
       // Hover state uses the box background color
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(100);
+      stroke(TextBox.COLORS.HOVER_STROKE);
       strokeWeight(2 / zoomFactor);
     } else {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(100);
+      stroke(TextBox.COLORS.NORMAL_STROKE);
       strokeWeight(1 / zoomFactor);
     }
     
-        rect(this.x - this.width/2, this.y - this.height/2, 
-          this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+    rect(this.x - this.width/2, this.y - this.height/2, 
+         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     // If this box holds an image, draw the image inside the box instead of text
     if (this.imageUrl) {
       if (this.imageLoaded && this.img) {
@@ -794,20 +833,20 @@ class TextBox {
     
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
     if (shouldDim) {
-      fill(255, 255, 255, 150); // White overlay with transparency to lighten/dim
+      const dimColor = TextBox.COLORS.DIM_OVERLAY;
+      fill(dimColor.r, dimColor.g, dimColor.b, dimColor.a);
       noStroke();
-       rect(this.x - this.width/2, this.y - this.height/2, 
-         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+      rect(this.x - this.width/2, this.y - this.height/2, 
+           this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     }
     
     // (cursor drawn inside text branch where variables are defined)
     
     // Draw resize handle in bottom-right corner (only when not editing)
     if (!this.isEditing && (this.isMouseOver() || this.isResizing)) {
-      // Get current zoom level from global scope
-      const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-      // Apply moderate scaling: icons get smaller when zoomed in
-      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+      // Use helper for zoom factor
+      const currentZoom = TextBox._getCurrentZoom();
+      const zoomFactor = TextBox._getClampedZoomFactor();
       const scaledHandleSize = this.resizeHandleSize / zoomFactor;
       
       let handleX = this.x + this.width/2 - scaledHandleSize;
@@ -857,10 +896,12 @@ class TextBox {
     pop();
   }
 
-  // Compute screen positions for the three color circles on the left edge
+  /**
+   * Computes screen positions for the three color circles on the left edge
+   * @returns {Array<Object>} Array of circle positions and properties
+   */
   getColorPaletteCircles() {
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const zoomFactor = TextBox._getClampedZoomFactor();
     const r = this.colorCircleRadius / zoomFactor;
     const spacing = this.colorCircleSpacing / zoomFactor;
     const marginTop = 0; // align top of first circle with top of text box
@@ -880,10 +921,11 @@ class TextBox {
     return circles;
   }
 
-  // Draw the color palette circles
+  /**
+   * Draws the color palette circles
+   */
   drawColorPalette() {
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const zoomFactor = TextBox._getClampedZoomFactor();
     const circles = this.getColorPaletteCircles();
     push();
     for (const c of circles) {
@@ -896,14 +938,16 @@ class TextBox {
     pop();
   }
 
-  // If mouse is over one of the color circles, return its key; else null
+  /**
+   * Checks if mouse is over one of the color circles
+   * @returns {string|null} Color key if over a circle, null otherwise
+   */
   getColorCircleUnderMouse() {
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     const circles = this.getColorPaletteCircles();
+    const zoomFactor = TextBox._getClampedZoomFactor();
     for (const c of circles) {
-      const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-      const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
       if (dist(mx, my, c.x, c.y) <= c.r + 3 / zoomFactor) {
         return c.key;
       }
@@ -911,7 +955,10 @@ class TextBox {
     return null;
   }
 
-  // Apply a background color by key from the palette
+  /**
+   * Applies a background color by key from the palette
+   * @param {string} key - Color key ('white', 'orange', 'red')
+   */
   setBackgroundByKey(key) {
     const entry = this.colorPalette.find(p => p.key === key);
     if (entry) {
@@ -919,7 +966,10 @@ class TextBox {
     }
   }
 
-  // Connector utilities (center points at each edge)
+  /**
+   * Gets connector points at the center of each edge
+   * @returns {Object} Object with left, right, top, bottom points
+   */
   getConnectorPoints() {
     const hw = this.width / 2;
     const hh = this.height / 2;
@@ -931,14 +981,23 @@ class TextBox {
     };
   }
 
+  /**
+   * Gets the center point of a specific connector
+   * @param {string} side - Side of the box ('left', 'right', 'top', 'bottom')
+   * @returns {Object|null} Point with x and y, or null if invalid side
+   */
   getConnectorCenter(side) {
     const pts = this.getConnectorPoints();
     return pts[side] || null;
   }
 
+  /**
+   * Gets which connector is under the mouse cursor
+   * @param {number} hitRadius - Hit detection radius in pixels
+   * @returns {string|null} Side name or null if not over any connector
+   */
   getConnectorUnderMouse(hitRadius = 10) {
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const zoomFactor = TextBox._getClampedZoomFactor();
     const scaledHitRadius = hitRadius / Math.sqrt(zoomFactor);
     const pts = this.getConnectorPoints();
     const sides = ['left', 'right', 'top', 'bottom'];
@@ -954,9 +1013,12 @@ class TextBox {
     return null;
   }
 
+  /**
+   * Draws connector dots at each edge of the box
+   * @param {boolean} active - Whether connectors should be highlighted
+   */
   drawConnectors(active = false) {
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const zoomFactor = TextBox._getClampedZoomFactor();
     const pts = this.getConnectorPoints();
     push();
     noStroke();
@@ -979,9 +1041,12 @@ class TextBox {
         my < this.y + this.height/2;
   }
   
+  /**
+   * Checks if mouse is over the resize handle
+   * @returns {boolean} true if mouse is over resize handle
+   */
   isMouseOverResizeHandle() {
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
+    const zoomFactor = TextBox._getClampedZoomFactor();
     const scaledHandleSize = this.resizeHandleSize / zoomFactor;
     let handleX = this.x + this.width/2 - scaledHandleSize;
     let handleY = this.y + this.height/2 - scaledHandleSize;
@@ -2281,11 +2346,11 @@ class TextBox {
       return;
     }
     
-    // Draw cursor line (blue) and scale stroke with global zoom for visibility
+    // Draw cursor line and scale stroke with global zoom for visibility
     push();
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const zoomFactor = Math.max(0.5, Math.min(2.0, currentZoom));
-    stroke(0, 0, 255);
+    const zoomFactor = TextBox._getClampedZoomFactor();
+    const cursorColor = TextBox.COLORS.CURSOR;
+    stroke(cursorColor.r, cursorColor.g, cursorColor.b);
     strokeWeight(2 / zoomFactor);
     line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
     pop();
@@ -2317,7 +2382,8 @@ class TextBox {
     }
     
     push();
-    fill(255, 100, 100, 100); // Red overlay with transparency
+    const selColor = TextBox.COLORS.SELECTION_HIGHLIGHT;
+    fill(selColor.r, selColor.g, selColor.b, selColor.a);
     noStroke();
     
     if (startInfo.lineIndex === endInfo.lineIndex) {
