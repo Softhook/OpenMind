@@ -413,7 +413,7 @@ class MindMap {
   }
   
   /**
-   * Center-aligns all selected boxes horizontally.
+   * Center-aligns selected boxes horizontally.
    * Calculates the average X position of selected boxes and moves them all to that center.
    * If no boxes are selected, does nothing.
    */
@@ -423,7 +423,7 @@ class MindMap {
       return;
     }
     
-    const boxesToAlign = Array.from(this.selectedBoxes).filter(b => b != null);
+    const boxesToAlign = Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
     
     // Need at least 2 boxes to align
     if (boxesToAlign.length < 2) return;
