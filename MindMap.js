@@ -413,6 +413,47 @@ class MindMap {
   }
   
   /**
+   * Center-aligns all selected boxes horizontally.
+   * Calculates the average X position of selected boxes and moves them all to that center.
+   * If no boxes are selected, does nothing.
+   */
+  centerAlignSelectedBoxes() {
+    // Only work on selected boxes - if nothing is selected, do nothing
+    if (!this.selectedBoxes || this.selectedBoxes.size === 0) {
+      return;
+    }
+    
+    const boxesToAlign = Array.from(this.selectedBoxes).filter(b => b != null);
+    
+    // Need at least 2 boxes to align
+    if (boxesToAlign.length < 2) return;
+    
+    // Calculate the average X position (center) of all selected boxes
+    let sumX = 0;
+    let validCount = 0;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x)) continue;
+      sumX += box.x;
+      validCount++;
+    }
+    
+    if (validCount < 2) return;
+    
+    const centerX = sumX / validCount;
+    
+    if (!Number.isFinite(centerX)) return;
+    
+    // Move all selected boxes to the calculated center X
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x)) continue;
+      box.x = centerX;
+    }
+    
+    this.isDirty = true;
+    this.isSaved = false;
+  }
+  
+  /**
    * Arranges selected boxes (or all boxes) in a hierarchical layout based on connections.
    * Uses a tree/graph layout algorithm to create a structured network diagram.
    * Root nodes (nodes with no incoming connections) are placed at the top.
