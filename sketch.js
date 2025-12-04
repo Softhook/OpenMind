@@ -1053,7 +1053,7 @@ function populateKeyboardControlsOverlay() {
     { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
-    { keys: 'A', description: 'Align boxes' },
+    { keys: 'A', description: 'Centre-align selected boxes' },
     { keys: 'Q', description: 'Left-align selected boxes' },
     { keys: 'W', description: 'Hierarchical layout of selected boxes' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
@@ -1371,12 +1371,15 @@ function keyPressed() {
       setMaxZoom();
       return false;
     }
-    // Align boxes: press A key
+    // Center-align selected boxes: press A key (only if boxes are selected)
     if (!hasModifier && (key === 'a' || key === 'A')) {
-      if (mindMap.pushUndo && mindMap.alignBoxes) {
-        mindMap.pushUndo();
-        mindMap.alignBoxes(12);
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
+        if (mindMap.pushUndo && mindMap.centerAlignSelectedBoxes) {
+          mindMap.pushUndo();
+          mindMap.centerAlignSelectedBoxes();
+        }
       }
+      // If nothing selected, do nothing
       return false;
     }
     // Left-align selected boxes: press Q key
