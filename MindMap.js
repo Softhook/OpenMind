@@ -374,6 +374,201 @@ class MindMap {
   }
   
   /**
+   * Left-aligns all selected boxes to the leftmost box's left edge.
+   * If no boxes are selected, aligns all boxes.
+   */
+  leftAlignSelectedBoxes() {
+    // Determine which boxes to align
+    let boxesToAlign = [];
+    if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+      boxesToAlign = Array.from(this.selectedBoxes);
+    } else if (this.boxes && this.boxes.length > 0) {
+      boxesToAlign = this.boxes.filter(b => b != null);
+    }
+    
+    if (boxesToAlign.length < 2) return;
+    
+    // Find the leftmost left edge (box.x - box.width/2)
+    let minLeftEdge = Infinity;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      const leftEdge = box.x - box.width / 2;
+      if (leftEdge < minLeftEdge) {
+        minLeftEdge = leftEdge;
+      }
+    }
+    
+    if (!Number.isFinite(minLeftEdge)) return;
+    
+    // Align all boxes so their left edge matches the minimum left edge
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      // New center x = minLeftEdge + width/2
+      box.x = minLeftEdge + box.width / 2;
+    }
+    
+    this.isDirty = true;
+    this.isSaved = false;
+  }
+  
+  /**
+   * Arranges selected boxes (or all boxes) in a hierarchical layout based on connections.
+   * Uses a tree/graph layout algorithm to create a structured network diagram.
+   * Root nodes (nodes with no incoming connections) are placed at the top.
+   */
+  hierarchicalLayout() {
+    // Determine which boxes to layout
+    let boxesToLayout = [];
+    if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+      boxesToLayout = Array.from(this.selectedBoxes);
+    } else if (this.boxes && this.boxes.length > 0) {
+      boxesToLayout = this.boxes.filter(b => b != null);
+    }
+    
+    if (boxesToLayout.length < 1) return;
+    
+    const boxSet = new Set(boxesToLayout);
+    
+    // Build adjacency lists for the selected boxes only
+    // fromBox -> toBox means an arrow goes from fromBox to toBox
+    const children = new Map(); // box -> array of child boxes
+    const parents = new Map();  // box -> array of parent boxes
+    
+    for (const box of boxesToLayout) {
+      children.set(box, []);
+      parents.set(box, []);
+    }
+    
+    // Only consider connections where both endpoints are in the selection
+    for (const conn of this.connections) {
+      if (!conn || !conn.fromBox || !conn.toBox) continue;
+      if (boxSet.has(conn.fromBox) && boxSet.has(conn.toBox)) {
+        children.get(conn.fromBox).push(conn.toBox);
+        parents.get(conn.toBox).push(conn.fromBox);
+      }
+    }
+    
+    // Find root nodes (boxes with no parents in the selection)
+    const roots = boxesToLayout.filter(box => parents.get(box).length === 0);
+    
+    // If no roots found (all nodes are in cycles), pick the first node
+    if (roots.length === 0 && boxesToLayout.length > 0) {
+      roots.push(boxesToLayout[0]);
+    }
+    
+    // Sort roots by color priority (red first, then orange, then white)
+    roots.sort((a, b) => {
+      const priorityA = this.getBoxColorPriority(a);
+      const priorityB = this.getBoxColorPriority(b);
+      return priorityA - priorityB;
+    });
+    
+    // Layout configuration
+    const HORIZONTAL_SPACING = 200; // Space between siblings
+    const VERTICAL_SPACING = 120;   // Space between levels
+    const START_X = 100;            // Starting X position
+    const START_Y = 100;            // Starting Y position
+    
+    // Assign levels using BFS from roots
+    const levels = new Map(); // box -> level (0 = root)
+    const visited = new Set();
+    const queue = [];
+    
+    // Initialize roots at level 0
+    for (const root of roots) {
+      levels.set(root, 0);
+      queue.push(root);
+      visited.add(root);
+    }
+    
+    // BFS to assign levels
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const currentLevel = levels.get(current);
+      
+      for (const child of children.get(current)) {
+        if (!visited.has(child)) {
+          visited.add(child);
+          levels.set(child, currentLevel + 1);
+          queue.push(child);
+        }
+      }
+    }
+    
+    // Handle any unvisited nodes (disconnected within selection)
+    for (const box of boxesToLayout) {
+      if (!visited.has(box)) {
+        visited.add(box);
+        levels.set(box, 0);
+      }
+    }
+    
+    // Group boxes by level
+    const levelGroups = new Map(); // level -> array of boxes
+    for (const box of boxesToLayout) {
+      const level = levels.get(box) || 0;
+      if (!levelGroups.has(level)) {
+        levelGroups.set(level, []);
+      }
+      levelGroups.get(level).push(box);
+    }
+    
+    // Sort boxes within each level by their original x position for stability
+    for (const [level, boxes] of levelGroups) {
+      boxes.sort((a, b) => {
+        // Primary sort: color priority
+        const priorityDiff = this.getBoxColorPriority(a) - this.getBoxColorPriority(b);
+        if (priorityDiff !== 0) return priorityDiff;
+        // Secondary sort: original x position
+        return a.x - b.x;
+      });
+    }
+    
+    // Calculate positions for each level
+    const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
+    
+    // Calculate center X based on the widest level
+    let maxLevelWidth = 0;
+    for (const [level, boxes] of levelGroups) {
+      let totalWidth = 0;
+      for (const box of boxes) {
+        totalWidth += (box.width || 100) + HORIZONTAL_SPACING;
+      }
+      totalWidth -= HORIZONTAL_SPACING; // Remove trailing spacing
+      if (totalWidth > maxLevelWidth) maxLevelWidth = totalWidth;
+    }
+    
+    const centerX = START_X + maxLevelWidth / 2;
+    
+    // Position boxes level by level
+    for (const level of sortedLevels) {
+      const boxes = levelGroups.get(level);
+      const y = START_Y + level * VERTICAL_SPACING;
+      
+      // Calculate total width of this level
+      let totalWidth = 0;
+      for (const box of boxes) {
+        totalWidth += (box.width || 100) + HORIZONTAL_SPACING;
+      }
+      totalWidth -= HORIZONTAL_SPACING;
+      
+      // Start X position to center this level
+      let x = centerX - totalWidth / 2;
+      
+      // Position each box
+      for (const box of boxes) {
+        const boxWidth = box.width || 100;
+        box.x = x + boxWidth / 2;
+        box.y = y;
+        x += boxWidth + HORIZONTAL_SPACING;
+      }
+    }
+    
+    this.isDirty = true;
+    this.isSaved = false;
+  }
+  
+  /**
    * Navigates between boxes using arrow keys
    * UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
    * LEFT/RIGHT: Move between boxes at same hierarchy level (siblings)
