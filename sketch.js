@@ -1054,6 +1054,8 @@ function populateKeyboardControlsOverlay() {
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
     { keys: 'A', description: 'Align boxes' },
+    { keys: 'Q', description: 'Left-align selected boxes' },
+    { keys: 'W', description: 'Hierarchical layout of selected boxes' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Scroll Wheel', description: 'Zoom in and out' },
@@ -1374,6 +1376,22 @@ function keyPressed() {
       if (mindMap.pushUndo && mindMap.alignBoxes) {
         mindMap.pushUndo();
         mindMap.alignBoxes(12);
+      }
+      return false;
+    }
+    // Left-align selected boxes: press Q key
+    if (!hasModifier && (key === 'q' || key === 'Q')) {
+      if (mindMap.pushUndo && mindMap.leftAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.leftAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Hierarchical layout: press W key
+    if (!hasModifier && (key === 'w' || key === 'W')) {
+      if (mindMap.pushUndo && mindMap.hierarchicalLayout) {
+        mindMap.pushUndo();
+        mindMap.hierarchicalLayout();
       }
       return false;
     }

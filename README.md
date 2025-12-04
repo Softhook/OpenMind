@@ -32,6 +32,8 @@ Global (when NOT editing text):
 - N: create a new box at the cursor
 - Space: reverse the selected connection
 - 0 or Home: reset view to fit all content
+- Q: left-align all selected boxes (aligns to leftmost box's left edge)
+- W: apply hierarchical layout to selected boxes (organizes based on connections)
 - Backspace/Delete: delete selected box(es) or selected connection
 - Cmd/Ctrl+C: copy selected box(es)
 - Cmd/Ctrl+V: paste copied box(es) at the cursor location
