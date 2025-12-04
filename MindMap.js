@@ -514,7 +514,7 @@ class MindMap {
     }
     
     // Sort boxes within each level by their original x position for stability
-    for (const [level, boxes] of levelGroups) {
+    for (const boxes of levelGroups.values()) {
       boxes.sort((a, b) => {
         // Primary sort: color priority
         const priorityDiff = this.getBoxColorPriority(a) - this.getBoxColorPriority(b);
