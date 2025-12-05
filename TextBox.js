@@ -14,6 +14,7 @@ class TextBox {
   static RESIZE_HANDLE_SIZE = 18;
   static CURSOR_BLINK_RATE = 530;
   static DRAG_EDGE_THICKNESS = 18;
+  static HORIZONTAL_EDGE_WIDTH = 10; // fixed thinner vertical grab area for all boxes
   static COLOR_CIRCLE_RADIUS = 8;
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
@@ -794,13 +795,15 @@ class TextBox {
         if (this.imageUrl) {
           rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
         } else {
+          // Left and right thin frames (use a uniform, smaller vertical grab width)
+          const verticalEdgeWidth = min(edgeThresholdX, TextBox.HORIZONTAL_EDGE_WIDTH);
           // Left frame
-          rect(this.x - this.width/2, this.y - this.height/2, edgeThresholdX, this.height);
+          rect(this.x - this.width/2, this.y - this.height/2, verticalEdgeWidth, this.height);
           // Right frame
-          rect(this.x + this.width/2 - edgeThresholdX, this.y - this.height/2, edgeThresholdX, this.height);
-          // Top frame (between left/right frames)
-          const topX = this.x - this.width/2 + edgeThresholdX;
-          const topW = this.width - edgeThresholdX * 2;
+          rect(this.x + this.width/2 - verticalEdgeWidth, this.y - this.height/2, verticalEdgeWidth, this.height);
+          // Top and bottom frames span between the vertical frames
+          const topX = this.x - this.width/2 + verticalEdgeWidth;
+          const topW = this.width - verticalEdgeWidth * 2;
           if (topW > 0) {
             rect(topX, this.y - this.height/2, topW, edgeThresholdY);
             // Bottom frame
@@ -1110,6 +1113,7 @@ class TextBox {
     const maxEdgeX = max(4, this.width / 2 - minCenterWidth / 2);
     const maxEdgeY = max(4, this.height / 2 - minCenterHeight / 2);
     const edgeThresholdX = min(this.dragEdgeThickness, maxEdgeX);
+    const verticalEdgeWidth = min(edgeThresholdX, TextBox.HORIZONTAL_EDGE_WIDTH);
     const edgeThresholdY = min(this.dragEdgeThickness, maxEdgeY);
 
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -1125,14 +1129,14 @@ class TextBox {
     let distFromTop = abs(my - (this.y - this.height/2));
     let distFromBottom = abs(my - (this.y + this.height/2));
     
-    let onVerticalEdge = (distFromLeft < edgeThresholdX || distFromRight < edgeThresholdX) &&
-               my > this.y - this.height/2 &&
-               my < this.y + this.height/2;
+    let onVerticalEdge = (distFromLeft < verticalEdgeWidth || distFromRight < verticalEdgeWidth) &&
+           my > this.y - this.height/2 &&
+           my < this.y + this.height/2;
     
     let onHorizontalEdge = (distFromTop < edgeThresholdY || distFromBottom < edgeThresholdY) &&
                            mx > this.x - this.width/2 &&
                            mx < this.x + this.width/2;
-    
+
     return onVerticalEdge || onHorizontalEdge;
   }
   
