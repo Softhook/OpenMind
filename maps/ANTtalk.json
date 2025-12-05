@@ -118,31 +118,6 @@
       }
     },
     {
-      "x": -971.7881876191657,
-      "y": 1918.7823699579048,
-      "text": "Multiple Ontologies\nEmpirically observing how different realties are made in practice. ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 46,
-          "end": 64,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
       "x": -910.5944864291978,
       "y": 2964.268868385855,
       "text": "",
@@ -196,11 +171,11 @@
     },
     {
       "x": -971.7881876191657,
-      "y": 964.4541919052695,
-      "text": "ANT uses the idea of an actant: \n- people but also non-humans: objects, animals, ideas, ideology.\n\nFocus is empirical on observing what acts. Reaction against classic sociology of structures that are given. \n\nLatour is well known for the method: Follow the Actors.",
+      "y": 1918.7823699579048,
+      "text": "Multiple Ontologies\nEmpirically observing how different realities are made in practice. ",
       "imageUrl": null,
       "width": 280,
-      "height": 234,
+      "height": 87,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -208,28 +183,8 @@
       },
       "highlights": [
         {
-          "start": 24,
-          "end": 31,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 246,
-          "end": 263,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 121,
-          "end": 140,
+          "start": 46,
+          "end": 65,
           "color": {
             "r": 255,
             "g": 255,
@@ -283,11 +238,66 @@
           }
         }
       ]
+    },
+    {
+      "x": -971.7881876191657,
+      "y": 964.4541919052695,
+      "text": "ANT uses the idea of an Actant: \n- people but also non-humans: objects, animals, ideas, ideology.\n\nFocus is empirical on observing what acts. Reaction against classic sociology gives claims structures that are given. \n\nLatour is well known for the method: Follow the Actors.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 25,
+          "end": 31,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 256,
+          "end": 273,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 121,
+          "end": 140,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 24,
+          "end": 26,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 14,
+      "from": 15,
       "to": 6
     }
   ]
