@@ -2,10 +2,19 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: Arial, sans-serif;
+  /* Prevent mobile browser overscroll and bounce */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  /* Prevent touch callout on iOS */
+  -webkit-touch-callout: none;
 }
 
 canvas {
   display: block;
+  /* Prevent default touch actions on canvas for better touch handling */
+  touch-action: none;
 }
 
 button {
@@ -24,4 +33,32 @@ button:hover {
 
 button:active {
   background-color: #3d8b40;
+}
+
+/* Mobile navigation overlay styles */
+#mobile-nav-overlay {
+  /* Safe area support for devices with notches */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+#mobile-nav-up,
+#mobile-nav-down {
+  /* Ensure buttons don't inherit text styles */
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  line-height: 1;
+  /* Prevent text selection on buttons */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Improve tap target */
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Improve button visibility on hover/active for touch feedback */
+#mobile-nav-up:active,
+#mobile-nav-down:active {
+  background-color: rgba(100, 150, 255, 0.9) !important;
+  transform: scale(0.95);
 }
