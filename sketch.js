@@ -458,6 +458,13 @@ function setupUIButtons() {
   keyboardControlsButton.attribute('aria-expanded', 'false');
   
   setupKeyboardControlsOverlay();
+
+  // Ensure overlay sizing updates when the window resizes
+  addTrackedEventListener(window, 'resize', () => {
+    try { updateKeyboardOverlaySize(); } catch (_) {}
+  });
+  // Set initial size based on current viewport
+  try { updateKeyboardOverlaySize(); } catch (_) {}
   
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
@@ -1046,12 +1053,17 @@ function setupKeyboardControlsOverlay() {
   keyboardOverlayContent.style('border-radius', '8px');
   keyboardOverlayContent.style('max-width', '520px');
   keyboardOverlayContent.style('width', '100%');
-  keyboardOverlayContent.style('max-height', '80vh');
+  // Make the overlay responsive to viewport size and allow scrolling when needed
+  keyboardOverlayContent.style('max-width', Math.min(720, window.innerWidth - 48) + 'px');
+  keyboardOverlayContent.style('width', '100%');
+  keyboardOverlayContent.style('max-height', 'calc(100vh - 48px)');
   keyboardOverlayContent.style('overflow-y', 'auto');
   keyboardOverlayContent.style('color', '#222222');
   keyboardOverlayContent.style('box-shadow', '0 16px 40px rgba(0, 0, 0, 0.35)');
   keyboardOverlayContent.style('box-sizing', 'border-box');
   keyboardOverlayContent.style('font-family', 'sans-serif');
+  // Slightly reduce the overall font size so more shortcuts fit without changing layout
+  keyboardOverlayContent.style('font-size', '13px');
 
   if (keyboardOverlayContent.elt) {
     overlayContentClickHandler = (event) => {
@@ -1071,14 +1083,14 @@ function populateKeyboardControlsOverlay() {
   const title = createElement('h2', 'Open Mind    <span style="font-size: 0.6em; color: grey;">Christian Nold, 2025</span>');
   title.parent(keyboardOverlayContent);
   title.style('margin', '0 0 12px 0');
-  title.style('font-size', '24px');
+  title.style('font-size', '20px');
   title.style('font-weight', '600');
 
   const hint = createElement('p');
   hint.html('Timed autosaves to browser. Box hierarchy: <span style="color: red;">Red</span> > <span style="color: orange;">Orange</span> > White');
   hint.parent(keyboardOverlayContent);
   hint.style('margin', '0 0 18px 0');
-  hint.style('font-size', '14px');
+  hint.style('font-size', '13px');
   hint.style('color', '#555555');
 
   const shortcuts = [
@@ -1111,16 +1123,18 @@ function populateKeyboardControlsOverlay() {
     row.parent(keyboardOverlayContent);
     row.style('display', 'flex');
     row.style('align-items', 'flex-start');
-    row.style('gap', '16px');
-    row.style('margin-bottom', '10px');
-    row.style('font-size', '15px');
+    row.style('gap', '12px');
+    row.style('margin-bottom', '8px');
+    row.style('font-size', '13px');
 
     const keyLabel = createSpan(item.keys);
     keyLabel.parent(row);
     keyLabel.style('font-family', 'monospace');
     keyLabel.style('font-weight', '600');
-    keyLabel.style('min-width', '160px');
+    // Reduce min-width so more keys fit horizontally on smaller screens
+    keyLabel.style('min-width', '120px');
     keyLabel.style('white-space', 'nowrap');
+    keyLabel.style('font-size', '13px');
 
     const description = createSpan(item.description);
     description.parent(row);
@@ -1140,6 +1154,8 @@ function populateKeyboardControlsOverlay() {
 function showKeyboardControlsOverlay() {
   if (!keyboardOverlay) return;
   keyboardOverlay.style('display', 'flex');
+  // Recompute sizing for current viewport so content fits
+  try { updateKeyboardOverlaySize(); } catch (_) {}
   keyboardOverlayVisible = true;
   if (keyboardControlsButton && keyboardControlsButton.attribute) {
     keyboardControlsButton.attribute('aria-expanded', 'true');
@@ -1152,6 +1168,22 @@ function hideKeyboardControlsOverlay() {
   keyboardOverlayVisible = false;
   if (keyboardControlsButton && keyboardControlsButton.attribute) {
     keyboardControlsButton.attribute('aria-expanded', 'false');
+  }
+}
+
+// Update overlay content size to fit viewport. Public so we can call on resize.
+function updateKeyboardOverlaySize() {
+  if (!keyboardOverlayContent) return;
+  try {
+    const minWidth = 360;
+    const maxWidth = Math.min(900, Math.max(minWidth, window.innerWidth - 48));
+    keyboardOverlayContent.style('max-width', maxWidth + 'px');
+
+    const minHeight = 180;
+    const maxHeight = Math.max(minHeight, window.innerHeight - 48);
+    keyboardOverlayContent.style('max-height', maxHeight + 'px');
+  } catch (e) {
+    // ignore
   }
 }
 
