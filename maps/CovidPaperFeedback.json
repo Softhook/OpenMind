@@ -254,41 +254,6 @@
       }
     },
     {
-      "x": -358.3492596172978,
-      "y": -17.65967714721708,
-      "text": " Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie? The theoretical framing (p.5) suggests a significant gap, but this could be made more explicit for the reader. What is the nature of this gap, and how does the study aim to address it?",
-      "imageUrl": null,
-      "width": 280,
-      "height": 255,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      },
-      "highlights": [
-        {
-          "start": 171,
-          "end": 210,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 322,
-          "end": 395,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
       "x": -334.77051276428233,
       "y": 725.1940992651762,
       "text": "Moreover, the study’s scope and focus should be articulated more clearly—what exactly does it address, and what considerations were made in positioning the findings?",
@@ -481,51 +446,6 @@
       ]
     },
     {
-      "x": 109.81326939521566,
-      "y": -1259.8241916135726,
-      "text": "Thank you, this review has been very helpful for improving this paper.\n\n\"The paper’s strongest contribution lies in its proposed methodological framework, which offers valuable insights into elusive publics—such as distributed, digitally mediated ones—and holds relevance beyond this specific context.\"\n\n I'm glad the reviewer feels that there's a clear contribution being made by this paper.\n\nThe review sugegst this paper is \nprimarily as a methodological and analytical contribution based on a case study in distributed, digitally mediated publics ... While the “designing with” component is less convincing\"\n\nThis is a very helpful point. And it has been adopted both into the abstract and the main text \n\n\"The discussion on the risk of hotspots being treated as personas (p.15) is ambiguous and would benefit from clarification\"\n\nThe point about the relation to personas method was removed since indeed it does not make sense.",
-      "imageUrl": null,
-      "width": 280,
-      "height": 717,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 555,
-          "end": 610,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 72,
-          "end": 301,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 711,
-          "end": 833,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
       "x": 1393.8192680620473,
       "y": 221.81753196622174,
       "text": "Is it weak to argue that the case study was used to develop the method\n\nI think it's more like a method assemblage. Like they talk about in New Materialism \n‘research-assemblage’ comprising researcher, data, methods and contexts",
@@ -627,11 +547,101 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -358.3492596172978,
+      "y": -17.65967714721708,
+      "text": " Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie? The theoretical framing (p.5) suggests a significant gap, but this could be made more explicit for the reader. What is the nature of this gap, and how does the study aim to address it?",
+      "imageUrl": null,
+      "width": 280,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 171,
+          "end": 210,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 322,
+          "end": 395,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 109.81326939521566,
+      "y": -1259.8241916135726,
+      "text": "Thank you, this review has been very helpful for improving this paper.\n\n\"The paper’s strongest contribution lies in its proposed methodological framework, which offers valuable insights into elusive publics—such as distributed, digitally mediated ones—and holds relevance beyond this specific context.\"\n\n I'm glad the reviewer feels that there's a clear contribution being made by this paper.\n\nThe review sugegst this paper is \nprimarily as a methodological and analytical contribution based on a case study in distributed, digitally mediated publics ... While the “designing with” component is less convincing\"\n\nThis is a very helpful point. And it has been adopted both into the abstract and led to a rewrite of the text in section 5\n\n\"The discussion on the risk of hotspots being treated as personas (p.15) is ambiguous and would benefit from clarification\"\n\nThe point about the relation to personas method was removed since indeed it does not help the overall argument. \n\n\" Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie\" \n\nIndeed, this has been addressed on page 4 ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 927,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 555,
+          "end": 610,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 72,
+          "end": 301,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 738,
+          "end": 860,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 977,
+          "end": 1187,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 15,
+      "from": 30,
       "to": 5
     },
     {
@@ -639,15 +649,15 @@
       "to": 2
     },
     {
-      "from": 23,
+      "from": 22,
       "to": 3
     },
     {
-      "from": 26,
+      "from": 24,
       "to": 0
     },
     {
-      "from": 25,
+      "from": 23,
       "to": 10
     },
     {
@@ -655,24 +665,24 @@
       "to": 10
     },
     {
-      "from": 21,
+      "from": 20,
       "to": 13
     },
     {
       "from": 13,
-      "to": 22
-    },
-    {
-      "from": 20,
       "to": 21
     },
     {
-      "from": 17,
+      "from": 19,
       "to": 20
     },
     {
-      "from": 18,
-      "to": 24
+      "from": 16,
+      "to": 19
+    },
+    {
+      "from": 17,
+      "to": 31
     }
   ]
 }
