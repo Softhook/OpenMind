@@ -96,6 +96,12 @@ let eventListeners = [];
 let overlayClickHandler = null;
 let overlayContentClickHandler = null;
 
+// Mobile navigation overlay state
+let mobileNavOverlay = null;
+let mobileNavUpButton = null;
+let mobileNavDownButton = null;
+let isTouchDevice = false;
+
 // ============================================================================
 // KEY REPEAT MANAGER
 // ============================================================================
@@ -396,6 +402,9 @@ function setup() {
     
     // Set up page visibility handling to prevent freezing when tab is hidden
     setupVisibilityHandling();
+    
+    // Set up mobile navigation overlay (for touch devices)
+    setupMobileNavigation();
     
       // Enable drag-and-drop of image files or image URLs onto the canvas
       try {
@@ -1152,6 +1161,244 @@ function toggleKeyboardControlsOverlay() {
   } else {
     showKeyboardControlsOverlay();
   }
+}
+
+// ============================================================================
+// MOBILE NAVIGATION OVERLAY
+// ============================================================================
+
+/**
+ * Detects if the current device supports touch events or has a mobile-sized screen
+ * @returns {boolean} true if touch is supported or mobile-sized
+ */
+function detectTouchDevice() {
+  const hasTouchEvents = (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator.msMaxTouchPoints > 0
+  );
+  const hasCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const isMobileSize = window.innerWidth <= 768 || window.innerHeight <= 500;
+  
+  return hasTouchEvents || hasCoarsePointer || isMobileSize;
+}
+
+/**
+ * Sets up the mobile navigation overlay with up/down buttons
+ */
+function setupMobileNavigation() {
+  try {
+    isTouchDevice = detectTouchDevice();
+    
+    // Create overlay container for mobile navigation buttons
+    mobileNavOverlay = createDiv();
+    mobileNavOverlay.id('mobile-nav-overlay');
+    mobileNavOverlay.style('position', 'fixed');
+    mobileNavOverlay.style('bottom', '20px');
+    mobileNavOverlay.style('left', '20px');
+    mobileNavOverlay.style('display', 'flex');
+    mobileNavOverlay.style('flex-direction', 'column');
+    mobileNavOverlay.style('gap', '10px');
+    mobileNavOverlay.style('z-index', '999');
+    mobileNavOverlay.style('pointer-events', 'auto');
+    // Initially show only on touch devices
+    mobileNavOverlay.style('opacity', isTouchDevice ? '1' : '0');
+    mobileNavOverlay.style('visibility', isTouchDevice ? 'visible' : 'hidden');
+    mobileNavOverlay.style('transition', 'opacity 0.3s ease');
+    
+    // Common button styles
+    const buttonSize = 56;
+    const buttonStyle = {
+      width: buttonSize + 'px',
+      height: buttonSize + 'px',
+      borderRadius: '50%',
+      border: '2px solid rgba(100, 100, 100, 0.5)',
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      color: '#333',
+      fontSize: '24px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      touchAction: 'manipulation'
+    };
+    
+    // Create Up button (navigate to previous box)
+    mobileNavUpButton = createButton('▲');
+    mobileNavUpButton.parent(mobileNavOverlay);
+    mobileNavUpButton.id('mobile-nav-up');
+    applyButtonStyles(mobileNavUpButton, buttonStyle);
+    mobileNavUpButton.attribute('aria-label', 'Navigate to previous box');
+    
+    // Create Down button (navigate to next box)
+    mobileNavDownButton = createButton('▼');
+    mobileNavDownButton.parent(mobileNavOverlay);
+    mobileNavDownButton.id('mobile-nav-down');
+    applyButtonStyles(mobileNavDownButton, buttonStyle);
+    mobileNavDownButton.attribute('aria-label', 'Navigate to next box');
+    
+    // Add touch event handlers for smooth navigation
+    setupMobileNavButtonEvents(mobileNavUpButton, 'up');
+    setupMobileNavButtonEvents(mobileNavDownButton, 'down');
+    
+    // Handle orientation changes
+    addTrackedEventListener(window, 'resize', updateMobileNavPosition);
+    addTrackedEventListener(window, 'orientationchange', updateMobileNavPosition);
+    
+    // Initial position update
+    updateMobileNavPosition();
+    
+  } catch (e) {
+    console.warn('Failed to setup mobile navigation:', e);
+  }
+}
+
+/**
+ * Applies styles to a p5.js button element
+ * @param {Object} button - p5.js button element
+ * @param {Object} styles - Style object
+ */
+function applyButtonStyles(button, styles) {
+  if (!button || !button.style) return;
+  for (const [key, value] of Object.entries(styles)) {
+    button.style(key, value);
+  }
+}
+
+/**
+ * Sets up touch and mouse event handlers for mobile navigation buttons
+ * @param {Object} button - p5.js button element
+ * @param {string} direction - 'up' or 'down'
+ */
+function setupMobileNavButtonEvents(button, direction) {
+  if (!button || !button.elt) return;
+  
+  const navigateAction = () => {
+    if (!mindMap) return;
+    
+    // Use the existing navigateBoxes method which handles smooth animation
+    if (direction === 'up') {
+      mindMap.navigateBoxes(UP_ARROW);
+    } else if (direction === 'down') {
+      mindMap.navigateBoxes(DOWN_ARROW);
+    }
+  };
+  
+  // Touch start handler with visual feedback
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
+    button.style('transform', 'scale(0.95)');
+  };
+  
+  // Touch end handler
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    button.style('backgroundColor', 'rgba(255, 255, 255, 0.9)');
+    button.style('transform', 'scale(1)');
+    navigateAction();
+  };
+  
+  // Mouse handlers for desktop testing
+  const handleMouseDown = (e) => {
+    button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
+    button.style('transform', 'scale(0.95)');
+  };
+  
+  const handleMouseUp = (e) => {
+    button.style('backgroundColor', 'rgba(255, 255, 255, 0.9)');
+    button.style('transform', 'scale(1)');
+  };
+  
+  // Mouse click for non-touch interaction
+  button.mousePressed(() => {
+    navigateAction();
+  });
+  
+  // Touch events for mobile
+  addTrackedEventListener(button.elt, 'touchstart', handleTouchStart, { passive: false });
+  addTrackedEventListener(button.elt, 'touchend', handleTouchEnd, { passive: false });
+  addTrackedEventListener(button.elt, 'touchcancel', handleTouchEnd, { passive: false });
+  
+  // Mouse events for visual feedback
+  addTrackedEventListener(button.elt, 'mousedown', handleMouseDown);
+  addTrackedEventListener(button.elt, 'mouseup', handleMouseUp);
+  addTrackedEventListener(button.elt, 'mouseleave', handleMouseUp);
+  
+  // Add transition for smooth button feedback
+  button.style('transition', 'background-color 0.15s ease, transform 0.15s ease');
+}
+
+/**
+ * Updates mobile navigation position based on screen orientation and size
+ */
+function updateMobileNavPosition() {
+  if (!mobileNavOverlay) return;
+  
+  try {
+    // Re-check if we should show/hide based on screen size
+    const shouldShow = detectTouchDevice();
+    
+    if (shouldShow) {
+      mobileNavOverlay.style('opacity', '1');
+      mobileNavOverlay.style('visibility', 'visible');
+    } else {
+      mobileNavOverlay.style('opacity', '0');
+      mobileNavOverlay.style('visibility', 'hidden');
+    }
+    
+    // Check current orientation
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    // Adjust position based on orientation and safe areas
+    const safeBottom = 20;
+    const safeLeft = 20;
+    
+    // Position remains in bottom-left for both orientations
+    mobileNavOverlay.style('bottom', safeBottom + 'px');
+    mobileNavOverlay.style('left', safeLeft + 'px');
+    
+    // Optionally adjust button size for smaller screens
+    const screenMin = Math.min(window.innerWidth, window.innerHeight);
+    let buttonSize = 56;
+    if (screenMin < 400) {
+      buttonSize = 48;
+    }
+    
+    if (mobileNavUpButton) {
+      mobileNavUpButton.style('width', buttonSize + 'px');
+      mobileNavUpButton.style('height', buttonSize + 'px');
+    }
+    if (mobileNavDownButton) {
+      mobileNavDownButton.style('width', buttonSize + 'px');
+      mobileNavDownButton.style('height', buttonSize + 'px');
+    }
+  } catch (e) {
+    console.warn('Failed to update mobile nav position:', e);
+  }
+}
+
+/**
+ * Shows the mobile navigation overlay
+ */
+function showMobileNavOverlay() {
+  if (!mobileNavOverlay) return;
+  mobileNavOverlay.style('opacity', '1');
+  mobileNavOverlay.style('visibility', 'visible');
+}
+
+/**
+ * Hides the mobile navigation overlay
+ */
+function hideMobileNavOverlay() {
+  if (!mobileNavOverlay) return;
+  mobileNavOverlay.style('opacity', '0');
+  mobileNavOverlay.style('visibility', 'hidden');
 }
 
 // ============================================================================
