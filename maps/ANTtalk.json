@@ -171,31 +171,6 @@
     },
     {
       "x": -971.7881876191657,
-      "y": 1918.7823699579048,
-      "text": "Multiple Ontologies\nEmpirically observing how different realities are made in practice. ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 46,
-          "end": 65,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -971.7881876191657,
       "y": 307.9401078737973,
       "text": "Designers are happy talking about affordances of objects. \nDoorhandles - Don Norman\n\nBut design has a problem with talking about systems - too literal or too abstract",
       "imageUrl": null,
@@ -293,11 +268,56 @@
           }
         }
       ]
+    },
+    {
+      "x": -971.7881876191657,
+      "y": 1918.7823699579048,
+      "text": "Multiple Ontologies\nEmpirically observing how alternative realities are made through practice.\n\nEthnography + Intervention",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 57,
+          "end": 67,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 0,
+          "end": 19,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 46,
+          "end": 57,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 15,
+      "from": 14,
       "to": 6
     }
   ]
