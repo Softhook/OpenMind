@@ -1,0 +1,21 @@
+{
+  "name": "openmind",
+  "version": "1.0.0",
+  "description": "A simple mind mapping application built with p5.js.",
+  "main": "Connection.js",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "jest",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "start": "npx serve -l 8888"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.40.1",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
