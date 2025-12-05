@@ -704,8 +704,9 @@ class TextBox {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(selColor.r, selColor.g, selColor.b);
       strokeWeight(2.5 / zoomFactor);
-    } else if (this.isMouseOver()) {
+    } else if (this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Hover state uses the box background color
+      // Disabled while navigating between boxes with arrow keys (presentation mode)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(TextBox.COLORS.HOVER_STROKE);
       strokeWeight(2 / zoomFactor);
@@ -771,6 +772,43 @@ class TextBox {
       // Top-anchored text: start at top padding of the box
       let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
       let textX = this.x - this.width / 2 + this.padding;
+
+      // If connector dots are visible (hover OR active connection from this box),
+      // slightly dim the draggable frame area so the grab-edge is visually prominent.
+      const connectorsVisible = ((! (typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
+                                 (typeof mindMap !== 'undefined' && mindMap.connectingFrom && mindMap.connectingFrom.box === this));
+      if (connectorsVisible && !this.isEditing) {
+        // Compute edge thresholds matching isMouseOnEdge logic
+        const minCenterWidth = 20;
+        const minCenterHeight = 20;
+        const maxEdgeX = max(4, this.width / 2 - minCenterWidth / 2);
+        const maxEdgeY = max(4, this.height / 2 - minCenterHeight / 2);
+        const edgeThresholdX = min(this.dragEdgeThickness, maxEdgeX);
+        const edgeThresholdY = min(this.dragEdgeThickness, maxEdgeY);
+
+        push();
+        noStroke();
+        fill(0, 0, 0, 20); // subtle dark dim for draggable frame
+
+        // For image boxes, the whole interior is draggable — dim the interior
+        if (this.imageUrl) {
+          rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+        } else {
+          // Left frame
+          rect(this.x - this.width/2, this.y - this.height/2, edgeThresholdX, this.height);
+          // Right frame
+          rect(this.x + this.width/2 - edgeThresholdX, this.y - this.height/2, edgeThresholdX, this.height);
+          // Top frame (between left/right frames)
+          const topX = this.x - this.width/2 + edgeThresholdX;
+          const topW = this.width - edgeThresholdX * 2;
+          if (topW > 0) {
+            rect(topX, this.y - this.height/2, topW, edgeThresholdY);
+            // Bottom frame
+            rect(topX, this.y + this.height/2 - edgeThresholdY, topW, edgeThresholdY);
+          }
+        }
+        pop();
+      }
       
       // Draw selection highlight if there's a selection
       if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
@@ -843,7 +881,8 @@ class TextBox {
     // (cursor drawn inside text branch where variables are defined)
     
     // Draw resize handle in bottom-right corner (only when not editing)
-    if (!this.isEditing && (this.isMouseOver() || this.isResizing)) {
+    // Hide hover-triggered resize handle during arrow-key navigation
+    if (!this.isEditing && ((this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) || this.isResizing)) {
       // Use helper for zoom factor
       const currentZoom = TextBox._getCurrentZoom();
       const zoomFactor = TextBox._getClampedZoomFactor();

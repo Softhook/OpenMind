@@ -283,7 +283,8 @@ class MindMap {
         // Don't show connectors if the box is being edited
         if (box.isEditing) continue;
         const active = this.connectingFrom && this.connectingFrom.box === box;
-        if (box.isMouseOver() || active) {
+        // During arrow-key navigation (presentation), don't show hover-triggered connectors
+        if ((!this.isArrowKeyNavigating && box.isMouseOver()) || active) {
           try { box.drawConnectors(!!active); } catch (e) {}
         }
       }
