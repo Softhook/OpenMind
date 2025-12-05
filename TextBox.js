@@ -14,7 +14,7 @@ class TextBox {
   static RESIZE_HANDLE_SIZE = 18;
   static CURSOR_BLINK_RATE = 530;
   static DRAG_EDGE_THICKNESS = 18;
-  static HORIZONTAL_EDGE_WIDTH = 10; // fixed thinner vertical grab area for all boxes
+  static HORIZONTAL_EDGE_WIDTH = 12; // fixed thinner vertical grab area for all boxes
   static COLOR_CIRCLE_RADIUS = 8;
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
