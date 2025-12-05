@@ -216,61 +216,6 @@
     },
     {
       "x": -971.7881876191657,
-      "y": 964.4541919052695,
-      "text": "ANT uses the idea of an Actant: \n- people but also non-humans: objects, animals, ideas, ideology.\n\nFocus is empirical on observing what acts. Reaction against classic sociology gives claims structures that are given. \n\nLatour is well known for the method: Follow the Actors.",
-      "imageUrl": null,
-      "width": 280,
-      "height": 234,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 25,
-          "end": 31,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 256,
-          "end": 273,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 121,
-          "end": 140,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 24,
-          "end": 26,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -971.7881876191657,
       "y": 1918.7823699579048,
       "text": "Multiple Ontologies\nEmpirically observing how alternative realities are made through practice.\n\nEthnography + Intervention",
       "imageUrl": null,
@@ -313,11 +258,66 @@
           }
         }
       ]
+    },
+    {
+      "x": -971.7881876191657,
+      "y": 964.4541919052695,
+      "text": "ANT uses the idea of an Actant: \n- people but also non-humans: objects, animals, ideas, ideology.\n\nFocus is empirical on observing what acts. Reaction against classic sociology which claims structures that are given. \n\nLatour proposed method: \nFollow the Actors.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 25,
+          "end": 31,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 244,
+          "end": 261,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 121,
+          "end": 140,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 24,
+          "end": 26,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 14,
+      "from": 15,
       "to": 6
     }
   ]

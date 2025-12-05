@@ -1054,8 +1054,11 @@ function setupKeyboardControlsOverlay() {
   keyboardOverlayContent.style('max-width', '520px');
   keyboardOverlayContent.style('width', '100%');
   // Make the overlay responsive to viewport size and allow scrolling when needed
-  keyboardOverlayContent.style('max-width', Math.min(720, window.innerWidth - 48) + 'px');
-  keyboardOverlayContent.style('width', '100%');
+  // Keep the overlay intentionally narrower so lines wrap earlier
+  // Let the content determine its width (shrink-to-fit) but cap at viewport width
+  keyboardOverlayContent.style('max-width', Math.min(560, window.innerWidth - 48) + 'px');
+  keyboardOverlayContent.style('width', 'auto');
+  keyboardOverlayContent.style('display', 'inline-block');
   keyboardOverlayContent.style('max-height', 'calc(100vh - 48px)');
   keyboardOverlayContent.style('overflow-y', 'auto');
   keyboardOverlayContent.style('color', '#222222');
@@ -1123,7 +1126,8 @@ function populateKeyboardControlsOverlay() {
     row.parent(keyboardOverlayContent);
     row.style('display', 'flex');
     row.style('align-items', 'flex-start');
-    row.style('gap', '12px');
+    // Increase gap between key column and description column
+    row.style('gap', '24px');
     row.style('margin-bottom', '8px');
     row.style('font-size', '13px');
 
@@ -1131,14 +1135,20 @@ function populateKeyboardControlsOverlay() {
     keyLabel.parent(row);
     keyLabel.style('font-family', 'monospace');
     keyLabel.style('font-weight', '600');
-    // Reduce min-width so more keys fit horizontally on smaller screens
-    keyLabel.style('min-width', '120px');
+    // Use a fixed column width so the left column doesn't push the right column
+    // Slightly reduce label column width to better fit a narrower overlay
+    keyLabel.style('flex', '0 0 120px');
+    keyLabel.style('min-width', '100px');
     keyLabel.style('white-space', 'nowrap');
     keyLabel.style('font-size', '13px');
+    keyLabel.style('text-align', 'right');
 
     const description = createSpan(item.description);
     description.parent(row);
+    // Allow the description column to flex and wrap without being pushed by the label
     description.style('flex', '1');
+    description.style('min-width', '0');
+    description.style('font-size', '13px');
   }
 
   const closeButton = createButton('Close');
@@ -1176,10 +1186,13 @@ function updateKeyboardOverlaySize() {
   if (!keyboardOverlayContent) return;
   try {
     const minWidth = 360;
-    const maxWidth = Math.min(900, Math.max(minWidth, window.innerWidth - 48));
+    // Only cap width; allow actual width to be content-driven (auto)
+    const maxWidth = Math.min(900, Math.max(220, window.innerWidth - 48));
     keyboardOverlayContent.style('max-width', maxWidth + 'px');
+    keyboardOverlayContent.style('width', 'auto');
+    keyboardOverlayContent.style('min-width', '0');
 
-    const minHeight = 180;
+    const minHeight = 120;
     const maxHeight = Math.max(minHeight, window.innerHeight - 48);
     keyboardOverlayContent.style('max-height', maxHeight + 'px');
   } catch (e) {
