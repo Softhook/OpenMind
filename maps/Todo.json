@@ -2,45 +2,6 @@
   "boxes": [
     {
       "x": -1271.1983182612043,
-      "y": -534.6755217800669,
-      "text": "Get back to Anna Jackman ",
-      "imageUrl": null,
-      "width": 195.978515625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1271.1983182612043,
-      "y": -460.3708205070677,
-      "text": "change the CV and ",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1271.1983182612043,
-      "y": -349.91145210571455,
-      "text": "Make the changes to the paper Just to have a first go at it and have it under control. Or otherwise it makes me anxious. ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1271.1983182612043,
       "y": -718.2156556280597,
       "text": "Todo",
       "imageUrl": null,
@@ -66,19 +27,6 @@
       }
     },
     {
-      "x": -1271.1983182612043,
-      "y": -253.4635379272657,
-      "text": "https://softhook.github.io/OpenMind/#maps/CovidPaperFeedback",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -481.6979208744239,
       "y": -751.0209872711316,
       "text": "Talk to Slav about the invoice change",
@@ -92,11 +40,11 @@
       }
     },
     {
-      "x": -948.6438688106391,
-      "y": -624.6900313927475,
-      "text": "Tomorrow two o'clock about ANT ",
+      "x": -764.1186590477749,
+      "y": -534.0135378907544,
+      "text": "Get back to Anna Jackman ",
       "imageUrl": null,
-      "width": 232.0791015625,
+      "width": 195.978515625,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -105,9 +53,87 @@
       }
     },
     {
-      "x": -924.6834195918891,
-      "y": -559.3168124176941,
-      "text": "https://softhook.github.io/OpenMind/#maps/ANTtalk.json",
+      "x": -1194.7498912252713,
+      "y": -416.9735585874707,
+      "text": "covid paper\nhttps://softhook.github.io/OpenMind/#maps/CovidPaperFeedback",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -866.7729085680626,
+      "y": -380.81409002484236,
+      "text": "Media studies research, maybe have a chat with what's her name? The Greek woman. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1248.0288821352642,
+      "y": -639.7684545107743,
+      "text": "Get the promotion into a draft state today. So we're ready to go. ",
+      "imageUrl": null,
+      "width": 281.07281008388895,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -994.5357992053889,
+      "y": -646.9316135284959,
+      "text": "CV",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1194.7498912252713,
+      "y": -319.9115722080859,
+      "text": "Make the methodological arguments ",
+      "imageUrl": null,
+      "width": 253.5712890625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -526.5131894614011,
+      "y": -272.9107160668933,
+      "text": "With open mind change the wasd keys to do the aligning. and Q to do the centre horizontal aighed layout. E to do the vertical aligned ;ayout\n\nr is for hierarchical layout",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1207.0326276747242,
+      "y": -552.2679173567983,
+      "text": "Do everything I can and just clarify what still needs working out. ",
       "imageUrl": null,
       "width": 280,
       "height": 66,
@@ -120,16 +146,20 @@
   ],
   "connections": [
     {
-      "from": 6,
-      "to": 4
-    },
-    {
-      "from": 0,
+      "from": 2,
       "to": 1
     },
     {
-      "from": 1,
-      "to": 2
+      "from": 4,
+      "to": 5
+    },
+    {
+      "from": 4,
+      "to": 8
+    },
+    {
+      "from": 6,
+      "to": 7
     }
   ]
 }
