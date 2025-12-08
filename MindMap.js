@@ -394,19 +394,12 @@ class MindMap {
   }
   
   /**
-   * Left-aligns all selected boxes to the leftmost box's left edge.
-   * If no boxes are selected, aligns all boxes.
+  * Left-aligns all selected boxes to the leftmost box's left edge.
+  * Requires at least two selected boxes.
    */
   leftAlignSelectedBoxes() {
-    // Determine which boxes to align
-    let boxesToAlign = [];
-    if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-      boxesToAlign = Array.from(this.selectedBoxes);
-    } else if (this.boxes && this.boxes.length > 0) {
-      boxesToAlign = this.boxes.filter(b => b != null);
-    }
-    
-    if (boxesToAlign.length < 2) return;
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
     
     // Find the leftmost left edge (box.x - box.width/2)
     let minLeftEdge = Infinity;
@@ -418,7 +411,7 @@ class MindMap {
       }
     }
     
-    if (!Number.isFinite(minLeftEdge)) return;
+    if (!Number.isFinite(minLeftEdge)) return false;
     
     // Align all boxes so their left edge matches the minimum left edge
     for (const box of boxesToAlign) {
@@ -429,6 +422,94 @@ class MindMap {
     
     this.isDirty = true;
     this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Right-aligns all selected boxes to the rightmost box's right edge.
+   * Requires at least two selected boxes.
+   */
+  rightAlignSelectedBoxes() {
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
+
+    let maxRightEdge = -Infinity;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      const rightEdge = box.x + box.width / 2;
+      if (rightEdge > maxRightEdge) {
+        maxRightEdge = rightEdge;
+      }
+    }
+
+    if (!Number.isFinite(maxRightEdge)) return false;
+
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      box.x = maxRightEdge - box.width / 2;
+    }
+
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Top-aligns all selected boxes to the highest box's top edge.
+   * Requires at least two selected boxes.
+   */
+  topAlignSelectedBoxes() {
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
+
+    let minTopEdge = Infinity;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      const topEdge = box.y - box.height / 2;
+      if (topEdge < minTopEdge) {
+        minTopEdge = topEdge;
+      }
+    }
+
+    if (!Number.isFinite(minTopEdge)) return false;
+
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      box.y = minTopEdge + box.height / 2;
+    }
+
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Bottom-aligns all selected boxes to the lowest box's bottom edge.
+   * Requires at least two selected boxes.
+   */
+  bottomAlignSelectedBoxes() {
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
+
+    let maxBottomEdge = -Infinity;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      const bottomEdge = box.y + box.height / 2;
+      if (bottomEdge > maxBottomEdge) {
+        maxBottomEdge = bottomEdge;
+      }
+    }
+
+    if (!Number.isFinite(maxBottomEdge)) return false;
+
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      box.y = maxBottomEdge - box.height / 2;
+    }
+
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
   }
   
   /**
@@ -437,15 +518,8 @@ class MindMap {
    * If no boxes are selected, does nothing.
    */
   centerAlignSelectedBoxes() {
-    // Only work on selected boxes - if nothing is selected, do nothing
-    if (!this.selectedBoxes || this.selectedBoxes.size === 0) {
-      return;
-    }
-    
-    const boxesToAlign = Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
-    
-    // Need at least 2 boxes to align
-    if (boxesToAlign.length < 2) return;
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
     
     // Calculate the average X position (center) of all selected boxes
     let sumX = 0;
@@ -456,11 +530,11 @@ class MindMap {
       validCount++;
     }
     
-    if (validCount < 2) return;
+    if (validCount < 2) return false;
     
     const centerX = sumX / validCount;
     
-    if (!Number.isFinite(centerX)) return;
+    if (!Number.isFinite(centerX)) return false;
     
     // Move all selected boxes to the calculated center X
     for (const box of boxesToAlign) {
@@ -470,23 +544,82 @@ class MindMap {
     
     this.isDirty = true;
     this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Horizontally aligns selected boxes to a shared center Y coordinate.
+   * Requires at least two selected boxes.
+   */
+  horizontalCenterAlignSelectedBoxes() {
+    const boxesToAlign = this._getSelectedBoxes();
+    if (boxesToAlign.length < 2) return false;
+
+    let sumY = 0;
+    let validCount = 0;
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y)) continue;
+      sumY += box.y;
+      validCount++;
+    }
+
+    if (validCount < 2) return false;
+
+    const centerY = sumY / validCount;
+    if (!Number.isFinite(centerY)) return false;
+
+    for (const box of boxesToAlign) {
+      if (!box || !MindMap._isValidNumber(box.y)) continue;
+      box.y = centerY;
+    }
+
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
   }
   
   /**
-   * Arranges selected boxes (or all boxes) in a hierarchical layout based on connections.
-   * Uses a tree/graph layout algorithm to create a structured network diagram.
-   * Root nodes (nodes with no incoming connections) are placed at the top.
+  * Arranges selected boxes in a hierarchical layout based on connections.
+  * Uses a tree/graph layout algorithm to create a structured network diagram.
+  * Root nodes (nodes with no incoming connections) are placed at the top and the layout is re-centered to keep the group in place.
    */
   hierarchicalLayout() {
-    // Determine which boxes to layout
-    let boxesToLayout = [];
-    if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-      boxesToLayout = Array.from(this.selectedBoxes);
-    } else if (this.boxes && this.boxes.length > 0) {
-      boxesToLayout = this.boxes.filter(b => b != null);
-    }
-    
-    if (boxesToLayout.length < 1) return;
+    // Determine which boxes to layout (selection only; otherwise do nothing)
+    const boxesToLayout = this._getSelectedBoxes();
+    if (boxesToLayout.length < 1) return false;
+
+    const getBounds = (boxes) => {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const box of boxes) {
+        if (!box) continue;
+        const halfW = MindMap._isValidNumber(box.width) ? box.width / 2 : 0;
+        const halfH = MindMap._isValidNumber(box.height) ? box.height / 2 : 0;
+        const left = MindMap._isValidNumber(box.x) ? box.x - halfW : null;
+        const right = MindMap._isValidNumber(box.x) ? box.x + halfW : null;
+        const top = MindMap._isValidNumber(box.y) ? box.y - halfH : null;
+        const bottom = MindMap._isValidNumber(box.y) ? box.y + halfH : null;
+        if (left !== null) minX = Math.min(minX, left);
+        if (right !== null) maxX = Math.max(maxX, right);
+        if (top !== null) minY = Math.min(minY, top);
+        if (bottom !== null) maxY = Math.max(maxY, bottom);
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+        return null;
+      }
+      return {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        centerX: (minX + maxX) / 2,
+        centerY: (minY + maxY) / 2,
+      };
+    };
+
+    const preBounds = getBounds(boxesToLayout);
     
     const boxSet = new Set(boxesToLayout);
     
@@ -625,8 +758,33 @@ class MindMap {
       }
     }
     
+    // After layout, shift group so its center matches the original (in-place layout)
+    const postBounds = getBounds(boxesToLayout);
+    if (preBounds && postBounds) {
+      const dx = preBounds.centerX - postBounds.centerX;
+      const dy = preBounds.centerY - postBounds.centerY;
+      if (Number.isFinite(dx) && Number.isFinite(dy)) {
+        for (const box of boxesToLayout) {
+          if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.y)) continue;
+          box.x += dx;
+          box.y += dy;
+        }
+      }
+    }
+
     this.isDirty = true;
     this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Returns selected boxes as an array, filtered for null/undefined.
+   */
+  _getSelectedBoxes() {
+    if (!this.selectedBoxes || this.selectedBoxes.size === 0) {
+      return [];
+    }
+    return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
   }
   
   /**

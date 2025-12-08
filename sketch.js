@@ -1103,9 +1103,13 @@ function populateKeyboardControlsOverlay() {
     { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
-    { keys: 'A', description: 'Centre-align selected boxes' },
-    { keys: 'Q', description: 'Left-align selected boxes' },
-    { keys: 'W', description: 'Hierarchical layout of selected boxes' },
+    { keys: 'A', description: 'Align selected boxes to the left' },
+    { keys: 'S', description: 'Align selected boxes to the bottom' },
+    { keys: 'D', description: 'Align selected boxes to the right' },
+    { keys: 'W', description: 'Align selected boxes to the top' },
+    { keys: 'Q', description: 'Align selected boxes to the horizontal centre' },
+    { keys: 'E', description: 'Align selected boxes to the vertical centre' },
+    { keys: 'R', description: 'Apply hierarchical layout in place (keep current position)' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Scroll Wheel', description: 'Zoom in and out' },
@@ -1689,28 +1693,57 @@ function keyPressed() {
       setMaxZoom();
       return false;
     }
-    // Center-align selected boxes: press A key (only if boxes are selected)
+    // Left-align selected boxes: press A key
     if (!hasModifier && (key === 'a' || key === 'A')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
-        if (mindMap.pushUndo && mindMap.centerAlignSelectedBoxes) {
-          mindMap.pushUndo();
-          mindMap.centerAlignSelectedBoxes();
-        }
-      }
-      // If nothing selected, do nothing
-      return false;
-    }
-    // Left-align selected boxes: press Q key
-    if (!hasModifier && (key === 'q' || key === 'Q')) {
-      if (mindMap.pushUndo && mindMap.leftAlignSelectedBoxes) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.leftAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.leftAlignSelectedBoxes();
       }
       return false;
     }
-    // Hierarchical layout: press W key
+    // Bottom-align selected boxes: press S key
+    if (!hasModifier && (key === 's' || key === 'S')) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.bottomAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.bottomAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Right-align selected boxes: press D key
+    if (!hasModifier && (key === 'd' || key === 'D')) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.rightAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.rightAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Top-align selected boxes: press W key
     if (!hasModifier && (key === 'w' || key === 'W')) {
-      if (mindMap.pushUndo && mindMap.hierarchicalLayout) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.topAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.topAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Horizontal center alignment: press Q key
+    if (!hasModifier && (key === 'q' || key === 'Q')) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.horizontalCenterAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.horizontalCenterAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Vertical center alignment: press E key
+    if (!hasModifier && (key === 'e' || key === 'E')) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.centerAlignSelectedBoxes) {
+        mindMap.pushUndo();
+        mindMap.centerAlignSelectedBoxes();
+      }
+      return false;
+    }
+    // Hierarchical layout in place: press R key
+    if (!hasModifier && (key === 'r' || key === 'R')) {
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.hierarchicalLayout) {
         mindMap.pushUndo();
         mindMap.hierarchicalLayout();
       }
