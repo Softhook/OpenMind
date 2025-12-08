@@ -1,6 +1,20 @@
 # OpenMind - Mind Mapping Software
 
-A simple mind mapping application built with p5.js.
+Author: Christian Nold (2025) • Live App: https://softhook.github.io/OpenMind
+
+![OpenMind mind map screenshot](./screenshot.png)
+
+OpenMind is a fast, keyboard-driven mind mapping app built with p5.js. Create, connect, and export ideas with minimal friction.
+
+## Quick Start
+
+- Use it instantly in the browser: https://softhook.github.io/OpenMind
+
+## Loading and Saving Maps
+
+- Click **Save** to download a JSON map. On Chrome/Edge you can pick a folder; other browsers download to `Downloads`.
+- Click **Load** to import a saved JSON. Sample maps live in the `maps/` folder (e.g., `maps/ResearchSummary.json`).
+- Export your canvas via **Export PNG**, **Export PDF**, or **Export Text** from the menu.
 
 ## Features
 
@@ -18,12 +32,15 @@ A simple mind mapping application built with p5.js.
    - On Chromium-based browsers (Chrome/Edge), Save opens a system Save As dialog (File System Access API)
    - On other browsers, it downloads to your default Downloads folder
 
-## How to Use
+## Menu Reference
 
-. Use the menu at the top:
-   - **New Box**: Creates a new node at a random position
-   - **Save**: Downloads your mind map as a JSON file
-   - **Load**: Loads a previously saved mind map
+- **New Box**: Create a node at a random position
+- **Save**: Download your mind map as JSON
+- **Load**: Import a previously saved map
+- **Export PNG/PDF/Text**: Download image, PDF, or plain-text outline
+- **Reset View**: Fit all boxes to the viewport
+
+## How to Use
 
 ### Keyboard Controls
 
@@ -44,9 +61,7 @@ While editing a text box:
 - Type to insert characters; Enter inserts a newline
 - Backspace: delete character before the caret
 - Delete (Fn+Backspace on macOS laptops): delete character after the caret
-- Word deletion:
-  - macOS: Option+Backspace (previous word), Option+Delete (next word)
-  - Windows/Linux: Ctrl+Backspace (previous word), Ctrl+Delete (next word)
+
 - Line deletion (macOS): Cmd+Backspace (to start of line), Cmd+Delete (to end of line)
 - Selection and clipboard:
   - Cmd/Ctrl+A: select all text in the box
@@ -54,19 +69,15 @@ While editing a text box:
   - Cmd/Ctrl+X: cut selection
   - Cmd/Ctrl+V: paste
   - Cmd/Ctrl+B: toggle highlight on the selected text (adds/removes persistent highlight)
+
+Presentation Mode
 - Arrow keys move the caret; Up/Down move between wrapped lines
 
-Clipboard notes:
-
 - Native OS paste and voice dictation: You can paste via the Edit menu, right-click menu, or dictation tools. The app listens for the browser's native paste/copy/cut events and inserts text into the focused box while editing.
+
 - Permissions: Browser clipboard APIs (navigator.clipboard) work best on HTTPS or localhost. If you open this app from a `file://` URL, native paste events still work, but programmatic clipboard reads may be blocked by the browser.
 
-Note on key repeat:
 
-- Holding Backspace/Delete will continuously delete. The app includes a fallback key-repeat if your browser/OS doesn’t auto-repeat these keys.
-- On macOS, if holding letter keys shows the accent popup and you prefer repeat for letters too, you can enable system key repeat by disabling press-and-hold accents (optional):
-  - Optional macOS setting: `defaults write -g ApplePressAndHoldEnabled -bool false` then log out/in.
-  - This is not required for Backspace/Delete; those repeat regardless, and the app provides a fallback for reliability.
 
 ### Mouse/Trackpad Controls
 
@@ -89,10 +100,3 @@ Note on key repeat:
 - `Connection.js` - Connection class for arrows between boxes
 - `MindMap.js` - MindMap class for managing the entire mind map with undo/redo
 - `style.css` - Styling for the UI
-
-## Future Enhancements
-
-- Redo functionality
-- Different box shapes and colors
-- Additional keyboard shortcuts and custom bindings
-- Touch/mobile support
