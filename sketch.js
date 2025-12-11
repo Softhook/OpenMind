@@ -560,7 +560,8 @@ function updateCursorForHover() {
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (mindMap.draggingConnection) { cursor('grabbing'); return; }
   if (isPanning) { cursor('grabbing'); return; }
-  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && !isEditing && keyIsDown(32)) { cursor('grab'); return; }
+  
+  if (!isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
   if (mindMap && mindMap.connections) {
@@ -1457,10 +1458,16 @@ function hideMobileNavOverlay() {
 /**
  * Handles mouse press events
  */
-function mousePressed() {
+function mousePressed(e) {
   if (keyboardOverlayVisible) return false;
-  // Prevent interaction with canvas when clicking on UI buttons
-  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mindMap) {
+  
+  // Ignore clicks on UI elements (buttons, inputs, etc.)
+  // Only handle clicks directly on the canvas
+  if (e && e.target && e.target.tagName !== 'CANVAS') {
+    return;
+  }
+
+  if (mindMap) {
     try {
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
       const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
@@ -1790,7 +1797,7 @@ function createNewBox() {
   // Create box at cursor position in world space if over canvas, else at viewport center
   let x, y;
   
-  if (mouseY > CONFIG.UI.TOOLBAR_HEIGHT && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+  if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     // Mouse is over canvas (in screen space) - use world position
     x = worldMouseX();
     y = worldMouseY();
