@@ -1,0 +1,95 @@
+{
+  "boxes": [
+    {
+      "x": -1369.7740919714101,
+      "y": -1032.1488244216964,
+      "text": "Dundee",
+      "imageUrl": null,
+      "width": 281.07281008388895,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1390.6149322336673,
+      "y": -471.945298019613,
+      "text": "land changing hand\ncommunity right to buy\n\ndetrimental management\nproove direct harm to community\non balance outways\n\nnoise and airpollution\n1 monitor outside of our monitoring\n\nairport are not doing any monitoring",
+      "imageUrl": null,
+      "width": 245.01953125,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 118,
+          "end": 176,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -1392.5310803422615,
+      "y": -306.31919681492536,
+      "text": "prooving detriment against benefits",
+      "imageUrl": null,
+      "width": 241.9091796875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1373.2097564649173,
+      "y": -891.1870893977381,
+      "text": "charity riverside foundation\ncommunity rights by compliant\ncatchment area\n\nriverside - sealevel rise\ncouncil flood ptection\nreclaimed land - not suitable for housing\nblue green parkland",
+      "imageUrl": null,
+      "width": 272.25390625,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1373.1246978586673,
+      "y": -682.8584992032069,
+      "text": "airport is subsidides - scotish government\n\n10s flights per week\nflight to london 2 to 3 per day\ngulfstream",
+      "imageUrl": null,
+      "width": 280,
+      "height": 150,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1396.8644136755947,
+      "y": -218.1525301482587,
+      "text": "Either go public engagement route or legal toute",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    }
+  ],
+  "connections": []
+}
