@@ -162,14 +162,18 @@ class TextBox {
             this.imageLoadError = false;
             this.naturalImageWidth = img.width;
             this.naturalImageHeight = img.height;
-            const maxW = 400;
-            const maxH = 300;
-            let w = img.width;
-            let h = img.height;
-            const scale = Math.min(1, maxW / w, maxH / h);
-            if (scale < 1) { w = w * scale; h = h * scale; }
-            this.width = max(this.minWidth, w);
-            this.height = max(this.minHeight, h);
+            
+            // Only set default dimensions if not already sized by user/save
+            if (!this.userResized) {
+              const maxW = 400;
+              const maxH = 300;
+              let w = img.width;
+              let h = img.height;
+              const scale = Math.min(1, maxW / w, maxH / h);
+              if (scale < 1) { w = w * scale; h = h * scale; }
+              this.width = max(this.minWidth, w);
+              this.height = max(this.minHeight, h);
+            }
           } catch (e) { console.warn('Image load handler error', e); }
         },
         (err) => {
