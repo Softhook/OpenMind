@@ -1,19 +1,6 @@
 {
   "boxes": [
     {
-      "x": -1336.7706372717253,
-      "y": -311.89457618822394,
-      "text": "Make the methodological arguments ",
-      "imageUrl": null,
-      "width": 253.5712890625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -859.0239065459198,
       "y": -1116.50163085986,
       "text": "Sort out the 5 exemplar EMAs",
@@ -66,64 +53,12 @@
       }
     },
     {
-      "x": -1384.01346292457,
-      "y": -634.672424778058,
-      "text": "the german research woman\nHi sorry I've been so out of touch and ",
-      "imageUrl": null,
-      "width": 202.19921875,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -486.5992224281775,
       "y": -584.7709656138676,
       "text": "Talk to Slav about the invoice change",
       "imageUrl": null,
       "width": 255.150390625,
       "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1344.5766672576256,
-      "y": -857.4821577550297,
-      "text": "Promotion Case finnished just needs to know the details of the Fiesta event. ",
-      "imageUrl": null,
-      "width": 281.07281008388895,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1345.11307229957,
-      "y": -739.8873093466854,
-      "text": "get back to alex chapman\nyeah sorry also very busy but over christmas happy to have a look at transcipts",
-      "imageUrl": null,
-      "width": 280,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1336.7706372717253,
-      "y": -431.89457618822394,
-      "text": "covid paper\nhttps://softhook.github.io/OpenMind/#maps/CovidPaperFeedback",
-      "imageUrl": null,
-      "width": 280,
-      "height": 87,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -155,16 +90,107 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -886.2273681331685,
+      "y": -825.3831551880324,
+      "text": "https://easst.net/conference/easst2026/programme/?utm_source=conference&utm_medium=sendy&utm_campaign=EASST2026_cfp_open#18101",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -929.9088081770359,
+      "y": -916.1061460483724,
+      "text": "Put in abstract for EASST \n28 Feb 2026 ",
+      "imageUrl": null,
+      "width": 187.3994140625,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1160.6364145625917,
+      "y": -1233.0765955974612,
+      "text": "Talk to George on the 22nd ",
+      "imageUrl": null,
+      "width": 196.78515625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1170.7167468804073,
+      "y": -1153.5539739791386,
+      "text": "Do the PLR report on the 22nd\n\ntalk to Derek that day ",
+      "imageUrl": null,
+      "width": 214.681640625,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1312.1298249392871,
+      "y": -694.9472042652146,
+      "text": "need to be 6500",
+      "imageUrl": null,
+      "width": 253.5712890625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -479.65396464794134,
+      "y": -809.7026382492082,
+      "text": "Talk to Omer, the potential PhD student ",
+      "imageUrl": null,
+      "width": 271.474609375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1312.1298249392871,
+      "y": -814.9472042652146,
+      "text": "covid paper\nhttps://softhook.github.io/OpenMind/#maps/CovidPaperFeedback",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
     {
-      "from": 6,
-      "to": 11
+      "from": 4,
+      "to": 6
     },
     {
-      "from": 9,
-      "to": 0
+      "from": 13,
+      "to": 11
     }
   ]
 }
