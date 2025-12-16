@@ -14,31 +14,6 @@
       }
     },
     {
-      "x": -334.77051276428233,
-      "y": 1082.833376555758,
-      "text": "Furthermore, the rationale behind the selection of specific hotspots (p.10) is missing. Why were these particular hotspots chosen over others?.",
-      "imageUrl": null,
-      "width": 280,
-      "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      },
-      "highlights": [
-        {
-          "start": 12,
-          "end": 87,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
       "x": 35.74231565214116,
       "y": 1125.9184111965053,
       "text": "Yes, that's an important point. And maybe I need to just show how the method identify the hotspots. I think that's doable. ",
@@ -177,19 +152,6 @@
       }
     },
     {
-      "x": 1110.1736531826004,
-      "y": 480.4166762221043,
-      "text": "Rather than selecting a pre-defined method and applying it to the case, the hotspot approach developed iteratively alongside the study. The complexities of the public under investigation prompted adjustments to the method, and these refinements, in turn, shaped the analytic focus. The version of the hotspot method used here is therefore tailored rather than generic.",
-      "imageUrl": null,
-      "width": 280,
-      "height": 234,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": 1767.117321259928,
       "y": 497.4828816431873,
       "text": "Rather than selecting a pre-defined method and applying it to the case, the hotspot approach developed iteratively alongside the study. The complexities of the public under investigation prompted adjustments to the method, and these refinements, in turn, shaped the analytic focus. The version of the hotspot method used here is therefore tailored rather than generic.",
@@ -279,31 +241,6 @@
         {
           "start": 140,
           "end": 164,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "x": -358.3492596172978,
-      "y": -531.3687724827289,
-      "text": "Overall, the study is well anchored in desing theory. However, the concept of digital publics per se is somewhat overlooked. The framing would benefit from engaging more directly with literature from media studies and related fields.",
-      "imageUrl": null,
-      "width": 280,
-      "height": 171,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      },
-      "highlights": [
-        {
-          "start": 126,
-          "end": 232,
           "color": {
             "r": 255,
             "g": 255,
@@ -446,19 +383,6 @@
       ]
     },
     {
-      "x": 1393.8192680620473,
-      "y": 221.81753196622174,
-      "text": "Is it weak to argue that the case study was used to develop the method\n\nI think it's more like a method assemblage. Like they talk about in New Materialism \n‘research-assemblage’ comprising researcher, data, methods and contexts",
-      "imageUrl": null,
-      "width": 280,
-      "height": 192,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -334.77051276428233,
       "y": 559.6868807737425,
       "text": "From a methodological standpoint, the application of the hotspot method to publics per se requires further argumentation and reflection (p.6). Why was this method chosen, and how was it adapted for this particular study?",
@@ -584,11 +508,87 @@
       ]
     },
     {
-      "x": 109.81326939521566,
-      "y": -1259.8241916135726,
-      "text": "Thank you, this review has been very helpful for improving this paper.\n\n\"The paper’s strongest contribution lies in its proposed methodological framework, which offers valuable insights into elusive publics—such as distributed, digitally mediated ones—and holds relevance beyond this specific context.\"\n\n I'm glad the reviewer feels that there's a clear contribution being made by this paper.\n\nThe review sugegst this paper is \nprimarily as a methodological and analytical contribution based on a case study in distributed, digitally mediated publics ... While the “designing with” component is less convincing\"\n\nThis is a very helpful point. And it has been adopted both into the abstract and led to a rewrite of the text in section 5\n\n\"The discussion on the risk of hotspots being treated as personas (p.15) is ambiguous and would benefit from clarification\"\n\nThe point about the relation to personas method was removed since indeed it does not help the overall argument. \n\n\" Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie\" \n\nIndeed, this has been addressed on page 4 ",
+      "x": 1110.1736531826004,
+      "y": 480.4166762221043,
+      "text": "Rather than selecting a pre-defined method and applying it to the case, the hotspot approach developed iteratively alongside the study. The complexities of the public under investigation prompted adjustments to the method, and these refinements, in turn, shaped the analytic focus. The version of the hotspot method used here is therefore tailored rather than generic.",
       "imageUrl": null,
       "width": 280,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 1393.8192680620473,
+      "y": 221.81753196622174,
+      "text": "Is it weak to argue that the case study was used to develop the method\n\nI think it's more like a method assemblage. Like they talk about in New Materialism \n‘research-assemblage’  ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -334.77051276428233,
+      "y": 1082.833376555758,
+      "text": "Furthermore, the rationale behind the selection of specific hotspots (p.10) is missing. Why were these particular hotspots chosen over others?.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 12,
+          "end": 87,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -358.3492596172978,
+      "y": -531.3687724827289,
+      "text": "Overall, the study is well anchored in desing theory. However, the concept of digital publics per se is somewhat overlooked. The framing would benefit from engaging more directly with literature from media studies and related fields.",
+      "imageUrl": null,
+      "width": 280,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 126,
+          "end": 232,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": 213.14110931788773,
+      "y": -1585.9353915031043,
+      "text": "Thank you, this review has been very helpful for improving this paper.\n\n\"The paper’s strongest contribution lies in its proposed methodological framework, which offers valuable insights into elusive publics—such as distributed, digitally mediated ones—and holds relevance beyond this specific context.\"\n\n I'm glad the reviewer feels that there's a clear contribution being made by this paper.\n\nThe review sugegst this paper is \nprimarily as a methodological and analytical contribution based on a case study in distributed, digitally mediated publics ... While the “designing with” component is less convincing\"\n\nThis is a very helpful point. And it has been adopted both into the abstract and led to a rewrite of the text in section 5\n\n\"The discussion on the risk of hotspots being treated as personas (p.15) is ambiguous and would benefit from clarification\"\n\nThe point about the relation to personas method was removed since indeed it does not help the overall argument. \n\n\" Additionally, the claim of a “considerable disagreement” (p.4) regarding how publics are constituted is questionable. If such disagreement exists, it should be clarified—where exactly does the controversy lie\" \n\nIndeed, this has been addressed on page 4 \n\nThe concept of digital publics per se is somewhat overlooked.The framing would benefit from engaging more directly with literature from media studies and related fields.\n\nI have specifically addressed a number of approaches from media studies which highlight the platform. \n\n the rationale behind the selection of specific hotspots (p.10) is missing. Why were these particular hotspots chosen over others?.\n\nThis has been addressed in section 3.2 where some of the exclusion criteria are made much more clear shich helps clarify the specificity of this method  ",
+      "imageUrl": null,
+      "width": 480.44047142894283,
       "height": 927,
       "backgroundColor": {
         "r": 255,
@@ -635,53 +635,83 @@
             "b": 0,
             "a": 180
           }
+        },
+        {
+          "start": 1509,
+          "end": 1640,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 1295,
+          "end": 1403,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 1234,
+          "end": 1403,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
         }
       ]
     }
   ],
   "connections": [
     {
-      "from": 30,
-      "to": 5
+      "from": 26,
+      "to": 4
     },
     {
-      "from": 1,
-      "to": 2
-    },
-    {
-      "from": 22,
-      "to": 3
-    },
-    {
-      "from": 24,
-      "to": 0
-    },
-    {
-      "from": 23,
-      "to": 10
-    },
-    {
-      "from": 0,
-      "to": 10
-    },
-    {
-      "from": 20,
-      "to": 13
-    },
-    {
-      "from": 13,
-      "to": 21
+      "from": 29,
+      "to": 1
     },
     {
       "from": 19,
-      "to": 20
+      "to": 2
     },
     {
-      "from": 16,
-      "to": 19
+      "from": 20,
+      "to": 0
+    },
+    {
+      "from": 28,
+      "to": 27
+    },
+    {
+      "from": 0,
+      "to": 27
     },
     {
       "from": 17,
+      "to": 11
+    },
+    {
+      "from": 11,
+      "to": 18
+    },
+    {
+      "from": 16,
+      "to": 17
+    },
+    {
+      "from": 30,
+      "to": 16
+    },
+    {
+      "from": 14,
       "to": 31
     }
   ]
