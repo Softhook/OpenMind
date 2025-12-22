@@ -233,6 +233,58 @@
         "g": 140,
         "b": 140
       }
+    },
+    {
+      "x": -1622.662344236733,
+      "y": -946.2666750487421,
+      "text": "Look at the official PLR template ",
+      "imageUrl": null,
+      "width": 229.447265625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1616.841543455483,
+      "y": -877.6279322625774,
+      "text": "Do an AI summary job for the PLR ",
+      "imageUrl": null,
+      "width": 241.0888671875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1610.224355955483,
+      "y": -1016.9853797375179,
+      "text": "Make all the figure descriptions work ",
+      "imageUrl": null,
+      "width": 254.3232421875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1623.821035642983,
+      "y": -1083.5441606210716,
+      "text": "Go through the whole document ",
+      "imageUrl": null,
+      "width": 227.1298828125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [

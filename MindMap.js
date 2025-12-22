@@ -577,6 +577,108 @@ class MindMap {
     this.isSaved = false;
     return true;
   }
+
+  /**
+   * Distributes selected boxes vertically (equal spacing between box edges).
+   * Preserves the top edge of the top-most box and the bottom edge of the bottom-most box.
+   * Requires at least three selected boxes.
+   */
+  distributeSelectedBoxesVertically() {
+    const boxes = this._getSelectedBoxes();
+    if (boxes.length < 3) return false;
+
+    // Sort by Y position
+    boxes.sort((a, b) => a.y - b.y);
+
+    // Calculate boundaries based on edges
+    const firstBox = boxes[0];
+    const lastBox = boxes[boxes.length - 1];
+    
+    if (!MindMap._isValidNumber(firstBox.y) || !MindMap._isValidNumber(firstBox.height) ||
+        !MindMap._isValidNumber(lastBox.y) || !MindMap._isValidNumber(lastBox.height)) {
+      return false;
+    }
+
+    const topEdge = firstBox.y - firstBox.height / 2;
+    const bottomEdge = lastBox.y + lastBox.height / 2;
+    const totalAvailableSpace = bottomEdge - topEdge;
+
+    // Calculate total height of all boxes
+    let totalBoxHeight = 0;
+    for (const box of boxes) {
+      if (!MindMap._isValidNumber(box.height)) return false;
+      totalBoxHeight += box.height;
+    }
+
+    // Calculate gap
+    const totalGap = totalAvailableSpace - totalBoxHeight;
+    const gap = totalGap / (boxes.length - 1);
+
+    // Reposition boxes
+    let currentTop = topEdge;
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      // Set new center Y
+      box.y = currentTop + box.height / 2;
+      // Advance currentTop for next box
+      currentTop += box.height + gap;
+    }
+    
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
+  }
+
+  /**
+   * Distributes selected boxes horizontally (equal spacing between box edges).
+   * Preserves the left edge of the left-most box and the right edge of the right-most box.
+   * Requires at least three selected boxes.
+   */
+  distributeSelectedBoxesHorizontally() {
+    const boxes = this._getSelectedBoxes();
+    if (boxes.length < 3) return false;
+
+    // Sort by X position
+    boxes.sort((a, b) => a.x - b.x);
+
+    // Calculate boundaries based on edges
+    const firstBox = boxes[0];
+    const lastBox = boxes[boxes.length - 1];
+    
+    if (!MindMap._isValidNumber(firstBox.x) || !MindMap._isValidNumber(firstBox.width) ||
+        !MindMap._isValidNumber(lastBox.x) || !MindMap._isValidNumber(lastBox.width)) {
+      return false;
+    }
+
+    const leftEdge = firstBox.x - firstBox.width / 2;
+    const rightEdge = lastBox.x + lastBox.width / 2;
+    const totalAvailableSpace = rightEdge - leftEdge;
+
+    // Calculate total width of all boxes
+    let totalBoxWidth = 0;
+    for (const box of boxes) {
+      if (!MindMap._isValidNumber(box.width)) return false;
+      totalBoxWidth += box.width;
+    }
+
+    // Calculate gap
+    const totalGap = totalAvailableSpace - totalBoxWidth;
+    const gap = totalGap / (boxes.length - 1);
+
+    // Reposition boxes
+    let currentLeft = leftEdge;
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      // Set new center X
+      box.x = currentLeft + box.width / 2;
+      // Advance currentLeft for next box
+      currentLeft += box.width + gap;
+    }
+
+    this.isDirty = true;
+    this.isSaved = false;
+    return true;
+  }
   
   /**
   * Arranges selected boxes in a hierarchical layout based on connections.

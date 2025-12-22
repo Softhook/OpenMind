@@ -1104,12 +1104,12 @@ function populateKeyboardControlsOverlay() {
     { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
-    { keys: 'A', description: 'Align selected boxes to the left' },
-    { keys: 'S', description: 'Align selected boxes to the bottom' },
-    { keys: 'D', description: 'Align selected boxes to the right' },
-    { keys: 'W', description: 'Align selected boxes to the top' },
-    { keys: 'Q', description: 'Align selected boxes to the horizontal centre' },
-    { keys: 'E', description: 'Align selected boxes to the vertical centre' },
+    { keys: 'A', description: 'Align selected boxes to the left (Shift+A distributes vertically)' },
+    { keys: 'S', description: 'Align selected boxes to the bottom (Shift+S distributes horizontally)' },
+    { keys: 'D', description: 'Align selected boxes to the right (Shift+D distributes vertically)' },
+    { keys: 'W', description: 'Align selected boxes to the top (Shift+W distributes horizontally)' },
+    { keys: 'Q', description: 'Align selected boxes to the horizontal centre (Shift+Q distributes horizontally)' },
+    { keys: 'E', description: 'Align selected boxes to the vertical centre (Shift+E distributes vertically)' },
     { keys: 'R', description: 'Apply hierarchical layout in place (keep current position)' },
     { keys: 'Arrow Keys', description: 'Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
@@ -1705,6 +1705,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.leftAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.leftAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
+          mindMap.distributeSelectedBoxesVertically();
+        }
       }
       return false;
     }
@@ -1713,6 +1716,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.bottomAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.bottomAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
+          mindMap.distributeSelectedBoxesHorizontally();
+        }
       }
       return false;
     }
@@ -1721,6 +1727,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.rightAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.rightAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
+          mindMap.distributeSelectedBoxesVertically();
+        }
       }
       return false;
     }
@@ -1729,6 +1738,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.topAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.topAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
+          mindMap.distributeSelectedBoxesHorizontally();
+        }
       }
       return false;
     }
@@ -1737,6 +1749,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.horizontalCenterAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.horizontalCenterAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
+          mindMap.distributeSelectedBoxesHorizontally();
+        }
       }
       return false;
     }
@@ -1745,6 +1760,9 @@ function keyPressed() {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.centerAlignSelectedBoxes) {
         mindMap.pushUndo();
         mindMap.centerAlignSelectedBoxes();
+        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
+          mindMap.distributeSelectedBoxesVertically();
+        }
       }
       return false;
     }
