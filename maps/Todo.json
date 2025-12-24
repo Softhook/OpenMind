@@ -1,32 +1,6 @@
 {
   "boxes": [
     {
-      "x": -731.5632406200305,
-      "y": -1114.322816057708,
-      "text": "Sort out the 5 exemplar EMAs",
-      "imageUrl": null,
-      "width": 210.7509765625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -761.9387289012805,
-      "y": -1200.1810800179144,
-      "text": "T190",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -188.38523459421265,
       "y": -768.556195644644,
       "text": "house",
@@ -79,32 +53,6 @@
       }
     },
     {
-      "x": -1160.6364145625917,
-      "y": -1233.0765955974612,
-      "text": "Talk to George on the 22nd ",
-      "imageUrl": null,
-      "width": 196.78515625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1170.7167468804073,
-      "y": -1153.5539739791386,
-      "text": "Do the PLR report on the 22nd\n\ntalk to Derek that day ",
-      "imageUrl": null,
-      "width": 214.681640625,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -160.78718301739568,
       "y": -1217.871996146418,
       "text": "Put in abstract for EASST \n28 Feb 2026 ",
@@ -131,9 +79,22 @@
       }
     },
     {
-      "x": -981.8778653607369,
-      "y": -804.3143389608526,
-      "text": "Pack all the computer up. Make sure I have the dongle bits ",
+      "x": -1629.0223262810543,
+      "y": -1023.1191003510498,
+      "text": "Latour paper",
+      "imageUrl": null,
+      "width": 254.3232421875,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1616.1839473748043,
+      "y": -952.1940400810281,
+      "text": "check that they received the T190 document",
       "imageUrl": null,
       "width": 280,
       "height": 66,
@@ -144,34 +105,8 @@
       }
     },
     {
-      "x": -1031.291927860737,
-      "y": -675.7642656338872,
-      "text": "Cloths for taking with me ",
-      "imageUrl": null,
-      "width": 181.171875,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1046.877865360737,
-      "y": -736.771080094142,
-      "text": "Give plants water ",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -457.13578919531886,
-      "y": -1110.7289315719022,
+      "x": -1616.1839473748043,
+      "y": -715.8439195409846,
       "text": "Assignments for monitoring have been selected for your tutors as shown below and can be collected at:\nhttp://www.open.ac.uk/etma/monitor/etmaM_collect.asp\n\nCourse-Pres TMA Appt Tutor Name\nT190-25J    01  R08  Sancha Helen De Burca\nT190-25J    01  R08  AnnMarie McKenna\nT190-25J    01  R08  Nuria Rodriguez",
       "imageUrl": null,
       "width": 280,
@@ -183,11 +118,11 @@
       }
     },
     {
-      "x": -1046.877865360737,
-      "y": -867.4999682232593,
-      "text": "take bins out",
+      "x": -1650.8084590935543,
+      "y": -881.2689798110064,
+      "text": "Sort out the 5 exemplar EMAs",
       "imageUrl": null,
-      "width": 150,
+      "width": 210.7509765625,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -196,34 +131,21 @@
       }
     },
     {
-      "x": -474.9389797958486,
-      "y": -793.4202649500928,
-      "text": "Open mind holding down the shift key while doing the WASD does the distribute as well as align ",
+      "x": -1642.6190059685543,
+      "y": -1083.5441606210716,
+      "text": "Tax return",
       "imageUrl": null,
-      "width": 280,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1044.699050558585,
-      "y": -622.3833029811643,
-      "text": "power off",
-      "imageUrl": null,
-      "width": 150,
+      "width": 227.1298828125,
       "height": 45,
       "backgroundColor": {
         "r": 255,
-        "g": 255,
-        "b": 255
+        "g": 200,
+        "b": 140
       }
     },
     {
-      "x": -1703.1636631890078,
-      "y": -1229.1908407203773,
+      "x": -1727.4228106857877,
+      "y": -1292.5341702953028,
       "text": "Todo",
       "imageUrl": null,
       "width": 150,
@@ -233,64 +155,12 @@
         "g": 140,
         "b": 140
       }
-    },
-    {
-      "x": -1622.662344236733,
-      "y": -946.2666750487421,
-      "text": "Look at the official PLR template ",
-      "imageUrl": null,
-      "width": 229.447265625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1616.841543455483,
-      "y": -877.6279322625774,
-      "text": "Do an AI summary job for the PLR ",
-      "imageUrl": null,
-      "width": 241.0888671875,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1610.224355955483,
-      "y": -1016.9853797375179,
-      "text": "Make all the figure descriptions work ",
-      "imageUrl": null,
-      "width": 254.3232421875,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1623.821035642983,
-      "y": -1083.5441606210716,
-      "text": "Go through the whole document ",
-      "imageUrl": null,
-      "width": 227.1298828125,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
     }
   ],
   "connections": [
     {
-      "from": 3,
-      "to": 4
+      "from": 1,
+      "to": 2
     }
   ]
 }
