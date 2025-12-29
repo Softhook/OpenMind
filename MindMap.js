@@ -1784,7 +1784,9 @@ class MindMap {
   toJSON() {
     return {
       boxes: this.boxes.map(box => box.toJSON()),
-      connections: this.connections.map(conn => conn.toJSON(this.boxes))
+      connections: this.connections.map(conn => conn.toJSON(this.boxes)),
+      lastModified: Date.now(),
+      name: this.getLastUsedFilename() || 'openmind.json'
     };
   }
   
