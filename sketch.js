@@ -244,6 +244,7 @@ function parseFileFromLocation() {
 /**
  * Fetch and load a JSON map from a given file path/URL.
  * Updates `lastLoadedUrlFile` so repeat navigations can be detected.
+ * Compares with browser cache to load the more recent version.
  */
 async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
   if (!fileToFetch) return false;
@@ -252,10 +253,73 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
   try {
     // If already loaded the same URL and not forced, skip
     if (!force && lastLoadedUrlFile && lastLoadedUrlFile === fileToFetch) return false;
+    
     const resp = await fetch(fileToFetch, { cache: 'no-cache' });
     if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
-    const data = await resp.json();
-    if (mindMap && typeof mindMap.load === 'function') await mindMap.load(data);
+    const urlData = await resp.json();
+    
+    // Check if we have a cached version in localStorage
+    let shouldUseCache = false;
+    try {
+      if (mindMap && mindMap.hasLocalStorageData && mindMap.hasLocalStorageData()) {
+        const cachedString = localStorage.getItem('openmind_autosave');
+        if (cachedString) {
+          const cachedData = JSON.parse(cachedString);
+          
+          // Compare timestamps if both have them
+          const urlTimestamp = urlData.lastModified || 0;
+          const cacheTimestamp = cachedData.lastModified || 0;
+          
+          // Check if names match (handling prefaced maps with same ending)
+          // Extract URL name with proper fallback chain
+          let urlName;
+          if (urlData.name) {
+            urlName = extractMapName(urlData.name);
+          } else if (fileToFetch) {
+            urlName = extractMapName(fileToFetch);
+          } else {
+            urlName = 'unnamed-map';
+          }
+          const cacheName = extractMapName(cachedData.name || '');
+          
+          const namesMatch = namesAreSimilar(urlName, cacheName);
+          
+          console.info('Map name comparison:', {
+            urlName,
+            cacheName,
+            namesMatch,
+            urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
+            cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
+          });
+          
+          // Use cache if: names match AND cache is more recent
+          if (namesMatch && cacheTimestamp > urlTimestamp) {
+            shouldUseCache = true;
+            console.info('Using cached version (more recent):', cacheName, 'cached:', new Date(cacheTimestamp), 'url:', new Date(urlTimestamp));
+          } else if (namesMatch) {
+            console.info('Using URL version (more recent):', urlName, 'url:', new Date(urlTimestamp), 'cached:', new Date(cacheTimestamp));
+          } else {
+            console.info('Names do not match - using URL version');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to compare with cache:', e);
+      // On error, default to URL version
+      shouldUseCache = false;
+    }
+    
+    // Load the appropriate version
+    if (shouldUseCache) {
+      // Load from cache instead of URL
+      if (mindMap && typeof mindMap.loadFromLocalStorage === 'function') {
+        await mindMap.loadFromLocalStorage();
+      }
+    } else {
+      // Load from URL
+      if (mindMap && typeof mindMap.load === 'function') await mindMap.load(urlData);
+    }
+    
     if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
     try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
     lastLoadedUrlFile = fileToFetch;
@@ -266,6 +330,74 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
   } finally {
     isMapLoading = false;
   }
+}
+
+/**
+ * Extracts a normalized map name from a full path or name
+ * @param {string} pathOrName - Full path or name
+ * @returns {string} Normalized name
+ */
+function extractMapName(pathOrName) {
+  if (!pathOrName || typeof pathOrName !== 'string') return '';
+  
+  // Extract basename (remove path) - handle both / and \ separators
+  let name = pathOrName;
+  const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+  if (lastSlash >= 0) {
+    name = name.substring(lastSlash + 1);
+  }
+  
+  // Remove URL-related characters (hash, query params)
+  name = name.replace(/[?#].*$/, '');
+  
+  // Remove .json extension
+  name = name.replace(/\.json$/i, '');
+  // Normalize whitespace and case
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Checks if two map names are similar (handles prefaced maps with same ending)
+ * @param {string} name1 - First name
+ * @param {string} name2 - Second name
+ * @returns {boolean} true if names match or one ends with the other (with separator)
+ */
+function namesAreSimilar(name1, name2) {
+  if (!name1 || !name2) return false;
+  name1 = name1.toLowerCase();
+  name2 = name2.toLowerCase();
+  
+  // Exact match
+  if (name1 === name2) return true;
+  
+  // Check if one name ends with the other, but only if preceded by a separator
+  // This prevents false matches like 'important' matching 'ant'
+  // Separators: dash, underscore, space
+  const separators = ['-', '_', ' '];
+  
+  if (name1.length > name2.length) {
+    // Check if name1 ends with name2 and has a separator before it
+    if (name1.endsWith(name2)) {
+      const prefixLength = name1.length - name2.length;
+      if (prefixLength > 0) {  // Ensure we have at least one character for separator
+        const charBeforeSuffix = name1[prefixLength - 1];
+        if (separators.includes(charBeforeSuffix)) return true;
+      }
+    }
+  }
+  
+  if (name2.length > name1.length) {
+    // Check if name2 ends with name1 and has a separator before it
+    if (name2.endsWith(name1)) {
+      const prefixLength = name2.length - name1.length;
+      if (prefixLength > 0) {  // Ensure we have at least one character for separator
+        const charBeforeSuffix = name2[prefixLength - 1];
+        if (separators.includes(charBeforeSuffix)) return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 /**
