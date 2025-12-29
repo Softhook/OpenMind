@@ -7,7 +7,7 @@ class MindMap {
   // Constants for configuration
   static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
   static ALIGN_TOLERANCE = 12;
-  
+
   // Layout constants
   static LAYOUT = {
     HORIZONTAL_SPACING: 200,
@@ -15,13 +15,13 @@ class MindMap {
     START_X: 100,
     START_Y: 100
   };
-  
+
   // Color constants for consistent styling
   static COLORS = {
     CONNECTING_LINE: { r: 100, g: 100, b: 255 },
     CONNECTOR_DOT: { r: 100, g: 150, b: 255 }
   };
-  
+
   /**
    * Helper to check if a number is valid (uses Utils if available)
    * @private
@@ -32,7 +32,7 @@ class MindMap {
     }
     return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
   }
-  
+
   /**
    * Helper to safely clone an object
    * @private
@@ -48,13 +48,17 @@ class MindMap {
       return obj;
     }
   }
-  
+
   /**
    * Initializes a new MindMap with default state
    */
   constructor() {
     this.boxes = [];
     this.connections = [];
+
+    // Default storage key for autosave
+    this.storageKey = 'openmind_autosave';
+
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
@@ -69,20 +73,20 @@ class MindMap {
     this.selectedBoxes = new Set();
     // Multi-selection of connections
     this.selectedConnections = new Set();
-    
+
     // Clipboard for copying/pasting boxes and their connections
     this.copiedBoxes = [];
     this.copiedConnections = [];
-    
+
     // Performance optimization: track if content has changed
     this.isDirty = true;
-    
+
     // Autosave tracking
     this.isSaved = true; // Track if current state is saved
-    
+
     // Arrow key navigation tracking
     this.isArrowKeyNavigating = false;
-    
+
     // Pan animation settings
     this.panAnimationSpeed = 0.15; // 0 to 1, higher = faster (0.15 is smooth)
     this.isPanAnimating = false;
@@ -93,7 +97,7 @@ class MindMap {
     this.isZoomAnimating = false;
     this.zoomAnimationSpeed = 0.12; // separate speed for zoom interpolation
   }
-  
+
   /**
    * Adds a new box to the mind map
    * @param {TextBox} box - The box to add
@@ -103,7 +107,7 @@ class MindMap {
     this.boxes.push(box);
     this.isDirty = true;
   }
-  
+
   /**
    * Adds a connection between two boxes
    * @param {TextBox} fromBox - Source box
@@ -115,13 +119,13 @@ class MindMap {
       console.warn('Cannot create connection: invalid boxes');
       return;
     }
-    
+
     // Prevent self-connections
     if (fromBox === toBox) {
       console.warn('Cannot create connection to self');
       return;
     }
-    
+
     // Check if connection already exists (same direction)
     for (let conn of this.connections) {
       if (conn.fromBox === fromBox && conn.toBox === toBox) {
@@ -129,7 +133,7 @@ class MindMap {
         return;
       }
     }
-    
+
     this.pushUndo();
     this.connections.push(new Connection(fromBox, toBox));
     this.isDirty = true;
@@ -145,12 +149,12 @@ class MindMap {
       // Deep clone to prevent reference issues
       const clonedSnap = MindMap._deepClone(snap);
       this.undoStack.push(clonedSnap);
-      
+
       // Limit stack size for memory management
       if (this.undoStack.length > this.maxUndo) {
         this.undoStack.shift();
       }
-      
+
       // Mark as unsaved since we're about to make a change
       this.isSaved = false;
     } catch (e) {
@@ -169,7 +173,7 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
   }
-  
+
   /**
    * Gets the color priority for a box (lower number = higher priority)
    * Red: priority 1, Orange: priority 2, White/other: priority 999
@@ -179,17 +183,17 @@ class MindMap {
   getBoxColorPriority(box) {
     if (!box || !box.backgroundColor) return 999; // white/default gets lowest priority
     const { r, g, b } = box.backgroundColor;
-    
+
     // Red: r=255, g=140, b=140
     if (r === 255 && g === 140 && b === 140) return 1;
-    
+
     // Orange: r=255, g=200, b=140
     if (r === 255 && g === 200 && b === 140) return 2;
-    
+
     // White or other: lowest priority
     return 999;
   }
-  
+
   /**
    * Updates animation states (call this every frame)
    */
@@ -224,7 +228,7 @@ class MindMap {
         }
         // Apply new zoom immediately so centerCameraOn uses correct scale
         zoom = constrain(newZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
-                        (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
+          (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
       }
 
       // Compute new world center by easing
@@ -248,14 +252,14 @@ class MindMap {
       if (this.isZoomAnimating && Math.abs(targetZoom - zoom) < 0.001) this.isZoomAnimating = false;
     }
   }
-  
+
   /**
    * Draws the mind map (connections and boxes)
    */
   draw() {
     // Update animations
     this.update();
-    
+
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
       for (let conn of this.connections) {
@@ -269,9 +273,9 @@ class MindMap {
     if (this.boxes) {
       for (let box of this.boxes) {
         if (!box) continue;
-        try { 
+        try {
           // Pass navigation state to box for dimming effect
-          box.draw(this.isArrowKeyNavigating && this.selectedBox !== box); 
+          box.draw(this.isArrowKeyNavigating && this.selectedBox !== box);
         } catch (e) { console.error('Error drawing box:', e); }
       }
     }
@@ -285,7 +289,7 @@ class MindMap {
         const active = this.connectingFrom && this.connectingFrom.box === box;
         // During arrow-key navigation (presentation), don't show hover-triggered connectors
         if ((!this.isArrowKeyNavigating && box.isMouseOver()) || active) {
-          try { box.drawConnectors(!!active); } catch (e) {}
+          try { box.drawConnectors(!!active); } catch (e) { }
         }
       }
     }
@@ -330,13 +334,13 @@ class MindMap {
         translate(mx, my);
         rotate(angle);
         const size = (conn.arrowSize || 10);
-        triangle(0, 0, -size, -size/2, -size, size/2);
+        triangle(0, 0, -size, -size / 2, -size, size / 2);
         pop();
         pop();
       }
     }
   }
-  
+
   /**
    * Aligns boxes' x and y positions when they are within a tolerance.
    * Groups nearby coordinates into clusters and snaps each cluster to its average.
@@ -392,7 +396,7 @@ class MindMap {
       }
     }
   }
-  
+
   /**
   * Left-aligns all selected boxes to the leftmost box's left edge.
   * Requires at least two selected boxes.
@@ -400,7 +404,7 @@ class MindMap {
   leftAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
-    
+
     // Find the leftmost left edge (box.x - box.width/2)
     let minLeftEdge = Infinity;
     for (const box of boxesToAlign) {
@@ -410,16 +414,16 @@ class MindMap {
         minLeftEdge = leftEdge;
       }
     }
-    
+
     if (!Number.isFinite(minLeftEdge)) return false;
-    
+
     // Align all boxes so their left edge matches the minimum left edge
     for (const box of boxesToAlign) {
       if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
       // New center x = minLeftEdge + width/2
       box.x = minLeftEdge + box.width / 2;
     }
-    
+
     this.isDirty = true;
     this.isSaved = false;
     return true;
@@ -511,7 +515,7 @@ class MindMap {
     this.isSaved = false;
     return true;
   }
-  
+
   /**
    * Center-aligns selected boxes horizontally.
    * Calculates the average X position of selected boxes and moves them all to that center.
@@ -520,7 +524,7 @@ class MindMap {
   centerAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
-    
+
     // Calculate the average X position (center) of all selected boxes
     let sumX = 0;
     let validCount = 0;
@@ -529,19 +533,19 @@ class MindMap {
       sumX += box.x;
       validCount++;
     }
-    
+
     if (validCount < 2) return false;
-    
+
     const centerX = sumX / validCount;
-    
+
     if (!Number.isFinite(centerX)) return false;
-    
+
     // Move all selected boxes to the calculated center X
     for (const box of boxesToAlign) {
       if (!box || !MindMap._isValidNumber(box.x)) continue;
       box.x = centerX;
     }
-    
+
     this.isDirty = true;
     this.isSaved = false;
     return true;
@@ -593,9 +597,9 @@ class MindMap {
     // Calculate boundaries based on edges
     const firstBox = boxes[0];
     const lastBox = boxes[boxes.length - 1];
-    
+
     if (!MindMap._isValidNumber(firstBox.y) || !MindMap._isValidNumber(firstBox.height) ||
-        !MindMap._isValidNumber(lastBox.y) || !MindMap._isValidNumber(lastBox.height)) {
+      !MindMap._isValidNumber(lastBox.y) || !MindMap._isValidNumber(lastBox.height)) {
       return false;
     }
 
@@ -623,7 +627,7 @@ class MindMap {
       // Advance currentTop for next box
       currentTop += box.height + gap;
     }
-    
+
     this.isDirty = true;
     this.isSaved = false;
     return true;
@@ -644,9 +648,9 @@ class MindMap {
     // Calculate boundaries based on edges
     const firstBox = boxes[0];
     const lastBox = boxes[boxes.length - 1];
-    
+
     if (!MindMap._isValidNumber(firstBox.x) || !MindMap._isValidNumber(firstBox.width) ||
-        !MindMap._isValidNumber(lastBox.x) || !MindMap._isValidNumber(lastBox.width)) {
+      !MindMap._isValidNumber(lastBox.x) || !MindMap._isValidNumber(lastBox.width)) {
       return false;
     }
 
@@ -679,7 +683,7 @@ class MindMap {
     this.isSaved = false;
     return true;
   }
-  
+
   /**
   * Arranges selected boxes in a hierarchical layout based on connections.
   * Uses a tree/graph layout algorithm to create a structured network diagram.
@@ -722,19 +726,19 @@ class MindMap {
     };
 
     const preBounds = getBounds(boxesToLayout);
-    
+
     const boxSet = new Set(boxesToLayout);
-    
+
     // Build adjacency lists for the selected boxes only
     // fromBox -> toBox means an arrow goes from fromBox to toBox
     const children = new Map(); // box -> array of child boxes
     const parents = new Map();  // box -> array of parent boxes
-    
+
     for (const box of boxesToLayout) {
       children.set(box, []);
       parents.set(box, []);
     }
-    
+
     // Only consider connections where both endpoints are in the selection
     for (const conn of this.connections) {
       if (!conn || !conn.fromBox || !conn.toBox) continue;
@@ -743,45 +747,45 @@ class MindMap {
         parents.get(conn.toBox).push(conn.fromBox);
       }
     }
-    
+
     // Find root nodes (boxes with no parents in the selection)
     const roots = boxesToLayout.filter(box => parents.get(box).length === 0);
-    
+
     // If no roots found (all nodes are in cycles), pick the first node
     if (roots.length === 0 && boxesToLayout.length > 0) {
       roots.push(boxesToLayout[0]);
     }
-    
+
     // Sort roots by color priority (red first, then orange, then white)
     roots.sort((a, b) => {
       const priorityA = this.getBoxColorPriority(a);
       const priorityB = this.getBoxColorPriority(b);
       return priorityA - priorityB;
     });
-    
+
     // Layout configuration using class constants
     const HORIZONTAL_SPACING = MindMap.LAYOUT.HORIZONTAL_SPACING;
     const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
     const START_X = MindMap.LAYOUT.START_X;
     const START_Y = MindMap.LAYOUT.START_Y;
-    
+
     // Assign levels using BFS from roots
     const levels = new Map(); // box -> level (0 = root)
     const visited = new Set();
     const queue = [];
-    
+
     // Initialize roots at level 0
     for (const root of roots) {
       levels.set(root, 0);
       queue.push(root);
       visited.add(root);
     }
-    
+
     // BFS to assign levels
     while (queue.length > 0) {
       const current = queue.shift();
       const currentLevel = levels.get(current);
-      
+
       for (const child of children.get(current)) {
         if (!visited.has(child)) {
           visited.add(child);
@@ -790,7 +794,7 @@ class MindMap {
         }
       }
     }
-    
+
     // Handle any unvisited nodes (disconnected within selection)
     for (const box of boxesToLayout) {
       if (!visited.has(box)) {
@@ -798,7 +802,7 @@ class MindMap {
         levels.set(box, 0);
       }
     }
-    
+
     // Group boxes by level
     const levelGroups = new Map(); // level -> array of boxes
     for (const box of boxesToLayout) {
@@ -808,7 +812,7 @@ class MindMap {
       }
       levelGroups.get(level).push(box);
     }
-    
+
     // Sort boxes within each level by their original x position for stability
     for (const boxes of levelGroups.values()) {
       boxes.sort((a, b) => {
@@ -819,10 +823,10 @@ class MindMap {
         return a.x - b.x;
       });
     }
-    
+
     // Calculate positions for each level
     const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
-    
+
     // Calculate center X based on the widest level
     let maxLevelWidth = 0;
     for (const [level, boxes] of levelGroups) {
@@ -833,24 +837,24 @@ class MindMap {
       totalWidth -= HORIZONTAL_SPACING; // Remove trailing spacing
       if (totalWidth > maxLevelWidth) maxLevelWidth = totalWidth;
     }
-    
+
     const centerX = START_X + maxLevelWidth / 2;
-    
+
     // Position boxes level by level
     for (const level of sortedLevels) {
       const boxes = levelGroups.get(level);
       const y = START_Y + level * VERTICAL_SPACING;
-      
+
       // Calculate total width of this level
       let totalWidth = 0;
       for (const box of boxes) {
         totalWidth += (box.width || 100) + HORIZONTAL_SPACING;
       }
       totalWidth -= HORIZONTAL_SPACING;
-      
+
       // Start X position to center this level
       let x = centerX - totalWidth / 2;
-      
+
       // Position each box
       for (const box of boxes) {
         const boxWidth = box.width || 100;
@@ -859,7 +863,7 @@ class MindMap {
         x += boxWidth + HORIZONTAL_SPACING;
       }
     }
-    
+
     // After layout, shift group so its center matches the original (in-place layout)
     const postBounds = getBounds(boxesToLayout);
     if (preBounds && postBounds) {
@@ -888,7 +892,7 @@ class MindMap {
     }
     return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
   }
-  
+
   /**
    * Navigates between boxes using arrow keys
    * UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
@@ -897,13 +901,13 @@ class MindMap {
    */
   navigateBoxes(keyCode) {
     if (!this.boxes || this.boxes.length === 0) return;
-    
+
     if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
       // UP/DOWN: Navigate through depth-first traversal
       const buildNavigationOrder = () => {
         const visited = new Set();
         const orderedBoxes = [];
-        
+
         // Get connected boxes for a given box (both directions)
         const getConnectedBoxes = (box) => {
           const connected = [];
@@ -922,19 +926,19 @@ class MindMap {
             return a.x - b.x;
           });
         };
-        
+
         // Depth-first traversal starting from a root box
         const traverse = (box) => {
           if (visited.has(box)) return;
           visited.add(box);
           orderedBoxes.push(box);
-          
+
           const connected = getConnectedBoxes(box);
           for (const connectedBox of connected) {
             traverse(connectedBox);
           }
         };
-        
+
         // Group boxes by priority
         const priorityGroups = new Map();
         for (const box of this.boxes) {
@@ -944,7 +948,7 @@ class MindMap {
           }
           priorityGroups.get(priority).push(box);
         }
-        
+
         // Sort each priority group by position
         for (const [priority, boxes] of priorityGroups) {
           boxes.sort((a, b) => {
@@ -953,7 +957,7 @@ class MindMap {
             return a.x - b.x;
           });
         }
-        
+
         // Process each priority group in order
         const sortedPriorities = Array.from(priorityGroups.keys()).sort((a, b) => a - b);
         for (const priority of sortedPriorities) {
@@ -964,21 +968,21 @@ class MindMap {
             }
           }
         }
-        
+
         return orderedBoxes;
       };
-      
+
       const sortedBoxes = buildNavigationOrder();
-      
+
       // Find current box in sorted list
       let currentIndex = -1;
       if (this.selectedBox) {
         currentIndex = sortedBoxes.indexOf(this.selectedBox);
       }
-      
+
       // Calculate next box based on arrow key
       let nextIndex = -1;
-      
+
       if (keyCode === UP_ARROW) {
         // Move to previous box
         if (currentIndex === -1) {
@@ -994,18 +998,18 @@ class MindMap {
           nextIndex = (currentIndex + 1) % sortedBoxes.length;
         }
       }
-      
+
       // Select the next box
       if (nextIndex >= 0 && nextIndex < sortedBoxes.length) {
         this.selectAndPanToBox(sortedBoxes[nextIndex]);
       }
-      
+
     } else if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
       // LEFT/RIGHT: Navigate between siblings (same hierarchy level)
-      
+
       // Get all boxes at the same priority level as current
       const currentPriority = this.selectedBox ? this.getBoxColorPriority(this.selectedBox) : 999;
-      
+
       // Get all boxes with same priority, sorted by position
       const samePriorityBoxes = this.boxes
         .filter(box => this.getBoxColorPriority(box) === currentPriority)
@@ -1014,18 +1018,18 @@ class MindMap {
           if (Math.abs(yDiff) > 10) return yDiff;
           return a.x - b.x;
         });
-      
+
       if (samePriorityBoxes.length === 0) return;
-      
+
       // Find current box in same-priority list
       let currentIndex = -1;
       if (this.selectedBox) {
         currentIndex = samePriorityBoxes.indexOf(this.selectedBox);
       }
-      
+
       // Calculate next box
       let nextIndex = -1;
-      
+
       if (keyCode === LEFT_ARROW) {
         if (currentIndex === -1) {
           nextIndex = samePriorityBoxes.length - 1;
@@ -1039,29 +1043,29 @@ class MindMap {
           nextIndex = (currentIndex + 1) % samePriorityBoxes.length;
         }
       }
-      
+
       // Select the next box
       if (nextIndex >= 0 && nextIndex < samePriorityBoxes.length) {
         this.selectAndPanToBox(samePriorityBoxes[nextIndex]);
       }
     }
   }
-  
+
   /**
    * Selects a box and pans camera to it
    * @param {TextBox} box - The box to select
    */
   selectAndPanToBox(box) {
     if (!box) return;
-    
+
     // Mark that we're navigating via arrow keys
     this.isArrowKeyNavigating = true;
-    
+
     // Stop editing current box
     if (this.selectedBox && this.selectedBox.isEditing) {
       this.selectedBox.stopEditing();
     }
-    
+
     // Clear all selections
     this.clearBoxSelection();
     if (this.selectedConnection) {
@@ -1071,11 +1075,11 @@ class MindMap {
     if (this.clearConnectionSelection) {
       this.clearConnectionSelection();
     }
-    
+
     // Select the new box
     this.selectedBox = box;
     this.addBoxToSelection(box);
-    
+
     // Compute target zoom using the same fit logic as the '+' key (setMaxZoom)
     let targetZoom = null;
     try {
@@ -1095,7 +1099,7 @@ class MindMap {
     // Pan and zoom camera to show the selected box
     this.panToBox(box, true, targetZoom);
   }
-  
+
   /**
    * Pans camera to center a box
    * @param {TextBox} box - The box to pan to
@@ -1103,7 +1107,7 @@ class MindMap {
    */
   panToBox(box, animated = true, targetZoom = null) {
     if (!box) return;
-    
+
     if (animated) {
       // Start animated pan
       this.panTargetX = box.x;
@@ -1122,7 +1126,7 @@ class MindMap {
       if (typeof centerCameraOn === 'function') {
         if (targetZoom != null && Number.isFinite(targetZoom)) {
           zoom = constrain(targetZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
-                          (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
+            (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
         }
         centerCameraOn(box.x, box.y);
       }
@@ -1142,7 +1146,7 @@ class MindMap {
         if (box.isMouseOver()) {
           return box;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     return null;
   }
@@ -1210,7 +1214,7 @@ class MindMap {
               destination = box;
               break;
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       }
     }
@@ -1225,7 +1229,7 @@ class MindMap {
     this.connectingFromInitiatedByKeyboard = false;
     return connected;
   }
-  
+
   /**
    * Handles mouse press events
    * Includes improved validation using shared utilities
@@ -1233,7 +1237,7 @@ class MindMap {
   handleMousePressed() {
     // Clear arrow key navigation flag when mouse is used
     this.isArrowKeyNavigating = false;
-    
+
     // Validate mouse coordinates using shared utility if available
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
@@ -1244,7 +1248,7 @@ class MindMap {
       return;
     }
     const shiftDown = keyIsDown(16); // SHIFT
-    
+
     if (this.connectingFrom && this.connectingFromInitiatedByKeyboard) {
       const hoveredBox = this.getTopMostBoxUnderMouse();
       if (hoveredBox && hoveredBox !== this.connectingFrom.box) {
@@ -1258,7 +1262,7 @@ class MindMap {
 
     // (connection deselection centralized in clearConnectionSelection())
     // Color circle clicks removed - colors are now changed via keyboard shortcuts (1, 2, 3)
-    
+
     // Check if clicking on resize handle
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {
@@ -1271,7 +1275,7 @@ class MindMap {
         return;
       }
     }
-    
+
     // PRIORITY: Arrowhead reattach comes before connector dots to avoid conflict when overlapping
     // Check if clicking on an existing connection's arrow head to reattach
     for (let i = this.connections.length - 1; i >= 0; i--) {
@@ -1289,7 +1293,7 @@ class MindMap {
           conn.selected = true;
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Check if clicking on a connector dot at box edge center for connection
@@ -1301,7 +1305,7 @@ class MindMap {
         return;
       }
     }
-    
+
     // Check if clicking inside a box
     for (let i = this.boxes.length - 1; i >= 0; i--) {
       let box = this.boxes[i];
@@ -1316,11 +1320,11 @@ class MindMap {
         if (onEdge) {
           // Edge click: start drag. If multiple boxes are selected, drag all of them together.
           this.pushUndo();
-          
+
           // If this box is already in selection and we have multiple selected, drag all
           const hasMultipleSelected = this.selectedBoxes && this.selectedBoxes.size > 1;
           const boxInSelection = this.selectedBoxes && this.selectedBoxes.has(box);
-          
+
           if (!boxInSelection || shiftDown) {
             // Box not selected or shift held: update selection
             if (!shiftDown) {
@@ -1370,7 +1374,7 @@ class MindMap {
         return;
       }
     }
-    
+
     // Check if clicking on a connection
     for (let conn of this.connections) {
       if (conn.isMouseOver()) {
@@ -1392,7 +1396,7 @@ class MindMap {
         return;
       }
     }
-    
+
     // Clicked outside all boxes and connections -> clear all selections
     if (this.selectedBox) {
       this.selectedBox.stopEditing();
@@ -1405,7 +1409,7 @@ class MindMap {
     // Always clear connection multi-selection and single selected connection
     if (this.clearConnectionSelection) this.clearConnectionSelection();
   }
-  
+
   /**
    * Handles mouse release events
    */
@@ -1442,7 +1446,7 @@ class MindMap {
     if (this.connectingFrom) {
       this.completeConnection();
     }
-    
+
     // Stop dragging and resizing all boxes
     for (let box of this.boxes) {
       if (!box) continue;
@@ -1451,7 +1455,7 @@ class MindMap {
       box.stopSelecting();
     }
   }
-  
+
   /**
    * Handles mouse drag events
    */
@@ -1472,7 +1476,7 @@ class MindMap {
         }
       }
       if (gestureActive) this.isSaved = false;
-    } catch (_) {}
+    } catch (_) { }
 
     for (let box of this.boxes) {
       if (!box) continue;
@@ -1485,7 +1489,7 @@ class MindMap {
       }
     }
   }
-  
+
   /**
    * Handles key press events
    * @param {string} key - The key that was pressed
@@ -1559,7 +1563,7 @@ class MindMap {
           return;
         }
       }
-      
+
       // Handle arrow keys for cursor movement within text
       if (keyCode === LEFT_ARROW) {
         this.selectedBox.moveCursorLeft();
@@ -1609,18 +1613,18 @@ class MindMap {
         } else if (this.selectedBox) {
           boxesToCopy = [this.selectedBox];
         }
-        
+
         if (boxesToCopy.length > 0) {
           this.copiedBoxes = [];
           const boxSet = new Set(boxesToCopy);
-          
+
           // Copy box data
           for (const box of boxesToCopy) {
             if (box) {
               this.copiedBoxes.push(box.toJSON());
             }
           }
-          
+
           // Copy connections between the selected boxes
           this.copiedConnections = [];
           for (const conn of this.connections) {
@@ -1644,19 +1648,19 @@ class MindMap {
           this.pushUndo();
           const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
           const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-          
+
           // Calculate offset from first copied box to paste location
           const firstBox = this.copiedBoxes[0];
           const offsetX = mx - firstBox.x;
           const offsetY = my - firstBox.y;
-          
+
           // Clear current selection
           this.clearBoxSelection();
           if (this.selectedBox) {
             this.selectedBox.stopEditing();
             this.selectedBox = null;
           }
-          
+
           // Paste all copied boxes with offset and track new boxes
           const newBoxes = [];
           for (const boxData of this.copiedBoxes) {
@@ -1672,7 +1676,7 @@ class MindMap {
               newBoxes.push(newBox);
             }
           }
-          
+
           // Recreate connections between the pasted boxes
           if (this.copiedConnections && this.copiedConnections.length > 0) {
             for (const connData of this.copiedConnections) {
@@ -1683,7 +1687,7 @@ class MindMap {
               }
             }
           }
-          
+
           this.isDirty = true;
         }
         return;
@@ -1717,20 +1721,20 @@ class MindMap {
         // Delete all selected boxes
         this.pushUndo();
         const boxesToDelete = Array.from(this.selectedBoxes);
-        
+
         for (const box of boxesToDelete) {
           // Remove connections involving this box
-          this.connections = this.connections.filter(conn => 
+          this.connections = this.connections.filter(conn =>
             conn.fromBox !== box && conn.toBox !== box
           );
-          
+
           // Remove the box
           const index = this.boxes.indexOf(box);
           if (index > -1) {
             this.boxes.splice(index, 1);
           }
         }
-        
+
         // Clear selection
         this.clearBoxSelection();
         if (this.selectedBox) {
@@ -1789,7 +1793,7 @@ class MindMap {
       name: this.getLastUsedFilename() || 'openmind.json'
     };
   }
-  
+
   /**
    * Loads mind map from JSON data
    * Uses shared utilities for safe iteration when available
@@ -1801,7 +1805,7 @@ class MindMap {
       console.error('Invalid data format');
       return;
     }
-    
+
     // Clean up existing references to prevent memory leaks
     this.boxes = [];
     this.connections = [];
@@ -1814,7 +1818,7 @@ class MindMap {
     if (this.selectedConnections) {
       this.selectedConnections.clear();
     }
-    
+
     // Load boxes with error handling
     // Use safe iteration utility if available
     if (Array.isArray(data.boxes)) {
@@ -1829,7 +1833,7 @@ class MindMap {
           console.error('Failed to load box:', e);
         }
       };
-      
+
       if (typeof Utils !== 'undefined' && Utils.safeForEach) {
         Utils.safeForEach(data.boxes, loadBox);
       } else {
@@ -1840,7 +1844,7 @@ class MindMap {
     } else {
       console.warn('No boxes data found');
     }
-    
+
     // Load connections with error handling
     if (Array.isArray(data.connections)) {
       const loadConnection = (connData) => {
@@ -1854,7 +1858,7 @@ class MindMap {
           console.error('Failed to load connection:', e);
         }
       };
-      
+
       if (typeof Utils !== 'undefined' && Utils.safeForEach) {
         Utils.safeForEach(data.connections, loadConnection);
       } else {
@@ -1865,10 +1869,10 @@ class MindMap {
     } else {
       console.warn('No connections data found');
     }
-    
+
     this.isDirty = true;
   }
-  
+
   /**
    * Gets the last used filename from localStorage
    * @returns {string} The last used filename or default
@@ -1915,7 +1919,7 @@ class MindMap {
   async save() {
     const data = this.toJSON();
     const defaultFilename = this.getLastUsedFilename();
-    
+
     try {
       // Use the File System Access API when available to let the user choose a location
       if (typeof window !== 'undefined' && window.showSaveFilePicker) {
@@ -1932,7 +1936,7 @@ class MindMap {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         await writable.write(blob);
         await writable.close();
-        
+
         // Remember the filename for next time
         this.setLastUsedFilename(handle.name);
       } else {
@@ -1942,15 +1946,15 @@ class MindMap {
       }
       // Mark as saved regardless of localStorage outcome; seed localStorage best-effort
       this.isSaved = true;
-      try { this.saveToLocalStorage(); } catch (_) {}
+      try { this.saveToLocalStorage(); } catch (_) { }
     } catch (e) {
       // User may cancel the dialog; that's not an error
       if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
       console.error('Save failed:', e);
-      try { alert('Save failed: ' + (e && e.message ? e.message : String(e))); } catch (_) {}
+      try { alert('Save failed: ' + (e && e.message ? e.message : String(e))); } catch (_) { }
     }
   }
-  
+
   /**
    * Loads mind map from external JSON data
    * @param {Object} data - The JSON data to load
@@ -1991,14 +1995,14 @@ class MindMap {
 
     this.fromJSON(data);
     // Seed autosave immediately after loading external data so the indicator shows saved
-    try { this.saveToLocalStorage(); } catch (_) {}
+    try { this.saveToLocalStorage(); } catch (_) { }
     this.isSaved = true;
   }
 
   // ============================================================================
   // BOX SELECTION HELPERS
   // ============================================================================
-  
+
   /**
    * Clears all box selections
    */
@@ -2050,7 +2054,7 @@ class MindMap {
   // ============================================================================
   // CONNECTION SELECTION HELPERS
   // ============================================================================
-  
+
   /**
    * Clears all connection selections
    */
@@ -2063,7 +2067,7 @@ class MindMap {
 
     // Also clear the single selectedConnection pointer if present
     if (this.selectedConnection) {
-      try { this.selectedConnection.selected = false; } catch (_) {}
+      try { this.selectedConnection.selected = false; } catch (_) { }
       this.selectedConnection = null;
     }
   }
@@ -2106,7 +2110,7 @@ class MindMap {
   // ============================================================================
   // LOCAL STORAGE / AUTOSAVE
   // ============================================================================
-  
+
   /**
    * Saves current state to localStorage
    * @returns {boolean} true if successful
@@ -2115,23 +2119,44 @@ class MindMap {
     try {
       const data = this.toJSON();
       const jsonString = JSON.stringify(data);
-      
+
       // Check localStorage availability and quota
       if (typeof localStorage === 'undefined') {
         console.warn('localStorage is not available');
         return false;
       }
-      
-      localStorage.setItem('openmind_autosave', jsonString);
+
+      localStorage.setItem(this.storageKey, jsonString);
       this.isSaved = true;
       return true;
     } catch (e) {
       // Handle quota exceeded errors specifically
       if (e.name === 'QuotaExceededError' || e.code === 22) {
+        console.warn('localStorage quota exceeded. Attempting to prune old caches...');
+
+        // Try to free up space by removing oldest map caches
+        if (this.pruneOldestCache()) {
+          // Retry saving
+          try {
+            const data = this.toJSON();
+            localStorage.setItem(this.storageKey, JSON.stringify(data));
+            this.isSaved = true;
+            console.log('Saved successfully after pruning.');
+            return true;
+          } catch (retryError) {
+            console.error('Failed to save even after pruning:', retryError);
+          }
+        }
+
         console.error('localStorage quota exceeded. Unable to autosave. Consider exporting your work.');
         // Try to show user-friendly error
         if (typeof alert !== 'undefined') {
-          alert('Storage quota exceeded. Please export your mind map to save your work.');
+          // Only alert if we haven't alerted recently to avoid spamming
+          const now = Date.now();
+          if (!this._lastQuotaAlert || now - this._lastQuotaAlert > 60000) {
+            alert('Storage quota exceeded. Please export your mind map to save your work.');
+            this._lastQuotaAlert = now;
+          }
         }
       } else {
         console.error('Failed to autosave to localStorage:', e);
@@ -2141,12 +2166,82 @@ class MindMap {
   }
 
   /**
+   * Sets the storage key for autosaving
+   * @param {string} key - The new storage key
+   */
+  setStorageKey(key) {
+    if (key && typeof key === 'string') {
+      this.storageKey = key;
+    }
+  }
+
+  /**
+   * Prunes the oldest map caches to free up space
+   * @returns {boolean} true if space was freed
+   */
+  pruneOldestCache() {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+
+      const mapKeys = [];
+      const prefix = 'openmind_map_';
+
+      // Find all map cache keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix) && key !== 'openmind_autosave') {
+          mapKeys.push(key);
+        }
+      }
+
+      // If no other maps to delete, we can't free space (don't delete current default autosave if possible, 
+      // or maybe we should if we are saving proper named map? 
+      // Current logic: only prune specific 'openmind_map_' keys, shielding 'openmind_autosave' unless we rename it later)
+      if (mapKeys.length === 0) return false;
+
+      // Sort by last modified
+      const cacheEntries = [];
+      for (const key of mapKeys) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            // optimized: peek at simplified version if parsing huge JSON is too slow?
+            // for now, full parse is safest to get reliable timestamp
+            const data = JSON.parse(raw);
+            cacheEntries.push({
+              key: key,
+              lastModified: data.lastModified || 0
+            });
+          }
+        } catch (e) {
+          // If corrupted, it's a prime candidate for deletion
+          cacheEntries.push({ key: key, lastModified: -1 });
+        }
+      }
+
+      // Sort oldest first
+      cacheEntries.sort((a, b) => a.lastModified - b.lastModified);
+
+      // Delete the oldest one (or more if needed? start with 1)
+      if (cacheEntries.length > 0) {
+        const oldest = cacheEntries[0];
+        localStorage.removeItem(oldest.key);
+        console.log('Pruned oldest cache:', oldest.key);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Error during cache pruning:', e);
+    }
+    return false;
+  }
+
+  /**
    * Loads state from localStorage
    * @returns {boolean} true if successful
    */
   loadFromLocalStorage() {
     try {
-      const saved = localStorage.getItem('openmind_autosave');
+      const saved = localStorage.getItem(this.storageKey);
       if (saved) {
         const data = JSON.parse(saved);
         // fromJSON handles validation internally
@@ -2170,7 +2265,7 @@ class MindMap {
    */
   hasLocalStorageData() {
     try {
-      return localStorage.getItem('openmind_autosave') !== null;
+      return localStorage.getItem(this.storageKey) !== null;
     } catch (e) {
       return false;
     }

@@ -263,48 +263,48 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
 
     const urlData = await resp.json();
 
-    // Check if we have a cached version in localStorage
+    // Determine appropriate storage key for this map
+    let urlName = 'unnamed-map';
+    if (urlData.name) {
+      urlName = extractMapName(urlData.name);
+    } else if (fileToFetch) {
+      urlName = extractMapName(fileToFetch);
+    }
+
+    // Create namespaced storage key: openmind_map_<normalized_name>
+    const storageKey = 'openmind_map_' + urlName;
+
+    // Set the storage key on the mindMap instance so future saves go to the right place
+    if (mindMap && typeof mindMap.setStorageKey === 'function') {
+      mindMap.setStorageKey(storageKey);
+    }
+
+    // Check if we have a cached version for THIS SPECIFIC map
     let shouldUseCache = false;
     try {
       if (mindMap && mindMap.hasLocalStorageData && mindMap.hasLocalStorageData()) {
-        const cachedString = localStorage.getItem('openmind_autosave');
+        // hasLocalStorageData now uses the set storageKey, so it checks the specific map's cache
+        const cachedString = localStorage.getItem(storageKey);
+
         if (cachedString) {
           const cachedData = JSON.parse(cachedString);
 
-          // Compare timestamps if both have them
+          // Compare timestamps
           const urlTimestamp = urlData.lastModified || headerTime || 0;
           const cacheTimestamp = cachedData.lastModified || 0;
 
-          // Check if names match (handling prefaced maps with same ending)
-          // Extract URL name with proper fallback chain
-          let urlName;
-          if (urlData.name) {
-            urlName = extractMapName(urlData.name);
-          } else if (fileToFetch) {
-            urlName = extractMapName(fileToFetch);
-          } else {
-            urlName = 'unnamed-map';
-          }
-          const cacheName = extractMapName(cachedData.name || '');
-
-          const namesMatch = namesAreSimilar(urlName, cacheName);
-
-          console.info('Map name comparison:', {
-            urlName,
-            cacheName,
-            namesMatch,
+          console.info('Map timestamp comparison:', {
+            mapName: urlName,
+            storageKey: storageKey,
             urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
             cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
           });
 
-          // Use cache if: names match AND cache is more recent
-          if (namesMatch && cacheTimestamp > urlTimestamp) {
+          if (cacheTimestamp > urlTimestamp) {
             shouldUseCache = true;
-            console.info('Using cached version (more recent):', cacheName, 'cached:', new Date(cacheTimestamp), 'url:', new Date(urlTimestamp));
-          } else if (namesMatch) {
-            console.info('Using URL version (more recent):', urlName, 'url:', new Date(urlTimestamp), 'cached:', new Date(cacheTimestamp));
+            console.info('Using cached version (more recent):', storageKey);
           } else {
-            console.info('Names do not match - using URL version');
+            console.info('Using URL version (more recent or same):', urlName);
           }
         }
       }
@@ -319,11 +319,23 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
       // Load from cache instead of URL
       if (mindMap && typeof mindMap.loadFromLocalStorage === 'function') {
         await mindMap.loadFromLocalStorage();
+        // Ensure storage key remains set after load (load might reset things potentially, though fromJSON doesn't reset key)
+        if (mindMap && typeof mindMap.setStorageKey === 'function') {
+          mindMap.setStorageKey(storageKey);
+        }
       }
     } else {
       // Load from URL
       if (mindMap && typeof mindMap.load === 'function') await mindMap.load(urlData);
+
+      // Ensure storage key is set correctly (load calls saveToLocalStorage which needs the key)
+      if (mindMap && typeof mindMap.setStorageKey === 'function') {
+        mindMap.setStorageKey(storageKey);
+      }
     }
+
+    // Final foolproof ensure key is set (redundant but safe)
+    if (mindMap && typeof mindMap.setStorageKey === 'function') mindMap.setStorageKey(storageKey);
 
     if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
     try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
