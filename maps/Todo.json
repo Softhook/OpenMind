@@ -131,19 +131,6 @@
       }
     },
     {
-      "x": -2147.091084520646,
-      "y": -728.609041932742,
-      "text": "Over the past decades, the smart city has been articulated primarily through policy agendas, infrastructural programmes, and critical theory. While these approaches have been effective in diagnosing the political economy, governance arrangements, and technological imaginaries of smart urbanism, they have largely treated design as a downstream activity—a matter of implementation, optimisation, or interface. This paper argues that contestation around the smart city cannot be addressed through critique alone, but requires a rethinking of smart urbanism as a design problem.\n\nTaking “the post-smart city” not as a rejection of digital urbanism but as a problem of re-design, the paper asks what becomes visible when design is treated as an epistemic and ontological practice rather than merely a delivery mechanism. Drawing on examples from participatory design, speculative prototyping, and infrastructural interventions that foreground frictions, ambiguities, and publics, the paper shows how design opens up alternative ways of framing and enacting urban intelligence—shifting attention from data extraction and control towards situated practices, contested publics, and the material conditions through which urban knowledge is produced.\n\nBy foregrounding design, the paper contributes to geographical debates on smart urbanism by moving beyond critique towards intervention, and to design research by situating design practice within the spatial, political, and policymaking complexities of contemporary cities.",
-      "imageUrl": null,
-      "width": 405.1174033149173,
-      "height": 633,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -901.1265534901885,
       "y": -472.82091032148065,
       "text": "Put in abstract for EASST \n28 Feb 2026 ",
@@ -196,19 +183,6 @@
       }
     },
     {
-      "x": -1787.0968691861437,
-      "y": -1307.770225504369,
-      "text": "Tax return",
-      "imageUrl": null,
-      "width": 227.1298828125,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
       "x": -1414.968781689774,
       "y": -1300.0405775871777,
       "text": "Latour paper",
@@ -233,6 +207,149 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -1029.861681363235,
+      "text": "Go through any invoices that I put in. ",
+      "imageUrl": null,
+      "width": 255.916015625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -621.4331099346634,
+      "text": "send to accountant",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -922.5045385060921,
+      "text": "Download all the individual bank account details ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -1341.4331099346637,
+      "text": "Tax return",
+      "imageUrl": null,
+      "width": 227.1298828125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -1244.5759670775208,
+      "text": "put in spreadsheet Tax year 24/25",
+      "imageUrl": null,
+      "width": 234.916015625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -1137.2188242203779,
+      "text": "Go through my expenses What is relevant for tax?  ",
+      "imageUrl": null,
+      "width": 185.43835529279977,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -718.2902527918063,
+      "text": "Divide by year ",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2691.7030005292027,
+      "y": -815.1473956489492,
+      "text": "Germany Tax stuff ",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1791.1421711521348,
+      "y": -1109.0281640768508,
+      "text": "Do the social media AI paper  try and do it in three days. ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1781.2962296749333,
+      "y": -1236.02705853796,
+      "text": "Ethics application for the airport paper. ",
+      "imageUrl": null,
+      "width": 266.8125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2147.091084520646,
+      "y": -728.609041932742,
+      "text": "Over the past decades, the smart city has been articulated primarily through policy agendas, infrastructural programmes, and critical theory. While these approaches have been effective in diagnosing the political economy, governance arrangements, and technological imaginaries of smart urbanism, they have largely treated design as a downstream activity—a matter of implementation, optimisation, or interface. This paper argues that contestation around the smart city cannot be addressed through critique alone, but requires a rethinking of smart urbanism as a design problem.\n\nTaking “the post-smart city” not as a rejection of digital urbanism but as a problem of re-design, the paper asks what becomes visible when design is treated as an epistemic and ontological practice rather than merely a delivery mechanism. Drawing on examples from participatory design, speculative prototyping, and infrastructural interventions that foreground frictions, ambiguities, and publics, the paper shows how design opens up alternative ways of framing and enacting urban intelligence—shifting attention from data extraction and control towards situated practices, contested publics, and the material conditions through which urban knowledge is produced.\n\nBy foregrounding design, the paper contributes to geographical debates on smart urbanism by moving beyond critique towards intervention, and to design research by situating design practice within the spatial, political, and policymaking complexities of contemporary cities.",
+      "imageUrl": null,
+      "width": 405.1174033149173,
+      "height": 633,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
@@ -241,12 +358,40 @@
       "to": 0
     },
     {
-      "from": 16,
-      "to": 17
+      "from": 14,
+      "to": 15
     },
     {
       "from": 9,
-      "to": 10
+      "to": 26
+    },
+    {
+      "from": 21,
+      "to": 16
+    },
+    {
+      "from": 16,
+      "to": 18
+    },
+    {
+      "from": 18,
+      "to": 23
+    },
+    {
+      "from": 20,
+      "to": 21
+    },
+    {
+      "from": 22,
+      "to": 17
+    },
+    {
+      "from": 19,
+      "to": 20
+    },
+    {
+      "from": 23,
+      "to": 22
     }
   ]
 }
