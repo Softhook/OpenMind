@@ -168,10 +168,10 @@ const KeyRepeat = {
       // Detect if browser is already delivering native repeats by checking time between consecutive keydowns
       // If we've seen two keydowns close together (faster than our threshold), browser is handling repeat
       const timeBetweenNativeKeydowns = s.lastNativeKeydownAt - s.prevNativeKeydownAt;
-      const hasNativeRepeat = s.prevNativeKeydownAt > 0 && 
-                              timeBetweenNativeKeydowns > 0 && 
-                              timeBetweenNativeKeydowns < this.nativeRepeatThreshold;
-      
+      const hasNativeRepeat = s.prevNativeKeydownAt > 0 &&
+        timeBetweenNativeKeydowns > 0 &&
+        timeBetweenNativeKeydowns < this.nativeRepeatThreshold;
+
       if (hasNativeRepeat) {
         // Browser is handling repeat, don't synthesize
         continue;
@@ -210,8 +210,8 @@ const KeyRepeat = {
  * @returns {number} World X coordinate
  */
 function worldMouseX() {
-  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber) 
-    ? Utils.safePositiveNumber(zoom, 1) 
+  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber)
+    ? Utils.safePositiveNumber(zoom, 1)
     : (zoom > 0 ? zoom : 1);
   return (mouseX - camX) / safeZoom;
 }
@@ -253,11 +253,16 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
   try {
     // If already loaded the same URL and not forced, skip
     if (!force && lastLoadedUrlFile && lastLoadedUrlFile === fileToFetch) return false;
-    
+
     const resp = await fetch(fileToFetch, { cache: 'no-cache' });
     if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
+
+    // Get last modified from headers as fallback
+    const lastModifiedHeader = resp.headers.get('Last-Modified');
+    const headerTime = lastModifiedHeader ? new Date(lastModifiedHeader).getTime() : 0;
+
     const urlData = await resp.json();
-    
+
     // Check if we have a cached version in localStorage
     let shouldUseCache = false;
     try {
@@ -265,11 +270,11 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
         const cachedString = localStorage.getItem('openmind_autosave');
         if (cachedString) {
           const cachedData = JSON.parse(cachedString);
-          
+
           // Compare timestamps if both have them
-          const urlTimestamp = urlData.lastModified || 0;
+          const urlTimestamp = urlData.lastModified || headerTime || 0;
           const cacheTimestamp = cachedData.lastModified || 0;
-          
+
           // Check if names match (handling prefaced maps with same ending)
           // Extract URL name with proper fallback chain
           let urlName;
@@ -281,9 +286,9 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
             urlName = 'unnamed-map';
           }
           const cacheName = extractMapName(cachedData.name || '');
-          
+
           const namesMatch = namesAreSimilar(urlName, cacheName);
-          
+
           console.info('Map name comparison:', {
             urlName,
             cacheName,
@@ -291,7 +296,7 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
             urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
             cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
           });
-          
+
           // Use cache if: names match AND cache is more recent
           if (namesMatch && cacheTimestamp > urlTimestamp) {
             shouldUseCache = true;
@@ -308,7 +313,7 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
       // On error, default to URL version
       shouldUseCache = false;
     }
-    
+
     // Load the appropriate version
     if (shouldUseCache) {
       // Load from cache instead of URL
@@ -319,7 +324,7 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
       // Load from URL
       if (mindMap && typeof mindMap.load === 'function') await mindMap.load(urlData);
     }
-    
+
     if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
     try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
     lastLoadedUrlFile = fileToFetch;
@@ -339,17 +344,17 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
  */
 function extractMapName(pathOrName) {
   if (!pathOrName || typeof pathOrName !== 'string') return '';
-  
+
   // Extract basename (remove path) - handle both / and \ separators
   let name = pathOrName;
   const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
   if (lastSlash >= 0) {
     name = name.substring(lastSlash + 1);
   }
-  
+
   // Remove URL-related characters (hash, query params)
   name = name.replace(/[?#].*$/, '');
-  
+
   // Remove .json extension
   name = name.replace(/\.json$/i, '');
   // Normalize whitespace and case
@@ -366,15 +371,15 @@ function namesAreSimilar(name1, name2) {
   if (!name1 || !name2) return false;
   name1 = name1.toLowerCase();
   name2 = name2.toLowerCase();
-  
+
   // Exact match
   if (name1 === name2) return true;
-  
+
   // Check if one name ends with the other, but only if preceded by a separator
   // This prevents false matches like 'important' matching 'ant'
   // Separators: dash, underscore, space
   const separators = ['-', '_', ' '];
-  
+
   if (name1.length > name2.length) {
     // Check if name1 ends with name2 and has a separator before it
     if (name1.endsWith(name2)) {
@@ -385,7 +390,7 @@ function namesAreSimilar(name1, name2) {
       }
     }
   }
-  
+
   if (name2.length > name1.length) {
     // Check if name2 ends with name1 and has a separator before it
     if (name2.endsWith(name1)) {
@@ -396,7 +401,7 @@ function namesAreSimilar(name1, name2) {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -416,8 +421,8 @@ function handleUrlChange() {
  * @returns {number} World Y coordinate
  */
 function worldMouseY() {
-  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber) 
-    ? Utils.safePositiveNumber(zoom, 1) 
+  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber)
+    ? Utils.safePositiveNumber(zoom, 1)
     : (zoom > 0 ? zoom : 1);
   return (mouseY - camY) / safeZoom;
 }
@@ -450,7 +455,7 @@ function screenY(worldY) {
 function setup() {
   try {
     createCanvas(windowWidth, windowHeight);
-    
+
     mindMap = new MindMap();
     try {
       if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
@@ -492,7 +497,7 @@ function setup() {
                   fname = fname.replace(/\.json$/i, '').trim();
                   document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
                 }
-              } catch (_) {}
+              } catch (_) { }
             }).catch((e) => {
               console.warn('Failed to load mindMap from localStorage:', e);
             });
@@ -505,7 +510,7 @@ function setup() {
                 fname = fname.replace(/\.json$/i, '').trim();
                 document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         } catch (e) {
           console.warn('Error while loading from localStorage:', e);
@@ -519,37 +524,37 @@ function setup() {
         if (mindMap) mindMap.isSaved = false;
       }
     }
-    
+
     // Create UI buttons
     setupUIButtons();
-    
+
     // Lay out buttons neatly
     layoutMenuButtons();
 
     // Hide menu buttons initially
     hideMenuButtons();
-    
+
     // Start autosave timer
     startAutosave();
-    
+
     // Set up page visibility handling to prevent freezing when tab is hidden
     setupVisibilityHandling();
-    
+
     // Set up mobile navigation overlay (for touch devices)
     setupMobileNavigation();
-    
-      // Enable drag-and-drop of image files or image URLs onto the canvas
-      try {
-        const canvasElt = document.querySelector('canvas');
-        if (canvasElt) {
-          addTrackedEventListener(canvasElt, 'dragover', (e) => {
-            e.preventDefault();
-          });
-          addTrackedEventListener(canvasElt, 'drop', handleCanvasDrop);
-        }
-      } catch (e) {
-        console.warn('Failed to setup drag/drop handlers:', e);
+
+    // Enable drag-and-drop of image files or image URLs onto the canvas
+    try {
+      const canvasElt = document.querySelector('canvas');
+      if (canvasElt) {
+        addTrackedEventListener(canvasElt, 'dragover', (e) => {
+          e.preventDefault();
+        });
+        addTrackedEventListener(canvasElt, 'drop', handleCanvasDrop);
       }
+    } catch (e) {
+      console.warn('Failed to setup drag/drop handlers:', e);
+    }
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -567,37 +572,37 @@ function setupUIButtons() {
   saveButton = createButton('Save');
   saveButton.position(100, 10);
   saveButton.mousePressed(() => mindMap.save());
-  
+
   loadButton = createButton('Load');
   loadButton.position(160, 10);
   loadButton.mousePressed(triggerFileLoad);
-  
+
   exportPNGButton = createButton('Export PNG');
   exportPNGButton.position(220, 10);
   exportPNGButton.mousePressed(exportPNG);
-  
+
   exportPDFButton = createButton('Export PDF');
   exportPDFButton.position(330, 10);
   exportPDFButton.mousePressed(exportPDF);
-  
+
   exportTextButton = createButton('Export Text');
   exportTextButton.position(430, 10);
   exportTextButton.mousePressed(exportText);
-  
+
   keyboardControlsButton = createButton('Keyboard Controls');
   keyboardControlsButton.position(530, 10);
   keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
   keyboardControlsButton.attribute('aria-expanded', 'false');
-  
+
   setupKeyboardControlsOverlay();
 
   // Ensure overlay sizing updates when the window resizes
   addTrackedEventListener(window, 'resize', () => {
-    try { updateKeyboardOverlaySize(); } catch (_) {}
+    try { updateKeyboardOverlaySize(); } catch (_) { }
   });
   // Set initial size based on current viewport
-  try { updateKeyboardOverlaySize(); } catch (_) {}
-  
+  try { updateKeyboardOverlaySize(); } catch (_) { }
+
   // Create hidden file input for loading
   fileInput = createFileInput(handleFileLoad);
   fileInput.position(-200, -200);
@@ -610,7 +615,7 @@ function setupUIButtons() {
 function draw() {
   background(UI_COLORS.BACKGROUND);
   updateMenuVisibility();
-  
+
   if (mindMap) {
     try {
       // Draw scene with camera transform
@@ -618,7 +623,7 @@ function draw() {
       translate(camX, camY);
       scale(zoom);
       mindMap.draw();
-      
+
       // Draw selection rectangle if selecting multiple boxes
       if (isSelectingMultiple) {
         drawSelectionRectangle();
@@ -627,10 +632,10 @@ function draw() {
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
-    
+
     // Draw save indicator (in screen space, not world space)
     drawSaveIndicator();
-    
+
     // Update mouse cursor based on hover context
     try {
       updateCursorForHover();
@@ -642,7 +647,7 @@ function draw() {
     if (isPageVisible) {
       try {
         KeyRepeat.update();
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -692,7 +697,7 @@ function updateCursorForHover() {
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (mindMap.draggingConnection) { cursor('grabbing'); return; }
   if (isPanning) { cursor('grabbing'); return; }
-  
+
   if (!isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
@@ -702,7 +707,7 @@ function updateCursorForHover() {
       if (!conn || !conn.isMouseOverArrowHead) continue;
       try {
         if (conn.isMouseOverArrowHead()) { cursor('alias'); return; }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -747,11 +752,11 @@ function updateCursorForHover() {
  * Adds an event listener and tracks it for cleanup
  * @param {Object} target - The event target (document, window, etc.)
  * @param {string} event - The event name
- * @param {Function} handler - The event handler function
+ * @param {Object} [options] - Optional event listener options (e.g. { passive: false })
  */
-function addTrackedEventListener(target, event, handler) {
-  target.addEventListener(event, handler);
-  eventListeners.push({ target, event, handler });
+function addTrackedEventListener(target, event, handler, options) {
+  target.addEventListener(event, handler, options);
+  eventListeners.push({ target, event, handler, options });
 }
 
 /**
@@ -770,14 +775,14 @@ function setupVisibilityHandling() {
   if (hasWebkitVisibility) {
     addTrackedEventListener(document, 'webkitvisibilitychange', handleVisibilityChange);
   }
-  
+
   // Only use window blur/focus as fallback if no Page Visibility API is available
   const hasAnyVisibilityAPI = hasStandardVisibility || hasWebkitVisibility;
   if (!hasAnyVisibilityAPI) {
     addTrackedEventListener(window, 'blur', handleWindowBlur);
     addTrackedEventListener(window, 'focus', handleWindowFocus);
   }
-  
+
   // Set initial state (check both standard and webkit-prefixed properties)
   // Use the available API to determine initial visibility
   if (hasStandardVisibility) {
@@ -808,7 +813,7 @@ function handleVisibilityChange() {
     return;
   }
   visibilityChangeInProgress = now;
-  
+
   // Check visibility using the available API
   let isHidden = false;
   if (typeof document.hidden !== 'undefined') {
@@ -816,7 +821,7 @@ function handleVisibilityChange() {
   } else if (typeof document.webkitHidden !== 'undefined') {
     isHidden = document.webkitHidden;
   }
-  
+
   if (isHidden) {
     // Page is now hidden
     isPageVisible = false;
@@ -851,7 +856,7 @@ function handleNativePaste(e) {
         if (!hasSelection && box.cursorPosition > 0 && box.text && (box.text[box.cursorPosition - 1] === 'v' || box.text[box.cursorPosition - 1] === 'V')) {
           box.removeChar();
         }
-      } catch (_) {}
+      } catch (_) { }
       mindMap.selectedBox.pasteText(text);
       // Prevent the browser from attempting to paste into a non-editable canvas
       if (e && typeof e.preventDefault === 'function') e.preventDefault();
@@ -865,7 +870,7 @@ function handleNativePaste(e) {
         // As a last resort, do nothing and allow default (though canvas has no default target)
       });
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function handleNativeCopy(e) {
@@ -876,7 +881,7 @@ function handleNativeCopy(e) {
       e.clipboardData.setData('text/plain', text);
       if (typeof e.preventDefault === 'function') e.preventDefault();
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -988,7 +993,7 @@ function handleNativeCut(e) {
       if (typeof mindMap.pushUndo === 'function') mindMap.pushUndo();
       if (typeof mindMap.selectedBox.deleteSelection === 'function') mindMap.selectedBox.deleteSelection();
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -1018,7 +1023,7 @@ function handlePageBecameHidden() {
   try {
     // Stop key repeat to avoid stuck states
     KeyRepeat.reset();
-    
+
     // Save current state to localStorage before going to background
     if (mindMap && !mindMap.isSaved) {
       mindMap.saveToLocalStorage();
@@ -1039,18 +1044,18 @@ function handlePageBecameVisible() {
     } catch (e) {
       console.error('Failed to reset key repeat:', e);
     }
-    
+
     // Reset any drag/pan states that might be stuck
     isPanning = false;
     rightPanActive = false;
     isSelectingMultiple = false;
-    
+
     // Reset interaction states in mindMap
     if (mindMap) {
       if (mindMap.draggingConnection) {
         mindMap.draggingConnection = null;
       }
-      
+
       // Reset any box states
       // Note: Check for null boxes as array may contain nulls during deletion/modification
       if (mindMap.boxes) {
@@ -1063,7 +1068,7 @@ function handlePageBecameVisible() {
         });
       }
     }
-    
+
     // Force a redraw
     if (typeof redraw === 'function') {
       try {
@@ -1083,9 +1088,9 @@ function handlePageBecameVisible() {
  */
 function updateMenuVisibility() {
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
-  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 && 
+  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 &&
     mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
-  const inButtonsBand = validMouse && mouseY >= 0 && 
+  const inButtonsBand = validMouse && mouseY >= 0 &&
     mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0 && mouseX <= menuRightEdge;
   const shouldShow = inTrigger || inButtonsBand;
 
@@ -1302,7 +1307,7 @@ function showKeyboardControlsOverlay() {
   if (!keyboardOverlay) return;
   keyboardOverlay.style('display', 'flex');
   // Recompute sizing for current viewport so content fits
-  try { updateKeyboardOverlaySize(); } catch (_) {}
+  try { updateKeyboardOverlaySize(); } catch (_) { }
   keyboardOverlayVisible = true;
   if (keyboardControlsButton && keyboardControlsButton.attribute) {
     keyboardControlsButton.attribute('aria-expanded', 'true');
@@ -1361,7 +1366,7 @@ function detectTouchDevice() {
   );
   const hasCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const isMobileSize = window.innerWidth <= 768 || window.innerHeight <= 500;
-  
+
   return hasTouchEvents || hasCoarsePointer || isMobileSize;
 }
 
@@ -1371,7 +1376,7 @@ function detectTouchDevice() {
 function setupMobileNavigation() {
   try {
     isTouchDevice = detectTouchDevice();
-    
+
     // Create overlay container for mobile navigation buttons
     mobileNavOverlay = createDiv();
     mobileNavOverlay.id('mobile-nav-overlay');
@@ -1387,7 +1392,7 @@ function setupMobileNavigation() {
     mobileNavOverlay.style('opacity', isTouchDevice ? '1' : '0');
     mobileNavOverlay.style('visibility', isTouchDevice ? 'visible' : 'hidden');
     mobileNavOverlay.style('transition', 'opacity 0.3s ease');
-    
+
     // Common button styles
     const buttonSize = 56;
     const buttonStyle = {
@@ -1407,32 +1412,32 @@ function setupMobileNavigation() {
       WebkitUserSelect: 'none',
       touchAction: 'manipulation'
     };
-    
+
     // Create Up button (navigate to previous box)
     mobileNavUpButton = createButton('▲');
     mobileNavUpButton.parent(mobileNavOverlay);
     mobileNavUpButton.id('mobile-nav-up');
     applyButtonStyles(mobileNavUpButton, buttonStyle);
     mobileNavUpButton.attribute('aria-label', 'Navigate to previous box');
-    
+
     // Create Down button (navigate to next box)
     mobileNavDownButton = createButton('▼');
     mobileNavDownButton.parent(mobileNavOverlay);
     mobileNavDownButton.id('mobile-nav-down');
     applyButtonStyles(mobileNavDownButton, buttonStyle);
     mobileNavDownButton.attribute('aria-label', 'Navigate to next box');
-    
+
     // Add touch event handlers for smooth navigation
     setupMobileNavButtonEvents(mobileNavUpButton, 'up');
     setupMobileNavButtonEvents(mobileNavDownButton, 'down');
-    
+
     // Handle orientation changes
     addTrackedEventListener(window, 'resize', updateMobileNavPosition);
     addTrackedEventListener(window, 'orientationchange', updateMobileNavPosition);
-    
+
     // Initial position update
     updateMobileNavPosition();
-    
+
   } catch (e) {
     console.warn('Failed to setup mobile navigation:', e);
   }
@@ -1457,10 +1462,10 @@ function applyButtonStyles(button, styles) {
  */
 function setupMobileNavButtonEvents(button, direction) {
   if (!button || !button.elt) return;
-  
+
   const navigateAction = () => {
     if (!mindMap) return;
-    
+
     // Use the existing navigateBoxes method which handles smooth animation
     if (direction === 'up') {
       mindMap.navigateBoxes(UP_ARROW);
@@ -1468,7 +1473,7 @@ function setupMobileNavButtonEvents(button, direction) {
       mindMap.navigateBoxes(DOWN_ARROW);
     }
   };
-  
+
   // Touch start handler with visual feedback
   const handleTouchStart = (e) => {
     e.preventDefault();
@@ -1476,7 +1481,7 @@ function setupMobileNavButtonEvents(button, direction) {
     button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
     button.style('transform', 'scale(0.95)');
   };
-  
+
   // Touch end handler
   const handleTouchEnd = (e) => {
     e.preventDefault();
@@ -1485,33 +1490,33 @@ function setupMobileNavButtonEvents(button, direction) {
     button.style('transform', 'scale(1)');
     navigateAction();
   };
-  
+
   // Mouse handlers for desktop testing
   const handleMouseDown = (e) => {
     button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
     button.style('transform', 'scale(0.95)');
   };
-  
+
   const handleMouseUp = (e) => {
     button.style('backgroundColor', 'rgba(255, 255, 255, 0.9)');
     button.style('transform', 'scale(1)');
   };
-  
+
   // Mouse click for non-touch interaction
   button.mousePressed(() => {
     navigateAction();
   });
-  
+
   // Touch events for mobile
   addTrackedEventListener(button.elt, 'touchstart', handleTouchStart, { passive: false });
   addTrackedEventListener(button.elt, 'touchend', handleTouchEnd, { passive: false });
   addTrackedEventListener(button.elt, 'touchcancel', handleTouchEnd, { passive: false });
-  
+
   // Mouse events for visual feedback
   addTrackedEventListener(button.elt, 'mousedown', handleMouseDown);
   addTrackedEventListener(button.elt, 'mouseup', handleMouseUp);
   addTrackedEventListener(button.elt, 'mouseleave', handleMouseUp);
-  
+
   // Add transition for smooth button feedback
   button.style('transition', 'background-color 0.15s ease, transform 0.15s ease');
 }
@@ -1521,11 +1526,11 @@ function setupMobileNavButtonEvents(button, direction) {
  */
 function updateMobileNavPosition() {
   if (!mobileNavOverlay) return;
-  
+
   try {
     // Re-check if we should show/hide based on screen size
     const shouldShow = detectTouchDevice();
-    
+
     if (shouldShow) {
       mobileNavOverlay.style('opacity', '1');
       mobileNavOverlay.style('visibility', 'visible');
@@ -1533,25 +1538,25 @@ function updateMobileNavPosition() {
       mobileNavOverlay.style('opacity', '0');
       mobileNavOverlay.style('visibility', 'hidden');
     }
-    
+
     // Check current orientation
     const isPortrait = window.innerHeight > window.innerWidth;
-    
+
     // Adjust position based on orientation and safe areas
     const safeBottom = 20;
     const safeLeft = 20;
-    
+
     // Position remains in bottom-left for both orientations
     mobileNavOverlay.style('bottom', safeBottom + 'px');
     mobileNavOverlay.style('left', safeLeft + 'px');
-    
+
     // Optionally adjust button size for smaller screens
     const screenMin = Math.min(window.innerWidth, window.innerHeight);
     let buttonSize = 56;
     if (screenMin < 400) {
       buttonSize = 48;
     }
-    
+
     if (mobileNavUpButton) {
       mobileNavUpButton.style('width', buttonSize + 'px');
       mobileNavUpButton.style('height', buttonSize + 'px');
@@ -1592,7 +1597,7 @@ function hideMobileNavOverlay() {
  */
 function mousePressed(e) {
   if (keyboardOverlayVisible) return false;
-  
+
   // Ignore clicks on UI elements (buttons, inputs, etc.)
   // Only handle clicks directly on the canvas
   if (e && e.target && e.target.tagName !== 'CANVAS') {
@@ -1607,7 +1612,7 @@ function mousePressed(e) {
       const spaceHeld = keyIsDown(32);
       const overAny = isOverAnyInteractive();
       const rightDown = (typeof mouseButton !== 'undefined' && mouseButton === RIGHT);
-      
+
       // Panning with spacebar OR right mouse when nothing is selected
       if ((spaceHeld && !isEditing) || (rightDown && noSelection && !isEditing)) {
         isPanning = true;
@@ -1618,7 +1623,7 @@ function mousePressed(e) {
         rightPanActive = !!rightDown;
         return false;
       }
-      
+
       // Multi-box selection when clicking in empty space with no box selected
       if (noSelection && !isEditing && !overAny) {
         isSelectingMultiple = true;
@@ -1654,14 +1659,14 @@ function mouseReleased() {
     rightPanActive = false;
     return;
   }
-  
+
   if (isSelectingMultiple) {
     // Complete multi-box selection
     completeMultiBoxSelection();
     isSelectingMultiple = false;
     return;
   }
-  
+
   if (mindMap) {
     try {
       mindMap.handleMouseReleased();
@@ -1683,7 +1688,7 @@ function mouseDragged() {
     applyCameraSoftBounds();
     return false;
   }
-  
+
   if (isSelectingMultiple) {
     // Update selection rectangle current corner
     selectionCurrentX = worldMouseX();
@@ -1730,31 +1735,31 @@ function keyPressed() {
         }
         return false; // prevent page-level select-all
       }
-      
+
       // Handle CMD/CTRL+Z for undo at the top level
       if (isCmd && (key === 'z' || key === 'Z')) {
         if (mindMap.undo) mindMap.undo();
         return false; // prevent browser undo
       }
-      
+
       // Handle CMD/CTRL+S for save
       if (isCmd && (key === 's' || key === 'S')) {
         mindMap.save();
         return false; // prevent browser save dialog
       }
-      
+
       // Handle CMD/CTRL+L for load
       if (isCmd && (key === 'l' || key === 'L')) {
         triggerFileLoad();
         return false; // prevent browser default
       }
-      
+
       // Handle F key for fullscreen toggle (only when not editing)
       if (!isEditing && !isCmd && (key === 'f' || key === 'F')) {
         toggleFullScreen();
         return false;
       }
-      
+
       // Space handling: if not editing, always prevent default, and still allow MindMap to react (e.g., reverse connection)
       if ((key === ' ' || keyCode === 32) && !isEditing) {
         // Route to MindMap first (may reverse a selected connection)
@@ -1772,7 +1777,7 @@ function keyPressed() {
   KeyRepeat.noteNativeKeydown(keyCode);
   // Start fallback repeat tracking for deletion keys
   KeyRepeat.start(keyCode);
-  
+
   // Prevent default behavior for backspace
   if (keyCode === BACKSPACE) {
     return false;
@@ -1781,23 +1786,23 @@ function keyPressed() {
   if (keyCode === DELETE) {
     return false;
   }
-  
+
   // Prevent default behavior for arrow keys when editing
   if (mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing) {
-    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW || 
-        keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW ||
+      keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
       return false;
     }
   }
-  
+
   // Prevent default behavior for arrow keys when navigating between boxes
   if (mindMap && (!mindMap.selectedBox || !mindMap.selectedBox.isEditing)) {
-    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW || 
-        keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+    if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW ||
+      keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
       return false;
     }
   }
-  
+
   // Prevent default behavior for some CMD/CTRL keys when appropriate.
   if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
     const editing = mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing;
@@ -1920,7 +1925,7 @@ function keyReleased() {
 // Ensure repeats stop if the window loses focus (redundant with visibility handling but kept as extra safeguard)
 if (typeof window !== 'undefined') {
   const handleWindowBlurForKeyRepeat = () => {
-    try { KeyRepeat.reset(); } catch (_) {}
+    try { KeyRepeat.reset(); } catch (_) { }
   };
   addTrackedEventListener(window, 'blur', handleWindowBlurForKeyRepeat);
 }
@@ -1943,10 +1948,10 @@ function createNewBox() {
     return;
   }
   if (mindMap.pushUndo) mindMap.pushUndo();
-  
+
   // Create box at cursor position in world space if over canvas, else at viewport center
   let x, y;
-  
+
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     // Mouse is over canvas (in screen space) - use world position
     x = worldMouseX();
@@ -1992,14 +1997,14 @@ async function handleFileLoad(file) {
     alert('Please select a valid file');
     return;
   }
-  
+
   // Validate file type
   if (!file.type.includes('application') && !file.name.endsWith('.json')) {
     console.error('Invalid file type:', file.type);
     alert('Please load a JSON file');
     return;
   }
-  
+
   // Show loading overlay while processing the file
   isMapLoading = true;
   try {
@@ -2007,7 +2012,7 @@ async function handleFileLoad(file) {
     if (!file.data) {
       throw new Error('File data is empty or invalid');
     }
-    
+
     // If data is a string, try to parse it
     let data = file.data;
     if (typeof data === 'string') {
@@ -2017,16 +2022,16 @@ async function handleFileLoad(file) {
         throw new Error('Failed to parse JSON: ' + e.message);
       }
     }
-    
+
     // Validate data structure
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid JSON structure');
     }
-    
+
     if (!data.boxes || !Array.isArray(data.boxes)) {
       throw new Error('Missing or invalid boxes data');
     }
-    
+
     // Load the mindMap; MindMap.load may perform async image conversions
     if (mindMap && typeof mindMap.load === 'function') {
       try {
@@ -2035,7 +2040,7 @@ async function handleFileLoad(file) {
         throw e;
       }
     }
-    
+
     // Remember the loaded filename for next time
     if (file.name) {
       mindMap.setLastUsedFilename(file.name);
@@ -2102,11 +2107,11 @@ function handleCanvasDrop(e) {
       for (let i = 0; i < dt.files.length; i++) {
         const f = dt.files[i];
         if (!f) continue;
-        
+
         const fileName = f.name || '';
         const fileType = f.type || '';
         const lowerName = fileName.toLowerCase();
-        
+
         // JSON file support: merge map into current map at drop point
         if (fileType === 'application/json' || lowerName.endsWith('.json')) {
           try {
@@ -2149,7 +2154,7 @@ function handleCanvasDrop(e) {
             });
           return;
         }
-        
+
         // PDF file support
         if (fileType === 'application/pdf' || lowerName.endsWith('.pdf')) {
           try {
@@ -2159,16 +2164,16 @@ function handleCanvasDrop(e) {
           }
           return;
         }
-        
+
         // Unrecognized file type: create a text box with the file path as a clickable link
         // Try to get the file path from various sources
         let filePath = null;
-        
+
         // Method 1: Check f.path (works in Electron and some environments)
         if (f.path && typeof f.path === 'string') {
           filePath = f.path;
         }
-        
+
         // Method 2: Check the text data from dataTransfer for file:// URL
         if (!filePath && droppedText) {
           const lines = droppedText.split('\n');
@@ -2192,14 +2197,14 @@ function handleCanvasDrop(e) {
             }
           }
         }
-        
+
         // Method 3: If we still don't have a path, just use the filename
         // (user can manually add the path if needed)
         if (!filePath && fileName) {
           // Create with just filename - user will see it's incomplete
           filePath = fileName;
         }
-        
+
         if (filePath) {
           createFilePathBox(filePath, wx, wy);
           return;
@@ -2212,7 +2217,7 @@ function handleCanvasDrop(e) {
       const url = droppedText.split('\n')[0].trim();
       if (url) {
         const lower = url.toLowerCase();
-        
+
         // Handle file:// URLs - create a text box with the path as a clickable link
         if (url.startsWith('file://')) {
           let filePath;
@@ -2225,7 +2230,7 @@ function handleCanvasDrop(e) {
           } catch (e) {
             filePath = url.substring(7);
           }
-          
+
           // Check if it's an image
           if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(lower)) {
             createImageBox(url, wx, wy);
@@ -2242,7 +2247,7 @@ function handleCanvasDrop(e) {
           }
           return;
         }
-        
+
         // Handle http/https URLs
         if (url.startsWith('http://') || url.startsWith('https://')) {
           if (lower.endsWith('.pdf')) {
@@ -2255,13 +2260,13 @@ function handleCanvasDrop(e) {
           }
           return;
         }
-        
+
         // Fallback: if it looks like a path, create a path box
         if (url.startsWith('/') || url.match(/^[A-Za-z]:\\/)) {
           createFilePathBox(url, wx, wy);
           return;
         }
-        
+
         // Default: try as image (original behavior)
         createImageBox(url, wx, wy);
         return;
@@ -2329,7 +2334,7 @@ async function createPdfBox(urlOrFile, filename, worldX, worldY) {
 
         const dataUrl = canvas.toDataURL('image/png');
         if (dataUrl) {
-            try {
+          try {
             // Attach preview as an image
             box.setImageFromUrl(dataUrl);
           } catch (e) {
@@ -2371,10 +2376,10 @@ function createFilePathBox(pathOrUrl, worldX, worldY) {
   try {
     if (!mindMap) return;
     mindMap.pushUndo();
-    
+
     // Create the link text - use file:// protocol for local paths
     let linkText = pathOrUrl;
-    
+
     // If it's already a URL (http, https, file), use as-is
     if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('file://')) {
       linkText = pathOrUrl;
@@ -2388,10 +2393,10 @@ function createFilePathBox(pathOrUrl, worldX, worldY) {
       // Relative path or just filename - prepend file:// anyway
       linkText = 'file://' + encodeURI(pathOrUrl).replace(/#/g, '%23');
     }
-    
+
     const box = new TextBox(worldX, worldY, linkText);
     mindMap.addBox(box);
-    
+
     // Select the new box
     mindMap.clearBoxSelection();
     mindMap.addBoxToSelection(box);
@@ -2476,11 +2481,11 @@ async function mergeMapData(data, wx, wy) {
         mindMap.selectedBox = newBoxes[0];
         mindMap.panToBox && mindMap.panToBox(newBoxes[0], true);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     mindMap.isDirty = true;
     mindMap.isSaved = false;
-    try { mindMap.saveToLocalStorage && mindMap.saveToLocalStorage(); } catch (_) {}
+    try { mindMap.saveToLocalStorage && mindMap.saveToLocalStorage(); } catch (_) { }
   } catch (e) {
     console.warn('mergeMapData failed', e);
     throw e;
@@ -2540,7 +2545,7 @@ function getContentBounds() {
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
     return { minX: 0, maxX: width, minY: 0, maxY: height };
   }
-  
+
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (let box of mindMap.boxes) {
     if (!box) continue;
@@ -2548,13 +2553,13 @@ function getContentBounds() {
     const right = box.x + box.width / 2;
     const top = box.y - box.height / 2;
     const bottom = box.y + box.height / 2;
-    
+
     minX = min(minX, left);
     maxX = max(maxX, right);
     minY = min(minY, top);
     maxY = max(maxY, bottom);
   }
-  
+
   return { minX, maxX, minY, maxY };
 }
 
@@ -2658,19 +2663,19 @@ function resetView() {
     zoom = 1;
     return;
   }
-  
+
   const bounds = getContentBounds();
   const contentWidth = bounds.maxX - bounds.minX;
   const contentHeight = bounds.maxY - bounds.minY;
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
-  
+
   // Calculate zoom to fit all content with 10% margin
   const margin = 1.1;
   const zoomX = width / (contentWidth * margin);
   const zoomY = height / (contentHeight * margin);
   zoom = constrain(min(zoomX, zoomY), CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
-  
+
   // Center the content in viewport
   camX = width / 2 - centerX * zoom;
   camY = height / 2 - centerY * zoom;
@@ -2721,7 +2726,7 @@ function isOverAnyInteractive() {
     try {
       if (conn.isMouseOver && conn.isMouseOver()) return true;
       if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) return true;
-    } catch (_) {}
+    } catch (_) { }
   }
   return false;
 }
@@ -2740,46 +2745,46 @@ function exportPNG() {
       alert('No content to export');
       return;
     }
-    
+
     // Get content bounds in world space
     const bounds = getContentBounds();
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
-    
+
     // Add padding
     const padding = CONFIG.EXPORT.PADDING;
     const totalWidth = contentWidth + padding * 2;
     const totalHeight = contentHeight + padding * 2;
-    
+
     // Create an offscreen graphics buffer at the content size (rounded to integers)
     const bufW = Math.max(1, Math.ceil(totalWidth));
     const bufH = Math.max(1, Math.ceil(totalHeight));
     const pg = createGraphics(bufW, bufH);
-    
+
     // Calculate the offset to map world space to buffer space
     const offsetX = padding - bounds.minX;
     const offsetY = padding - bounds.minY;
-    
+
     // Draw the mind map into the buffer
     pg.push();
     pg.translate(offsetX, offsetY);
     pg.background(240);
-    
+
     // Draw connections
     for (let conn of mindMap.connections) {
       if (!conn || !conn.fromBox || !conn.toBox) continue;
-      
+
       let start = conn.fromBox.getConnectionPoint(conn.toBox);
       let end = conn.toBox.getConnectionPoint(conn.fromBox);
-      
+
       if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
         continue;
       }
-      
+
       pg.stroke(80);
       pg.strokeWeight(2);
       pg.line(start.x, start.y, end.x, end.y);
-      
+
       // Draw arrow
       let angle = Math.atan2(end.y - start.y, end.x - start.x);
       if (!isNaN(angle)) {
@@ -2792,16 +2797,16 @@ function exportPNG() {
         pg.pop();
       }
     }
-    
+
     // Draw boxes
     for (let box of mindMap.boxes) {
       if (!box) continue;
-      
+
       if (box.x == null || box.y == null || box.width == null || box.height == null ||
-          isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
+        isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
         continue;
       }
-      
+
       // Draw box background (use box background color if available)
       if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
         pg.fill(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
@@ -2810,7 +2815,7 @@ function exportPNG() {
       }
       pg.stroke(100);
       pg.strokeWeight(1);
-      pg.rect(box.x - box.width/2, box.y - box.height/2, box.width, box.height, box.cornerRadius);
+      pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height, box.cornerRadius);
 
       // If this box contains an image, draw the image into the export buffer
       if (box.imageUrl) {
@@ -2827,7 +2832,7 @@ function exportPNG() {
           } else if (box.imageLoadError) {
             pg.fill(240);
             pg.noStroke();
-            pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+            pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
             pg.fill(120);
             pg.textAlign(CENTER, CENTER);
             pg.textSize(12);
@@ -2835,7 +2840,7 @@ function exportPNG() {
           } else {
             pg.fill(240);
             pg.noStroke();
-            pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+            pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
             pg.fill(100);
             pg.textAlign(CENTER, CENTER);
             pg.textSize(12);
@@ -2845,7 +2850,7 @@ function exportPNG() {
           // Fallback placeholder on any drawing error
           pg.fill(220);
           pg.noStroke();
-          pg.rect(box.x - box.width/2 + 4, box.y - box.height/2 + 4, box.width - 8, box.height - 8, 0);
+          pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
           pg.fill(80);
           pg.textAlign(CENTER, CENTER);
           pg.textSize(12);
@@ -2923,7 +2928,7 @@ function exportPNG() {
           }
           pg.fill(0);
         }
-      } catch (_) {}
+      } catch (_) { }
 
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
@@ -2931,9 +2936,9 @@ function exportPNG() {
         }
       }
     }
-    
+
     pg.pop();
-    
+
     // Save the buffer as PNG by converting to a data URL and downloading
     try {
       const dataUrl = pg.canvas && pg.canvas.toDataURL ? pg.canvas.toDataURL('image/png') : null;
@@ -2976,22 +2981,22 @@ function getWrappedLines(box) {
   if (!box || !box.text || box.width == null || box.padding == null || box.fontSize == null) {
     return [''];
   }
-  
+
   let lines = String(box.text).split('\n');
   let wrappedLines = [];
   let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
   let maxTextWidth = max(10, baseWidth - box.padding * 2);
-  
+
   // Set text size to match box font size for accurate measurements
   textSize(box.fontSize);
-  
+
   for (let line of lines) {
     // Handle empty lines (explicit newlines)
     if (!line || line === '') {
       wrappedLines.push('');
       continue;
     }
-    
+
     // If line fits within width, add it as-is
     if (textWidth(line) <= maxTextWidth) {
       wrappedLines.push(line);
@@ -2999,10 +3004,10 @@ function getWrappedLines(box) {
       // Line is too long, wrap by words
       let words = line.split(' ');
       let currentLine = '';
-      
+
       for (let i = 0; i < words.length; i++) {
         let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-        
+
         if (textWidth(testLine) <= maxTextWidth) {
           currentLine = testLine;
         } else {
@@ -3025,13 +3030,13 @@ function getWrappedLines(box) {
           }
         }
       }
-      
+
       if (currentLine) {
         wrappedLines.push(currentLine);
       }
     }
   }
-  
+
   return wrappedLines.length > 0 ? wrappedLines : [''];
 }
 
@@ -3044,32 +3049,32 @@ async function exportPDF() {
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error('jsPDF library not loaded');
     }
-    
+
     // Validate mindMap and its data
     if (!mindMap || !mindMap.boxes || !mindMap.connections) {
       throw new Error('MindMap not properly initialized');
     }
-    
+
     if (mindMap.boxes.length === 0) {
       alert('No content to export');
       return;
     }
-    
+
     // Create PDF using jsPDF
     const { jsPDF } = window.jspdf;
-    
+
     // Get content bounds in world space
     const bounds = getContentBounds();
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
     const contentCenterX = (bounds.minX + bounds.maxX) / 2;
     const contentCenterY = (bounds.minY + bounds.maxY) / 2;
-    
+
     // Add some padding around content
     const padding = CONFIG.EXPORT.PADDING;
     const totalWidth = contentWidth + padding * 2;
     const totalHeight = contentHeight + padding * 2;
-    
+
     // Choose orientation based on content aspect ratio
     const isLandscape = totalWidth > totalHeight;
     const pdf = new jsPDF({
@@ -3077,28 +3082,28 @@ async function exportPDF() {
       unit: 'pt',
       format: 'a4'
     });
-    
+
     // Get PDF dimensions
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    
+
     // Calculate scaling to fit all content to page with margins
     const margin = CONFIG.EXPORT.MARGIN;
     const scale = Math.min(
       (pageWidth - 2 * margin) / totalWidth,
       (pageHeight - 2 * margin) / totalHeight
     );
-    
+
     // Validate scale
     if (!isFinite(scale) || scale <= 0 || isNaN(scale)) {
       throw new Error('Invalid scaling calculation');
     }
-    
+
     // Calculate offset to center the content on the page
     // We need to map world space to PDF space
     const offsetX = margin - bounds.minX * scale + (pageWidth - totalWidth * scale) / 2;
     const offsetY = margin - bounds.minY * scale + (pageHeight - totalHeight * scale) / 2;
-    
+
     // Helper function to transform world coordinates to PDF coordinates
     function tx(worldX) { return offsetX + worldX * scale; }
     function ty(worldY) { return offsetY + worldY * scale; }
@@ -3123,20 +3128,20 @@ async function exportPDF() {
     } catch (e) {
       console.warn('Image prefetch for PDF failed', e);
     }
-    
+
     // Draw connections first (behind boxes)
     pdf.setLineWidth(ts(2));
     for (let conn of mindMap.connections) {
       if (!conn || !conn.fromBox || !conn.toBox) continue;
-      
+
       let start = conn.fromBox.getConnectionPoint(conn.toBox);
       let end = conn.toBox.getConnectionPoint(conn.fromBox);
-      
+
       // Validate connection points
       if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
         continue;
       }
-      
+
       // Set color
       if (conn.selected) {
         pdf.setDrawColor(100, 150, 255);
@@ -3147,44 +3152,44 @@ async function exportPDF() {
         pdf.setFillColor(80, 80, 80);
         pdf.setLineWidth(ts(2));
       }
-      
+
       // Draw line
       pdf.line(tx(start.x), ty(start.y), tx(end.x), ty(end.y));
-      
+
       // Draw arrow head
       let angle = Math.atan2(end.y - start.y, end.x - start.x);
-      
+
       // Validate angle
       if (isNaN(angle)) continue;
-      
+
       let arrowSize = ts(10);
-      
+
       let x1 = tx(end.x);
       let y1 = ty(end.y);
       let x2 = x1 - arrowSize * Math.cos(angle - Math.PI / 6);
       let y2 = y1 - arrowSize * Math.sin(angle - Math.PI / 6);
       let x3 = x1 - arrowSize * Math.cos(angle + Math.PI / 6);
       let y3 = y1 - arrowSize * Math.sin(angle + Math.PI / 6);
-      
+
       pdf.triangle(x1, y1, x2, y2, x3, y3, 'F');
     }
-    
+
     // Draw boxes
     pdf.setLineWidth(ts(1));
     for (let box of mindMap.boxes) {
       if (!box) continue;
-      
+
       // Validate box properties
       if (box.x == null || box.y == null || box.width == null || box.height == null ||
-          isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
+        isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
         continue;
       }
-      
+
       let boxX = tx(box.x - box.width / 2);
       let boxY = ty(box.y - box.height / 2);
       let boxW = ts(box.width);
       let boxH = ts(box.height);
-      
+
       // Set fill color from box background; outline slightly heavier when selected
       if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
         pdf.setFillColor(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
@@ -3198,10 +3203,10 @@ async function exportPDF() {
         pdf.setDrawColor(100, 100, 100);
         pdf.setLineWidth(ts(1));
       }
-      
+
       // Draw rounded rectangle
       pdf.roundedRect(boxX, boxY, boxW, boxH, ts(box.cornerRadius), ts(box.cornerRadius), 'FD');
-      
+
       // If this box contains an image and we have a prepared data URL, embed it into the PDF
       if (box.imageUrl) {
         const dataUrl = imageDataMap.get(box);
@@ -3236,18 +3241,18 @@ async function exportPDF() {
         pdf.setFillColor(245, 245, 245);
         pdf.rect(boxX + ts(4), boxY + ts(4), boxW - ts(8), boxH - ts(8), 'F');
       }
-      
+
       // Draw text (for non-image boxes and fallbacks)
       pdf.setFontSize(ts(box.fontSize));
       pdf.setTextColor(0, 0, 0);
-      
+
       // Prefer TextBox's wrapText to obtain line-to-absolute mapping for highlights
       let wrappedLines = (typeof box.wrapText === 'function') ? box.wrapText(box.text || '') : getWrappedLines(box);
       let lineHeight = ts(box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5));
       // Top-anchored text in PDF: use top baseline and align highlights to the same top
       let startY = ty(box.y - box.height / 2) + ts(box.padding);
       let textX = tx(box.x - box.width / 2 + box.padding);
-      
+
       // Draw persistent highlights behind text using rectangles
       try {
         if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
@@ -3308,15 +3313,15 @@ async function exportPDF() {
           // Restore text color after highlight rectangles
           pdf.setTextColor(0, 0, 0);
         }
-      } catch (_) {}
-      
+      } catch (_) { }
+
       for (let i = 0; i < wrappedLines.length; i++) {
         if (wrappedLines[i] != null) {
           pdf.text(String(wrappedLines[i]), textX, startY + i * lineHeight, { baseline: 'top' });
         }
       }
     }
-    
+
     // Save the PDF
     pdf.save('mindmap.pdf');
   } catch (e) {
@@ -3347,13 +3352,13 @@ function exportText() {
       alert('No content to export');
       return;
     }
-    
+
     // Build a hierarchy based on connections
     const hierarchy = buildTextHierarchy();
-    
+
     // Generate text output
     let textOutput = hierarchy.join('\n\n');
-    
+
     // Create a blob and download
     const blob = new Blob([textOutput], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -3378,60 +3383,60 @@ function buildTextHierarchy() {
   // Build adjacency list from connections (from -> to)
   const children = new Map(); // box -> array of child boxes
   const parents = new Map();  // box -> array of parent boxes
-  
+
   for (let box of mindMap.boxes) {
     children.set(box, []);
     parents.set(box, []);
   }
-  
+
   for (let conn of mindMap.connections) {
     if (!conn.fromBox || !conn.toBox) continue;
     children.get(conn.fromBox).push(conn.toBox);
     parents.get(conn.toBox).push(conn.fromBox);
   }
-  
+
   // Find root nodes (boxes with no parents)
   const roots = mindMap.boxes.filter(box => parents.get(box).length === 0);
-  
+
   // If no roots found (circular graph), use all boxes sorted by position
   if (roots.length === 0) {
     return mindMap.boxes
       .map(box => box.text || '')
       .filter(text => text.trim() !== '');
   }
-  
+
   // Traverse from each root using depth-first search
   const visited = new Set();
   const result = [];
-  
+
   function traverse(box) {
     if (visited.has(box)) return;
     visited.add(box);
-    
+
     // Add this box's text
     if (box.text && box.text.trim() !== '') {
       result.push(box.text.trim());
     }
-    
+
     // Traverse children
     const boxChildren = children.get(box) || [];
     for (let child of boxChildren) {
       traverse(child);
     }
   }
-  
+
   // Sort roots by y-position (top to bottom), then x-position (left to right)
   roots.sort((a, b) => {
     const yDiff = a.y - b.y;
     if (Math.abs(yDiff) > 50) return yDiff; // Different rows
     return a.x - b.x; // Same row, sort by x
   });
-  
+
   // Traverse from each root
   for (let root of roots) {
     traverse(root);
   }
-  
+
   // Add any unvisited boxes (disconnected components)
   const unvisited = mindMap.boxes.filter(box => !visited.has(box));
   unvisited.sort((a, b) => {
@@ -3439,13 +3444,13 @@ function buildTextHierarchy() {
     if (Math.abs(yDiff) > 50) return yDiff;
     return a.x - b.x;
   });
-  
+
   for (let box of unvisited) {
     if (box.text && box.text.trim() !== '') {
       result.push(box.text.trim());
     }
   }
-  
+
   return result;
 }
 
@@ -3461,7 +3466,7 @@ function drawSelectionRectangle() {
   const y1 = min(selectionStartY, selectionCurrentY);
   const x2 = max(selectionStartX, selectionCurrentX);
   const y2 = max(selectionStartY, selectionCurrentY);
-  
+
   const selColors = UI_COLORS.SELECTION_RECT;
   push();
   // Semi-transparent fill
@@ -3491,7 +3496,7 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
   if (typeof Utils !== 'undefined' && Utils.segmentIntersectsRect) {
     return Utils.segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2);
   }
-  
+
   // Fallback implementation
   // Normalize rect coordinates
   const minRx = Math.min(rx1, rx2);
@@ -3510,7 +3515,7 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
 
   // Quick check: any endpoint inside rect
   if ((x1 >= minRx && x1 <= maxRx && y1 >= minRy && y1 <= maxRy) ||
-      (x2 >= minRx && x2 <= maxRx && y2 >= minRy && y2 <= maxRy)) {
+    (x2 >= minRx && x2 <= maxRx && y2 >= minRy && y2 <= maxRy)) {
     return true;
   }
 
@@ -3527,9 +3532,9 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
     const o4 = orient(cx, cy, dx, dy, bx, by);
 
     if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) && Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
-        (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) && Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
-        (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) && Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
-        (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) && Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
+      (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) && Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
+      (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) && Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
+      (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) && Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
       return true; // collinear overlap cases
     }
 
@@ -3554,12 +3559,12 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
  */
 function completeMultiBoxSelection() {
   if (!mindMap) return;
-  
+
   const x1 = min(selectionStartX, selectionCurrentX);
   const y1 = min(selectionStartY, selectionCurrentY);
   const x2 = max(selectionStartX, selectionCurrentX);
   const y2 = max(selectionStartY, selectionCurrentY);
-  
+
   // Clear current selection if shift is not held
   const shiftHeld = keyIsDown(16);
   if (!shiftHeld) {
@@ -3567,7 +3572,7 @@ function completeMultiBoxSelection() {
     // Also clear existing connection selection when starting a fresh rectangle selection
     if (mindMap.clearConnectionSelection) mindMap.clearConnectionSelection();
   }
-  
+
   // Select all boxes that intersect the selection rectangle (any part of the box)
   for (const box of mindMap.boxes) {
     if (!box) continue;
@@ -3614,15 +3619,15 @@ function completeMultiBoxSelection() {
 function cleanup() {
   try {
     // Remove all tracked event listeners
-    for (const { target, event, handler } of eventListeners) {
+    for (const { target, event, handler, options } of eventListeners) {
       try {
-        target.removeEventListener(event, handler);
+        target.removeEventListener(event, handler, options);
       } catch (e) {
         console.warn('Failed to remove event listener:', event, e);
       }
     }
     eventListeners = [];
-    
+
     // Remove overlay event listeners
     if (keyboardOverlay && keyboardOverlay.elt && overlayClickHandler) {
       try {
@@ -3631,7 +3636,7 @@ function cleanup() {
         console.warn('Failed to remove overlay click listener:', e);
       }
     }
-    
+
     if (keyboardOverlayContent && keyboardOverlayContent.elt && overlayContentClickHandler) {
       try {
         keyboardOverlayContent.elt.removeEventListener('click', overlayContentClickHandler);
@@ -3639,20 +3644,20 @@ function cleanup() {
         console.warn('Failed to remove overlay content click listener:', e);
       }
     }
-    
+
     // Clear autosave timer
     if (autosaveTimer) {
       clearInterval(autosaveTimer);
       autosaveTimer = null;
     }
-    
+
     // Reset key repeat state
     try {
       KeyRepeat.reset();
     } catch (e) {
       console.warn('Failed to reset key repeat:', e);
     }
-    
+
     // Save final state before cleanup
     if (mindMap && !mindMap.isSaved) {
       try {
@@ -3683,7 +3688,7 @@ function startAutosave() {
   if (autosaveTimer) {
     clearInterval(autosaveTimer);
   }
-  
+
   // Set up periodic autosave
   autosaveTimer = setInterval(() => {
     // Only autosave when page is visible to avoid issues with background throttling
@@ -3696,12 +3701,12 @@ function startAutosave() {
 // Draw save indicator at far left of menu when visible
 function drawSaveIndicator() {
   if (!mindMap || !menuIsVisible) return;
-  
+
   const size = CONFIG.UI.SAVE_INDICATOR_SIZE;
   const x = CONFIG.UI.SAVE_INDICATOR_X;
   const y = CONFIG.UI.SAVE_INDICATOR_Y;
   const colors = UI_COLORS.SAVE_INDICATOR;
-  
+
   push();
   // Draw circle
   noStroke();
