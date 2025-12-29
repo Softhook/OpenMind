@@ -271,8 +271,15 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
           const cacheTimestamp = cachedData.lastModified || 0;
           
           // Check if names match (handling prefaced maps with same ending)
-          // Use fileToFetch only if urlData.name is missing, and extract just the basename
-          const urlName = extractMapName(urlData.name || extractMapName(fileToFetch) || 'unnamed-map');
+          // Extract URL name with proper fallback chain
+          let urlName;
+          if (urlData.name) {
+            urlName = extractMapName(urlData.name);
+          } else if (fileToFetch) {
+            urlName = extractMapName(fileToFetch);
+          } else {
+            urlName = 'unnamed-map';
+          }
           const cacheName = extractMapName(cachedData.name || '');
           
           const namesMatch = namesAreSimilar(urlName, cacheName);
@@ -280,9 +287,9 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
           // Use cache if: names match AND cache is more recent
           if (namesMatch && cacheTimestamp > urlTimestamp) {
             shouldUseCache = true;
-            console.log('Using cached version (more recent):', cacheName, 'cached:', new Date(cacheTimestamp), 'url:', new Date(urlTimestamp));
+            console.info('Using cached version (more recent):', cacheName, 'cached:', new Date(cacheTimestamp), 'url:', new Date(urlTimestamp));
           } else if (namesMatch) {
-            console.log('Using URL version (more recent):', urlName, 'url:', new Date(urlTimestamp), 'cached:', new Date(cacheTimestamp));
+            console.info('Using URL version (more recent):', urlName, 'url:', new Date(urlTimestamp), 'cached:', new Date(cacheTimestamp));
           }
         }
       }
@@ -352,16 +359,22 @@ function namesAreSimilar(name1, name2) {
   if (name1.length > name2.length) {
     // Check if name1 ends with name2 and has a separator before it
     if (name1.endsWith(name2)) {
-      const charBeforeSuffix = name1[name1.length - name2.length - 1];
-      if (separators.includes(charBeforeSuffix)) return true;
+      const prefixLength = name1.length - name2.length;
+      if (prefixLength > 0) {  // Ensure we have at least one character for separator
+        const charBeforeSuffix = name1[prefixLength - 1];
+        if (separators.includes(charBeforeSuffix)) return true;
+      }
     }
   }
   
   if (name2.length > name1.length) {
     // Check if name2 ends with name1 and has a separator before it
     if (name2.endsWith(name1)) {
-      const charBeforeSuffix = name2[name2.length - name1.length - 1];
-      if (separators.includes(charBeforeSuffix)) return true;
+      const prefixLength = name2.length - name1.length;
+      if (prefixLength > 0) {  // Ensure we have at least one character for separator
+        const charBeforeSuffix = name2[prefixLength - 1];
+        if (separators.includes(charBeforeSuffix)) return true;
+      }
     }
   }
   
