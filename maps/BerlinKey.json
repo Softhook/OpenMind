@@ -4,6 +4,7 @@
       "x": -816.4248854546752,
       "y": 994.933811186599,
       "text": "From Object to Parable: Revisiting Latour’s Berlin Key to call for Reflexive Storytelling in Actor-Network Theory",
+      "imageUrl": null,
       "width": 280,
       "height": 87,
       "backgroundColor": {
@@ -13,9 +14,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
-      "y": 1834.6777394855917,
+      "x": -1543.4564462775313,
+      "y": 1863.0272012570358,
       "text": "there is room for improvement in Latour's account of the Berlin key: \n\nfirst, at an empirical level due to the methods Latour used in the study and second, \n\nat a meta-conceptual level in its elevation of a priori arguments over situated stories. ",
+      "imageUrl": null,
       "width": 292.5736572692923,
       "height": 213,
       "backgroundColor": {
@@ -25,9 +27,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
+      "x": -1543.4564462775313,
       "y": 2133.052835698342,
       "text": "Annemarie Mol and Helen Verran that foreground the author as a reflexive participant, while distinguishing between the empirical component and the narrative element, offers a way for ANT theorists to assume responsibility for their accounts. We argue that this these approaches towards storytelling point the way towards more engaged, situated, and reflexive orientation for ANT in the 21st century",
+      "imageUrl": null,
       "width": 280,
       "height": 255,
       "backgroundColor": {
@@ -37,33 +40,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
-      "y": 1249.533416028857,
-      "text": "Introduction",
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 7.039608153488494,
-      "y": 1249.533416028857,
-      "text": "Observations about key as object and text",
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
       "x": -346.1781489818395,
       "y": 1249.533416028857,
       "text": "Methodology",
+      "imageUrl": null,
       "width": 150,
       "height": 45,
       "backgroundColor": {
@@ -76,6 +56,7 @@
       "x": 363.68250717618946,
       "y": 1249.533416028857,
       "text": "Discussion",
+      "imageUrl": null,
       "width": 150,
       "height": 45,
       "backgroundColor": {
@@ -88,6 +69,7 @@
       "x": 705.3756046345228,
       "y": 1249.533416028857,
       "text": "Conclusion How ANT should tell stories for the future",
+      "imageUrl": null,
       "width": 280,
       "height": 66,
       "backgroundColor": {
@@ -100,6 +82,7 @@
       "x": 705.3756046345228,
       "y": 1492.6413995112339,
       "text": "",
+      "imageUrl": null,
       "width": 150,
       "height": 45,
       "backgroundColor": {
@@ -112,6 +95,7 @@
       "x": -654.4409188453985,
       "y": 1249.533416028857,
       "text": "Context of the Paper",
+      "imageUrl": null,
       "width": 152.4130859375,
       "height": 45,
       "backgroundColor": {
@@ -121,9 +105,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
-      "y": 1473.6567857904847,
+      "x": -1543.4564462775313,
+      "y": 1490.9759323744238,
       "text": "Latour dead time to review what ANT is. Why does this matter? Because we are defining the future of ANT. ",
+      "imageUrl": null,
       "width": 280,
       "height": 87,
       "backgroundColor": {
@@ -133,9 +118,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
-      "y": 1623.7073103148623,
+      "x": -1543.4564462775313,
+      "y": 1645.5015668157298,
       "text": "Other special issues that have been created. Lots of focus on recent work\n\nBut little examinations of Latours early texts that have more to tell us about the fundmental nature of ANT",
+      "imageUrl": null,
       "width": 254.91469055521088,
       "height": 150,
       "backgroundColor": {
@@ -145,9 +131,10 @@
       }
     },
     {
-      "x": -961.6040257357287,
+      "x": -1543.4564462775313,
       "y": 1357.4502979331178,
       "text": "Key important paper cited by man in fields beyond ANT, design archeology, became iconic for defining materility",
+      "imageUrl": null,
       "width": 228.68601791640822,
       "height": 108,
       "backgroundColor": {
@@ -155,32 +142,143 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "x": 3.1368907820952643,
+      "y": 2112.6272399956783,
+      "text": "Latour’s Counter‑Moves\nTruth = transformation through mediation  \n Myth/parable = necessary vehicle of truth\nInterpretation = condition of truth’s survival\nGoal = restore narrative as ontological operator  ",
+      "imageUrl": null,
+      "width": 334.65013005551873,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 3.1368907820952643,
+      "y": 2363.336255117131,
+      "text": "A. Parable as Method\nIndirect, transformative speech \nProduces metanoia (shift in stance)\nRejects “Double Click” immediacy\n\nB. Maquette / Model-in-Scale\nSmall narrative = ontological laboratory\nExample performs theory, not illustrates it\n\nReprise (Repetition-with-Difference)\nTruth renewed through retelling\nParallel to Gospel multiplicity ",
+      "imageUrl": null,
+      "width": 316.8888377874751,
+      "height": 276,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 3.1368907820952643,
+      "y": 1935.4182248742259,
+      "text": "Bultmann’s Key Commitments\nTruth = existential decision (kerygma) \nMyth = historically contingent shell\nInterpretation = extraction of core message \nGoal = “demythologize” to reach pure proclamation",
+      "imageUrl": null,
+      "width": 377.00398084854567,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -1543.4564462775313,
+      "y": 1249.533416028857,
+      "text": "Introduction",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": 3.1368907820952643,
+      "y": 2614.0452702385833,
+      "text": " Mundane object → narrative displacement of agency\nKey “acts” (delegation, prescription, moralization)\nStory forces reader to experience redistributed agency\nParable = theory in miniature  ",
+      "imageUrl": null,
+      "width": 359.31084633907477,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -24.726914393046634,
+      "y": 1384.3291455608328,
+      "text": "about the physical object",
+      "imageUrl": null,
+      "width": 178.1025390625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": 7.039608153488494,
+      "y": 1249.533416028857,
+      "text": "Observations about key as object and text",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
     }
   ],
   "connections": [
     {
-      "from": 7,
-      "to": 8
+      "from": 5,
+      "to": 6
     },
     {
-      "from": 3,
-      "to": 12
-    },
-    {
-      "from": 12,
+      "from": 14,
       "to": 10
     },
     {
       "from": 10,
-      "to": 11
+      "to": 8
     },
     {
-      "from": 11,
+      "from": 8,
+      "to": 9
+    },
+    {
+      "from": 9,
       "to": 1
     },
     {
       "from": 1,
       "to": 2
+    },
+    {
+      "from": 13,
+      "to": 11
+    },
+    {
+      "from": 11,
+      "to": 12
+    },
+    {
+      "from": 12,
+      "to": 15
+    },
+    {
+      "from": 17,
+      "to": 16
+    },
+    {
+      "from": 16,
+      "to": 13
     }
   ]
 }
