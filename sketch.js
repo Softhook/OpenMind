@@ -284,12 +284,22 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
           
           const namesMatch = namesAreSimilar(urlName, cacheName);
           
+          console.info('Map name comparison:', {
+            urlName,
+            cacheName,
+            namesMatch,
+            urlTimestamp: urlTimestamp ? new Date(urlTimestamp).toISOString() : 'missing',
+            cacheTimestamp: cacheTimestamp ? new Date(cacheTimestamp).toISOString() : 'missing'
+          });
+          
           // Use cache if: names match AND cache is more recent
           if (namesMatch && cacheTimestamp > urlTimestamp) {
             shouldUseCache = true;
             console.info('Using cached version (more recent):', cacheName, 'cached:', new Date(cacheTimestamp), 'url:', new Date(urlTimestamp));
           } else if (namesMatch) {
             console.info('Using URL version (more recent):', urlName, 'url:', new Date(urlTimestamp), 'cached:', new Date(cacheTimestamp));
+          } else {
+            console.info('Names do not match - using URL version');
           }
         }
       }
@@ -335,6 +345,17 @@ function extractMapName(pathOrName) {
   const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
   if (lastSlash >= 0) {
     name = name.substring(lastSlash + 1);
+  }
+  
+  // Remove URL-related characters (hash, query params)
+  // Remove everything after ? or # if present
+  const queryIndex = name.indexOf('?');
+  if (queryIndex >= 0) {
+    name = name.substring(0, queryIndex);
+  }
+  const hashIndex = name.indexOf('#');
+  if (hashIndex >= 0) {
+    name = name.substring(0, hashIndex);
   }
   
   // Remove .json extension
