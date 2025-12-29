@@ -288,8 +288,8 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
             urlName,
             cacheName,
             namesMatch,
-            urlTimestamp: urlTimestamp ? new Date(urlTimestamp).toISOString() : 'missing',
-            cacheTimestamp: cacheTimestamp ? new Date(cacheTimestamp).toISOString() : 'missing'
+            urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
+            cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
           });
           
           // Use cache if: names match AND cache is more recent
@@ -348,15 +348,7 @@ function extractMapName(pathOrName) {
   }
   
   // Remove URL-related characters (hash, query params)
-  // Remove everything after ? or # if present
-  const queryIndex = name.indexOf('?');
-  if (queryIndex >= 0) {
-    name = name.substring(0, queryIndex);
-  }
-  const hashIndex = name.indexOf('#');
-  if (hashIndex >= 0) {
-    name = name.substring(0, hashIndex);
-  }
+  name = name.replace(/[?#].*$/, '');
   
   // Remove .json extension
   name = name.replace(/\.json$/i, '');
