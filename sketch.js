@@ -329,8 +329,14 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
  */
 function extractMapName(pathOrName) {
   if (!pathOrName || typeof pathOrName !== 'string') return '';
-  // Extract basename (remove path)
-  let name = pathOrName.split('/').pop().split('\\').pop();
+  
+  // Extract basename (remove path) - handle both / and \ separators
+  let name = pathOrName;
+  const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+  if (lastSlash >= 0) {
+    name = name.substring(lastSlash + 1);
+  }
+  
   // Remove .json extension
   name = name.replace(/\.json$/i, '');
   // Normalize whitespace and case
