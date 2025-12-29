@@ -271,7 +271,8 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
           const cacheTimestamp = cachedData.lastModified || 0;
           
           // Check if names match (handling prefaced maps with same ending)
-          const urlName = extractMapName(urlData.name || fileToFetch);
+          // Use fileToFetch only if urlData.name is missing, and extract just the basename
+          const urlName = extractMapName(urlData.name || extractMapName(fileToFetch) || 'unnamed-map');
           const cacheName = extractMapName(cachedData.name || '');
           
           const namesMatch = namesAreSimilar(urlName, cacheName);
@@ -333,7 +334,7 @@ function extractMapName(pathOrName) {
  * Checks if two map names are similar (handles prefaced maps with same ending)
  * @param {string} name1 - First name
  * @param {string} name2 - Second name
- * @returns {boolean} true if names match or one ends with the other
+ * @returns {boolean} true if names match or one ends with the other (with separator)
  */
 function namesAreSimilar(name1, name2) {
   if (!name1 || !name2) return false;
@@ -343,10 +344,26 @@ function namesAreSimilar(name1, name2) {
   // Exact match
   if (name1 === name2) return true;
   
-  // Check if one name ends with the other (handles prefixed maps)
-  // e.g., "backup-mymap" and "mymap" should match
-  if (name1.length > name2.length && name1.endsWith(name2)) return true;
-  if (name2.length > name1.length && name2.endsWith(name1)) return true;
+  // Check if one name ends with the other, but only if preceded by a separator
+  // This prevents false matches like 'important' matching 'ant'
+  // Separators: dash, underscore, space
+  const separators = ['-', '_', ' '];
+  
+  if (name1.length > name2.length) {
+    // Check if name1 ends with name2 and has a separator before it
+    if (name1.endsWith(name2)) {
+      const charBeforeSuffix = name1[name1.length - name2.length - 1];
+      if (separators.includes(charBeforeSuffix)) return true;
+    }
+  }
+  
+  if (name2.length > name1.length) {
+    // Check if name2 ends with name1 and has a separator before it
+    if (name2.endsWith(name1)) {
+      const charBeforeSuffix = name2[name2.length - name1.length - 1];
+      if (separators.includes(charBeforeSuffix)) return true;
+    }
+  }
   
   return false;
 }
