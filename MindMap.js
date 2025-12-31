@@ -1340,6 +1340,9 @@ class MindMap {
             this.addBoxToSelection(box);
           }
 
+          // Set as the primary selected box (important for arrow key navigation)
+          this.selectedBox = box;
+
           // Stop editing to avoid text interaction while dragging
           box.stopEditing();
 
