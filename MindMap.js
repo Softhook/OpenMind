@@ -1227,6 +1227,8 @@ class MindMap {
 
     this.connectingFrom = null;
     this.connectingFromInitiatedByKeyboard = false;
+    // Clear navigation mode after completing connection so arrow keys don't immediately navigate
+    this.isArrowKeyNavigating = false;
     return connected;
   }
 
@@ -1235,8 +1237,10 @@ class MindMap {
    * Includes improved validation using shared utilities
    */
   handleMousePressed() {
-    // Clear arrow key navigation flag when mouse is used
-    this.isArrowKeyNavigating = false;
+    // Note: We intentionally DON'T clear isArrowKeyNavigating here anymore.
+    // This allows users to click a box edge (to select it without editing)
+    // and then use arrow keys to navigate from that box in presentation mode.
+    // The flag will be cleared when actually editing text or other interactions.
 
     // Validate mouse coordinates using shared utility if available
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
@@ -1266,6 +1270,7 @@ class MindMap {
     // Check if clicking on resize handle
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {
+        this.isArrowKeyNavigating = false; // Clear navigation when resizing
         this.selectedBox = box;
         // Single select this box when resizing
         if (!shiftDown) this.clearBoxSelection();
@@ -1284,6 +1289,7 @@ class MindMap {
       try {
         if (conn.isMouseOverArrowHead()) {
           // Begin dragging the arrow head to a new target
+          this.isArrowKeyNavigating = false; // Clear navigation when reattaching
           this.draggingConnection = { conn, originalTo: conn.toBox };
           // Select this connection
           if (this.selectedConnection && this.selectedConnection !== conn) {
@@ -1300,6 +1306,7 @@ class MindMap {
     for (let box of this.boxes) {
       const side = box.getConnectorUnderMouse();
       if (side) {
+        this.isArrowKeyNavigating = false; // Clear navigation when creating connection
         this.connectingFrom = { box, side };
         this.connectingFromInitiatedByKeyboard = false;
         return;
@@ -1353,6 +1360,7 @@ class MindMap {
           // Center click
           if (shiftDown) {
             // Toggle selection without entering text edit
+            this.isArrowKeyNavigating = false; // Clear navigation when multi-selecting
             this.toggleBoxSelection(box);
             // Also stop editing any box when toggling selection
             if (this.selectedBox) {
@@ -1361,6 +1369,7 @@ class MindMap {
             this.selectedBox = null;
           } else {
             // Single-select and enter editing
+            this.isArrowKeyNavigating = false; // Clear navigation mode when entering edit
             this.clearBoxSelection();
             this.addBoxToSelection(box);
             this.selectedBox = box;
@@ -1379,6 +1388,7 @@ class MindMap {
     for (let conn of this.connections) {
       if (conn.isMouseOver()) {
         // Deselect any selected box
+        this.isArrowKeyNavigating = false; // Clear navigation when selecting connection
         if (this.selectedBox) {
           this.selectedBox.stopEditing();
           this.selectedBox = null;
@@ -1402,6 +1412,9 @@ class MindMap {
       this.selectedBox.stopEditing();
       this.selectedBox = null;
     }
+
+    // Clear navigation mode when clicking empty background
+    this.isArrowKeyNavigating = false;
 
     // Always clear box multi-selection when clicking the empty background
     this.clearBoxSelection();
@@ -1448,11 +1461,21 @@ class MindMap {
     }
 
     // Stop dragging and resizing all boxes
+    // If any box was being dragged or resized, clear navigation mode
+    // so arrow keys will enter presentation mode on current box rather than continuing navigation
+    let wasInteracting = false;
     for (let box of this.boxes) {
       if (!box) continue;
+      if (box.isDragging || box.isResizing) {
+        wasInteracting = true;
+      }
       box.stopDrag();
       box.stopResize();
       box.stopSelecting();
+    }
+    
+    if (wasInteracting) {
+      this.isArrowKeyNavigating = false;
     }
   }
 
@@ -1602,6 +1625,42 @@ class MindMap {
       }
     } else if (keyCode === UP_ARROW || keyCode === DOWN_ARROW || keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
       // Arrow keys for box navigation when NOT editing text
+      
+      // Block navigation during active interactions
+      if (this.connectingFrom || this.draggingConnection) {
+        return; // Ignore arrow keys while creating/reattaching connections
+      }
+      
+      // Check if any box is being dragged or resized
+      let anyBoxInteracting = false;
+      if (this.boxes) {
+        for (const box of this.boxes) {
+          if (box && (box.isDragging || box.isResizing)) {
+            anyBoxInteracting = true;
+            break;
+          }
+        }
+      }
+      if (anyBoxInteracting) {
+        return; // Ignore arrow keys during drag/resize operations
+      }
+      
+      // If a box is selected but in editing mode, exit editing first so navigation can begin from that box
+      if (this.selectedBox && this.selectedBox.isEditing) {
+        this.selectedBox.stopEditing();
+        // Don't navigate on this key press - let user press arrow key again to start navigation
+        // This gives them a chance to see the box is no longer editing
+        return;
+      }
+      
+      // If a box is selected but we're not yet in arrow key navigation mode,
+      // the first arrow press should enter presentation mode on the CURRENT box
+      // (not navigate to the next one yet)
+      if (this.selectedBox && !this.isArrowKeyNavigating) {
+        this.selectAndPanToBox(this.selectedBox);
+        return;
+      }
+      
       this.navigateBoxes(keyCode);
     } else if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
       // CMD/CTRL combinations when NOT editing text
@@ -1654,7 +1713,8 @@ class MindMap {
           const offsetX = mx - firstBox.x;
           const offsetY = my - firstBox.y;
 
-          // Clear current selection
+          // Clear current selection and navigation mode
+          this.isArrowKeyNavigating = false;
           this.clearBoxSelection();
           if (this.selectedBox) {
             this.selectedBox.stopEditing();
@@ -1735,7 +1795,8 @@ class MindMap {
           }
         }
 
-        // Clear selection
+        // Clear selection and navigation mode after deletion
+        this.isArrowKeyNavigating = false;
         this.clearBoxSelection();
         if (this.selectedBox) {
           this.selectedBox = null;
@@ -1748,6 +1809,8 @@ class MindMap {
         if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
           this.selectedConnection = null;
         }
+        // Clear navigation mode after deleting connections
+        this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
         // Delete selected connection only
         this.pushUndo();
@@ -1756,6 +1819,8 @@ class MindMap {
           this.connections.splice(index, 1);
           this.selectedConnection = null;
         }
+        // Clear navigation mode after deleting single connection
+        this.isArrowKeyNavigating = false;
       }
     } else if (key === '1' || key === '2' || key === '3') {
       // Number keys to change selected box colors (when not editing)
@@ -1812,6 +1877,7 @@ class MindMap {
     this.selectedBox = null;
     this.selectedConnection = null;
     this.connectingFrom = null;
+    this.isArrowKeyNavigating = false; // Clear navigation state when loading new state
     if (this.selectedBoxes) {
       this.selectedBoxes.clear();
     }
