@@ -14,19 +14,6 @@
       }
     },
     {
-      "x": -3108.646183522545,
-      "y": -578.6846427209152,
-      "text": "Sort out the 5 exemplar EMAs",
-      "imageUrl": null,
-      "width": 210.7509765625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -3113.1304364522325,
       "y": -1412.858247207561,
       "text": "Germany Tax stuff ",
@@ -64,54 +51,6 @@
         "g": 255,
         "b": 255
       }
-    },
-    {
-      "x": -3086.446476491295,
-      "y": -1086.9325261344418,
-      "text": "Talk to Slav about the invoice change",
-      "imageUrl": null,
-      "width": 255.150390625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1377.5772020047038,
-      "y": 436.00690006452527,
-      "text": "Citizen Science is Societal Test \n\nWithin Science and Technology Studies (STS), citizen science has attracted sustained attention as a site where the authority of science is negotiated and reworked. Citizen science is often framed as a hybrid of scientific research and public participation, or as a response to perceived crises in expertise, governance, or trust. Such accounts tend to evaluate citizen science in normative or discursive terms, focusing on questions of empowerment, engagement, or legitimacy. In contrast, within the natural sciences citizen science is frequently promoted as a productive force for generating data more quickly, cheaply, and at greater scale. This paper proposes an alternative framing: citizen science as a form of societal testing where citizen science is approached  as a test bed where scientific practices, publics and governance arrangements are empirically put to the test. \n\nDrawing on a longitudinal case study of participatory pollutions sensing conducted during the author’s doctoral research, alongside a public inquiry related to London City Airport, the paper traces how citizen science operated through testing practices. These included the deployment of sensors, the production and circulation of data, and engagement with regulatory and legal institutions. Empirically, the tests examined EU innovation policy, UK noise regulation, the cohesion of resident groups, and the affiliations of scientists involved. \n\nUnderstanding citizen science as a societal test has significant methodological consequences for how it should be studied. First, it requires shifting the empirical focus from abstract categories, normative claims, or single-site observations to the practices through which tests are enacted. Researchers must trace what is being tested, how tests are organised, and what material and institutional work is involved. This means attending to sensors, data protocols, infrastructures, legal documents, and procedural workflows as part of the empirical field. Second, analysis must adopt a distributed lens that attends to tracking multiple sites and actors to flollow the networks of institutions, scientific communities, regulatory bodies, and publics. Third, a longitudinal perspective is needed to see the consequences of tests appear in differnt forms and sites. This approach requires immersion and reflexivity of the researche to recognise how they are part of the test ecology, influencing the enactment of tests.\n\nSeeing citizen science as a test bed—where sociotechnical practices, protocols, and interactions are being experimentaed with, shifts it from a matter of mild interest to a site where future forms of material politics and governance are being developed in the wild.",
-      "imageUrl": null,
-      "width": 500.48495065101974,
-      "height": 927,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 1757,
-          "end": 1879,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        },
-        {
-          "start": 0,
-          "end": 33,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
     },
     {
       "x": -3113.1304364522325,
@@ -153,19 +92,6 @@
       }
     },
     {
-      "x": -3074.021671803795,
-      "y": -330.7370408978202,
-      "text": "Assignments for monitoring have been selected for your tutors as shown below and can be collected at:\nhttp://www.open.ac.uk/etma/monitor/etmaM_collect.asp\n\nCourse-Pres TMA Appt Tutor Name\nT190-25J    01  R08  Sancha Helen De Burca\nT190-25J    01  R08  AnnMarie McKenna\nT190-25J    01  R08  Nuria Rodriguez",
-      "imageUrl": null,
-      "width": 280,
-      "height": 255,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -3080.143742116295,
       "y": -507.2108418093677,
       "text": " ExternalExaminer \nforms@mdx.ac.uk as soon as possible.",
@@ -177,31 +103,6 @@
         "g": 255,
         "b": 255
       }
-    },
-    {
-      "x": -1908.9972996843571,
-      "y": 310.00690006452527,
-      "text": "Design the post smart city\n\nOver the past decades, the smart city has been articulated primarily through policy agendas, infrastructural programmes, and critical theory. While these approaches have been effective in diagnosing the political economy, governance arrangements, and technological imaginaries of smart urbanism, they have largely treated design as a downstream activity—a matter of implementation, optimisation, or interface. This paper argues that contestation around the smart city cannot be addressed through critique alone, but requires a rethinking of smart urbanism as a design problem.\n\nTaking “the post-smart city” not as a rejection of digital urbanism but as a problem of re-design, the paper asks what becomes visible when design is treated as an epistemic and ontological practice rather than merely a delivery mechanism. Drawing on examples from participatory design, speculative prototyping, and infrastructural interventions that foreground frictions, ambiguities, and publics, the paper shows how design opens up alternative ways of framing and enacting urban intelligence—shifting attention from data extraction and control towards situated practices, contested publics, and the material conditions through which urban knowledge is produced.\n\nBy foregrounding design, the paper contributes to geographical debates on smart urbanism by moving beyond critique towards intervention, and to design research by situating design practice within the spatial, political, and policymaking complexities of contemporary cities.",
-      "imageUrl": null,
-      "width": 405.1174033149173,
-      "height": 675,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 26,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
     },
     {
       "x": -3074.021671803795,
@@ -256,45 +157,6 @@
       }
     },
     {
-      "x": -3113.1304364522325,
-      "y": -1508.6511103072412,
-      "text": "Download all the individual bank account details ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -3139.021671803795,
-      "y": -1178.7773004361059,
-      "text": "House",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      }
-    },
-    {
-      "x": -3113.1304364522325,
-      "y": -1604.4439734069215,
-      "text": "Tax return",
-      "imageUrl": null,
-      "width": 227.1298828125,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      }
-    },
-    {
       "x": -2786.6541447801105,
       "y": -573.1433871873969,
       "text": "LinkedIn Academia",
@@ -333,9 +195,74 @@
       ]
     },
     {
+      "x": -3086.446476491295,
+      "y": -1086.9325261344418,
+      "text": "Talk to Slav about the invoice change",
+      "imageUrl": null,
+      "width": 255.150390625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -3113.1304364522325,
+      "y": -1508.6511103072412,
+      "text": "Download all the individual bank account details ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -3113.1304364522325,
+      "y": -1604.4439734069215,
+      "text": "Tax return",
+      "imageUrl": null,
+      "width": 227.1298828125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": -3139.021671803795,
+      "y": -1178.7773004361059,
+      "text": "House",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "x": -3108.646183522545,
+      "y": -578.6846427209152,
+      "text": "Sort out the 5 exemplar EMAs",
+      "imageUrl": null,
+      "width": 210.7509765625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
       "x": -2336.707520382079,
       "y": 86.78627805032599,
-      "text": "To know where to publish it ",
+      "text": "Where to publish it ",
       "imageUrl": null,
       "width": 195.978515625,
       "height": 45,
@@ -352,6 +279,32 @@
       "imageUrl": null,
       "width": 280,
       "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -2618.53923535096,
+      "y": 29.485912722032335,
+      "text": "Latour paper\nhttps://softhook.github.io/OpenMind/#maps/BerlinKey\n",
+      "imageUrl": null,
+      "width": 254.3232421875,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "x": -3074.021671803795,
+      "y": -330.7370408978202,
+      "text": "Assignments for monitoring have been selected for your tutors as shown below and can be collected at:\nhttp://www.open.ac.uk/etma/monitor/etmaM_collect.asp\n\nCourse-Pres TMA Appt Tutor Name\nT190-25J    01  R08  Sancha Helen De Burca\nT190-25J    01  R08  AnnMarie McKenna\nT190-25J    01  R08  Nuria Rodriguez",
+      "imageUrl": null,
+      "width": 280,
+      "height": 255,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -384,41 +337,104 @@
       ]
     },
     {
-      "x": -2618.53923535096,
-      "y": 29.485912722032335,
-      "text": "Latour paper\nhttps://softhook.github.io/OpenMind/#maps/BerlinKey\n",
+      "x": -1377.5772020047038,
+      "y": 436.00690006452527,
+      "text": "Citizen Science is Societal Test \n\nWithin Science and Technology Studies (STS), citizen science has attracted sustained attention as a site where the authority of science is negotiated and reworked. Citizen science is often framed as a hybrid of scientific research and public participation, or as a response to perceived crises in expertise, governance, or trust. Such accounts tend to evaluate citizen science in normative or discursive terms, focusing on questions of empowerment, engagement, or legitimacy. In contrast, within the natural sciences citizen science is frequently promoted as a productive force for generating data more quickly, cheaply, and at greater scale. This paper proposes an alternative framing: citizen science as a form of societal testing where citizen science is approached  as a test bed where scientific practices, publics and governance arrangements are empirically put to the test. \n\nDrawing on a longitudinal case study of participatory pollutions sensing conducted during the author’s doctoral research, alongside a public inquiry related to London City Airport, the paper traces how citizen science operated through testing practices. These included the deployment of sensors, the production and circulation of data, and engagement with regulatory and legal institutions. Empirically, the tests examined EU innovation policy, UK noise regulation, the cohesion of resident groups, and the affiliations of scientists involved. \n\nUnderstanding citizen science as a societal test has significant methodological consequences for how it should be studied. First, it requires shifting the empirical focus from abstract categories, normative claims, or single-site observations to the practices through which tests are enacted. Researchers must trace what is being tested, how tests are organised, and what material and institutional work is involved. This means attending to sensors, data protocols, infrastructures, legal documents, and procedural workflows as part of the empirical field. Second, analysis must adopt a distributed lens that attends to tracking multiple sites and actors to flollow the networks of institutions, scientific communities, regulatory bodies, and publics. Third, a longitudinal perspective is needed to see the consequences of tests appear in differnt forms and sites. This approach requires immersion and reflexivity of the researche to recognise how they are part of the test ecology, influencing the enactment of tests.\n\nSeeing citizen science as a test bed—where sociotechnical practices, protocols, and interactions are being experimentaed with, shifts it from a matter of mild interest to a site where future forms of material politics and governance are being developed in the wild.",
       "imageUrl": null,
-      "width": 254.3232421875,
-      "height": 108,
+      "width": 500.48495065101974,
+      "height": 927,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
-      }
+      },
+      "highlights": [
+        {
+          "start": 1757,
+          "end": 1879,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 0,
+          "end": 33,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "x": -1910.5474040684906,
+      "y": 286.55606077519184,
+      "text": "Design the post smart city\n\nOver the past decades, the smart city has been articulated primarily through policy agendas, infrastructural programmes, and critical theory. While these approaches have been effective in diagnosing the political economy, governance arrangements, and technological imaginaries of smart urbanism, they have largely treated design as a downstream activity—a matter of implementation, optimisation, or interface. This paper argues that contestation around the smart city cannot be addressed through critique alone, but requires a rethinking of smart urbanism as a design problem.\n\nTaking “the post-smart city” not as a rejection of digital urbanism but as a problem of re-design, the paper asks what becomes visible when design is treated as an epistemic and ontological practice rather than merely a delivery mechanism. Drawing on examples from participatory design, speculative prototyping, and infrastructural interventions that foreground frictions, ambiguities, and publics, the paper shows how design opens up alternative ways of framing and enacting urban intelligence—shifting attention from data extraction and control towards situated practices, contested publics, and the material conditions through which urban knowledge is produced.\n\nBy foregrounding design, the paper contributes to geographical debates on smart urbanism by moving beyond critique towards intervention, and to design research by situating design practice within the spatial, political, and policymaking complexities of contemporary cities.",
+      "imageUrl": null,
+      "width": 405.1174033149173,
+      "height": 675,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 26,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 5,
+      "from": 14,
       "to": 0
     },
     {
-      "from": 17,
-      "to": 2
+      "from": 15,
+      "to": 1
+    },
+    {
+      "from": 16,
+      "to": 15
+    },
+    {
+      "from": 1,
+      "to": 4
+    },
+    {
+      "from": 25,
+      "to": 24
+    },
+    {
+      "from": 23,
+      "to": 19
     },
     {
       "from": 19,
-      "to": 17
+      "to": 20
     },
     {
-      "from": 2,
-      "to": 7
+      "from": 23,
+      "to": 25
     },
     {
-      "from": 12,
+      "from": 24,
       "to": 6
     }
   ],
-  "lastModified": 1767200817596,
+  "lastModified": 1767209237791,
   "name": "Todo.json"
 }
