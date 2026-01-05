@@ -14,19 +14,6 @@
       }
     },
     {
-      "x": -3113.1304364522325,
-      "y": -1412.858247207561,
-      "text": "Germany Tax stuff ",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "x": -2768.7337346238605,
       "y": -520.6375874378455,
       "text": "rebuild my website with AI",
@@ -45,19 +32,6 @@
       "text": "Talk to Omer, the potential PhD student ",
       "imageUrl": null,
       "width": 271.474609375,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -3113.1304364522325,
-      "y": -1327.5653841078806,
-      "text": "send to accountant",
-      "imageUrl": null,
-      "width": 150,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -209,19 +183,6 @@
     },
     {
       "x": -3113.1304364522325,
-      "y": -1508.6511103072412,
-      "text": "Download all the individual bank account details ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -3113.1304364522325,
       "y": -1604.4439734069215,
       "text": "Tax return",
       "imageUrl": null,
@@ -292,19 +253,6 @@
       "imageUrl": null,
       "width": 254.3232421875,
       "height": 108,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -3074.021671803795,
-      "y": -330.7370408978202,
-      "text": "Assignments for monitoring have been selected for your tutors as shown below and can be collected at:\nhttp://www.open.ac.uk/etma/monitor/etmaM_collect.asp\n\nCourse-Pres TMA Appt Tutor Name\nT190-25J    01  R08  Sancha Helen De Burca\nT190-25J    01  R08  AnnMarie McKenna\nT190-25J    01  R08  Nuria Rodriguez",
-      "imageUrl": null,
-      "width": 280,
-      "height": 255,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -395,46 +343,60 @@
           }
         }
       ]
+    },
+    {
+      "x": -3074.021671803795,
+      "y": -330.7370408978202,
+      "text": "Assignments for monitoring have been selected for your tutors as shown below and can be collected at:\nhttp://www.open.ac.uk/etma/monitor/etmaM_collect.asp\n\nCourse-Pres TMA Appt Tutor Name\nT190-25J    01  R08  Sancha Helen De Burca\nT190-25J    01  R08  AnnMarie McKenna\nT190-25J    01  R08  Nuria Rodriguez",
+      "imageUrl": null,
+      "width": 280,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "x": -3114.307933927076,
+      "y": -1495.947523010486,
+      "text": "send to accountant",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
     }
   ],
   "connections": [
     {
-      "from": 14,
+      "from": 12,
       "to": 0
     },
     {
-      "from": 15,
-      "to": 1
-    },
-    {
-      "from": 16,
-      "to": 15
-    },
-    {
-      "from": 1,
-      "to": 4
-    },
-    {
-      "from": 25,
-      "to": 24
-    },
-    {
-      "from": 23,
-      "to": 19
-    },
-    {
-      "from": 19,
+      "from": 21,
       "to": 20
     },
     {
-      "from": 23,
-      "to": 25
+      "from": 19,
+      "to": 16
     },
     {
-      "from": 24,
-      "to": 6
+      "from": 16,
+      "to": 17
+    },
+    {
+      "from": 19,
+      "to": 21
+    },
+    {
+      "from": 20,
+      "to": 4
     }
   ],
-  "lastModified": 1767209237791,
-  "name": "Todo.json"
+  "lastModified": 1767606833355,
+  "name": "maps/Todo.json"
 }
