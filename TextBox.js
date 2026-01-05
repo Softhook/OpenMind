@@ -18,7 +18,7 @@ class TextBox {
   static COLOR_CIRCLE_RADIUS = 8;
   static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
-  
+
   // Color constants for consistent styling
   static COLORS = {
     SELECTION_OUTLINE: { r: 60, g: 120, b: 255 },
@@ -31,11 +31,11 @@ class TextBox {
     DIM_OVERLAY: { r: 255, g: 255, b: 255, a: 150 },
     DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 }
   };
-  
+
   // Regex pattern to detect URLs (http, https, file://, and local paths)
   // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
   static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
-  
+
   /**
    * Helper to check if a number is valid (uses Utils if available)
    * @private
@@ -46,7 +46,7 @@ class TextBox {
     }
     return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
   }
-  
+
   /**
    * Helper to safely get a positive number
    * @private
@@ -57,7 +57,7 @@ class TextBox {
     }
     return TextBox._isValidNumber(value) && value > 0 ? value : defaultValue;
   }
-  
+
   /**
    * Gets the current zoom level from global scope, with fallback.
    * @private
@@ -69,7 +69,7 @@ class TextBox {
     }
     return typeof zoom !== 'undefined' && zoom > 0 ? zoom : 1;
   }
-  
+
   /**
    * Gets a clamped zoom factor for UI scaling.
    * @private
@@ -82,7 +82,40 @@ class TextBox {
     const currentZoom = TextBox._getCurrentZoom();
     return Math.max(0.5, Math.min(2.0, currentZoom));
   }
-  
+
+  /**
+   * Generates a unique identifier (UUID v4)
+   * Uses crypto.randomUUID() when available, falls back to manual generation
+   * for older browsers (Safari < 15.4) or non-HTTPS contexts
+   * @returns {string} UUID string
+   */
+  static generateUUID() {
+    // Use native crypto.randomUUID if available (Safari 15.4+, HTTPS required)
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      try {
+        return crypto.randomUUID();
+      } catch (e) {
+        // Fall through to manual generation
+      }
+    }
+
+    // Fallback: generate UUID v4 manually
+    // Uses crypto.getRandomValues if available, otherwise Math.random
+    const getRandomValues = (typeof crypto !== 'undefined' && crypto.getRandomValues)
+      ? (arr) => crypto.getRandomValues(arr)
+      : (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); return arr; };
+
+    const bytes = new Uint8Array(16);
+    getRandomValues(bytes);
+
+    // Set version (4) and variant (RFC 4122)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC 4122
+
+    // Convert to hex string with dashes
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  }
   /**
    * Creates a new TextBox
    * @param {number} x - Center X coordinate
@@ -90,6 +123,8 @@ class TextBox {
    * @param {string} text - Initial text content
    */
   constructor(x, y, text = "") {
+    // Generate stable unique identifier for collaboration
+    this.id = TextBox.generateUUID();
     this.x = x;
     this.y = y;
     this.text = TextBox.sanitizeText(text);
@@ -162,7 +197,7 @@ class TextBox {
             this.imageLoadError = false;
             this.naturalImageWidth = img.width;
             this.naturalImageHeight = img.height;
-            
+
             // Only set default dimensions if not already sized by user/save
             if (!this.userResized) {
               const maxW = 400;
@@ -250,7 +285,7 @@ class TextBox {
       console.warn('setPdfFromUrl failed', e);
     }
   }
-  
+
   /**
    * Gets the default color palette for boxes
    * @returns {Array<Object>} Array of color palette entries with key and color
@@ -262,7 +297,7 @@ class TextBox {
       { key: 'red', color: { r: 255, g: 140, b: 140 } }
     ];
   }
-  
+
   /**
    * Detects all hyperlinks in the text
    * @returns {Array<Object>} Array of {start, end, url} objects
@@ -271,16 +306,16 @@ class TextBox {
     if (this.cachedLinks !== null) {
       return this.cachedLinks;
     }
-    
+
     const links = [];
     if (!this.text || this.text.length === 0) {
       this.cachedLinks = links;
       return links;
     }
-    
+
     // Reset regex lastIndex for global pattern
     TextBox.URL_PATTERN.lastIndex = 0;
-    
+
     let match;
     while ((match = TextBox.URL_PATTERN.exec(this.text)) !== null) {
       let url = match[0];
@@ -296,11 +331,11 @@ class TextBox {
         });
       }
     }
-    
+
     this.cachedLinks = links;
     return links;
   }
-  
+
   /**
    * Checks if a character position is within a link
    * @param {number} charPos - Character position in text
@@ -315,7 +350,7 @@ class TextBox {
     }
     return null;
   }
-  
+
   /**
    * Gets the link under the mouse cursor
    * @param {number} mx - Mouse X in world coordinates
@@ -324,11 +359,11 @@ class TextBox {
    */
   getLinkAtMouse(mx, my) {
     if (this.imageUrl) return null; // No text links in image boxes
-    
+
     const charPos = this.getCursorPositionFromMouse(mx, my);
     return this.getLinkAtPosition(charPos);
   }
-  
+
   /**
    * Opens a URL in a new browser window/tab
    * For file:// URLs, attempts to open in the default application
@@ -336,9 +371,9 @@ class TextBox {
    */
   static openLink(url) {
     if (!url) return;
-    
+
     let targetUrl = url;
-    
+
     // Handle file:// URLs and local paths
     if (url.startsWith('file://')) {
       // Already a file:// URL, use as-is
@@ -358,7 +393,7 @@ class TextBox {
       }
     }
     // else: http/https URLs - use as-is
-    
+
     // Open in new tab/window
     try {
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -366,7 +401,7 @@ class TextBox {
       console.warn('Failed to open link:', url, e);
     }
   }
-  
+
   /**
    * Checks if the mouse is currently over a link
    * @returns {boolean} true if mouse is over a link
@@ -374,13 +409,13 @@ class TextBox {
   isMouseOverLink() {
     if (this.imageUrl) return false;
     if (!this.isMouseOver()) return false;
-    
+
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    
+
     return this.getLinkAtMouse(mx, my) !== null;
   }
-  
+
   /**
    * Sanitizes text to normalize line endings and remove problematic invisible characters
    * Uses shared utility if available for consistency
@@ -392,22 +427,22 @@ class TextBox {
     if (typeof Utils !== 'undefined' && Utils.sanitizeText) {
       return Utils.sanitizeText(text);
     }
-    
+
     // Fallback implementation
     if (text === null || text === undefined) return '';
     text = String(text);
-    
+
     // Normalize line endings: convert \r\n and \r to \n
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    
+
     // Remove invisible/control characters except newlines and tabs
     // Keep: \n (newline at 0x0A), \t (tab at 0x09), and printable characters (0x20+)
     // Remove: C0 controls (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F), DEL (0x7F), and C1 controls (0x80-0x9F)
     text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F\x80-\x9F]/g, '');
-    
+
     return text;
   }
-  
+
   /**
    * Gets the maximum width of logical lines (split by \n) without wrapping
    * @returns {number} Maximum line width in pixels
@@ -428,7 +463,7 @@ class TextBox {
    */
   updateDimensions() {
     if (this.text == null) this.text = '';
-    
+
     // Invalidate cache
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
@@ -445,9 +480,9 @@ class TextBox {
       this.cachedLineCharMap = [0];
       return;
     }
-    
+
     textSize(this.fontSize);
-    
+
     // Compute natural width of logical lines (no wrapping)
     const naturalWidth = this.getNaturalMaxLineWidth() + this.padding * 2;
     const isSingleLogicalLine = this.text.indexOf('\n') === -1;
@@ -466,16 +501,16 @@ class TextBox {
     }
 
     let wrappedLines = this.wrapText(this.text);
-    
+
     // Height: always reflow to fit wrapped lines for the current width
     const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
   }
-  
+
   // ============================================================================
   // TEXT WRAPPING AND LAYOUT
   // ============================================================================
-  
+
   /**
    * Wraps text to fit within the box width
    * @param {string} text - Text to wrap
@@ -484,25 +519,25 @@ class TextBox {
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
-    
+
     // Use cache if width hasn't changed
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines && this.cachedWidth === currentWidth && this.text === text) {
       return this.cachedWrappedLines;
     }
-    
+
     let lines = text.split('\n');
     let wrappedLines = [];
     let lineCharMap = []; // Maps each wrapped line index to its start position in original text
     let maxTextWidth = max(10, currentWidth - this.padding * 2);
     let charPos = 0; // Current position in original text
-    
+
     textSize(this.fontSize);
-    
+
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
       let line = lines[lineIdx];
       let lineStartPos = charPos; // Remember where this logical line starts
-      
+
       // Handle empty lines (from explicit newlines)
       if (line === '') {
         wrappedLines.push('');
@@ -513,7 +548,7 @@ class TextBox {
         }
         continue;
       }
-      
+
       if (textWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
         lineCharMap.push(charPos);
@@ -530,24 +565,24 @@ class TextBox {
         let regex = /\S+/g; // Match sequences of non-whitespace
         let match;
         let prevEnd = 0;
-        
+
         while ((match = regex.exec(line)) !== null) {
           // Calculate how many spaces before this word
           let spacesBefore = match.index - prevEnd;
-          wordPositions.push({ 
-            word: match[0], 
+          wordPositions.push({
+            word: match[0],
             start: match.index,
             spacesBefore: spacesBefore
           });
           prevEnd = match.index + match[0].length;
         }
-        
+
         // If line ends with spaces, we still need to handle it
         let hasTrailingSpace = line.length > 0 && line[line.length - 1] === ' ';
-        
+
         let currentLine = '';
         let currentLineStartPos = 0;
-        
+
         for (let i = 0; i < wordPositions.length; i++) {
           let wp = wordPositions[i];
           // Build the test line with the correct number of spaces
@@ -563,7 +598,7 @@ class TextBox {
             : wp.spacesBefore;
           const spacer = ' '.repeat(spacerCount);
           let testLine = currentLine + spacer + wp.word;
-          
+
           if (textWidth(testLine) <= maxTextWidth) {
             if (!currentLine) {
               // First content on this visual line maps to the start of the rendered spaces
@@ -610,7 +645,7 @@ class TextBox {
             }
           }
         }
-        
+
         // Handle trailing spaces after the last word, or a line with only spaces
         if (wordPositions.length > 0) {
           // There are words - check for trailing spaces after the last word
@@ -655,13 +690,13 @@ class TextBox {
             }
           }
         }
-        
+
         // Push the last line of this paragraph
         if (currentLine) {
           wrappedLines.push(currentLine);
           lineCharMap.push(lineStartPos + currentLineStartPos);
         }
-        
+
         // Move to next logical line (past newline if not last logical line)
         if (lineIdx < lines.length - 1) {
           charPos += line.length + 1;
@@ -670,33 +705,33 @@ class TextBox {
         }
       }
     }
-    
+
     const result = wrappedLines.length > 0 ? wrappedLines : [''];
     if (result.length === 1 && result[0] === '') {
       lineCharMap = [0];
     }
-    
+
     // Cache the results
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
     this.cachedLineCharMap = lineCharMap;
     return result;
   }
-  
+
   // ============================================================================
   // DRAWING AND RENDERING
   // ============================================================================
-  
+
   /**
    * Draws the text box with its content, selection, cursor, and UI elements
    * @param {boolean} shouldDim - Whether to dim this box (for navigation focus)
    */
   draw(shouldDim = false) {
     push();
-    
+
     // Get zoom factor for UI scaling
     const zoomFactor = TextBox._getClampedZoomFactor();
-    
+
     // Draw box
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
@@ -720,9 +755,9 @@ class TextBox {
       stroke(TextBox.COLORS.NORMAL_STROKE);
       strokeWeight(1 / zoomFactor);
     }
-    
-    rect(this.x - this.width/2, this.y - this.height/2, 
-         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+
+    rect(this.x - this.width / 2, this.y - this.height / 2,
+      this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     // If this box holds an image, draw the image inside the box instead of text
     if (this.imageUrl) {
       if (this.imageLoaded && this.img) {
@@ -736,11 +771,11 @@ class TextBox {
           const drawW = iw * scale;
           const drawH = ih * scale;
           image(this.img, this.x, this.y, drawW, drawH);
-          } catch (e) {
+        } catch (e) {
           // fallback: draw placeholder
           fill(220);
           noStroke();
-          rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
+          rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
           fill(80);
           textAlign(CENTER, CENTER);
           textSize(12);
@@ -749,7 +784,7 @@ class TextBox {
       } else if (this.imageLoadError) {
         fill(240);
         noStroke();
-        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
+        rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
         fill(120);
         textAlign(CENTER, CENTER);
         textSize(12);
@@ -758,7 +793,7 @@ class TextBox {
         // Loading placeholder
         fill(240);
         noStroke();
-        rect(this.x - this.width/2 + 4, this.y - this.height/2 + 4, this.width - 8, this.height - 8, 0);
+        rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
         fill(100);
         textAlign(CENTER, CENTER);
         textSize(12);
@@ -771,7 +806,7 @@ class TextBox {
       noStroke();
       textAlign(LEFT, CENTER);
       textSize(this.fontSize);
-      
+
       let wrappedLines = this.wrapText(this.text);
       let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
       // Top-anchored text: start at top padding of the box
@@ -780,8 +815,8 @@ class TextBox {
 
       // If connector dots are visible (hover OR active connection from this box),
       // slightly dim the draggable frame area so the grab-edge is visually prominent.
-      const connectorsVisible = ((! (typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
-                                 (typeof mindMap !== 'undefined' && mindMap.connectingFrom && mindMap.connectingFrom.box === this));
+      const connectorsVisible = ((!(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
+        (typeof mindMap !== 'undefined' && mindMap.connectingFrom && mindMap.connectingFrom.box === this));
       if (connectorsVisible && !this.isEditing) {
         // Compute edge thresholds matching isMouseOnEdge logic
         const minCenterWidth = 20;
@@ -797,26 +832,26 @@ class TextBox {
 
         // For image boxes, the whole interior is draggable — dim the interior
         if (this.imageUrl) {
-          rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+          rect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
         } else {
           // Left and right thin frames (use a uniform, smaller vertical grab width)
           const verticalEdgeWidth = min(edgeThresholdX, TextBox.HORIZONTAL_EDGE_WIDTH);
           // Left frame
-          rect(this.x - this.width/2, this.y - this.height/2, verticalEdgeWidth, this.height);
+          rect(this.x - this.width / 2, this.y - this.height / 2, verticalEdgeWidth, this.height);
           // Right frame
-          rect(this.x + this.width/2 - verticalEdgeWidth, this.y - this.height/2, verticalEdgeWidth, this.height);
+          rect(this.x + this.width / 2 - verticalEdgeWidth, this.y - this.height / 2, verticalEdgeWidth, this.height);
           // Top and bottom frames span between the vertical frames
-          const topX = this.x - this.width/2 + verticalEdgeWidth;
+          const topX = this.x - this.width / 2 + verticalEdgeWidth;
           const topW = this.width - verticalEdgeWidth * 2;
           if (topW > 0) {
-            rect(topX, this.y - this.height/2, topW, edgeThresholdY);
+            rect(topX, this.y - this.height / 2, topW, edgeThresholdY);
             // Bottom frame
-            rect(topX, this.y + this.height/2 - edgeThresholdY, topW, edgeThresholdY);
+            rect(topX, this.y + this.height / 2 - edgeThresholdY, topW, edgeThresholdY);
           }
         }
         pop();
       }
-      
+
       // Draw selection highlight if there's a selection
       if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
         this.drawSelection(wrappedLines, textX, startY, lineHeight);
@@ -826,24 +861,24 @@ class TextBox {
       if (this.highlights && this.highlights.length > 0) {
         this.drawHighlights(wrappedLines, textX, startY, lineHeight);
       }
-      
+
       for (let i = 0; i < wrappedLines.length; i++) {
         let lineText = wrappedLines[i];
-        
+
         // Get absolute character position for this line
-        let lineStartPos = (this.cachedLineCharMap && this.cachedLineCharMap[i] !== undefined) 
+        let lineStartPos = (this.cachedLineCharMap && this.cachedLineCharMap[i] !== undefined)
           ? this.cachedLineCharMap[i] : 0;
-        
+
         // Detect links for coloring
         const links = this.detectLinks();
-        
+
         // Always render character by character for precise spacing control
         // This ensures multiple spaces are visible
         let xPos = textX;
         for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
           let char = lineText[charIdx];
           let absCharPos = lineStartPos + charIdx;
-          
+
           // Check if this character is part of a link
           let isInLink = false;
           for (const link of links) {
@@ -852,14 +887,14 @@ class TextBox {
               break;
             }
           }
-          
+
           // Set color based on whether character is in a link
           if (isInLink) {
             fill(0, 100, 220); // Blue for links
           } else {
             fill(0); // Black for regular text
           }
-          
+
           // For spaces, use measured width to ensure they take up space
           if (char === ' ') {
             // Draw a space by moving position (p5 text(' ') might collapse)
@@ -875,18 +910,18 @@ class TextBox {
         this.drawCursor(wrappedLines, textX, startY, lineHeight);
       }
     }
-    
+
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
     if (shouldDim) {
       const dimColor = TextBox.COLORS.DIM_OVERLAY;
       fill(dimColor.r, dimColor.g, dimColor.b, dimColor.a);
       noStroke();
-      rect(this.x - this.width/2, this.y - this.height/2, 
-           this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
+      rect(this.x - this.width / 2, this.y - this.height / 2,
+        this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
     }
-    
+
     // (cursor drawn inside text branch where variables are defined)
-    
+
     // Draw resize handle in bottom-right corner (only when not editing)
     // Hide hover-triggered resize handle during arrow-key navigation
     if (!this.isEditing && ((this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) || this.isResizing)) {
@@ -894,49 +929,49 @@ class TextBox {
       const currentZoom = TextBox._getCurrentZoom();
       const zoomFactor = TextBox._getClampedZoomFactor();
       const scaledHandleSize = this.resizeHandleSize / zoomFactor;
-      
-      let handleX = this.x + this.width/2 - scaledHandleSize;
-      let handleY = this.y + this.height/2 - scaledHandleSize;
-      let cx = handleX + scaledHandleSize/2;
-      let cy = handleY + scaledHandleSize/2;
-      
+
+      let handleX = this.x + this.width / 2 - scaledHandleSize;
+      let handleY = this.y + this.height / 2 - scaledHandleSize;
+      let cx = handleX + scaledHandleSize / 2;
+      let cy = handleY + scaledHandleSize / 2;
+
       // Draw shadow for depth
       fill(0, 0, 0, 20);
       noStroke();
-      circle(cx + 0.5/currentZoom, cy + 1/currentZoom, scaledHandleSize * 1.2);
-      
+      circle(cx + 0.5 / currentZoom, cy + 1 / currentZoom, scaledHandleSize * 1.2);
+
       // Draw circular handle background with hover state
       fill(this.isMouseOverResizeHandle() ? color(100, 150, 255) : color(140, 140, 140));
       stroke(this.isMouseOverResizeHandle() ? color(70, 120, 230) : color(100, 100, 100));
       strokeWeight(1.5 / zoomFactor);
       circle(cx, cy, scaledHandleSize);
-      
+
       // Draw modern resize arrows (diagonal double-headed arrow)
       stroke(255);
       strokeWeight(1.8 / zoomFactor);
       strokeCap(ROUND);
-      
+
       // Main diagonal line
       let arrowSize = scaledHandleSize * 0.35;
-      let angle = PI/4 + PI; // 45 degrees rotated 180 degrees = 225 degrees (pointing from top-right to bottom-left)
+      let angle = PI / 4 + PI; // 45 degrees rotated 180 degrees = 225 degrees (pointing from top-right to bottom-left)
       let dx = cos(angle) * arrowSize;
       let dy = sin(angle) * arrowSize;
-      
+
       // Arrow pointing from top-right to bottom-left
       line(cx - dx, cy - dy, cx + dx, cy + dy);
-      
+
       // Arrow heads
       let headSize = scaledHandleSize * 0.2;
       // Top-right arrow head
-      line(cx - dx, cy - dy, cx - dx + headSize * cos(angle + PI/4), cy - dy + headSize * sin(angle + PI/4));
-      line(cx - dx, cy - dy, cx - dx + headSize * cos(angle - PI/4), cy - dy + headSize * sin(angle - PI/4));
+      line(cx - dx, cy - dy, cx - dx + headSize * cos(angle + PI / 4), cy - dy + headSize * sin(angle + PI / 4));
+      line(cx - dx, cy - dy, cx - dx + headSize * cos(angle - PI / 4), cy - dy + headSize * sin(angle - PI / 4));
       // Bottom-left arrow head
-      line(cx + dx, cy + dy, cx + dx - headSize * cos(angle + PI/4), cy + dy - headSize * sin(angle + PI/4));
-      line(cx + dx, cy + dy, cx + dx - headSize * cos(angle - PI/4), cy + dy - headSize * sin(angle - PI/4));
-      
+      line(cx + dx, cy + dy, cx + dx - headSize * cos(angle + PI / 4), cy + dy - headSize * sin(angle + PI / 4));
+      line(cx + dx, cy + dy, cx + dx - headSize * cos(angle - PI / 4), cy + dy - headSize * sin(angle - PI / 4));
+
       strokeCap(SQUARE); // Reset to default
     }
-    
+
     // Color palette circles are no longer drawn - color is changed via keyboard shortcuts (1, 2, 3)
 
     pop();
@@ -1077,16 +1112,16 @@ class TextBox {
     circle(pts.bottom.x, pts.bottom.y, r * 2);
     pop();
   }
-  
+
   isMouseOver() {
-      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-      return mx > this.x - this.width/2 &&
-        mx < this.x + this.width/2 &&
-        my > this.y - this.height/2 &&
-        my < this.y + this.height/2;
+    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
+    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    return mx > this.x - this.width / 2 &&
+      mx < this.x + this.width / 2 &&
+      my > this.y - this.height / 2 &&
+      my < this.y + this.height / 2;
   }
-  
+
   /**
    * Checks if mouse is over the resize handle
    * @returns {boolean} true if mouse is over resize handle
@@ -1094,23 +1129,23 @@ class TextBox {
   isMouseOverResizeHandle() {
     const zoomFactor = TextBox._getClampedZoomFactor();
     const scaledHandleSize = this.resizeHandleSize / zoomFactor;
-    let handleX = this.x + this.width/2 - scaledHandleSize;
-    let handleY = this.y + this.height/2 - scaledHandleSize;
-    let cx = handleX + scaledHandleSize/2;
-    let cy = handleY + scaledHandleSize/2;
+    let handleX = this.x + this.width / 2 - scaledHandleSize;
+    let handleY = this.y + this.height / 2 - scaledHandleSize;
+    let cx = handleX + scaledHandleSize / 2;
+    let cy = handleY + scaledHandleSize / 2;
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     // Use circular hit detection for the circular handle
     let distance = dist(mx, my, cx, cy);
-    return distance < scaledHandleSize/2;
+    return distance < scaledHandleSize / 2;
   }
-  
+
   isMouseOnEdge() {
     // Don't trigger edge connection if over resize handle
     if (this.isMouseOverResizeHandle()) {
       return false;
     }
-    
+
     // Make the draggable edge zone a bit larger, while keeping a minimum editable center
     const minCenterWidth = 20;  // ensure at least 20px center horizontal edit zone
     const minCenterHeight = 20; // ensure at least 20px center vertical edit zone
@@ -1125,81 +1160,81 @@ class TextBox {
 
     // For image boxes, the entire interior should behave like the edge-draggable area
     if (this.imageUrl) {
-      return mx > this.x - this.width/2 && mx < this.x + this.width/2 &&
-             my > this.y - this.height/2 && my < this.y + this.height/2;
+      return mx > this.x - this.width / 2 && mx < this.x + this.width / 2 &&
+        my > this.y - this.height / 2 && my < this.y + this.height / 2;
     }
-    let distFromLeft = abs(mx - (this.x - this.width/2));
-    let distFromRight = abs(mx - (this.x + this.width/2));
-    let distFromTop = abs(my - (this.y - this.height/2));
-    let distFromBottom = abs(my - (this.y + this.height/2));
-    
+    let distFromLeft = abs(mx - (this.x - this.width / 2));
+    let distFromRight = abs(mx - (this.x + this.width / 2));
+    let distFromTop = abs(my - (this.y - this.height / 2));
+    let distFromBottom = abs(my - (this.y + this.height / 2));
+
     let onVerticalEdge = (distFromLeft < verticalEdgeWidth || distFromRight < verticalEdgeWidth) &&
-           my > this.y - this.height/2 &&
-           my < this.y + this.height/2;
-    
+      my > this.y - this.height / 2 &&
+      my < this.y + this.height / 2;
+
     let onHorizontalEdge = (distFromTop < edgeThresholdY || distFromBottom < edgeThresholdY) &&
-                           mx > this.x - this.width/2 &&
-                           mx < this.x + this.width/2;
+      mx > this.x - this.width / 2 &&
+      mx < this.x + this.width / 2;
 
     return onVerticalEdge || onHorizontalEdge;
   }
-  
+
   getCursorPositionFromMouse(mx, my) {
     // Validate mouse coordinates
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return this.text ? this.text.length : 0;
     }
-    
+
     textSize(this.fontSize);
     let wrappedLines = this.wrapText(this.text);
-    
+
     // Handle empty wrapped lines
     if (!wrappedLines || wrappedLines.length === 0) {
       return 0;
     }
-    
+
     let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     // Top-anchored text positioning
     let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     let textX = this.x - this.width / 2 + this.padding;
-    
+
     // Find which visual line was clicked using a stable rounding strategy
     // This avoids off-by-one cases near the midline between rows
     let relativeY = (my - startY) / lineHeight;
     let clickedLine = Math.round(relativeY);
     if (!Number.isFinite(clickedLine)) clickedLine = 0;
     clickedLine = constrain(clickedLine, 0, wrappedLines.length - 1);
-    
+
     // Find position within the line
     let lineText = wrappedLines[clickedLine];
     let closestPos = lineText.length;
     let minDist = Infinity;
-    
+
     for (let i = 0; i <= lineText.length; i++) {
       let textBefore = lineText.slice(0, i);
       let xPos = textX + textWidth(textBefore);
       let dist = abs(mx - xPos);
-      
+
       if (dist < minDist) {
         minDist = dist;
         closestPos = i;
       }
     }
-    
+
     // Use character map to convert wrapped line position to absolute text position
     if (!this.cachedLineCharMap || clickedLine >= this.cachedLineCharMap.length) {
       // Fallback if map is not available
       return min(this.text.length, closestPos);
     }
-    
+
     let lineStartPos = this.cachedLineCharMap[clickedLine];
     return min(this.text.length, lineStartPos + closestPos);
   }
-  
+
   // ============================================================================
   // TEXT EDITING AND MANIPULATION
   // ============================================================================
-  
+
   /**
    * Helper: Checks if a character is whitespace
    * Uses shared utility if available
@@ -1213,7 +1248,7 @@ class TextBox {
     }
     return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
   }
-  
+
   /**
    * Starts editing mode at the given mouse position
    * @param {number} mx - Mouse X in world coordinates (optional)
@@ -1247,9 +1282,9 @@ class TextBox {
     this.selectionEnd = -1;
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
-    
+
   }
-  
+
   stopEditing() {
     this.isEditing = false;
     this.isSelecting = false;
@@ -1269,40 +1304,40 @@ class TextBox {
       const margin = 6; // make it a bit forgiving
       return mx >= left - margin && mx <= right + margin && my >= top - margin && my <= bottom + margin;
     }
-    
+
     textSize(this.fontSize);
     const wrappedLines = this.wrapText(this.text);
     const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     // Top-anchored: first line center at top+padding+lineHeight/2
     const startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
     const textX = this.x - this.width / 2 + this.padding;
-    
+
     // Find the nearest line index based on Y
     let lineIndex = Math.round((my - startY) / lineHeight);
     if (lineIndex < 0 || lineIndex >= wrappedLines.length) return false;
-    
+
     const lineCenterY = startY + lineIndex * lineHeight;
     const lineTop = lineCenterY - lineHeight / 2;
     const lineBottom = lineCenterY + lineHeight / 2;
-    
+
     // Margins to make selecting easier, and dragging more reliable
     const marginX = 6;
     const marginY = 4;
     if (my < lineTop - marginY || my > lineBottom + marginY) return false;
-    
+
     const lineText = wrappedLines[lineIndex] || '';
     let lineWidth = textWidth(lineText);
-    
+
     // For empty visual lines, allow clicks anywhere within the inner padded area
     const innerLeft = this.x - this.width / 2 + this.padding;
     const innerRight = this.x + this.width / 2 - this.padding;
     if (lineWidth <= 0) {
       return mx >= innerLeft - marginX && mx <= innerRight + marginX;
     }
-    
+
     const lineLeft = textX;
     const lineRight = textX + lineWidth;
-    
+
     // Only consider the actual text width on this line (with small margins)
     return mx >= lineLeft - marginX && mx <= lineRight + marginX;
   }
@@ -1374,7 +1409,7 @@ class TextBox {
     // (PDF handling removed) — PDFs are treated as images (preview) or normal text boxes.
 
     let pos = this.getCursorPositionFromMouse(mx, my);
-    
+
     // Check if clicking on a link (only when not already editing or when Cmd/Ctrl is held)
     const isCmd = typeof keyIsDown === 'function' && (keyIsDown(91) || keyIsDown(93) || keyIsDown(17));
     if (!this.isEditing || isCmd) {
@@ -1398,7 +1433,7 @@ class TextBox {
 
     const now = millis();
     const isDouble = (now - this.lastClickTime) <= this.doubleClickThreshold &&
-                     dist(mx, my, this.lastClickX, this.lastClickY) < 6;
+      dist(mx, my, this.lastClickX, this.lastClickY) < 6;
     this.lastClickTime = now;
     this.lastClickX = mx;
     this.lastClickY = my;
@@ -1441,7 +1476,7 @@ class TextBox {
     this.selectionStart = start;
     this.selectionEnd = end;
   }
-  
+
   /**
    * Adds a character at the cursor position
    * @param {string} char - Character to add
@@ -1451,20 +1486,20 @@ class TextBox {
     if (this.text === null || this.text === undefined) {
       this.text = '';
     }
-    
+
     // Validate char
     if (char === null || char === undefined) {
       return;
     }
-    
+
     // Sanitize the character being added (necessary for Enter key which can produce \r on some platforms)
     char = TextBox.sanitizeText(char);
-    
+
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       this.deleteSelection();
     }
-    
+
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
     // Prepare insertion
@@ -1476,7 +1511,7 @@ class TextBox {
     this.updateDimensions();
     this.resetCursorBlink();
   }
-  
+
   /**
    * Removes the character before the cursor (Backspace)
    */
@@ -1497,13 +1532,13 @@ class TextBox {
           this.selectionEnd = -1;
         }
         if (this.cursorPosition > 0) {
-              const delPos = this.cursorPosition - 1;
-              this.applyEditDelta(delPos, 1, 0);
-              this.text = this.text.slice(0, delPos) + this.text.slice(this.cursorPosition);
-              this.cursorPosition--;
+          const delPos = this.cursorPosition - 1;
+          this.applyEditDelta(delPos, 1, 0);
+          this.text = this.text.slice(0, delPos) + this.text.slice(this.cursorPosition);
+          this.cursorPosition--;
         }
       }
-          // highlights adjusted above via applyEditDelta
+      // highlights adjusted above via applyEditDelta
       this.updateDimensions();
     }
     this.resetCursorBlink();
@@ -1643,7 +1678,7 @@ class TextBox {
     }
     this.resetCursorBlink();
   }
-  
+
   /**
    * Selects all text in the box
    */
@@ -1651,7 +1686,7 @@ class TextBox {
     this.selectionStart = 0;
     this.selectionEnd = this.text.length;
   }
-  
+
   /**
    * Gets the currently selected text
    * @returns {string} Selected text or empty string
@@ -1664,7 +1699,7 @@ class TextBox {
     }
     return '';
   }
-  
+
   /**
    * Deletes the currently selected text
    */
@@ -1681,7 +1716,7 @@ class TextBox {
       this.updateDimensions();
     }
   }
-  
+
   /**
    * Pastes text at the cursor position
    * @param {string} pastedText - Text to paste
@@ -1691,18 +1726,18 @@ class TextBox {
     if (pastedText === null || pastedText === undefined) {
       return;
     }
-    
+
     // Ensure text is defined
     if (this.text === null || this.text === undefined) {
       this.text = '';
     }
-    
+
     // Sanitize pasted text to normalize line endings and remove invisible characters
     pastedText = TextBox.sanitizeText(pastedText);
-    
+
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
-    
+
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
       let start = min(this.selectionStart, this.selectionEnd);
@@ -1853,11 +1888,11 @@ class TextBox {
     }
     this.highlights = newHighlights;
   }
-  
+
   // ============================================================================
   // DRAGGING AND RESIZING
   // ============================================================================
-  
+
   /**
    * Starts dragging the box
    * @param {number} mx - Mouse X in world coordinates
@@ -1868,7 +1903,7 @@ class TextBox {
     this.dragOffsetX = this.x - mx;
     this.dragOffsetY = this.y - my;
   }
-  
+
   /**
    * Updates box position while dragging
    * @param {number} mx - Mouse X in world coordinates
@@ -1880,20 +1915,20 @@ class TextBox {
       if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
         return;
       }
-      
+
       // Move in world space - no constraints (allow infinite canvas)
       this.x = mx + this.dragOffsetX;
       this.y = my + this.dragOffsetY;
     }
   }
-  
+
   /**
    * Stops dragging the box
    */
   stopDrag() {
     this.isDragging = false;
   }
-  
+
   /**
    * Starts resizing the box
    * @param {number} mx - Mouse X in world coordinates
@@ -1910,7 +1945,7 @@ class TextBox {
     this.resizeStartLeft = this.x - this.width / 2;
     this.resizeStartTop = this.y - this.height / 2;
   }
-  
+
   /**
    * Updates box size while resizing
    * @param {number} mx - Mouse X in world coordinates
@@ -1922,10 +1957,10 @@ class TextBox {
       if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
         return;
       }
-      
+
       let deltaX = mx - this.resizeStartX;
       let deltaY = my - this.resizeStartY;
-      
+
       // Prevent NaN
       if (isNaN(deltaX) || isNaN(deltaY)) {
         return;
@@ -1987,16 +2022,16 @@ class TextBox {
       this.y = this.resizeStartTop + this.height / 2;
     }
   }
-  
+
   wrapTextForWidth(targetWidth) {
     let lines = this.text.split('\n');
     let wrappedLines = [];
     // Guard width for invalid targetWidth
     let baseWidth = (targetWidth != null && isFinite(targetWidth)) ? targetWidth : ((this.width != null && isFinite(this.width)) ? this.width : this.minWidth);
     let maxTextWidth = max(10, baseWidth - this.padding * 2);
-    
+
     textSize(this.fontSize);
-    
+
     for (let line of lines) {
       if (textWidth(line) <= maxTextWidth) {
         wrappedLines.push(line);
@@ -2004,10 +2039,10 @@ class TextBox {
         // Break line into words
         let words = line.split(' ');
         let currentLine = '';
-        
+
         for (let i = 0; i < words.length; i++) {
           let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-          
+
           if (textWidth(testLine) <= maxTextWidth) {
             currentLine = testLine;
           } else {
@@ -2031,17 +2066,17 @@ class TextBox {
             }
           }
         }
-        
+
         // Push the last line
         if (currentLine) {
           wrappedLines.push(currentLine);
         }
       }
     }
-    
+
     return wrappedLines.length > 0 ? wrappedLines : [''];
   }
-  
+
   /**
    * Stops resizing the box
    */
@@ -2054,11 +2089,11 @@ class TextBox {
     // Adjust center so the top remains fixed after height changes
     this.y = prevTop + this.height / 2;
   }
-  
+
   // ============================================================================
   // CONNECTIONS AND GEOMETRY
   // ============================================================================
-  
+
   /**
    * Gets the connection point on the edge of the box nearest to another box
    * @param {TextBox} otherBox - The target box
@@ -2069,72 +2104,73 @@ class TextBox {
     if (!otherBox || otherBox.x == null || otherBox.y == null) {
       return { x: this.x, y: this.y };
     }
-    
+
     let dx = otherBox.x - this.x;
     let dy = otherBox.y - this.y;
-    
+
     // Avoid division by zero and handle same position
     if (dx === 0 && dy === 0) {
       return { x: this.x + this.width / 2, y: this.y };
     }
-    
+
     let hw = this.width / 2;
     let hh = this.height / 2;
-    
+
     // Calculate intersection with each edge and pick the correct one
     let px, py;
-    
+
     // Calculate the ratio to reach each edge (handle division by zero)
     let t_right = (dx > 0) ? hw / dx : Infinity;
     let t_left = (dx < 0) ? -hw / dx : Infinity;
     let t_bottom = (dy > 0) ? hh / dy : Infinity;
     let t_top = (dy < 0) ? -hh / dy : Infinity;
-    
+
     // Find the smallest positive ratio (closest edge intersection)
     let t = min(t_right, t_left, t_bottom, t_top);
-    
+
     // Validate t
     if (!isFinite(t) || isNaN(t)) {
       return { x: this.x, y: this.y };
     }
-    
+
     // Calculate the intersection point
     px = this.x + t * dx;
     py = this.y + t * dy;
-    
+
     // Validate results
     if (isNaN(px) || isNaN(py) || !isFinite(px) || !isFinite(py)) {
       return { x: this.x, y: this.y };
     }
-    
+
     // Constrain to box bounds (for safety)
     px = constrain(px, this.x - hw, this.x + hw);
     py = constrain(py, this.y - hh, this.y + hh);
-    
+
     return { x: px, y: py };
   }
-  
+
   // ============================================================================
   // SERIALIZATION
   // ============================================================================
-  
+
   /**
    * Serializes the text box to JSON
    * @returns {Object} JSON representation
    */
   toJSON() {
     return {
+      id: this.id,
       x: this.x,
       y: this.y,
       text: this.text,
       imageUrl: this.imageUrl || null,
       width: this.width,
       height: this.height,
-      backgroundColor: this.backgroundColor
-      ,highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined
+      backgroundColor: this.backgroundColor,
+      highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined
     };
   }
-  
+
   /**
    * Creates a TextBox from JSON data
    * Uses shared utilities for validation when available
@@ -2147,17 +2183,22 @@ class TextBox {
       console.warn('Invalid box data');
       return null;
     }
-    
+
     // Use shared utility for number validation if available
     const isValid = TextBox._isValidNumber;
-    
+
     // Validate required fields with defaults
     let x = isValid(data.x) ? data.x : 100;
     let y = isValid(data.y) ? data.y : 100;
     let text = data.text != null ? TextBox.sanitizeText(String(data.text)) : 'New Node';
-    
+
     let box = new TextBox(x, y, text);
-    
+
+    // Preserve existing ID if present (for loading saved maps), otherwise keep generated one
+    if (data.id && typeof data.id === 'string') {
+      box.id = data.id;
+    }
+
     // Set optional dimensions if valid
     if (isValid(data.width) && data.width > 0) {
       box.width = data.width;
@@ -2202,7 +2243,7 @@ class TextBox {
         const start = Math.max(0, Math.min(textLen, Math.floor(h.start)));
         const end = Math.max(0, Math.min(textLen, Math.floor(h.end)));
         if (start >= end) continue;
-        
+
         // Validate highlight color with proper clamping
         let color;
         if (typeof Utils !== 'undefined' && Utils.validateColor) {
@@ -2226,14 +2267,14 @@ class TextBox {
     }
     // PDF embedding removed: we no longer load or store PDF URLs. If a map
     // contains a PDF URL, it will be ignored to avoid embedding binary data.
-    
+
     return box;
   }
-  
+
   // ============================================================================
   // CURSOR HELPERS
   // ============================================================================
-  
+
   /**
    * Resets cursor blink state (makes cursor visible)
    */
@@ -2241,7 +2282,7 @@ class TextBox {
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
   }
-  
+
   moveCursorLeft() {
     if (this.text == null) {
       this.text = '';
@@ -2253,7 +2294,7 @@ class TextBox {
       this.resetCursorBlink();
     }
   }
-  
+
   moveCursorRight() {
     if (this.text == null) {
       this.text = '';
@@ -2265,16 +2306,16 @@ class TextBox {
       this.resetCursorBlink();
     }
   }
-  
+
   moveCursorUp() {
     let wrappedLines = this.wrapText(this.text);
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
-    
+
     if (lineIndex > 0 && this.cachedLineCharMap) {
       // Move to previous line, same position or end of line
       let prevLineLength = wrappedLines[lineIndex - 1].length;
       let newPosInLine = min(posInLine, prevLineLength);
-      
+
       // Use character map to get the absolute position
       let prevLineStart = this.cachedLineCharMap[lineIndex - 1];
       this.cursorPosition = prevLineStart + newPosInLine;
@@ -2283,16 +2324,16 @@ class TextBox {
       this.resetCursorBlink();
     }
   }
-  
+
   moveCursorDown() {
     let wrappedLines = this.wrapText(this.text);
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
-    
+
     if (lineIndex < wrappedLines.length - 1 && this.cachedLineCharMap) {
       // Move to next line, same position or end of line
       let nextLineLength = wrappedLines[lineIndex + 1].length;
       let newPosInLine = min(posInLine, nextLineLength);
-      
+
       // Use character map to get the absolute position
       let nextLineStart = this.cachedLineCharMap[lineIndex + 1];
       this.cursorPosition = nextLineStart + newPosInLine;
@@ -2301,98 +2342,98 @@ class TextBox {
       this.resetCursorBlink();
     }
   }
-  
+
   getCursorLineAndPosition(wrappedLines) {
     // Validate inputs
     if (!wrappedLines || wrappedLines.length === 0) {
       return { lineIndex: 0, posInLine: 0 };
     }
-    
+
     if (this.text == null) {
       this.text = '';
     }
-    
+
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
-    
+
     // Use character map for precise mapping
     if (!this.cachedLineCharMap || this.cachedLineCharMap.length === 0) {
       return { lineIndex: 0, posInLine: 0 };
     }
-    
+
     // Find which wrapped line contains the cursor position
     let lineIndex = 0;
     for (let i = 0; i < this.cachedLineCharMap.length; i++) {
       let lineStart = this.cachedLineCharMap[i];
-      let lineEnd = (i < this.cachedLineCharMap.length - 1) 
-        ? this.cachedLineCharMap[i + 1] 
+      let lineEnd = (i < this.cachedLineCharMap.length - 1)
+        ? this.cachedLineCharMap[i + 1]
         : this.text.length;
       const isLast = (i === this.cachedLineCharMap.length - 1);
-      
+
       // Use half-open intervals [start, end) except on the last line where end is inclusive
       if ((this.cursorPosition >= lineStart && this.cursorPosition < lineEnd) ||
-          (isLast && this.cursorPosition >= lineStart && this.cursorPosition <= lineEnd)) {
+        (isLast && this.cursorPosition >= lineStart && this.cursorPosition <= lineEnd)) {
         lineIndex = i;
         break;
       }
-      
+
       // If cursor is past all mapped positions, it's on the last line
       if (isLast) {
         lineIndex = i;
       }
     }
-    
+
     // Calculate position within the wrapped line
     let lineStartPos = this.cachedLineCharMap[lineIndex];
     let posInLine = this.cursorPosition - lineStartPos;
-    
+
     // Ensure posInLine doesn't exceed the wrapped line length
     if (wrappedLines[lineIndex]) {
       posInLine = min(posInLine, wrappedLines[lineIndex].length);
     }
-    
+
     return { lineIndex, posInLine };
   }
-  
+
   drawCursor(wrappedLines, textX, startY, lineHeight) {
     // Validate inputs
-    if (!wrappedLines || wrappedLines.length === 0 || 
-        textX == null || startY == null || lineHeight == null ||
-        isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
+    if (!wrappedLines || wrappedLines.length === 0 ||
+      textX == null || startY == null || lineHeight == null ||
+      isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
       return;
     }
-    
+
     // Update cursor blink state
     let currentTime = millis();
     if (currentTime - this.cursorBlinkTime > this.cursorBlinkRate) {
       this.cursorVisible = !this.cursorVisible;
       this.cursorBlinkTime = currentTime;
     }
-    
+
     if (!this.cursorVisible) {
       return;
     }
-    
+
     // Find cursor position in wrapped text
     let { lineIndex, posInLine } = this.getCursorLineAndPosition(wrappedLines);
-    
+
     // Validate line index
     if (lineIndex < 0 || lineIndex >= wrappedLines.length) {
       return;
     }
-    
+
     // Calculate cursor screen position
     textSize(this.fontSize);
     let lineText = wrappedLines[lineIndex] || '';
     let textBeforeCursor = lineText.slice(0, max(0, posInLine));
     let cursorX = textX + textWidth(textBeforeCursor);
     let cursorY = startY + lineIndex * lineHeight;
-    
+
     // Validate cursor position
     if (isNaN(cursorX) || isNaN(cursorY)) {
       return;
     }
-    
+
     // Draw cursor line and scale stroke with global zoom for visibility
     push();
     const zoomFactor = TextBox._getClampedZoomFactor();
@@ -2402,44 +2443,44 @@ class TextBox {
     line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
     pop();
   }
-  
+
   drawSelection(wrappedLines, textX, startY, lineHeight) {
     // Validate inputs
-    if (!wrappedLines || wrappedLines.length === 0 || 
-        textX == null || startY == null || lineHeight == null ||
-        isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
+    if (!wrappedLines || wrappedLines.length === 0 ||
+      textX == null || startY == null || lineHeight == null ||
+      isNaN(textX) || isNaN(startY) || isNaN(lineHeight)) {
       return;
     }
-    
+
     let start = min(this.selectionStart, this.selectionEnd);
     let end = max(this.selectionStart, this.selectionEnd);
-    
+
     if (start === end || start < 0 || end < 0) return;
-    
+
     textSize(this.fontSize);
-    
+
     // Convert absolute positions to line positions
     let startInfo = this.getLineAndPositionFromChar(start, wrappedLines);
     let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
-    
+
     // Validate line indices
     if (startInfo.lineIndex < 0 || startInfo.lineIndex >= wrappedLines.length ||
-        endInfo.lineIndex < 0 || endInfo.lineIndex >= wrappedLines.length) {
+      endInfo.lineIndex < 0 || endInfo.lineIndex >= wrappedLines.length) {
       return;
     }
-    
+
     push();
     const selColor = TextBox.COLORS.SELECTION_HIGHLIGHT;
     fill(selColor.r, selColor.g, selColor.b, selColor.a);
     noStroke();
-    
+
     if (startInfo.lineIndex === endInfo.lineIndex) {
       // Selection within single line
       let lineText = wrappedLines[startInfo.lineIndex] || '';
       let x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
       let x2 = textX + textWidth(lineText.slice(0, max(0, endInfo.posInLine)));
       let y = startY + startInfo.lineIndex * lineHeight;
-      
+
       if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
         rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
       }
@@ -2447,11 +2488,11 @@ class TextBox {
       // Multi-line selection
       for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
         if (i < 0 || i >= wrappedLines.length) continue;
-        
+
         let lineText = wrappedLines[i] || '';
         let y = startY + i * lineHeight;
         let x1, x2;
-        
+
         if (i === startInfo.lineIndex) {
           // First line: from start position to end of line
           x1 = textX + textWidth(lineText.slice(0, max(0, startInfo.posInLine)));
@@ -2465,13 +2506,13 @@ class TextBox {
           x1 = textX;
           x2 = textX + textWidth(lineText);
         }
-        
+
         if (!isNaN(x1) && !isNaN(x2) && !isNaN(y)) {
           rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
         }
       }
     }
-    
+
     pop();
   }
 
@@ -2528,44 +2569,44 @@ class TextBox {
     }
     pop();
   }
-  
+
   getLineAndPositionFromChar(charPos, wrappedLines) {
     // Use character map for precise mapping
     if (!this.cachedLineCharMap || this.cachedLineCharMap.length === 0) {
       return { lineIndex: 0, posInLine: 0 };
     }
-    
+
     // Find which wrapped line contains the character position
     let lineIndex = 0;
     for (let i = 0; i < this.cachedLineCharMap.length; i++) {
       let lineStart = this.cachedLineCharMap[i];
-      let lineEnd = (i < this.cachedLineCharMap.length - 1) 
-        ? this.cachedLineCharMap[i + 1] 
+      let lineEnd = (i < this.cachedLineCharMap.length - 1)
+        ? this.cachedLineCharMap[i + 1]
         : this.text.length;
       const isLast = (i === this.cachedLineCharMap.length - 1);
-      
+
       // Use half-open intervals [start, end) except on the last line where end is inclusive
       if ((charPos >= lineStart && charPos < lineEnd) ||
-          (isLast && charPos >= lineStart && charPos <= lineEnd)) {
+        (isLast && charPos >= lineStart && charPos <= lineEnd)) {
         lineIndex = i;
         break;
       }
-      
+
       // If charPos is past all mapped positions, it's on the last line
       if (isLast) {
         lineIndex = i;
       }
     }
-    
+
     // Calculate position within the wrapped line
     let lineStartPos = this.cachedLineCharMap[lineIndex];
     let posInLine = charPos - lineStartPos;
-    
+
     // Ensure posInLine doesn't exceed the wrapped line length
     if (wrappedLines[lineIndex]) {
       posInLine = min(posInLine, wrappedLines[lineIndex].length);
     }
-    
+
     return { lineIndex, posInLine };
   }
 }

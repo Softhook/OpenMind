@@ -109,6 +109,16 @@ class MindMap {
   }
 
   /**
+   * Finds a box by its unique ID
+   * @param {string} id - The box ID to search for
+   * @returns {TextBox|null} The box with the given ID, or null if not found
+   */
+  getBoxById(id) {
+    if (!id || typeof id !== 'string') return null;
+    return this.boxes.find(box => box && box.id === id) || null;
+  }
+
+  /**
    * Adds a connection between two boxes
    * @param {TextBox} fromBox - Source box
    * @param {TextBox} toBox - Target box
@@ -1476,7 +1486,7 @@ class MindMap {
       box.stopResize();
       box.stopSelecting();
     }
-    
+
     if (wasInteracting) {
       this.isArrowKeyNavigating = false;
     }
@@ -1628,12 +1638,12 @@ class MindMap {
       }
     } else if (keyCode === UP_ARROW || keyCode === DOWN_ARROW || keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
       // Arrow keys for box navigation when NOT editing text
-      
+
       // Block navigation during active interactions
       if (this.connectingFrom || this.draggingConnection) {
         return; // Ignore arrow keys while creating/reattaching connections
       }
-      
+
       // Check if any box is being dragged or resized
       let anyBoxInteracting = false;
       if (this.boxes) {
@@ -1647,7 +1657,7 @@ class MindMap {
       if (anyBoxInteracting) {
         return; // Ignore arrow keys during drag/resize operations
       }
-      
+
       // If a box is selected but in editing mode, exit editing first so navigation can begin from that box
       if (this.selectedBox && this.selectedBox.isEditing) {
         this.selectedBox.stopEditing();
@@ -1655,7 +1665,7 @@ class MindMap {
         // This gives them a chance to see the box is no longer editing
         return;
       }
-      
+
       // If a box is selected but we're not yet in arrow key navigation mode,
       // the first arrow press should enter presentation mode on the CURRENT box
       // (not navigate to the next one yet)
@@ -1663,7 +1673,7 @@ class MindMap {
         this.selectAndPanToBox(this.selectedBox);
         return;
       }
-      
+
       this.navigateBoxes(keyCode);
     } else if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) {
       // CMD/CTRL combinations when NOT editing text
@@ -1727,8 +1737,10 @@ class MindMap {
           // Paste all copied boxes with offset and track new boxes
           const newBoxes = [];
           for (const boxData of this.copiedBoxes) {
+            // Destructure to exclude id - pasted boxes must get new unique IDs
+            const { id: _excludedId, ...boxDataWithoutId } = boxData;
             const newBoxData = {
-              ...boxData,
+              ...boxDataWithoutId,
               x: boxData.x + offsetX,
               y: boxData.y + offsetY
             };

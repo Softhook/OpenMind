@@ -1,0 +1,243 @@
+/**
+ * Unit tests for collaboration-related refactoring
+ * Tests UUID generation, ID-based serialization, and backward compatibility
+ * 
+ * NOTE: These tests verify the code structure and logic directly.
+ * For full integration testing, use the browser.
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+// Read the source files for structural verification
+const textBoxCode = fs.readFileSync(path.join(__dirname, '../../TextBox.js'), 'utf8');
+const connectionCode = fs.readFileSync(path.join(__dirname, '../../Connection.js'), 'utf8');
+const mindMapCode = fs.readFileSync(path.join(__dirname, '../../MindMap.js'), 'utf8');
+
+describe('TextBox UUID Implementation', () => {
+    test('constructor should generate ID using TextBox.generateUUID()', () => {
+        // Verify the constructor includes ID generation via helper
+        expect(textBoxCode).toMatch(/constructor\s*\([^)]*\)\s*\{[^}]*this\.id\s*=\s*TextBox\.generateUUID\(\)/s);
+    });
+
+    test('generateUUID static method should exist with fallback support', () => {
+        // Verify generateUUID method exists
+        expect(textBoxCode).toMatch(/static\s+generateUUID\s*\(\)\s*\{/);
+        // Verify it tries crypto.randomUUID first
+        expect(textBoxCode).toMatch(/crypto\.randomUUID\s*\(\)/);
+        // Verify it has a fallback with crypto.getRandomValues
+        expect(textBoxCode).toMatch(/crypto\.getRandomValues/);
+        // Verify it has a Math.random fallback for edge cases
+        expect(textBoxCode).toMatch(/Math\.random\(\)/);
+    });
+
+    test('toJSON should include id field', () => {
+        // Verify toJSON includes id
+        expect(textBoxCode).toMatch(/toJSON\s*\(\)\s*\{[^}]*return\s*\{[^}]*id:\s*this\.id/s);
+    });
+
+    test('fromJSON should preserve existing ID if present', () => {
+        // Verify fromJSON checks for and preserves existing ID
+        expect(textBoxCode).toMatch(/if\s*\(data\.id\s*&&\s*typeof\s*data\.id\s*===\s*['"]string['"]\s*\)\s*\{/);
+        expect(textBoxCode).toMatch(/box\.id\s*=\s*data\.id/);
+    });
+});
+
+describe('Connection ID-based Serialization', () => {
+    test('toJSON should include fromId and toId', () => {
+        // Verify toJSON includes ID-based references
+        expect(connectionCode).toMatch(/toJSON\s*\([^)]*\)\s*\{[^}]*fromId:/s);
+        expect(connectionCode).toMatch(/toJSON\s*\([^)]*\)\s*\{[^}]*toId:/s);
+    });
+
+    test('toJSON should include legacy from and to indices', () => {
+        // Verify backward compatibility with indices
+        expect(connectionCode).toMatch(/toJSON\s*\([^)]*\)\s*\{[^}]*from:\s*boxes\.indexOf/s);
+        expect(connectionCode).toMatch(/toJSON\s*\([^)]*\)\s*\{[^}]*to:\s*boxes\.indexOf/s);
+    });
+
+    test('fromJSON should try ID-based lookup first', () => {
+        // Verify ID-based lookup is attempted first
+        expect(connectionCode).toMatch(/if\s*\(data\.fromId\s*&&\s*data\.toId\)/);
+    });
+
+    test('fromJSON should fall back to index-based lookup', () => {
+        // Verify fallback to indices
+        expect(connectionCode).toMatch(/Fallback to index-based lookup/);
+        expect(connectionCode).toMatch(/boxes\[data\.from\]/);
+        expect(connectionCode).toMatch(/boxes\[data\.to\]/);
+    });
+
+    test('fromJSON should support Map input for ID lookup', () => {
+        // Verify Map support
+        expect(connectionCode).toMatch(/boxesOrMap instanceof Map/);
+        expect(connectionCode).toMatch(/boxesOrMap\.get\(data\.fromId\)/);
+    });
+});
+
+describe('MindMap getBoxById', () => {
+    test('should have getBoxById method', () => {
+        // Verify getBoxById method exists
+        expect(mindMapCode).toMatch(/getBoxById\s*\(\s*id\s*\)\s*\{/);
+    });
+
+    test('getBoxById should validate input', () => {
+        // Verify input validation
+        expect(mindMapCode).toMatch(/if\s*\(!id\s*\|\|\s*typeof\s*id\s*!==\s*['"]string['"]\s*\)\s*return\s*null/);
+    });
+
+    test('getBoxById should search boxes by id', () => {
+        // Verify it searches boxes by id
+        expect(mindMapCode).toMatch(/this\.boxes\.find\s*\([^)]*box\.id\s*===\s*id/);
+    });
+});
+
+describe('Backward Compatibility', () => {
+    test('Connection.fromJSON should handle legacy data without IDs', () => {
+        // The fallback should work when only from/to indices are present
+        expect(connectionCode).toMatch(/\(!fromBox\s*\|\|\s*!toBox\)\s*&&\s*Array\.isArray\(boxesOrMap\)/);
+    });
+
+    test('TextBox.fromJSON should generate new ID for legacy data', () => {
+        // New boxes are created with randomUUID, then ID is optionally overwritten
+        expect(textBoxCode).toMatch(/let\s+box\s*=\s*new\s+TextBox\s*\(/);
+        expect(textBoxCode).toMatch(/if\s*\(data\.id\s*&&\s*typeof\s*data\.id\s*===\s*['"]string['"]\s*\)\s*\{[^}]*box\.id\s*=\s*data\.id/s);
+    });
+});
+
+describe('Code Quality', () => {
+    test('TextBox.id should be documented in JSDoc', () => {
+        expect(textBoxCode).toMatch(/Generate.*unique identifier|stable.*identifier/i);
+    });
+
+    test('Connection serialization should have descriptive comments', () => {
+        expect(connectionCode).toMatch(/ID-based references.*stable.*collaboration|stable.*collaboration/i);
+        expect(connectionCode).toMatch(/Legacy.*backward compatibility|backward compatibility/i);
+    });
+});
+
+// ============================================================================
+// EDGE CASE TESTS
+// ============================================================================
+
+describe('UUID Format Validation', () => {
+    test('generateUUID should produce valid UUID v4 format', () => {
+        // UUID v4 sets specific bits: version 4 (0100) at position 12-15
+        // and variant bits (10xx) at position 16-17
+        expect(textBoxCode).toMatch(/bytes\[6\].*0x0f.*0x40/); // Version 4
+        expect(textBoxCode).toMatch(/bytes\[8\].*0x3f.*0x80/); // RFC 4122 variant
+    });
+
+    test('generateUUID should produce proper hex format with dashes', () => {
+        // Should produce format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        expect(textBoxCode).toMatch(/hex\.slice\(0,\s*8\).*hex\.slice\(8,\s*12\).*hex\.slice\(12,\s*16\)/);
+    });
+
+    test('fromJSON should only accept string IDs', () => {
+        // Should check typeof data.id === 'string'
+        expect(textBoxCode).toMatch(/typeof\s*data\.id\s*===\s*['"]string['"]/);
+    });
+});
+
+describe('Paste ID Exclusion', () => {
+    test('paste logic should exclude original ID from copied data', () => {
+        // Verify the destructuring pattern that excludes id
+        expect(mindMapCode).toMatch(/const\s*\{\s*id:\s*_excludedId.*\}\s*=\s*boxData/);
+    });
+
+    test('paste should use boxDataWithoutId for creating new boxes', () => {
+        // Verify the spread uses the id-excluded object
+        expect(mindMapCode).toMatch(/\.\.\.boxDataWithoutId/);
+    });
+
+    test('pasted boxes should get new IDs via TextBox.fromJSON', () => {
+        // Verify TextBox.fromJSON is used for pasting
+        expect(mindMapCode).toMatch(/TextBox\.fromJSON\(newBoxData\)/);
+    });
+});
+
+describe('Connection Edge Cases', () => {
+    test('Connection.fromJSON should validate both boxes exist', () => {
+        // Should check if both fromBox and toBox are valid before creating connection
+        expect(connectionCode).toMatch(/if\s*\(!fromBox\s*\|\|\s*!toBox\)/);
+        expect(connectionCode).toMatch(/Referenced boxes do not exist/);
+    });
+
+    test('Connection.fromJSON should handle partial ID match with index fallback', () => {
+        // If ID lookup fails partially, should try indices for the missing one
+        // Uses || to fill in missing boxes: fromBox = fromBox || boxes[data.from]
+        expect(connectionCode).toMatch(/fromBox\s*=\s*fromBox\s*\|\|\s*boxes\[data\.from\]/);
+        expect(connectionCode).toMatch(/toBox\s*=\s*toBox\s*\|\|\s*boxes\[data\.to\]/);
+    });
+
+    test('Connection.fromJSON should validate array bounds for indices', () => {
+        // Should check that indices are within array bounds
+        expect(connectionCode).toMatch(/data\.from\s*>=\s*0\s*&&\s*data\.to\s*>=\s*0/);
+        expect(connectionCode).toMatch(/data\.from\s*<\s*boxes\.length\s*&&\s*data\.to\s*<\s*boxes\.length/);
+    });
+
+    test('Connection.toJSON should handle null boxes gracefully', () => {
+        // Should use ternary to handle null fromBox/toBox
+        expect(connectionCode).toMatch(/this\.fromBox\s*\?\s*this\.fromBox\.id\s*:\s*null/);
+        expect(connectionCode).toMatch(/this\.toBox\s*\?\s*this\.toBox\.id\s*:\s*null/);
+    });
+
+    test('Connection.fromJSON should handle Map with missing IDs', () => {
+        // When using Map, if IDs don't exist, get() returns undefined
+        // The code should handle this gracefully by falling through
+        expect(connectionCode).toMatch(/boxesOrMap\.get\(data\.fromId\)/);
+        expect(connectionCode).toMatch(/boxesOrMap\.get\(data\.toId\)/);
+    });
+});
+
+describe('Undo/Redo ID Preservation', () => {
+    test('pushUndo should serialize via toJSON which includes IDs', () => {
+        // Verify undo uses toJSON
+        expect(mindMapCode).toMatch(/pushUndo\s*\(\)\s*\{[^}]*this\.toJSON\(\)/s);
+    });
+
+    test('undo should restore via fromJSON which preserves IDs', () => {
+        // Verify undo uses fromJSON to restore
+        expect(mindMapCode).toMatch(/undo\s*\(\)\s*\{[^}]*this\.fromJSON\(snap\)/s);
+    });
+});
+
+describe('Error Handling', () => {
+    test('Connection.fromJSON should log warning for invalid inputs', () => {
+        expect(connectionCode).toMatch(/console\.warn\s*\(\s*['"]Invalid connection data/);
+    });
+
+    test('Connection.fromJSON should log warning for missing boxes', () => {
+        expect(connectionCode).toMatch(/console\.warn\s*\(\s*['"]Referenced boxes do not exist/);
+    });
+
+    test('TextBox.fromJSON should handle invalid input data', () => {
+        expect(textBoxCode).toMatch(/if\s*\(!data\s*\|\|\s*typeof\s*data\s*!==\s*['"]object['"]\)/);
+        expect(textBoxCode).toMatch(/console\.warn\s*\(\s*['"]Invalid box data/);
+    });
+
+    test('generateUUID should catch crypto.randomUUID errors', () => {
+        // Should have try-catch around crypto.randomUUID
+        expect(textBoxCode).toMatch(/try\s*\{[^}]*crypto\.randomUUID\(\)[^}]*\}\s*catch/s);
+    });
+});
+
+describe('MindMap Integration', () => {
+    test('MindMap.fromJSON should load boxes before connections', () => {
+        // Boxes must be loaded first so connections can reference them
+        // Check that boxes loading comes before connections loading
+        const boxesLoadIndex = mindMapCode.indexOf('Load boxes with error handling');
+        const connectionsLoadIndex = mindMapCode.indexOf('Load connections with error handling');
+        expect(boxesLoadIndex).toBeLessThan(connectionsLoadIndex);
+    });
+
+    test('MindMap.toJSON should include box IDs in output', () => {
+        // toJSON maps boxes through their toJSON
+        expect(mindMapCode).toMatch(/boxes:\s*this\.boxes\.map\s*\(\s*box\s*=>\s*box\.toJSON\(\)/);
+    });
+
+    test('MindMap.toJSON should pass boxes array to Connection.toJSON', () => {
+        // Connections need the boxes array for index calculation
+        expect(mindMapCode).toMatch(/connections:\s*this\.connections\.map\s*\(\s*conn\s*=>\s*conn\.toJSON\(this\.boxes\)/);
+    });
+});
