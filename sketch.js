@@ -907,6 +907,10 @@ function draw() {
       }
 
       // Draw remote users' cursors (in world space)
+      if (typeof collaborationManager !== 'undefined' && collaborationManager && typeof collaborationManager.updateCursors === 'function') {
+        collaborationManager.updateCursors();
+      }
+
       if (typeof drawRemoteCursors === 'function') {
         drawRemoteCursors();
       }

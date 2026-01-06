@@ -127,6 +127,9 @@ class TextBox {
     this.id = TextBox.generateUUID();
     this.x = x;
     this.y = y;
+    // Interpolation targets (init to current pos)
+    this.targetX = x;
+    this.targetY = y;
     this.text = TextBox.sanitizeText(text);
     this.imageUrl = null;
     this.img = null;
@@ -731,6 +734,26 @@ class TextBox {
 
     // Get zoom factor for UI scaling
     const zoomFactor = TextBox._getClampedZoomFactor();
+
+    // INTERPOLATION: Smoothly move towards target if not being dragged
+    if (!this.isDragging && !this.isResizing) {
+      // Simple lerp
+      if (typeof this.targetX === 'number' && Math.abs(this.targetX - this.x) > 0.5) {
+        this.x = this.x + (this.targetX - this.x) * 0.2;
+      } else if (typeof this.targetX === 'number') {
+        this.x = this.targetX;
+      }
+
+      if (typeof this.targetY === 'number' && Math.abs(this.targetY - this.y) > 0.5) {
+        this.y = this.y + (this.targetY - this.y) * 0.2;
+      } else if (typeof this.targetY === 'number') {
+        this.y = this.targetY;
+      }
+    } else {
+      // If dragging, snap target to current to avoid rubber-banding when released
+      this.targetX = this.x;
+      this.targetY = this.y;
+    }
 
     // Draw box
     if (this.isEditing) {

@@ -17,26 +17,37 @@ class CollaborationManager {
     // CONSTANTS
     // ============================================================================
 
-    static WEBSOCKET_SERVER = (() => {
-        if (typeof window === 'undefined') return 'ws://localhost:1234';
+    static PRODUCTION_SERVER = 'wss://y-websocket-19go.onrender.com';
+    static LOCAL_SERVER_PORT = 1234;
 
-        // Check for manual override via URL parameter (e.g. ?server=public)
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('server') === 'public' || params.get('server') === 'demo') {
-            return 'wss://demos.yjs.dev';
+    static WEBSOCKET_SERVER = (() => {
+        if (typeof window === 'undefined') {
+            return `ws://localhost:${CollaborationManager.LOCAL_SERVER_PORT}`;
         }
 
         const host = window.location.hostname;
-        // Check for localhost
-        if (host === 'localhost' || host === '127.0.0.1') {
-            return 'ws://localhost:1234';
+        const params = new URLSearchParams(window.location.search);
+        const serverOverride = params.get('server');
+
+        // Manual override via URL parameter (e.g. ?server=public)
+        if (serverOverride === 'public' || serverOverride === 'demo') {
+            return 'wss://demos.yjs.dev';
         }
-        // Check for private/LAN IP addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-        if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host)) {
-            return `ws://${host}:1234`;
+
+        // Local development environments
+        const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+        const isPrivateIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host);
+
+        if (isLocalhost) {
+            return `ws://localhost:${CollaborationManager.LOCAL_SERVER_PORT}`;
         }
-        // Otherwise use production server
-        return 'wss://y-websocket-19go.onrender.com';
+
+        if (isPrivateIP) {
+            return `ws://${host}:${CollaborationManager.LOCAL_SERVER_PORT}`;
+        }
+
+        // Production
+        return CollaborationManager.PRODUCTION_SERVER;
     })();
 
     static DEFAULT_USER_COLORS = [
@@ -44,6 +55,9 @@ class CollaborationManager {
         '#2196f3', '#00bcd4', '#009688', '#4caf50',
         '#8bc34a', '#ff9800', '#ff5722', '#795548'
     ];
+
+    // Timing constants
+    static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
 
     // ============================================================================
     // CONSTRUCTOR
@@ -85,6 +99,9 @@ class CollaborationManager {
         // Yjs and y-websocket modules (loaded dynamically)
         this.Y = null;
         this.WebsocketProvider = null;
+
+        // Interpolation
+        this.interpolatedCursors = new Map(); // userId -> { x, y, targetX, targetY, lastUpdate }
     }
 
     // ============================================================================
@@ -115,7 +132,7 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                captureTimeout: 100 // Merge edits within 100ms into one undo step (more granular)
+                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
@@ -174,28 +191,39 @@ class CollaborationManager {
             this.awareness = this.provider.awareness;
             this._setupAwareness();
 
-            // Track connection state
+            // Track connection state - set isConnected based on actual WebSocket status
+            this.provider.on('status', ({ status }) => {
+                console.log('CollaborationManager: Connection status:', status);
+                const wasConnected = this.isConnected;
+                this.isConnected = (status === 'connected');
+
+                if (this.onConnectionChange) {
+                    this.onConnectionChange(status);
+                }
+
+                // Notify about peer changes when connection status changes
+                if (wasConnected !== this.isConnected && this.onPeersChange) {
+                    this.onPeersChange(this.getRemoteUsers());
+                }
+            });
+
+            // Track sync state
             this.provider.on('synced', ({ synced }) => {
                 console.log('CollaborationManager: Sync status:', synced);
+
+                // FORCE connection state to true if synced (fixes split-brain issue)
+                if (synced && !this.isConnected) {
+                    console.log('CollaborationManager: Synced implies connected. Forcing state.');
+                    this.isConnected = true;
+                    if (this.onConnectionChange) this.onConnectionChange('connected');
+                }
+
                 if (this.onConnectionChange) {
                     this.onConnectionChange(synced ? 'synced' : 'syncing');
                 }
             });
 
-            // Track connection status
-            this.provider.on('status', ({ status }) => {
-                console.log('CollaborationManager: Connection status:', status);
-                if (this.onConnectionChange) {
-                    this.onConnectionChange(status);
-                }
-            });
-
-            this.isConnected = true;
-            console.log(`CollaborationManager: Connected to room "${roomName}"`);
-
-            if (this.onConnectionChange) {
-                this.onConnectionChange('connected');
-            }
+            console.log(`CollaborationManager: Connecting to room "${roomName}"...`);
 
         } catch (error) {
             console.error('CollaborationManager: Failed to connect', error);
@@ -325,20 +353,19 @@ class CollaborationManager {
      * @private
      */
     _setupMindMapCallbacks() {
-        const self = this;
-
         // When a box changes locally, sync to Yjs
+        // Note: Using arrow functions which capture `this` automatically
         if (typeof MindMap !== 'undefined') {
             MindMap.onBoxChange = (box) => {
-                self.syncBoxToYjs(box);
+                this.syncBoxToYjs(box);
             };
 
             MindMap.onBoxDelete = (boxId) => {
-                self.deleteBoxFromYjs(boxId);
+                this.deleteBoxFromYjs(boxId);
             };
 
             MindMap.onConnectionsChange = () => {
-                self.syncConnectionsToYjs();
+                this.syncConnectionsToYjs();
             };
         }
     }
@@ -360,7 +387,7 @@ class CollaborationManager {
     // ============================================================================
 
     /**
-     * Dynamically loads Yjs and y-webrtc from CDN
+     * Dynamically loads Yjs and y-websocket from CDN
      * @private
      */
     async _loadDependencies() {
@@ -375,13 +402,10 @@ class CollaborationManager {
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
             console.log('CollaborationManager: Dependencies loaded via ESM.sh (Websockets)');
-            return;
         } catch (error) {
             console.error('CollaborationManager: Failed to load dependencies', error);
             throw new Error('Failed to load collaboration dependencies. Internet connection required.');
         }
-
-
     }
 
     // ============================================================================
@@ -482,19 +506,60 @@ class CollaborationManager {
             .filter(c => c && c.fromBox && c.toBox)
             .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
 
-        // Get current Yjs connections
-        const yjsConns = this.yconnections.toArray();
-
-        // Simple diff: clear and replace (for MVP)
-        // TODO: Optimize with proper diff for large connection sets
+        // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
         this.ydoc.transact(() => {
-            // Clear existing
-            while (this.yconnections.length > 0) {
-                this.yconnections.delete(0);
-            }
-            // Add current
+            const yjsConns = this.yconnections.toArray();
+
+            // Map valid Yjs connections to their current indices (handling potential duplicates)
+            // format: "fromId->toId" => [index1, index2...]
+            const yjsMap = new Map();
+            yjsConns.forEach((c, i) => {
+                if (c && c.fromId && c.toId) {
+                    const key = `${c.fromId}->${c.toId}`;
+                    if (!yjsMap.has(key)) yjsMap.set(key, []);
+                    yjsMap.get(key).push(i);
+                }
+            });
+
+            // Identify connections to keep vs add
+            const toAdd = [];
+
             for (const conn of localConns) {
-                this.yconnections.push([conn]);
+                const key = `${conn.fromId}->${conn.toId}`;
+                if (yjsMap.has(key)) {
+                    // Connection exists in Yjs, keep one instance of it
+                    const indices = yjsMap.get(key);
+                    if (indices.length > 0) {
+                        // consume one index (remove from list so we don't use it again)
+                        indices.shift();
+                        // if list empty, remove key
+                        if (indices.length === 0) yjsMap.delete(key);
+                    } else {
+                        // Should be unreachable if logic is correct
+                        toAdd.push(conn);
+                    }
+                } else {
+                    // Not in Yjs, need to add
+                    toAdd.push(conn);
+                }
+            }
+
+            // Identify connections to delete (anything remaining in yjsMap)
+            // We must collect ALL indices to delete
+            const indicesToDelete = [];
+            for (const indices of yjsMap.values()) {
+                indicesToDelete.push(...indices);
+            }
+
+            // Delete in descending order to avoid index shifting problems
+            indicesToDelete.sort((a, b) => b - a);
+            for (const index of indicesToDelete) {
+                this.yconnections.delete(index, 1);
+            }
+
+            // Add new connections
+            if (toAdd.length > 0) {
+                this.yconnections.push(toAdd);
             }
         });
     }
@@ -540,7 +605,10 @@ class CollaborationManager {
 
         // Observe connection changes
         this.yconnections.observe((event) => {
+            // Skip if we're in a sync loop, but DO process undo/redo transactions
+            const isUndoRedo = event.transaction.origin === this.undoManager;
             if (this.isSyncing) return;
+            if (event.transaction.local && !isUndoRedo) return;
 
             this.isSyncing = true;
             try {
@@ -567,13 +635,18 @@ class CollaborationManager {
         let box = this.mindMap.getBoxById(boxId);
 
         if (box) {
-            // Update existing box
-            box.x = data.x;
-            box.y = data.y;
-            box.text = data.text || '';
-            box.width = data.width;
-            box.height = data.height;
-            if (data.backgroundColor) {
+            // INTERPOLATION: Update targets, not direct position, unless it's a new box or we need to snap
+            if (typeof data.x === 'number') box.targetX = data.x;
+            if (typeof data.y === 'number') box.targetY = data.y;
+
+            // Update existing box with validation
+            // if (typeof data.x === 'number') box.x = data.x; // Replaced by targetX
+            // if (typeof data.y === 'number') box.y = data.y; // Replaced by targetY
+            if (typeof data.text === 'string') box.text = data.text;
+            if (typeof data.width === 'number') box.width = data.width;
+            if (typeof data.height === 'number') box.height = data.height;
+
+            if (data.backgroundColor && typeof data.backgroundColor === 'object') {
                 box.backgroundColor = { ...data.backgroundColor };
             }
             if (data.imageUrl !== undefined) {
@@ -662,10 +735,22 @@ class CollaborationManager {
             selectedBoxIds: []
         });
 
-        // Observe awareness changes
+        // Observe awareness changes with error handling
         this.awareness.on('change', () => {
-            if (this.onAwarenessChange) {
-                this.onAwarenessChange(this.getRemoteUsers());
+            try {
+                const remoteUsers = this.getRemoteUsers();
+
+                // Notify about awareness changes
+                if (this.onAwarenessChange) {
+                    this.onAwarenessChange(remoteUsers);
+                }
+
+                // Also notify about peer changes (awareness includes peer list)
+                if (this.onPeersChange) {
+                    this.onPeersChange(remoteUsers);
+                }
+            } catch (error) {
+                console.error('CollaborationManager: Error in awareness change handler', error);
             }
         });
     }
@@ -691,8 +776,8 @@ class CollaborationManager {
     }
 
     /**
-     * Gets all remote users' awareness states
-     * @returns {Array<{clientId, user, cursor, selectedBoxIds}>}
+     * Gets state of all remote users (cursors, selections) with INTERPOLATED positions
+     * @returns {Array<Object>}
      */
     getRemoteUsers() {
         if (!this.awareness) return [];
@@ -700,15 +785,75 @@ class CollaborationManager {
         const states = [];
         this.awareness.getStates().forEach((state, clientId) => {
             if (clientId !== this.awareness.clientID && state.user) {
+                // Use interpolated position if available
+                const interpolated = this.interpolatedCursors.get(state.user.id);
+                let cursor = state.cursor;
+
+                if (interpolated) {
+                    cursor = { x: interpolated.x, y: interpolated.y };
+                }
+
                 states.push({
                     clientId,
                     user: state.user,
-                    cursor: state.cursor,
+                    cursor: cursor,
                     selectedBoxIds: state.selectedBoxIds || []
                 });
             }
         });
         return states;
+    }
+
+    /**
+     * Updates cursor interpolation. Call this in the draw loop.
+     * @param {number} lerpFactor - Interpolation speed (0.0 to 1.0)
+     */
+    updateCursors(lerpFactor = 0.2) {
+        if (!this.awareness) return;
+
+        const states = this.awareness.getStates();
+
+        states.forEach((state, clientId) => {
+            if (clientId === this.awareness.clientID) return;
+            if (state.user && state.cursor) {
+                const userId = state.user.id;
+                let data = this.interpolatedCursors.get(userId);
+
+                if (!data) {
+                    // Init new user
+                    data = { x: state.cursor.x, y: state.cursor.y, targetX: state.cursor.x, targetY: state.cursor.y };
+                    this.interpolatedCursors.set(userId, data);
+                }
+
+                // Update target if changed
+                if (state.cursor.x !== data.targetX || state.cursor.y !== data.targetY) {
+                    data.targetX = state.cursor.x;
+                    data.targetY = state.cursor.y;
+                }
+
+                // Smoothly interpolate current x/y towards target
+                data.x = data.x + (data.targetX - data.x) * lerpFactor;
+                data.y = data.y + (data.targetY - data.y) * lerpFactor;
+
+                // Snap if very close
+                if (Math.abs(data.x - data.targetX) < 0.5) data.x = data.targetX;
+                if (Math.abs(data.y - data.targetY) < 0.5) data.y = data.targetY;
+            }
+        });
+
+        // Cleanup disconnected users
+        // Create set of currently active user IDs
+        const activeUserIds = new Set();
+        states.forEach(state => {
+            if (state.user) activeUserIds.add(state.user.id);
+        });
+
+        // Remove any interpolated cursors for users who are no longer active
+        for (const userId of this.interpolatedCursors.keys()) {
+            if (!activeUserIds.has(userId)) {
+                this.interpolatedCursors.delete(userId);
+            }
+        }
     }
 
     // ============================================================================
@@ -720,7 +865,7 @@ class CollaborationManager {
      * @private
      */
     _generateUserId() {
-        return 'user_' + Math.random().toString(36).substr(2, 9);
+        return 'user_' + Math.random().toString(36).substring(2, 11);
     }
 
     /**

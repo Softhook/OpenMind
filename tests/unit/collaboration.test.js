@@ -248,3 +248,33 @@ describe('MindMap Integration', () => {
         expect(mindMapCode).toMatch(/connections:\s*this\.connections\.map\s*\(\s*conn\s*=>\s*conn\.toJSON\(this\.boxes\)/);
     });
 });
+
+describe('Optimization & Robustness', () => {
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+
+    test('syncConnectionsToYjs should use optimized diff logic', () => {
+        // Should NOT use the O(n^2) while-loop clear pattern
+        expect(collabCode).not.toMatch(/while\s*\(this\.yconnections\.length\s*>\s*0\)\s*\{\s*this\.yconnections\.delete\(0\);\s*\}/s);
+
+        // Should use Map for O(1) lookups
+        expect(collabCode).toMatch(/const\s+yjsMap\s*=\s*new\s+Map\(\)/);
+
+        // Should calculate adds and deletes separately
+        expect(collabCode).toMatch(/toAdd\.push\(conn\)/);
+        expect(collabCode).toMatch(/indicesToDelete\.sort\(\(a,\s*b\)\s*=>\s*b\s*-\s*a\)/);
+    });
+
+    test('_applyBoxFromYjs should validate input types', () => {
+        // Should check for number types on coordinates
+        expect(collabCode).toMatch(/typeof\s+data\.x\s*===\s*['"]number['"]/);
+        expect(collabCode).toMatch(/typeof\s+data\.y\s*===\s*['"]number['"]/);
+
+        // Should check for string type on text
+        expect(collabCode).toMatch(/typeof\s+data\.text\s*===\s*['"]string['"]/);
+    });
+
+    test('UndoManager should use constant for timeout', () => {
+        // Should use the static constant, not hardcoded 100
+        expect(collabCode).toMatch(/captureTimeout:\s*CollaborationManager\.UNDO_CAPTURE_TIMEOUT/);
+    });
+});
