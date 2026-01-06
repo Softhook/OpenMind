@@ -17,9 +17,20 @@ class CollaborationManager {
     // CONSTANTS
     // ============================================================================
 
-    static WEBSOCKET_SERVER = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-        ? 'ws://localhost:1234'
-        : 'wss://site--y-websockets--l9lrvfgkxvzh.code.run';
+    static WEBSOCKET_SERVER = (() => {
+        if (typeof window === 'undefined') return 'ws://localhost:1234';
+        const host = window.location.hostname;
+        // Check for localhost
+        if (host === 'localhost' || host === '127.0.0.1') {
+            return 'ws://localhost:1234';
+        }
+        // Check for private/LAN IP addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host)) {
+            return `ws://${host}:1234`;
+        }
+        // Otherwise use production server
+        return 'wss://site--y-websockets-78445555d9.code.run';
+    })();
 
     static DEFAULT_USER_COLORS = [
         '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
@@ -46,6 +57,7 @@ class CollaborationManager {
         // Shared types
         this.yboxes = null;      // Y.Map<boxId, boxData>
         this.yconnections = null; // Y.Array<{fromId, toId}>
+        this.undoManager = null;  // Y.UndoManager for collaborative undo/redo
 
         // Connection state
         this.roomName = null;
@@ -95,6 +107,13 @@ class CollaborationManager {
             // Initialize shared types
             this.yboxes = this.ydoc.getMap('boxes');
             this.yconnections = this.ydoc.getArray('connections');
+
+            // Create UndoManager for collaborative undo/redo
+            // It tracks only LOCAL changes, not remote ones
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
+                captureTimeout: 500 // Merge edits within 500ms into one undo step
+            });
+            console.log('CollaborationManager: UndoManager initialized');
 
             // Create Websocket provider
             this.provider = new this.WebsocketProvider(
@@ -156,6 +175,11 @@ class CollaborationManager {
             this.provider = null;
         }
 
+        if (this.undoManager) {
+            this.undoManager.destroy();
+            this.undoManager = null;
+        }
+
         if (this.ydoc) {
             this.ydoc.destroy();
             this.ydoc = null;
@@ -175,6 +199,59 @@ class CollaborationManager {
         if (this.onConnectionChange) {
             this.onConnectionChange('disconnected');
         }
+    }
+
+    /**
+     * Undo the last local operation (collaborative-aware)
+     * Only undoes YOUR changes, not other users' changes
+     * @returns {boolean} true if undo was performed
+     */
+    undo() {
+        if (!this.undoManager) return false;
+        if (this.undoManager.undoStack.length === 0) return false;
+
+        this.undoManager.undo();
+        console.log('CollaborationManager: Undo performed');
+
+        // Trigger redraw
+        if (this.mindMap) {
+            this.mindMap.isDirty = true;
+        }
+        return true;
+    }
+
+    /**
+     * Redo the last undone operation (collaborative-aware)
+     * @returns {boolean} true if redo was performed
+     */
+    redo() {
+        if (!this.undoManager) return false;
+        if (this.undoManager.redoStack.length === 0) return false;
+
+        this.undoManager.redo();
+        console.log('CollaborationManager: Redo performed');
+
+        // Trigger redraw
+        if (this.mindMap) {
+            this.mindMap.isDirty = true;
+        }
+        return true;
+    }
+
+    /**
+     * Check if undo is available
+     * @returns {boolean}
+     */
+    canUndo() {
+        return this.undoManager && this.undoManager.undoStack.length > 0;
+    }
+
+    /**
+     * Check if redo is available
+     * @returns {boolean}
+     */
+    canRedo() {
+        return this.undoManager && this.undoManager.redoStack.length > 0;
     }
 
     /**
@@ -253,25 +330,33 @@ class CollaborationManager {
     _syncLocalToYjs() {
         if (!this.ydoc || !this.mindMap) return;
 
-        // Only sync if we're the first to join (empty Yjs state)
-        if (this.yboxes.size === 0 && this.mindMap.boxes.length > 0) {
-            console.log('CollaborationManager: Syncing local state to Yjs');
+        // Always sync local boxes to Yjs - Yjs will merge by ID
+        // Same IDs update existing entries, different IDs are added
+        if (this.mindMap.boxes.length > 0) {
+            console.log('CollaborationManager: Syncing local state to Yjs, local boxes:', this.mindMap.boxes.length, 'yjs boxes:', this.yboxes.size);
 
             this.ydoc.transact(() => {
-                // Sync boxes
+                // Sync boxes - Yjs Map uses box.id as key, so duplicates are impossible
                 for (const box of this.mindMap.boxes) {
                     if (box && box.id) {
                         this.yboxes.set(box.id, this._boxToYjsData(box));
                     }
                 }
 
-                // Sync connections
+                // Sync connections - check for duplicates before adding
+                const existingConns = new Set(
+                    this.yconnections.toArray().map(c => `${c.fromId}->${c.toId}`)
+                );
                 for (const conn of this.mindMap.connections) {
                     if (conn && conn.fromBox && conn.toBox) {
-                        this.yconnections.push([{
-                            fromId: conn.fromBox.id,
-                            toId: conn.toBox.id
-                        }]);
+                        const key = `${conn.fromBox.id}->${conn.toBox.id}`;
+                        if (!existingConns.has(key)) {
+                            this.yconnections.push([{
+                                fromId: conn.fromBox.id,
+                                toId: conn.toBox.id
+                            }]);
+                            existingConns.add(key);
+                        }
                     }
                 }
             });
@@ -361,8 +446,7 @@ class CollaborationManager {
 
         // Observe box changes
         this.yboxes.observe((event) => {
-            console.log('Yjs Observer: Box change event', event.transaction.local, event.changes.keys);
-            if (this.isSyncing) return;
+            if (event.transaction.local || this.isSyncing) return;
 
             this.isSyncing = true;
             try {

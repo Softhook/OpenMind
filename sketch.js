@@ -1989,9 +1989,24 @@ function keyPressed() {
         return false; // prevent page-level select-all
       }
 
-      // Handle CMD/CTRL+Z for undo at the top level
-      if (isCmd && (key === 'z' || key === 'Z')) {
-        if (mindMap.undo) mindMap.undo();
+      // Handle CMD/CTRL+SHIFT+Z or CMD/CTRL+Y for redo (check BEFORE undo!)
+      const isShift = keyIsDown(16);
+      if ((isCmd && (key === 'z' || key === 'Z') && isShift) || (isCmd && (key === 'y' || key === 'Y'))) {
+        if (collaborationManager && collaborationManager.isConnected && collaborationManager.canRedo()) {
+          collaborationManager.redo();
+        }
+        return false; // prevent browser redo
+      }
+
+      // Handle CMD/CTRL+Z for undo at the top level (only when Shift is NOT pressed)
+      if (isCmd && (key === 'z' || key === 'Z') && !isShift) {
+        // Use collaborative undo when connected (only undoes YOUR changes)
+        // Fall back to local undo when not in collaboration mode
+        if (collaborationManager && collaborationManager.isConnected && collaborationManager.canUndo()) {
+          collaborationManager.undo();
+        } else if (mindMap.undo) {
+          mindMap.undo();
+        }
         return false; // prevent browser undo
       }
 
@@ -2738,6 +2753,20 @@ async function mergeMapData(data, wx, wy) {
 
     mindMap.isDirty = true;
     mindMap.isSaved = false;
+
+    // Sync new boxes to collaboration system
+    if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+      for (const nb of newBoxes) {
+        if (nb && nb.id) {
+          MindMap.onBoxChange(nb);
+        }
+      }
+    }
+    // Sync connections
+    if (typeof MindMap !== 'undefined' && MindMap.onConnectionsChange) {
+      MindMap.onConnectionsChange();
+    }
+
     try { mindMap.saveToLocalStorage && mindMap.saveToLocalStorage(); } catch (_) { }
   } catch (e) {
     console.warn('mergeMapData failed', e);

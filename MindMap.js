@@ -198,11 +198,14 @@ class MindMap {
 
   /**
    * Reverts to the most recent snapshot from undo stack
+   * Note: When connected to a collaboration room, use CollaborationManager.undo() instead
+   * which properly handles CRDT-aware undo of only YOUR changes.
    */
   undo() {
     if (!this.undoStack || this.undoStack.length === 0) return;
     const snap = this.undoStack.pop();
     if (!snap) return;
+
     this.fromJSON(snap);
     this.isDirty = true;
     this.isSaved = false;
@@ -1871,6 +1874,16 @@ class MindMap {
           if (index > -1) {
             this.boxes.splice(index, 1);
           }
+
+          // Notify collaboration system of deletion
+          if (MindMap.onBoxDelete && box.id) {
+            MindMap.onBoxDelete(box.id);
+          }
+        }
+
+        // Notify collaboration system of connection changes
+        if (MindMap.onConnectionsChange) {
+          MindMap.onConnectionsChange();
         }
 
         // Clear selection and navigation mode after deletion
@@ -2071,6 +2084,7 @@ class MindMap {
     try {
       // Use the File System Access API when available to let the user choose a location
       if (typeof window !== 'undefined' && window.showSaveFilePicker) {
+        console.log('MindMap.save: Using showSaveFilePicker (Save As dialog)');
         const handle = await window.showSaveFilePicker({
           suggestedName: defaultFilename,
           types: [
@@ -2089,6 +2103,7 @@ class MindMap {
         this.setLastUsedFilename(handle.name);
       } else {
         // Fallback: regular download (browser chooses default Downloads location)
+        console.log('MindMap.save: Fallback to saveJSON (auto-download)');
         saveJSON(data, defaultFilename);
         // Note: In fallback mode, we keep using the same filename since we can't detect what the user named it
       }

@@ -1933,6 +1933,14 @@ class TextBox {
       // Move in world space - no constraints (allow infinite canvas)
       this.x = mx + this.dragOffsetX;
       this.y = my + this.dragOffsetY;
+
+      // Throttled sync during drag for real-time collaboration
+      // Sync at most every 100ms to avoid overwhelming the network
+      const now = typeof millis === 'function' ? millis() : Date.now();
+      if (!this._lastDragSyncTime || now - this._lastDragSyncTime >= 100) {
+        this._lastDragSyncTime = now;
+        TextBox._notifyChange(this);
+      }
     }
   }
 
@@ -1941,6 +1949,8 @@ class TextBox {
    */
   stopDrag() {
     this.isDragging = false;
+    // Notify collaboration system of position change
+    TextBox._notifyChange(this);
   }
 
   /**
@@ -2004,6 +2014,8 @@ class TextBox {
           // Recompute center so left/top remain fixed while bottom-right moves
           this.x = this.resizeStartLeft + this.width / 2;
           this.y = this.resizeStartTop + this.height / 2;
+          // Throttled sync for image resize
+          this._throttledResizeSync();
           return;
         }
       }
@@ -2034,6 +2046,21 @@ class TextBox {
       // Recompute center so left/top remain fixed while bottom-right moves
       this.x = this.resizeStartLeft + this.width / 2;
       this.y = this.resizeStartTop + this.height / 2;
+
+      // Throttled sync during resize for real-time collaboration
+      this._throttledResizeSync();
+    }
+  }
+
+  /**
+   * Throttled sync helper for resize operations
+   * @private
+   */
+  _throttledResizeSync() {
+    const now = typeof millis === 'function' ? millis() : Date.now();
+    if (!this._lastResizeSyncTime || now - this._lastResizeSyncTime >= 100) {
+      this._lastResizeSyncTime = now;
+      TextBox._notifyChange(this);
     }
   }
 
@@ -2102,6 +2129,8 @@ class TextBox {
     this.updateDimensions();
     // Adjust center so the top remains fixed after height changes
     this.y = prevTop + this.height / 2;
+    // Notify collaboration system of size/position change
+    TextBox._notifyChange(this);
   }
 
   // ============================================================================
