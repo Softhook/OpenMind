@@ -39,6 +39,7 @@ const UI_COLORS = {
 // Application state variables for the mind map, UI, and camera/zoom
 
 let mindMap;
+let collaborationManager = null; // CollaborationManager for real-time sync
 let saveButton;
 let loadButton;
 let fileInput;
@@ -48,6 +49,7 @@ let exportTextButton;
 let menuIsVisible = false;
 let keyboardControlsButton;
 let keyboardOverlay = null;
+let inviteButton = null; // Share button for collaboration
 let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
@@ -232,6 +234,9 @@ function parseFileFromLocation() {
   }
   if (hash && hash.length > 1) {
     let h = decodeURIComponent(hash.substring(1));
+    // Ignore collaboration room hashes
+    if (h.startsWith('room=')) return null;
+
     if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
     return h;
   }
@@ -421,10 +426,208 @@ function namesAreSimilar(name1, name2) {
  * Handler to respond to URL changes (hash/popstate) and initial load.
  */
 function handleUrlChange() {
-  const fileToFetch = parseFileFromLocation();
-  if (fileToFetch) {
-    // Load the map and don't fall back to localStorage when a URL is present
-    loadMapFromUrl(fileToFetch);
+  // Check for room changes first
+  const newRoom = parseRoomFromHash();
+  const currentRoom = collaborationManager ? collaborationManager.roomName : null;
+
+  if (newRoom !== currentRoom) {
+    if (collaborationManager) {
+      collaborationManager.disconnect();
+      collaborationManager = null;
+    }
+    if (newRoom && mindMap) {
+      initializeCollaboration(newRoom);
+      return; // Don't load file when in collaboration mode
+    }
+  }
+
+  // Handle file loading (skip if in collaboration mode)
+  if (!newRoom) {
+    const fileToFetch = parseFileFromLocation();
+    if (fileToFetch) {
+      loadMapFromUrl(fileToFetch);
+    }
+  }
+}
+
+/**
+ * Parses server URL from query params
+ * @returns {string|null} Server URL or null
+ */
+function parseServerFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('server');
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Parses room ID from URL hash
+ * @returns {string|null} Room name or null if not in a room
+ */
+function parseRoomFromHash() {
+  try {
+    const hash = window.location.hash;
+    const match = hash.match(/room=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Initializes collaboration for a given room
+ * @param {string} roomName 
+ */
+async function initializeCollaboration(roomName) {
+  if (!mindMap || !roomName) return;
+  if (typeof CollaborationManager === 'undefined') {
+    console.warn('CollaborationManager not loaded');
+    return;
+  }
+
+  try {
+    collaborationManager = new CollaborationManager(mindMap);
+
+    // Set up callbacks
+    collaborationManager.onConnectionChange = (status) => {
+      console.log('Collaboration status:', status);
+    };
+
+    collaborationManager.onPeersChange = (peers) => {
+      console.log('Connected peers:', peers.length);
+    };
+
+    const serverUrl = parseServerFromUrl();
+    if (serverUrl) {
+      console.log('Connecting to custom signaling server:', serverUrl);
+    }
+    await collaborationManager.connect(roomName, serverUrl);
+    console.log('Collaboration initialized for room:', roomName);
+  } catch (e) {
+    console.error('Failed to initialize collaboration:', e);
+    collaborationManager = null;
+  }
+}
+
+/**
+ * Generates a shareable collaboration link
+ * @returns {string} URL with room hash
+ */
+function generateShareLink() {
+  if (typeof CollaborationManager === 'undefined') return window.location.href;
+  const roomName = collaborationManager
+    ? collaborationManager.roomName
+    : CollaborationManager.generateRoomName();
+  return CollaborationManager.generateRoomUrl(roomName);
+}
+
+/**
+ * Starts a new session or shares the current one
+ */
+function shareSession() {
+  if (!collaborationManager || !collaborationManager.isConnected) {
+    // Start new session
+    const room = CollaborationManager.generateRoomName();
+    // Setting hash triggers handleUrlChange -> initializeCollaboration
+    window.location.hash = `room=${room}`;
+  } else {
+    // Copy link
+    const url = generateShareLink();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('Link copied to clipboard: ' + url);
+      }).catch(err => {
+        prompt('Copy this link:', url);
+      });
+    } else {
+      prompt('Copy this link:', url);
+    }
+  }
+}
+
+/**
+ * Updates local user presence (cursor, selection) broadcast
+ */
+function updateCollaborationPresence() {
+  if (!collaborationManager || !collaborationManager.isConnected) return;
+
+  // Throttle updates (every ~100ms)
+  if (frameCount % 6 !== 0) return;
+
+  // Update cursor position (world space)
+  if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+    const wx = worldMouseX();
+    const wy = worldMouseY();
+    // Only update if valid numbers
+    if (Number.isFinite(wx) && Number.isFinite(wy)) {
+      collaborationManager.updateCursor(wx, wy);
+    }
+  }
+
+  // Update selection
+  if (mindMap) {
+    let selectedIds = [];
+    if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
+      selectedIds = Array.from(mindMap.selectedBoxes).map(b => b.id).filter(id => id);
+    } else if (mindMap.selectedBox && mindMap.selectedBox.id) {
+      selectedIds = [mindMap.selectedBox.id];
+    }
+    collaborationManager.updateSelection(selectedIds);
+  }
+}
+
+/**
+ * Draws cursors of remote users
+ */
+function drawRemoteCursors() {
+  if (!collaborationManager || !collaborationManager.isConnected) return;
+
+  const users = collaborationManager.getRemoteUsers();
+  if (!users || users.length === 0) return;
+
+  for (const userState of users) {
+    if (!userState.cursor) continue;
+
+    const { x, y } = userState.cursor;
+    const color = userState.user ? userState.user.color : '#aaaaaa';
+    const name = userState.user ? userState.user.name : 'Unknown';
+
+    // Draw cursor (simple arrow or circle)
+    push();
+    translate(x, y);
+
+    // Cursor body
+    noStroke();
+    fill(color);
+    triangle(0, 0, 12, 12, 0, 18); // Simple cursor shape
+
+    // Name tag
+    if (name) {
+      fill(color);
+      rect(15, 0, textWidth(name) + 10, 20, 4);
+      fill(255);
+      textAlign(LEFT, CENTER);
+      textSize(12);
+      text(name, 20, 10);
+    }
+    pop();
+
+    // Highlight remote selections
+    if (userState.selectedBoxIds && userState.selectedBoxIds.length > 0 && mindMap) {
+      noFill();
+      stroke(color);
+      strokeWeight(3);
+      for (const id of userState.selectedBoxIds) {
+        const box = mindMap.getBoxById(id);
+        if (box) {
+          rectMode(CENTER);
+          rect(box.x, box.y, box.width + 10, box.height + 10, 8);
+        }
+      }
+    }
   }
 }
 
@@ -567,6 +770,12 @@ function setup() {
     } catch (e) {
       console.warn('Failed to setup drag/drop handlers:', e);
     }
+
+    // Check for collaboration room in URL
+    const roomId = parseRoomFromHash();
+    if (roomId) {
+      initializeCollaboration(roomId);
+    }
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -606,6 +815,12 @@ function setupUIButtons() {
   keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
   keyboardControlsButton.attribute('aria-expanded', 'false');
 
+  inviteButton = createButton('Start Collaboration');
+  inviteButton.position(680, 10);
+  inviteButton.mousePressed(shareSession);
+  inviteButton.style('background-color', '#4caf50');
+  inviteButton.style('color', 'white');
+
   setupKeyboardControlsOverlay();
 
   // Ensure overlay sizing updates when the window resizes
@@ -637,10 +852,21 @@ function draw() {
       mindMap.draw();
 
       // Draw selection rectangle if selecting multiple boxes
+      // Draw selection rectangle if selecting multiple boxes
       if (isSelectingMultiple) {
         drawSelectionRectangle();
       }
+
+      // Draw remote users' cursors (in world space)
+      if (typeof drawRemoteCursors === 'function') {
+        drawRemoteCursors();
+      }
       pop();
+
+      // Update our presence (cursor position, selection) throttled
+      if (typeof updateCollaborationPresence === 'function') {
+        updateCollaborationPresence();
+      }
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
@@ -1123,6 +1349,7 @@ function showMenuButtons() {
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
+  if (inviteButton && inviteButton.style) inviteButton.style('display', 'inline-block');
 }
 
 /**
@@ -1135,6 +1362,7 @@ function hideMenuButtons() {
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
+  if (inviteButton && inviteButton.style) inviteButton.style('display', 'none');
 }
 
 /**
@@ -1163,6 +1391,19 @@ function layoutMenuButtons() {
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
   keyboardControlsButton.position(x, y); x += w(keyboardControlsButton) + gap;
+
+  if (inviteButton) {
+    // Check if collaboration is active to update text/style
+    if (collaborationManager && collaborationManager.isConnected) {
+      inviteButton.html('Share Link');
+      inviteButton.style('background-color', '#2196f3');
+    } else {
+      inviteButton.html('Start Collaboration');
+      inviteButton.style('background-color', '#4caf50');
+    }
+    inviteButton.style('display', 'inline-block');
+    inviteButton.position(x, y); x += w(inviteButton) + gap;
+  }
 
   // Update the hover band to cover to the right of the last button
   menuRightEdge = x + 10;

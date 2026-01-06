@@ -49,6 +49,20 @@ class MindMap {
     }
   }
 
+  // ============================================================================
+  // COLLABORATION CALLBACKS
+  // ============================================================================
+  // These callbacks are set by CollaborationManager to sync changes to Yjs
+
+  /** @type {function(TextBox):void|null} Called when a box is added or modified */
+  static onBoxChange = null;
+
+  /** @type {function(string):void|null} Called when a box is deleted (receives box ID) */
+  static onBoxDelete = null;
+
+  /** @type {function():void|null} Called when connections change */
+  static onConnectionsChange = null;
+
   /**
    * Initializes a new MindMap with default state
    */
@@ -106,6 +120,11 @@ class MindMap {
     this.pushUndo();
     this.boxes.push(box);
     this.isDirty = true;
+
+    // Notify collaboration system
+    if (MindMap.onBoxChange && box) {
+      MindMap.onBoxChange(box);
+    }
   }
 
   /**
@@ -147,6 +166,11 @@ class MindMap {
     this.pushUndo();
     this.connections.push(new Connection(fromBox, toBox));
     this.isDirty = true;
+
+    // Notify collaboration system
+    if (MindMap.onConnectionsChange) {
+      MindMap.onConnectionsChange();
+    }
   }
 
   /**
@@ -436,6 +460,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -465,6 +490,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -494,6 +520,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -523,6 +550,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -558,6 +586,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -589,6 +618,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToAlign);
     return true;
   }
 
@@ -640,6 +670,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxes);
     return true;
   }
 
@@ -691,6 +722,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxes);
     return true;
   }
 
@@ -890,6 +922,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
+    this._notifyBoxesChanged(boxesToLayout);
     return true;
   }
 
@@ -901,6 +934,21 @@ class MindMap {
       return [];
     }
     return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
+  }
+
+  /**
+   * Notifies the collaboration system that boxes have changed.
+   * Call this after batch operations like alignment/distribution.
+   * @param {TextBox[]} boxes - Array of boxes that changed
+   * @private
+   */
+  _notifyBoxesChanged(boxes) {
+    if (!MindMap.onBoxChange || !boxes || boxes.length === 0) return;
+    for (const box of boxes) {
+      if (box) {
+        MindMap.onBoxChange(box);
+      }
+    }
   }
 
   /**
@@ -1489,6 +1537,17 @@ class MindMap {
 
     if (wasInteracting) {
       this.isArrowKeyNavigating = false;
+
+      // Sync all selected boxes to collaboration after drag/resize
+      if (MindMap.onBoxChange) {
+        for (let box of this.boxes) {
+          if (box && this.selectedBoxes && this.selectedBoxes.has(box)) {
+            MindMap.onBoxChange(box);
+          } else if (box && box === this.selectedBox) {
+            MindMap.onBoxChange(box);
+          }
+        }
+      }
     }
   }
 
@@ -1594,6 +1653,10 @@ class MindMap {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
               this.pushUndo();
               this.selectedBox.toggleHighlightOnSelection();
+              // Notify collaboration system of highlight change
+              if (MindMap.onBoxChange) {
+                MindMap.onBoxChange(this.selectedBox);
+              }
             }
           } catch (e) { console.error('Highlight toggle failed', e); }
           return;
@@ -1845,16 +1908,20 @@ class MindMap {
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
+          const changedBoxes = [];
           for (const box of this.selectedBoxes) {
             if (box && typeof box.setBackgroundByKey === 'function') {
               box.setBackgroundByKey(colorKey);
+              changedBoxes.push(box);
             }
           }
+          this._notifyBoxesChanged(changedBoxes);
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
             this.selectedBox.setBackgroundByKey(colorKey);
+            this._notifyBoxesChanged([this.selectedBox]);
           }
         }
       }

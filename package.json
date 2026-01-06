@@ -4,12 +4,21 @@
   "description": "Mind mapping application with real-time collaboration support",
   "main": "sketch.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "start-signaling": "HOST=localhost PORT=4444 y-websocket"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
   },
-  "keywords": ["mindmap", "collaboration", "p5js"],
-  "license": "MIT"
+  "keywords": [
+    "mindmap",
+    "collaboration",
+    "p5js"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3",
+    "y-websocket": "^1.5.0"
+  }
 }

@@ -1289,6 +1289,20 @@ class TextBox {
     this.isEditing = false;
     this.isSelecting = false;
     this.updateDimensions();
+
+    // Notify collaboration system of text/dimension changes
+    TextBox._notifyChange(this);
+  }
+
+  /**
+   * Notifies collaboration system of changes to this box
+   * @param {TextBox} box 
+   * @private
+   */
+  static _notifyChange(box) {
+    if (typeof MindMap !== 'undefined' && MindMap.onBoxChange && box) {
+      MindMap.onBoxChange(box);
+    }
   }
 
   // Determine if the given point is within the inner text area (excludes padding)
