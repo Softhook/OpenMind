@@ -17,7 +17,9 @@ class CollaborationManager {
     // CONSTANTS
     // ============================================================================
 
-    static WEBSOCKET_SERVER = 'ws://localhost:4444'; // Local signaling server (run with: npm run start-signaling)
+    static WEBSOCKET_SERVER = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+        ? 'ws://localhost:1234'
+        : 'wss://site--y-websockets--l9lrvfgkxvzh.code.run';
 
     static DEFAULT_USER_COLORS = [
         '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
