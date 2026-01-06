@@ -457,7 +457,17 @@ function handleUrlChange() {
 function parseServerFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
-    return params.get('server');
+    const server = params.get('server');
+    if (!server) return null;
+
+    // If it's a full URL, return it
+    if (server.startsWith('ws://') || server.startsWith('wss://')) {
+      return server;
+    }
+
+    // If it's a keyword like 'public' or 'demo', return null 
+    // effectively letting CollaborationManager's internal logic handle the override
+    return null;
   } catch (e) {
     return null;
   }
@@ -470,8 +480,25 @@ function parseServerFromUrl() {
 function parseRoomFromHash() {
   try {
     const hash = window.location.hash;
+
+    // Explicit room parameter
     const match = hash.match(/room=([^&]+)/);
-    return match ? decodeURIComponent(match[1]) : null;
+    if (match) return decodeURIComponent(match[1]);
+
+    // If server override is present, treat the entire hash as a room name (if it's not a file)
+    // Check raw params directly since parseServerFromUrl only returns valid URLs now
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('server') && hash.length > 1) {
+      // Remove the leading #
+      let h = decodeURIComponent(hash.substring(1));
+      // Basic sanity check: allow alphanumeric room names (and standard URL safe chars)
+      // Reject if it looks like a file (ends in .json) just in case
+      if (!h.toLowerCase().endsWith('.json')) {
+        return h;
+      }
+    }
+
+    return null;
   } catch (e) {
     return null;
   }

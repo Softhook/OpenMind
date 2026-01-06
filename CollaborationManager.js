@@ -36,7 +36,7 @@ class CollaborationManager {
             return `ws://${host}:1234`;
         }
         // Otherwise use production server
-        return 'wss://demos.yjs.dev';
+        return 'wss://site--y-websockets-78445555d9.code.run';
     })();
 
     static DEFAULT_USER_COLORS = [
