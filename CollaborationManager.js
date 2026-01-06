@@ -36,7 +36,7 @@ class CollaborationManager {
             return `ws://${host}:1234`;
         }
         // Otherwise use production server
-        return 'wss://site--y-websockets-78445555d9.code.run';
+        return 'wss://y-websocket-19go.onrender.com';
     })();
 
     static DEFAULT_USER_COLORS = [
