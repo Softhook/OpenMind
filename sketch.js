@@ -516,7 +516,11 @@ async function initializeCollaboration(roomName) {
   }
 
   try {
-    collaborationManager = new CollaborationManager(mindMap);
+    // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
+    if (!collaborationManager) {
+      collaborationManager = new CollaborationManager(mindMap);
+      await collaborationManager.initialize();
+    }
 
     // Set up callbacks
     collaborationManager.onConnectionChange = (status) => {
@@ -535,7 +539,6 @@ async function initializeCollaboration(roomName) {
     console.log('Collaboration initialized for room:', roomName);
   } catch (e) {
     console.error('Failed to initialize collaboration:', e);
-    collaborationManager = null;
   }
 }
 
@@ -699,6 +702,16 @@ function setup() {
     createCanvas(windowWidth, windowHeight);
 
     mindMap = new MindMap();
+
+    // Create CollaborationManager immediately for unified undo system
+    // Undo/redo works even without network connection
+    if (typeof CollaborationManager !== 'undefined') {
+      collaborationManager = new CollaborationManager(mindMap);
+      collaborationManager.initialize().catch((e) => {
+        console.error('Failed to initialize collaboration manager:', e);
+      });
+    }
+
     try {
       if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
         let fname = mindMap.getLastUsedFilename() || '';
@@ -722,28 +735,18 @@ function setup() {
     addTrackedEventListener(window, 'hashchange', handleUrlChange);
     addTrackedEventListener(window, 'popstate', handleUrlChange);
 
-    if (!lastLoadedUrlFile) {
-      // Try to load from localStorage first
+    // Check if joining a collaboration room - if so, skip localStorage
+    // (state will come from Yjs sync with other peers)
+    const roomId = parseRoomFromHash();
+
+    if (!lastLoadedUrlFile && !roomId) {
+      // Try to load from localStorage first (only when NOT joining a room)
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
         try {
           // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
           const maybePromise = mindMap.loadFromLocalStorage();
-          if (maybePromise && typeof maybePromise.then === 'function') {
-            maybePromise.then(() => {
-              try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
-              try {
-                if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
-                  let fname = mindMap.getLastUsedFilename() || '';
-                  fname = fname.split('/').pop().split('\\').pop();
-                  fname = fname.replace(/\.json$/i, '').trim();
-                  document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
-                }
-              } catch (_) { }
-            }).catch((e) => {
-              console.warn('Failed to load mindMap from localStorage:', e);
-            });
-          } else {
+          const afterLoad = () => {
             try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
             try {
               if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
@@ -753,17 +756,37 @@ function setup() {
                 document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
               }
             } catch (_) { }
+            // Clear undo history after loading to prevent undo from reverting the load
+            if (collaborationManager) {
+              collaborationManager.clearUndoHistory();
+            }
+          };
+          if (maybePromise && typeof maybePromise.then === 'function') {
+            maybePromise.then(afterLoad).catch((e) => {
+              console.warn('Failed to load mindMap from localStorage:', e);
+            });
+          } else {
+            afterLoad();
           }
         } catch (e) {
           console.warn('Error while loading from localStorage:', e);
         }
       } else {
-        // Create initial boxes as examples only if no autosave exists
+        // Create initial boxes as examples only if no autosave exists AND not joining room
         mindMap.addBox(new TextBox(300, 200, "Idea"));
         mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
         mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
         // Initial state is unsaved, will be autosaved on first interval
         if (mindMap) mindMap.isSaved = false;
+        // Clear undo history so creating example boxes isn't undoable
+        if (collaborationManager) {
+          // Wait for initialization then clear
+          setTimeout(() => {
+            if (collaborationManager && collaborationManager.isInitialized) {
+              collaborationManager.clearUndoHistory();
+            }
+          }, 200);
+        }
       }
     }
 
@@ -798,8 +821,7 @@ function setup() {
       console.warn('Failed to setup drag/drop handlers:', e);
     }
 
-    // Check for collaboration room in URL
-    const roomId = parseRoomFromHash();
+    // Check for collaboration room in URL (roomId already declared above)
     if (roomId) {
       initializeCollaboration(roomId);
     }
@@ -2019,7 +2041,8 @@ function keyPressed() {
       // Handle CMD/CTRL+SHIFT+Z or CMD/CTRL+Y for redo (check BEFORE undo!)
       const isShift = keyIsDown(16);
       if ((isCmd && (key === 'z' || key === 'Z') && isShift) || (isCmd && (key === 'y' || key === 'Y'))) {
-        if (collaborationManager && collaborationManager.isConnected && collaborationManager.canRedo()) {
+        // Always use collaborationManager for redo (unified undo system)
+        if (collaborationManager && collaborationManager.canRedo()) {
           collaborationManager.redo();
         }
         return false; // prevent browser redo
@@ -2027,12 +2050,9 @@ function keyPressed() {
 
       // Handle CMD/CTRL+Z for undo at the top level (only when Shift is NOT pressed)
       if (isCmd && (key === 'z' || key === 'Z') && !isShift) {
-        // Use collaborative undo when connected (only undoes YOUR changes)
-        // Fall back to local undo when not in collaboration mode
-        if (collaborationManager && collaborationManager.isConnected && collaborationManager.canUndo()) {
+        // Always use collaborationManager for undo (unified undo system)
+        if (collaborationManager && collaborationManager.canUndo()) {
           collaborationManager.undo();
-        } else if (mindMap.undo) {
-          mindMap.undo();
         }
         return false; // prevent browser undo
       }

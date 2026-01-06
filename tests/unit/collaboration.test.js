@@ -190,15 +190,22 @@ describe('Connection Edge Cases', () => {
     });
 });
 
-describe('Undo/Redo ID Preservation', () => {
-    test('pushUndo should serialize via toJSON which includes IDs', () => {
-        // Verify undo uses toJSON
-        expect(mindMapCode).toMatch(/pushUndo\s*\(\)\s*\{[^}]*this\.toJSON\(\)/s);
+describe('Unified Undo System (Yjs UndoManager)', () => {
+
+    test('MindMap.undo should be deprecated', () => {
+        // Verify undo shows deprecation warning
+        expect(mindMapCode).toMatch(/undo\s*\(\)\s*\{[^}]*deprecated/si);
     });
 
-    test('undo should restore via fromJSON which preserves IDs', () => {
-        // Verify undo uses fromJSON to restore
-        expect(mindMapCode).toMatch(/undo\s*\(\)\s*\{[^}]*this\.fromJSON\(snap\)/s);
+    test('MindMap.pushUndo should be a no-op', () => {
+        // Verify pushUndo is now a no-op (Yjs handles undo tracking)
+        expect(mindMapCode).toMatch(/pushUndo\s*\(\)\s*\{[^}]*No-op/s);
+    });
+
+    test('CollaborationManager should have initialize method', () => {
+        // Verify initialize method exists for unified undo system
+        const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+        expect(collabCode).toMatch(/async initialize\s*\(\)/);
     });
 });
 

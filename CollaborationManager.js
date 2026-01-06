@@ -56,7 +56,7 @@ class CollaborationManager {
     constructor(mindMap) {
         this.mindMap = mindMap;
 
-        // Yjs state (initialized on connect)
+        // Yjs state (initialized in initialize())
         this.ydoc = null;
         this.provider = null;
         this.awareness = null;
@@ -64,11 +64,12 @@ class CollaborationManager {
         // Shared types
         this.yboxes = null;      // Y.Map<boxId, boxData>
         this.yconnections = null; // Y.Array<{fromId, toId}>
-        this.undoManager = null;  // Y.UndoManager for collaborative undo/redo
+        this.undoManager = null;  // Y.UndoManager for undo/redo
 
         // Connection state
         this.roomName = null;
         this.isConnected = false;
+        this.isInitialized = false;
         this.isSyncing = false; // Prevent feedback loops
 
         // User identity
@@ -81,9 +82,60 @@ class CollaborationManager {
         this.onPeersChange = null;
         this.onAwarenessChange = null;
 
-        // Yjs and y-webrtc modules (loaded dynamically)
+        // Yjs and y-websocket modules (loaded dynamically)
         this.Y = null;
         this.WebsocketProvider = null;
+    }
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+
+    /**
+     * Initializes Yjs document and UndoManager.
+     * Call this once at startup. Undo/redo works even without network connection.
+     * @returns {Promise<void>}
+     */
+    async initialize() {
+        if (this.isInitialized) {
+            console.warn('CollaborationManager: Already initialized');
+            return;
+        }
+
+        try {
+            // Load Yjs modules dynamically
+            await this._loadDependencies();
+
+            // Create Yjs document (local, not yet synced)
+            this.ydoc = new this.Y.Doc();
+
+            // Initialize shared types
+            this.yboxes = this.ydoc.getMap('boxes');
+            this.yconnections = this.ydoc.getArray('connections');
+
+            // Create UndoManager - tracks LOCAL changes only
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
+                captureTimeout: 100 // Merge edits within 100ms into one undo step (more granular)
+            });
+
+            // Set up observers for Yjs → local sync (including undo/redo)
+            this._setupObservers();
+
+            // Set up MindMap callbacks for local → Yjs sync
+            this._setupMindMapCallbacks();
+
+            // NOTE: _syncLocalToYjs() is NOT called here.
+            // It should be called explicitly after loading local data
+            // but ONLY if not joining a collaborative room.
+            // When joining a room, the room's state is authoritative.
+
+            this.isInitialized = true;
+            console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
+
+        } catch (error) {
+            console.error('CollaborationManager: Failed to initialize', error);
+            throw error;
+        }
     }
 
     // ============================================================================
@@ -91,11 +143,17 @@ class CollaborationManager {
     // ============================================================================
 
     /**
-     * Connects to a collaboration room
+     * Connects to a collaboration room via WebSocket.
+     * Must call initialize() first.
      * @param {string} roomName - Unique room identifier
+     * @param {string|null} serverUrl - Optional custom server URL
      * @returns {Promise<void>}
      */
     async connect(roomName, serverUrl = null) {
+        if (!this.isInitialized) {
+            await this.initialize();
+        }
+
         if (this.isConnected) {
             console.warn('CollaborationManager: Already connected');
             return;
@@ -105,24 +163,7 @@ class CollaborationManager {
         const signalingUrl = serverUrl || CollaborationManager.WEBSOCKET_SERVER;
 
         try {
-            // Load Yjs modules dynamically
-            await this._loadDependencies();
-
-            // Create Yjs document
-            this.ydoc = new this.Y.Doc();
-
-            // Initialize shared types
-            this.yboxes = this.ydoc.getMap('boxes');
-            this.yconnections = this.ydoc.getArray('connections');
-
-            // Create UndoManager for collaborative undo/redo
-            // It tracks only LOCAL changes, not remote ones
-            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                captureTimeout: 500 // Merge edits within 500ms into one undo step
-            });
-            console.log('CollaborationManager: UndoManager initialized');
-
-            // Create Websocket provider
+            // Create Websocket provider (adds sync layer to existing Yjs doc)
             this.provider = new this.WebsocketProvider(
                 signalingUrl,
                 this.roomName,
@@ -132,15 +173,6 @@ class CollaborationManager {
             // Set up awareness for presence
             this.awareness = this.provider.awareness;
             this._setupAwareness();
-
-            // Set up observers for Yjs → local sync
-            this._setupObservers();
-
-            // Set up MindMap callbacks for local → Yjs sync
-            this._setupMindMapCallbacks();
-
-            // Sync existing local state to Yjs
-            this._syncLocalToYjs();
 
             // Track connection state
             this.provider.on('synced', ({ synced }) => {
@@ -173,15 +205,37 @@ class CollaborationManager {
     }
 
     /**
-     * Disconnects from the current room
+     * Disconnects from the current room but preserves local Yjs state.
+     * Undo/redo continues to work after disconnecting.
      */
     disconnect() {
+        // Only disconnect the WebSocket provider, NOT the Yjs doc/UndoManager
         if (this.provider) {
             this.provider.disconnect();
             this.provider.destroy();
             this.provider = null;
         }
 
+        // Clear awareness (remote cursors) but keep local state
+        this.awareness = null;
+        this.roomName = null;
+        this.isConnected = false;
+
+        console.log('CollaborationManager: Disconnected from room (local undo still works)');
+
+        if (this.onConnectionChange) {
+            this.onConnectionChange('disconnected');
+        }
+    }
+
+    /**
+     * Fully destroys the collaboration manager, including Yjs state.
+     * Call this only when shutting down the application.
+     */
+    destroy() {
+        this.disconnect();
+
+        // Now destroy Yjs state
         if (this.undoManager) {
             this.undoManager.destroy();
             this.undoManager = null;
@@ -194,18 +248,12 @@ class CollaborationManager {
 
         this.yboxes = null;
         this.yconnections = null;
-        this.awareness = null;
-        this.roomName = null;
-        this.isConnected = false;
-
-        console.log('CollaborationManager: Disconnected');
+        this.isInitialized = false;
 
         // Clear MindMap callbacks
         this._clearMindMapCallbacks();
 
-        if (this.onConnectionChange) {
-            this.onConnectionChange('disconnected');
-        }
+        console.log('CollaborationManager: Destroyed');
     }
 
     /**
@@ -259,6 +307,17 @@ class CollaborationManager {
      */
     canRedo() {
         return this.undoManager && this.undoManager.redoStack.length > 0;
+    }
+
+    /**
+     * Clears the undo/redo history.
+     * Call this after loading files to prevent undo from reverting the load.
+     */
+    clearUndoHistory() {
+        if (this.undoManager) {
+            this.undoManager.clear();
+            console.log('CollaborationManager: Undo history cleared');
+        }
     }
 
     /**
@@ -453,7 +512,11 @@ class CollaborationManager {
 
         // Observe box changes
         this.yboxes.observe((event) => {
-            if (event.transaction.local || this.isSyncing) return;
+            // Skip if we're in a sync loop, but DO process undo/redo transactions
+            // Undo/redo transactions are local but have origin === this.undoManager
+            const isUndoRedo = event.transaction.origin === this.undoManager;
+            if (this.isSyncing) return;
+            if (event.transaction.local && !isUndoRedo) return;
 
             this.isSyncing = true;
             try {

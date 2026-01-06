@@ -174,41 +174,22 @@ class MindMap {
   }
 
   /**
-   * Pushes current state to undo stack before making a change
-   * Uses shared deep clone utility for reliable copying
+   * DEPRECATED: Pushes current state to undo stack.
+   * This is now a no-op. Undo is handled by Yjs UndoManager via CollaborationManager.
+   * Kept for backwards compatibility with existing code that calls pushUndo().
    */
   pushUndo() {
-    try {
-      const snap = this.toJSON();
-      // Deep clone to prevent reference issues
-      const clonedSnap = MindMap._deepClone(snap);
-      this.undoStack.push(clonedSnap);
-
-      // Limit stack size for memory management
-      if (this.undoStack.length > this.maxUndo) {
-        this.undoStack.shift();
-      }
-
-      // Mark as unsaved since we're about to make a change
-      this.isSaved = false;
-    } catch (e) {
-      console.warn('Failed to push undo snapshot:', e);
-    }
+    // No-op: Yjs UndoManager tracks changes automatically
+    // Mark as unsaved since we're about to make a change
+    this.isSaved = false;
   }
 
   /**
-   * Reverts to the most recent snapshot from undo stack
-   * Note: When connected to a collaboration room, use CollaborationManager.undo() instead
-   * which properly handles CRDT-aware undo of only YOUR changes.
+   * DEPRECATED: Use collaborationManager.undo() instead.
+   * This method is kept for backwards compatibility but should not be called.
    */
   undo() {
-    if (!this.undoStack || this.undoStack.length === 0) return;
-    const snap = this.undoStack.pop();
-    if (!snap) return;
-
-    this.fromJSON(snap);
-    this.isDirty = true;
-    this.isSaved = false;
+    console.warn('MindMap.undo() is deprecated. Use collaborationManager.undo() instead.');
   }
 
   /**
@@ -2032,6 +2013,19 @@ class MindMap {
     }
 
     this.isDirty = true;
+
+    // Sync loaded boxes and connections to Yjs (for unified undo)
+    // This ensures loaded data is tracked by UndoManager
+    if (MindMap.onBoxChange) {
+      for (const box of this.boxes) {
+        if (box && box.id) {
+          MindMap.onBoxChange(box);
+        }
+      }
+    }
+    if (MindMap.onConnectionsChange) {
+      MindMap.onConnectionsChange();
+    }
   }
 
   /**
