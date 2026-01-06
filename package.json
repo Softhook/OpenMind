@@ -5,6 +5,7 @@
   "main": "sketch.js",
   "scripts": {
     "test": "jest",
+    "start": "HOST=0.0.0.0 y-websocket",
     "start-signaling": "HOST=localhost PORT=4444 y-websocket"
   },
   "devDependencies": {
