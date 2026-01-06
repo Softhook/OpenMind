@@ -19,6 +19,13 @@ class CollaborationManager {
 
     static WEBSOCKET_SERVER = (() => {
         if (typeof window === 'undefined') return 'ws://localhost:1234';
+
+        // Check for manual override via URL parameter (e.g. ?server=public)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('server') === 'public' || params.get('server') === 'demo') {
+            return 'wss://demos.yjs.dev';
+        }
+
         const host = window.location.hostname;
         // Check for localhost
         if (host === 'localhost' || host === '127.0.0.1') {
@@ -29,7 +36,7 @@ class CollaborationManager {
             return `ws://${host}:1234`;
         }
         // Otherwise use production server
-        return 'wss://site--y-websockets-78445555d9.code.run';
+        return 'wss://demos.yjs.dev';
     })();
 
     static DEFAULT_USER_COLORS = [

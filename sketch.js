@@ -234,8 +234,8 @@ function parseFileFromLocation() {
   }
   if (hash && hash.length > 1) {
     let h = decodeURIComponent(hash.substring(1));
-    // Ignore collaboration room hashes
-    if (h.startsWith('room=')) return null;
+    // Ignore collaboration room hashes or if server override is present
+    if (h.startsWith('room=') || (searchParams && (searchParams.get('server')))) return null;
 
     if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
     return h;
