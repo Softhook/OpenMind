@@ -93,6 +93,8 @@ class CollaborationManager {
         this.roomName = null;
         this.isConnected = false;
         this.isInitialized = false;
+        this.isInitializing = false; // Track if initialization is in progress
+        this.initializationPromise = null; // Store the initialization promise
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
 
@@ -144,6 +146,26 @@ class CollaborationManager {
             return;
         }
 
+        // If initialization is already in progress, wait for it to complete
+        if (this.isInitializing) {
+            console.warn('CollaborationManager: Initialization already in progress, waiting...');
+            return this.initializationPromise;
+        }
+
+        this.isInitializing = true;
+
+        // Store the initialization promise so concurrent calls can await it
+        this.initializationPromise = this._doInitialize();
+
+        return this.initializationPromise;
+    }
+
+    /**
+     * Performs the actual initialization work.
+     * @private
+     * @returns {Promise<void>}
+     */
+    async _doInitialize() {
         try {
             // Load Yjs modules dynamically
             await this._loadDependencies();
@@ -177,6 +199,9 @@ class CollaborationManager {
         } catch (error) {
             console.error('CollaborationManager: Failed to initialize', error);
             throw error;
+        } finally {
+            this.isInitializing = false;
+            this.initializationPromise = null;
         }
     }
 
@@ -390,6 +415,8 @@ class CollaborationManager {
         this.yboxes = null;
         this.yconnections = null;
         this.isInitialized = false;
+        this.isInitializing = false;
+        this.initializationPromise = null;
 
         // Clear MindMap callbacks
         this._clearMindMapCallbacks();
