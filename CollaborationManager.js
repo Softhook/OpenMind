@@ -232,7 +232,7 @@ class CollaborationManager {
 
                 // Handle sync transitions: rebuild from Yjs when transitioning to synced state
                 // This handles both initial sync and resync after reconnection
-                if (synced && isResync && this.yboxes && this.mindMap) {
+                if (isResync && this.yboxes && this.mindMap) {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
