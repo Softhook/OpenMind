@@ -94,6 +94,7 @@ class CollaborationManager {
         this.isConnected = false;
         this.isInitialized = false;
         this.isInitializing = false; // Track if initialization is in progress
+        this.initializationPromise = null; // Store the initialization promise
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
 
@@ -145,53 +146,56 @@ class CollaborationManager {
             return;
         }
 
-        if (this.isInitializing) {
+        // If initialization is already in progress, wait for it to complete
+        if (this.isInitializing && this.initializationPromise) {
             console.warn('CollaborationManager: Initialization already in progress, waiting...');
-            // Wait for the existing initialization to complete
-            while (this.isInitializing) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            return;
+            return this.initializationPromise;
         }
 
         this.isInitializing = true;
 
-        try {
-            // Load Yjs modules dynamically
-            await this._loadDependencies();
+        // Store the initialization promise so concurrent calls can await it
+        this.initializationPromise = (async () => {
+            try {
+                // Load Yjs modules dynamically
+                await this._loadDependencies();
 
-            // Create Yjs document (local, not yet synced)
-            this.ydoc = new this.Y.Doc();
+                // Create Yjs document (local, not yet synced)
+                this.ydoc = new this.Y.Doc();
 
-            // Initialize shared types
-            this.yboxes = this.ydoc.getMap('boxes');
-            this.yconnections = this.ydoc.getArray('connections');
+                // Initialize shared types
+                this.yboxes = this.ydoc.getMap('boxes');
+                this.yconnections = this.ydoc.getArray('connections');
 
-            // Create UndoManager - tracks LOCAL changes only
-            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
-            });
+                // Create UndoManager - tracks LOCAL changes only
+                this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
+                    captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
+                });
 
-            // Set up observers for Yjs → local sync (including undo/redo)
-            this._setupObservers();
+                // Set up observers for Yjs → local sync (including undo/redo)
+                this._setupObservers();
 
-            // Set up MindMap callbacks for local → Yjs sync
-            this._setupMindMapCallbacks();
+                // Set up MindMap callbacks for local → Yjs sync
+                this._setupMindMapCallbacks();
 
-            // NOTE: _syncLocalToYjs() is NOT called here.
-            // It should be called explicitly after loading local data
-            // but ONLY if not joining a collaborative room.
-            // When joining a room, the room's state is authoritative.
+                // NOTE: _syncLocalToYjs() is NOT called here.
+                // It should be called explicitly after loading local data
+                // but ONLY if not joining a collaborative room.
+                // When joining a room, the room's state is authoritative.
 
-            this.isInitialized = true;
-            console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
+                this.isInitialized = true;
+                console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
 
-        } catch (error) {
-            console.error('CollaborationManager: Failed to initialize', error);
-            throw error;
-        } finally {
-            this.isInitializing = false;
-        }
+            } catch (error) {
+                console.error('CollaborationManager: Failed to initialize', error);
+                throw error;
+            } finally {
+                this.isInitializing = false;
+                this.initializationPromise = null;
+            }
+        })();
+
+        return this.initializationPromise;
     }
 
     // ============================================================================
@@ -405,6 +409,7 @@ class CollaborationManager {
         this.yconnections = null;
         this.isInitialized = false;
         this.isInitializing = false;
+        this.initializationPromise = null;
 
         // Clear MindMap callbacks
         this._clearMindMapCallbacks();
