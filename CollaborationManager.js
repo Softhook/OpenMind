@@ -93,6 +93,7 @@ class CollaborationManager {
         this.roomName = null;
         this.isConnected = false;
         this.isInitialized = false;
+        this.isInitializing = false; // Track if initialization is in progress
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
 
@@ -144,6 +145,17 @@ class CollaborationManager {
             return;
         }
 
+        if (this.isInitializing) {
+            console.warn('CollaborationManager: Initialization already in progress, waiting...');
+            // Wait for the existing initialization to complete
+            while (this.isInitializing) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            return;
+        }
+
+        this.isInitializing = true;
+
         try {
             // Load Yjs modules dynamically
             await this._loadDependencies();
@@ -177,6 +189,8 @@ class CollaborationManager {
         } catch (error) {
             console.error('CollaborationManager: Failed to initialize', error);
             throw error;
+        } finally {
+            this.isInitializing = false;
         }
     }
 
@@ -390,6 +404,7 @@ class CollaborationManager {
         this.yboxes = null;
         this.yconnections = null;
         this.isInitialized = false;
+        this.isInitializing = false;
 
         // Clear MindMap callbacks
         this._clearMindMapCallbacks();
