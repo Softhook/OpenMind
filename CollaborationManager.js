@@ -233,6 +233,9 @@ class CollaborationManager {
                         this._syncLocalToYjs();
                     } else if (!yjsEmpty) {
                         console.log('CollaborationManager: Room has data, receiving', this.yboxes.size, 'boxes');
+                        // IMPORTANT: Rebuild connections from Yjs on initial sync
+                        // The observer only fires on changes, not for existing data
+                        this._rebuildConnectionsFromYjs();
                     }
                 }
 

@@ -696,12 +696,15 @@ function drawRemoteCursors() {
 
     // Name tag
     if (name) {
+      textSize(12);
+      const tagWidth = textWidth(name) + 10;
+      const tagHeight = 20;
       fill(color);
-      rect(15, 0, textWidth(name) + 10, 20, 4);
+      rectMode(CORNER);
+      rect(15, 0, tagWidth, tagHeight, 4);
       fill(255);
       textAlign(LEFT, CENTER);
-      textSize(12);
-      text(name, 20, 10);
+      text(name, 20, tagHeight / 2);
     }
     pop();
 
@@ -738,15 +741,17 @@ function drawRemoteCursors() {
         push();
         noStroke();
         fill(color);
+        textSize(11);
         const tagText = '✏ ' + name;
         const tagWidth = textWidth(tagText) + 12;
+        const tagHeight = 16;
         const tagX = box.x - box.width / 2;
-        const tagY = box.y - box.height / 2 - 18;
-        rect(tagX, tagY, tagWidth, 16, 4);
+        const tagY = box.y - box.height / 2 - tagHeight - 4;
+        rectMode(CORNER);
+        rect(tagX, tagY, tagWidth, tagHeight, 4);
         fill(255);
         textAlign(LEFT, CENTER);
-        textSize(11);
-        text(tagText, tagX + 6, tagY + 8);
+        text(tagText, tagX + 6, tagY + tagHeight / 2);
         pop();
       }
     }
