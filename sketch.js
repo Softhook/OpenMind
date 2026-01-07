@@ -584,6 +584,9 @@ async function initializeCollaboration(roomName) {
     }
     await collaborationManager.connect(roomName, serverUrl);
     console.log('Collaboration initialized for room:', roomName);
+
+    // Update browser tab title to show room name
+    document.title = roomName + ' — OpenMind';
   } catch (e) {
     console.error('Failed to initialize collaboration:', e);
     // Clear timeouts on error
