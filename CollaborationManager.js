@@ -110,6 +110,10 @@ class CollaborationManager {
 
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
+
+        // Periodic consistency check timer
+        this.consistencyCheckTimer = null;
+        this.consistencyCheckInterval = 3000; // Check every 3 seconds
     }
 
     // ============================================================================
@@ -272,6 +276,15 @@ class CollaborationManager {
                     }
                 }
 
+                // Start or stop consistency check based on sync state
+                if (synced) {
+                    // Start periodic consistency check when fully synced
+                    this._startConsistencyCheck();
+                } else {
+                    // Stop consistency check when not synced
+                    this._stopConsistencyCheck();
+                }
+
                 if (this.onConnectionChange) {
                     this.onConnectionChange(synced ? 'synced' : 'syncing');
                 }
@@ -296,6 +309,9 @@ class CollaborationManager {
             clearTimeout(this.syncRetryTimer);
             this.syncRetryTimer = null;
         }
+
+        // Stop consistency check timer
+        this._stopConsistencyCheck();
 
         // Clear any pending text sync timers to prevent orphaned callbacks
         if (this.textSyncTimers) {
@@ -1092,6 +1108,99 @@ class CollaborationManager {
             name += chars[Math.floor(Math.random() * chars.length)];
         }
         return name;
+    }
+
+    // ============================================================================
+    // CONSISTENCY CHECK
+    // ============================================================================
+
+    /**
+     * Checks for mismatches between Yjs and local state and reconciles them.
+     * This is called periodically when connected and synced to detect and fix
+     * synchronization issues that may occur after the initial sync.
+     * @private
+     */
+    _performConsistencyCheck() {
+        // Only check if connected, synced, and not currently syncing
+        if (!this.isConnected || !this.provider?.synced || this.isSyncing) {
+            return;
+        }
+
+        if (!this.yboxes || !this.mindMap || !this.mindMap.boxes) {
+            return;
+        }
+
+        // Compare Yjs vs Local box IDs
+        const yjsBoxIds = new Set();
+        this.yboxes.forEach((_, id) => yjsBoxIds.add(id));
+        
+        const localBoxIds = new Set(this.mindMap.boxes.map(b => b.id));
+
+        const onlyInYjs = [...yjsBoxIds].filter(id => !localBoxIds.has(id));
+        const onlyInLocal = [...localBoxIds].filter(id => !yjsBoxIds.has(id));
+
+        // If there's a mismatch, reconcile
+        if (onlyInYjs.length > 0 || onlyInLocal.length > 0) {
+            console.warn('CollaborationManager: Consistency check detected mismatch!');
+            console.warn('  Boxes only in Yjs:', onlyInYjs.length);
+            console.warn('  Boxes only in Local:', onlyInLocal.length);
+            console.warn('  Reconciling...');
+
+            this.isSyncing = true;
+            try {
+                // Add missing boxes from Yjs to local
+                for (const id of onlyInYjs) {
+                    const data = this.yboxes.get(id);
+                    if (data) {
+                        this._applyBoxFromYjs(id, data, true); // snap to position
+                    }
+                }
+
+                // Add missing boxes from local to Yjs
+                for (const id of onlyInLocal) {
+                    const box = this.mindMap.getBoxById(id);
+                    if (box) {
+                        this.yboxes.set(id, this._boxToYjsData(box));
+                    }
+                }
+
+                // Rebuild connections to ensure consistency
+                this._rebuildConnectionsFromYjs();
+
+                this.mindMap.isDirty = true;
+                console.log('CollaborationManager: Consistency check reconciliation complete');
+            } finally {
+                this.isSyncing = false;
+            }
+        }
+    }
+
+    /**
+     * Starts periodic consistency checking
+     * @private
+     */
+    _startConsistencyCheck() {
+        if (this.consistencyCheckTimer) {
+            return; // Already running
+        }
+
+        this.consistencyCheckTimer = setInterval(() => {
+            this._performConsistencyCheck();
+        }, this.consistencyCheckInterval);
+
+        console.log('CollaborationManager: Started consistency check timer');
+    }
+
+    /**
+     * Stops periodic consistency checking
+     * @private
+     */
+    _stopConsistencyCheck() {
+        if (this.consistencyCheckTimer) {
+            clearInterval(this.consistencyCheckTimer);
+            this.consistencyCheckTimer = null;
+            console.log('CollaborationManager: Stopped consistency check timer');
+        }
     }
 
     // ============================================================================
