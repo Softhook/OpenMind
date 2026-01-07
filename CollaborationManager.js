@@ -106,6 +106,9 @@ class CollaborationManager {
 
         // Debounce timers for text sync during editing
         this.textSyncTimers = new Map(); // boxId -> timeoutId
+
+        // Retry timer for initial sync race condition
+        this.syncRetryTimer = null;
     }
 
     // ============================================================================
@@ -233,9 +236,32 @@ class CollaborationManager {
                         this._syncLocalToYjs();
                     } else if (!yjsEmpty) {
                         console.log('CollaborationManager: Room has data, receiving', this.yboxes.size, 'boxes');
-                        // IMPORTANT: Rebuild connections from Yjs on initial sync
+                        // IMPORTANT: Rebuild BOXES and connections from Yjs on initial sync
                         // The observer only fires on changes, not for existing data
+                        this._rebuildBoxesFromYjs();
                         this._rebuildConnectionsFromYjs();
+                    } else if (yjsEmpty && !localHasData) {
+                        // Race condition: sync fired before local data loaded
+                        // Retry multiple times to catch late-loading data
+                        console.log('CollaborationManager: Both empty, scheduling sync retries...');
+                        let retryCount = 0;
+                        const maxRetries = 5;
+                        const retryInterval = 500;
+
+                        const attemptSync = () => {
+                            retryCount++;
+                            if (this.yboxes && this.yboxes.size === 0 &&
+                                this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
+                                console.log('CollaborationManager: Retry', retryCount, '- seeding with local data');
+                                this._syncLocalToYjs();
+                            } else if (retryCount < maxRetries) {
+                                this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
+                            } else {
+                                console.log('CollaborationManager: Sync retries exhausted, room may be empty');
+                            }
+                        };
+
+                        this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
                     }
                 }
 
@@ -258,6 +284,12 @@ class CollaborationManager {
      * Undo/redo continues to work after disconnecting.
      */
     disconnect() {
+        // Clear sync retry timer
+        if (this.syncRetryTimer) {
+            clearTimeout(this.syncRetryTimer);
+            this.syncRetryTimer = null;
+        }
+
         // Clear any pending text sync timers to prevent orphaned callbacks
         if (this.textSyncTimers) {
             for (const timer of this.textSyncTimers.values()) {
@@ -681,17 +713,32 @@ class CollaborationManager {
      * Applies a box update from Yjs to local state
      * @param {string} boxId 
      * @param {Object} data 
+     * @param {boolean} snapToPosition - If true, set x/y directly instead of using interpolation
      * @private
      */
-    _applyBoxFromYjs(boxId, data) {
+    _applyBoxFromYjs(boxId, data, snapToPosition = false) {
         if (!this.mindMap || !data) return;
 
         let box = this.mindMap.getBoxById(boxId);
 
         if (box) {
-            // INTERPOLATION: Update targets, not direct position, unless it's a new box or we need to snap
-            if (typeof data.x === 'number') box.targetX = data.x;
-            if (typeof data.y === 'number') box.targetY = data.y;
+            // Update position: snap immediately or interpolate
+            if (typeof data.x === 'number') {
+                if (snapToPosition) {
+                    box.x = data.x;
+                    box.targetX = data.x;
+                } else {
+                    box.targetX = data.x;
+                }
+            }
+            if (typeof data.y === 'number') {
+                if (snapToPosition) {
+                    box.y = data.y;
+                    box.targetY = data.y;
+                } else {
+                    box.targetY = data.y;
+                }
+            }
 
             // Update existing box with validation
             // if (typeof data.x === 'number') box.x = data.x; // Replaced by targetX
@@ -749,6 +796,43 @@ class CollaborationManager {
                 this.mindMap.selectedBox = null;
             }
         }
+    }
+
+    /**
+     * Rebuilds all boxes from Yjs state.
+     * Called on initial sync when joining an existing room.
+     * @private
+     */
+    _rebuildBoxesFromYjs() {
+        if (!this.mindMap || !this.yboxes) return;
+
+        console.log('CollaborationManager: Rebuilding boxes from Yjs, count:', this.yboxes.size);
+
+        // Track which local boxes exist in Yjs
+        const yjsBoxIds = new Set();
+
+        // Apply each Yjs box to local state (snap to position immediately on initial rebuild)
+        this.yboxes.forEach((data, boxId) => {
+            yjsBoxIds.add(boxId);
+            this._applyBoxFromYjs(boxId, data, true); // snapToPosition = true
+        });
+
+        // Remove local boxes that don't exist in Yjs
+        // (They were deleted by another user or never synced)
+        this.mindMap.boxes = this.mindMap.boxes.filter(box => {
+            if (!box || !box.id) return false;
+            if (yjsBoxIds.has(box.id)) return true;
+            console.log('CollaborationManager: Removing local-only box:', box.id);
+            return false;
+        });
+
+        // Clear selection if selected box was removed
+        if (this.mindMap.selectedBox && !yjsBoxIds.has(this.mindMap.selectedBox.id)) {
+            this.mindMap.selectedBox = null;
+        }
+
+        // Mark for redraw
+        this.mindMap.isDirty = true;
     }
 
     /**
@@ -992,9 +1076,96 @@ class CollaborationManager {
         }
         return name;
     }
+
+    // ============================================================================
+    // DEBUG
+    // ============================================================================
+
+    /**
+     * Outputs comprehensive sync state to the console for debugging.
+     * Call from console: collaborationManager.debug() or collab.debug()
+     */
+    debug() {
+        const mm = this.mindMap;
+
+        console.group('🔍 COLLABORATION DEBUG');
+
+        // Connection status
+        console.group('📡 Connection');
+        console.log('isConnected:', this.isConnected);
+        console.log('isInitialized:', this.isInitialized);
+        console.log('isSyncing:', this.isSyncing);
+        console.log('roomName:', this.roomName);
+        console.log('userId:', this.userId);
+        console.log('WebSocket URL:', this.provider?.url);
+        console.log('WS readyState:', this.provider?.ws?.readyState, '(1=OPEN)');
+        console.log('provider.synced:', this.provider?.synced);
+        console.groupEnd();
+
+        // Box comparison
+        console.group('📦 Boxes');
+        const yjsBoxCount = this.yboxes?.size ?? 0;
+        const localBoxCount = mm?.boxes?.length ?? 0;
+        console.log('Yjs boxes:', yjsBoxCount);
+        console.log('Local boxes:', localBoxCount);
+
+        if (this.yboxes && mm?.boxes) {
+            const yjsIds = new Set();
+            this.yboxes.forEach((_, id) => yjsIds.add(id));
+            const localIds = new Set(mm.boxes.map(b => b.id));
+
+            const onlyYjs = [...yjsIds].filter(id => !localIds.has(id));
+            const onlyLocal = [...localIds].filter(id => !yjsIds.has(id));
+
+            if (onlyYjs.length) console.warn('⚠️ In Yjs ONLY:', onlyYjs);
+            if (onlyLocal.length) console.warn('⚠️ In Local ONLY:', onlyLocal);
+            if (!onlyYjs.length && !onlyLocal.length) console.log('✅ Box IDs match');
+
+            // Show first 5 boxes with position comparison
+            console.log('Sample boxes (first 5):');
+            let count = 0;
+            this.yboxes.forEach((data, id) => {
+                if (count++ >= 5) return;
+                const local = mm.getBoxById(id);
+                const posMatch = local && Math.abs(local.x - data.x) < 2 && Math.abs(local.y - data.y) < 2;
+                console.log(`  ${id.slice(0, 8)}: yjs(${Math.round(data.x)},${Math.round(data.y)}) local(${local ? Math.round(local.x) + ',' + Math.round(local.y) : 'MISSING'}) ${posMatch ? '✅' : '⚠️'}`);
+            });
+        }
+        console.groupEnd();
+
+        // Connections
+        console.group('🔗 Connections');
+        const yjsConnCount = this.yconnections?.length ?? 0;
+        const localConnCount = mm?.connections?.length ?? 0;
+        console.log('Yjs connections:', yjsConnCount);
+        console.log('Local connections:', localConnCount);
+        if (yjsConnCount !== localConnCount) {
+            console.warn('⚠️ Connection count mismatch!');
+        }
+        console.groupEnd();
+
+        // Awareness
+        console.group('👥 Awareness');
+        const states = this.awareness?.getStates();
+        console.log('Total clients:', states?.size ?? 0);
+        states?.forEach((state, clientId) => {
+            const isSelf = clientId === this.awareness?.clientID;
+            console.log(`  ${isSelf ? '(you)' : ''} ${state.user?.name}: cursor=${state.cursor ? 'yes' : 'no'}, editing=${state.editingBoxId || 'none'}`);
+        });
+        console.groupEnd();
+
+        console.groupEnd(); // End main group
+
+        return 'Debug complete. Check console output above.';
+    }
 }
 
 // Make available globally
 if (typeof window !== 'undefined') {
     window.CollaborationManager = CollaborationManager;
+    // Convenience shortcut: window.collab after collaborationManager is initialized
+    Object.defineProperty(window, 'collab', {
+        get: function () { return window.collaborationManager; },
+        configurable: true
+    });
 }
