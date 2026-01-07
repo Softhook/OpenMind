@@ -86,6 +86,7 @@ class CollaborationManager {
         this.isConnected = false;
         this.isInitialized = false;
         this.isSyncing = false; // Prevent feedback loops
+        this.lastSyncedState = false; // Track previous synced state to detect transitions
 
         // User identity
         this.userId = this._generateUserId();
@@ -218,6 +219,10 @@ class CollaborationManager {
             this.provider.on('synced', ({ synced }) => {
                 console.log('CollaborationManager: Sync status:', synced);
 
+                // Detect transition from not-synced to synced (initial sync or resync)
+                const isResync = synced && !this.lastSyncedState;
+                this.lastSyncedState = synced;
+
                 // FORCE connection state to true if synced (fixes split-brain issue)
                 if (synced && !this.isConnected) {
                     console.log('CollaborationManager: Synced implies connected. Forcing state.');
@@ -225,19 +230,21 @@ class CollaborationManager {
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
 
-                // SEED EMPTY ROOM: If Yjs is empty after sync but we have local data, push it
-                // This handles the case where the first user to join has data to share
-                if (synced && this.yboxes && this.mindMap) {
+                // Handle sync transitions: rebuild from Yjs when transitioning to synced state
+                // This handles both initial sync and resync after reconnection
+                if (isResync && this.yboxes && this.mindMap) {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
                     if (yjsEmpty && localHasData) {
+                        // Room is empty, seed with local data (first user to join)
                         console.log('CollaborationManager: Room is empty, seeding with local data');
                         this._syncLocalToYjs();
                     } else if (!yjsEmpty) {
-                        console.log('CollaborationManager: Room has data, receiving', this.yboxes.size, 'boxes');
-                        // IMPORTANT: Rebuild BOXES and connections from Yjs on initial sync
-                        // The observer only fires on changes, not for existing data
+                        // Room has data, rebuild from Yjs (on any sync transition)
+                        console.log('CollaborationManager: Synced with data, rebuilding from Yjs:', this.yboxes.size, 'boxes');
+                        // IMPORTANT: Rebuild BOXES and connections from Yjs on every sync transition
+                        // The observer only fires on changes, not for existing data at sync time
                         this._rebuildBoxesFromYjs();
                         this._rebuildConnectionsFromYjs();
                     } else if (yjsEmpty && !localHasData) {
@@ -309,6 +316,7 @@ class CollaborationManager {
         this.awareness = null;
         this.roomName = null;
         this.isConnected = false;
+        this.lastSyncedState = false; // Reset sync state tracking
 
         console.log('CollaborationManager: Disconnected from room (local undo still works)');
 
