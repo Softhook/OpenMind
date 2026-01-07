@@ -437,7 +437,8 @@ function handleUrlChange() {
 
   if (newRoom !== currentRoom) {
     if (collaborationManager) {
-      collaborationManager.disconnect();
+      // Fully destroy the old instance to properly clean up awareness
+      collaborationManager.destroy();
       collaborationManager = null;
     }
     if (newRoom && mindMap) {
@@ -4149,6 +4150,15 @@ function cleanup() {
         mindMap.saveToLocalStorage();
       } catch (e) {
         console.warn('Failed to save on cleanup:', e);
+      }
+    }
+
+    // Disconnect collaboration manager to clean up awareness
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (e) {
+        console.warn('Failed to disconnect collaboration manager:', e);
       }
     }
   } catch (e) {
