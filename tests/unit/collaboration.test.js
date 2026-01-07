@@ -292,3 +292,72 @@ describe('Text Editing Protection', () => {
         expect(collabCode).toMatch(/Don't overwrite text while user is actively editing/);
     });
 });
+
+describe('Periodic Consistency Check', () => {
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+
+    test('should have consistencyCheckTimer and consistencyCheckInterval in constructor', () => {
+        // Should initialize consistency check properties
+        expect(collabCode).toMatch(/this\.consistencyCheckTimer\s*=\s*null/);
+        expect(collabCode).toMatch(/this\.consistencyCheckInterval\s*=\s*\d+/);
+    });
+
+    test('should have _performConsistencyCheck method', () => {
+        // Should have the main consistency check method
+        expect(collabCode).toMatch(/_performConsistencyCheck\s*\(\s*\)\s*\{/);
+    });
+
+    test('_performConsistencyCheck should check if connected and synced', () => {
+        // Should verify connection and sync state before checking
+        expect(collabCode).toMatch(/if\s*\(\s*!this\.isConnected\s*\|\|\s*!this\.provider\?\.synced\s*\|\|\s*this\.isSyncing\s*\)/);
+    });
+
+    test('_performConsistencyCheck should compare Yjs vs Local box IDs', () => {
+        // Should identify boxes only in Yjs or only in Local
+        expect(collabCode).toMatch(/onlyInYjs.*=.*yjsBoxIds.*filter.*!localBoxIds\.has/s);
+        expect(collabCode).toMatch(/onlyInLocal.*=.*localBoxIds.*filter.*!yjsBoxIds\.has/s);
+    });
+
+    test('_performConsistencyCheck should reconcile mismatches', () => {
+        // Should add missing boxes from Yjs to local
+        expect(collabCode).toMatch(/for\s*\(\s*const\s+id\s+of\s+onlyInYjs\s*\)/);
+        expect(collabCode).toMatch(/_applyBoxFromYjs\s*\(\s*id,\s*data,\s*true\s*\)/);
+        
+        // Should add missing boxes from local to Yjs
+        expect(collabCode).toMatch(/for\s*\(\s*const\s+id\s+of\s+onlyInLocal\s*\)/);
+        expect(collabCode).toMatch(/this\.yboxes\.set\s*\(\s*id,\s*this\._boxToYjsData/);
+    });
+
+    test('should have _startConsistencyCheck method', () => {
+        expect(collabCode).toMatch(/_startConsistencyCheck\s*\(\s*\)\s*\{/);
+        expect(collabCode).toMatch(/setInterval.*_performConsistencyCheck/s);
+    });
+
+    test('should have _stopConsistencyCheck method', () => {
+        expect(collabCode).toMatch(/_stopConsistencyCheck\s*\(\s*\)\s*\{/);
+        expect(collabCode).toMatch(/clearInterval\s*\(\s*this\.consistencyCheckTimer\s*\)/);
+    });
+
+    test('should start consistency check when synced', () => {
+        // Should call _startConsistencyCheck when synced
+        expect(collabCode).toMatch(/if\s*\(\s*synced\s*\)\s*\{[^}]*_startConsistencyCheck/s);
+    });
+
+    test('should stop consistency check when not synced', () => {
+        // Should call _stopConsistencyCheck when not synced
+        expect(collabCode).toMatch(/else\s*\{[^}]*_stopConsistencyCheck/s);
+    });
+
+    test('should stop consistency check on disconnect', () => {
+        // disconnect() should call _stopConsistencyCheck
+        // The regex must allow for the entire disconnect method body
+        expect(collabCode).toMatch(/disconnect\s*\(\s*\)\s*\{[\s\S]*?_stopConsistencyCheck/);
+    });
+
+    test('_performConsistencyCheck should log warnings on mismatch', () => {
+        // Should log when mismatch is detected
+        expect(collabCode).toMatch(/console\.warn.*Consistency check detected mismatch/);
+        expect(collabCode).toMatch(/Boxes only in Yjs/);
+        expect(collabCode).toMatch(/Boxes only in Local/);
+    });
+});
