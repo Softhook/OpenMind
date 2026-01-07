@@ -65,6 +65,8 @@ class CollaborationManager {
     static SYNC_RETRY_DELAY = 5000; // ms - delay between retries (5s for cold start)
     static MAX_SYNC_RETRIES = 12; // Maximum retries (12 * 5s = 60s total)
     static COLD_START_THRESHOLD = 5000; // ms - if connection takes >5s, assume cold start
+    static COLD_START_GRACE_PERIOD = 60000; // ms - grace period before removing local data (60s)
+    static EXPONENTIAL_BACKOFF_ATTEMPTS = 6; // Number of attempts with exponential backoff before fixed interval
 
     // ============================================================================
     // CONSTRUCTOR
@@ -588,17 +590,20 @@ class CollaborationManager {
                     
                     // Exponential backoff: 10s, 15s, 20s, 25s, 30s, then 5s intervals
                     // This gives server time to warm up from cold start
-                    const nextDelay = attemptNumber < 6 
+                    const nextDelay = attemptNumber < CollaborationManager.EXPONENTIAL_BACKOFF_ATTEMPTS
                         ? CollaborationManager.SYNC_VERIFICATION_DELAY + (attemptNumber * CollaborationManager.SYNC_RETRY_DELAY)
                         : CollaborationManager.SYNC_RETRY_DELAY;
                     
                     this._verifySyncWithBackoff(attemptNumber + 1, maxAttempts, nextDelay);
                 } else {
-                    console.error(`CollaborationManager: Sync failed after ${maxAttempts} attempts over ${Math.round((Date.now() - this.lastSyncAttemptTime + delay * maxAttempts) / 1000)}s. Server may be down or unreachable.`);
+                    const firstAttemptTime = this.connectionStartTime || Date.now() - 60000;
+                    const totalTime = Math.round((Date.now() - firstAttemptTime) / 1000);
+                    console.error(`CollaborationManager: Sync failed after ${maxAttempts} attempts over ${totalTime}s. Server may be down or unreachable.`);
                     // Keep local data - don't lose user's work
                 }
             } else if (this.yboxes && this.yboxes.size > 0) {
-                const timeTaken = Date.now() - (this.lastSyncAttemptTime || 0);
+                const firstAttemptTime = this.connectionStartTime || this.lastSyncAttemptTime || Date.now();
+                const timeTaken = Date.now() - firstAttemptTime;
                 console.log(`✅ CollaborationManager: Sync verified after ${attemptNumber} attempt(s) in ${Math.round(timeTaken/1000)}s. Yjs has ${this.yboxes.size} boxes.`);
                 this.syncAttemptCount = 0;
             }
@@ -1215,14 +1220,15 @@ class CollaborationManager {
         if (onlyInYjs.length > 0 || onlyInLocal.length > 0) {
             // IMPORTANT: Check if this might be a pending sync (cold start grace period)
             // Don't destroy user's work if server is still processing the sync
-            const timeSinceLastSync = Date.now() - (this.lastSyncAttemptTime || 0);
-            const GRACE_PERIOD = 60000; // 60 seconds grace period for cold starts
+            const timeSinceLastSync = this.lastSyncAttemptTime 
+                ? Date.now() - this.lastSyncAttemptTime
+                : Number.MAX_SAFE_INTEGER; // If never synced, treat as very old
             
-            if (onlyInLocal.length > 0 && timeSinceLastSync < GRACE_PERIOD && this.syncAttemptCount > 0) {
+            if (onlyInLocal.length > 0 && timeSinceLastSync < CollaborationManager.COLD_START_GRACE_PERIOD && this.syncAttemptCount > 0) {
                 // Within grace period of active sync attempts - likely cold start delay
                 console.log(
                     `CollaborationManager: Consistency check detected ${onlyInLocal.length} local-only boxes, ` +
-                    `but within ${Math.round((GRACE_PERIOD - timeSinceLastSync)/1000)}s grace period of sync attempt. ` +
+                    `but within ${Math.round((CollaborationManager.COLD_START_GRACE_PERIOD - timeSinceLastSync)/1000)}s grace period of sync attempt. ` +
                     `Retrying sync instead of rebuilding (cold start protection).`
                 );
                 this.lastSyncAttemptTime = Date.now();
