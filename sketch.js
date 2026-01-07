@@ -437,7 +437,8 @@ function handleUrlChange() {
 
   if (newRoom !== currentRoom) {
     if (collaborationManager) {
-      collaborationManager.disconnect();
+      // Fully destroy the old instance to properly clean up awareness
+      collaborationManager.destroy();
       collaborationManager = null;
     }
     if (newRoom && mindMap) {

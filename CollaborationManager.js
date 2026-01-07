@@ -374,6 +374,16 @@ class CollaborationManager {
             this.textSyncTimers.clear();
         }
 
+        // Signal awareness that this client is leaving BEFORE disconnect
+        // Setting local state to null notifies other clients that we're leaving
+        if (this.awareness) {
+            try {
+                this.awareness.setLocalState(null);
+            } catch (e) {
+                console.warn('CollaborationManager: Error clearing awareness state', e);
+            }
+        }
+
         // Only disconnect the WebSocket provider, NOT the Yjs doc/UndoManager
         if (this.provider) {
             this.provider.disconnect();
@@ -381,7 +391,7 @@ class CollaborationManager {
             this.provider = null;
         }
 
-        // Clear awareness (remote cursors) but keep local state
+        // Clear awareness reference after provider is destroyed
         this.awareness = null;
         this.roomName = null;
         this.isConnected = false;
