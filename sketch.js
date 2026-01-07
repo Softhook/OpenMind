@@ -559,6 +559,14 @@ async function initializeCollaboration(roomName) {
     }
     await collaborationManager.connect(roomName, serverUrl);
     console.log('Collaboration initialized for room:', roomName);
+
+    // Fallback: If synced event never fires (empty room), dismiss overlay after timeout
+    setTimeout(() => {
+      if (syncStatus === 'syncing') {
+        console.log('Sync timeout: Assuming empty room, dismissing overlay');
+        syncStatus = null;
+      }
+    }, 3000);
   } catch (e) {
     console.error('Failed to initialize collaboration:', e);
   }
