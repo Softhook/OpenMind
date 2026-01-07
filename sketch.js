@@ -91,8 +91,11 @@ let visibilityChangeInProgress = 0; // Timestamp of last visibility change for d
 let lastLoadedUrlFile = null;
 // Loading indicator state
 let isMapLoading = false;
-// Collaboration sync status for overlay: null, 'connecting', 'syncing', 'connected'
+// Collaboration sync status for overlay: null, 'connecting', 'server_starting', 'syncing'
 let syncStatus = null;
+// Timeout handles for sync overlay (module scope for proper cleanup)
+let syncConnectionTimeout = null;
+let syncEmptyRoomTimeout = null;
 // Event listener cleanup tracking
 let eventListeners = [];
 
@@ -525,19 +528,41 @@ async function initializeCollaboration(roomName) {
     }
 
     // Set up callbacks
+    // Clear any existing timeouts from previous connection attempts
+    if (syncConnectionTimeout) clearTimeout(syncConnectionTimeout);
+    if (syncEmptyRoomTimeout) clearTimeout(syncEmptyRoomTimeout);
+
     collaborationManager.onConnectionChange = (status) => {
       console.log('Collaboration status:', status);
       // Track specific sync status for overlay
       const prevStatus = syncStatus;
       if (status === 'connecting') {
         syncStatus = 'connecting';
+        // Detect slow connection (server cold start on Render)
+        syncConnectionTimeout = setTimeout(() => {
+          if (syncStatus === 'connecting') {
+            console.log('Connection slow - server may be starting up');
+            syncStatus = 'server_starting';
+          }
+        }, 5000);
       } else if (status === 'connected') {
+        if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
         syncStatus = 'syncing'; // Connected but waiting for initial sync
+        // Start empty room timeout - if no sync after 5s, assume empty room
+        syncEmptyRoomTimeout = setTimeout(() => {
+          if (syncStatus === 'syncing') {
+            console.log('Sync timeout: Assuming empty room, dismissing overlay');
+            syncStatus = null;
+          }
+        }, 5000);
       } else if (status === 'syncing') {
         syncStatus = 'syncing';
       } else if (status === 'synced') {
+        if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         syncStatus = null; // Fully synced, hide overlay
       } else if (status === 'disconnected') {
+        if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
+        if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         syncStatus = null;
       }
       if (prevStatus !== syncStatus) {
@@ -559,16 +584,12 @@ async function initializeCollaboration(roomName) {
     }
     await collaborationManager.connect(roomName, serverUrl);
     console.log('Collaboration initialized for room:', roomName);
-
-    // Fallback: If synced event never fires (empty room), dismiss overlay after timeout
-    setTimeout(() => {
-      if (syncStatus === 'syncing') {
-        console.log('Sync timeout: Assuming empty room, dismissing overlay');
-        syncStatus = null;
-      }
-    }, 3000);
   } catch (e) {
     console.error('Failed to initialize collaboration:', e);
+    // Clear timeouts on error
+    if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
+    if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
+    syncStatus = null;
   }
 }
 
@@ -1016,6 +1037,9 @@ function draw() {
     if (syncStatus === 'connecting') {
       mainMessage = 'Connecting to server';
       subMessage = 'Establishing WebSocket connection...';
+    } else if (syncStatus === 'server_starting') {
+      mainMessage = 'Server is starting up';
+      subMessage = 'This may take up to a minute on first load...';
     } else if (syncStatus === 'syncing') {
       mainMessage = 'Waiting for sync';
       subMessage = 'Looking for peers with map data...';
