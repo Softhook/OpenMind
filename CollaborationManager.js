@@ -529,7 +529,10 @@ class CollaborationManager {
             width: box.width,
             height: box.height,
             backgroundColor: box.backgroundColor ? { ...box.backgroundColor } : null,
-            imageUrl: box.imageUrl || null
+            imageUrl: box.imageUrl || null,
+            highlights: Array.isArray(box.highlights) && box.highlights.length > 0
+                ? box.highlights.map(h => ({ start: h.start, end: h.end, color: h.color }))
+                : null
         };
     }
 
@@ -758,6 +761,12 @@ class CollaborationManager {
             }
             if (data.imageUrl !== undefined) {
                 box.imageUrl = data.imageUrl;
+            }
+            // Sync highlights (only when not editing to avoid conflicts)
+            if (Array.isArray(data.highlights) && !box.isEditing) {
+                box.highlights = data.highlights.map(h => ({ start: h.start, end: h.end, color: h.color }));
+            } else if (data.highlights === null && !box.isEditing) {
+                box.highlights = [];
             }
             box.updateDimensions();
         } else {

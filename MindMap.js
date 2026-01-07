@@ -1502,6 +1502,11 @@ class MindMap {
       // If not changed, keep original
       conn.toBox = changed ? conn.toBox : originalTo;
       this.draggingConnection = null;
+
+      // Sync connection change to collaboration if reattached
+      if (changed && MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
+      }
       return;
     }
 
@@ -1816,6 +1821,18 @@ class MindMap {
           }
 
           this.isDirty = true;
+
+          // Sync pasted boxes and connections to collaboration
+          for (const box of newBoxes) {
+            if (MindMap.onBoxChange) {
+              MindMap.onBoxChange(box);
+            }
+          }
+          if (newBoxes.length > 0 || (this.copiedConnections && this.copiedConnections.length > 0)) {
+            if (MindMap.onConnectionsChange) {
+              MindMap.onConnectionsChange();
+            }
+          }
         }
         return;
       }
@@ -1840,6 +1857,10 @@ class MindMap {
       if (this.selectedConnection) {
         this.pushUndo();
         this.selectedConnection.reverse();
+        // Sync connection change to collaboration
+        if (MindMap.onConnectionsChange) {
+          MindMap.onConnectionsChange();
+        }
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
@@ -1895,6 +1916,10 @@ class MindMap {
         if (index > -1) {
           this.connections.splice(index, 1);
           this.selectedConnection = null;
+          // Sync connection deletion to collaboration
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange();
+          }
         }
         // Clear navigation mode after deleting single connection
         this.isArrowKeyNavigating = false;
