@@ -59,6 +59,8 @@ class CollaborationManager {
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
+    static SYNC_VERIFICATION_DELAY = 500; // ms - delay before verifying initial sync succeeded
+    static SYNC_RETRY_DELAY = 1000; // ms - delay before retrying failed sync
 
     // ============================================================================
     // CONSTRUCTOR
@@ -259,11 +261,11 @@ class CollaborationManager {
                                     } else {
                                         console.log('CollaborationManager: Sync recovered on retry');
                                     }
-                                }, 1000);
+                                }, CollaborationManager.SYNC_RETRY_DELAY);
                             } else if (this.yboxes) {
                                 console.log('CollaborationManager: Sync verification OK, Yjs has', this.yboxes.size, 'boxes');
                             }
-                        }, 500);
+                        }, CollaborationManager.SYNC_VERIFICATION_DELAY);
                     } else if (!yjsEmpty) {
                         // Room has data, rebuild from Yjs (on any sync transition)
                         console.log('CollaborationManager: Synced with data, rebuilding from Yjs:', this.yboxes.size, 'boxes');
@@ -1169,7 +1171,8 @@ class CollaborationManager {
             console.warn(
                 `CollaborationManager: Consistency check detected mismatch! ` +
                 `Boxes only in Yjs: ${onlyInYjs.length}, ` +
-                `Boxes only in Local: ${onlyInLocal.length}. Rebuilding from Yjs...`
+                `Boxes only in Local: ${onlyInLocal.length}. ` +
+                `Rebuilding local state from Yjs authority...`
             );
 
             this.isSyncing = true;

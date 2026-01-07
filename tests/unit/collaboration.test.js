@@ -355,7 +355,7 @@ describe('Periodic Consistency Check', () => {
         expect(collabCode).toMatch(/console\.warn\s*\([\s\S]*?Consistency check detected mismatch/);
         expect(collabCode).toMatch(/Boxes only in Yjs/);
         expect(collabCode).toMatch(/Boxes only in Local/);
-        expect(collabCode).toMatch(/Rebuilding from Yjs/);
+        expect(collabCode).toMatch(/Rebuilding.*from Yjs/);
     });
 
     test('_performConsistencyCheck should use Yjs as authority', () => {
@@ -363,5 +363,7 @@ describe('Periodic Consistency Check', () => {
         expect(collabCode).toMatch(/STRATEGY.*Yjs is the source of truth/s);
         // Should call rebuild methods (Yjs authoritative)
         expect(collabCode).toMatch(/Yjs is authoritative.*rebuild local state from Yjs/s);
+        // Log message should clarify Yjs authority
+        expect(collabCode).toMatch(/Rebuilding local state from Yjs authority/);
     });
 });
