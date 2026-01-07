@@ -391,7 +391,7 @@ class CollaborationManager {
             this.provider = null;
         }
 
-        // Clear awareness reference (provider owns awareness, so it's destroyed when provider is destroyed)
+        // Null out awareness reference (it's destroyed along with the provider above)
         this.awareness = null;
         this.roomName = null;
         this.isConnected = false;
