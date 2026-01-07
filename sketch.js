@@ -91,6 +91,8 @@ let visibilityChangeInProgress = 0; // Timestamp of last visibility change for d
 let lastLoadedUrlFile = null;
 // Loading indicator state
 let isMapLoading = false;
+// Collaboration sync status for overlay: null, 'connecting', 'syncing', 'connected'
+let syncStatus = null;
 // Event listener cleanup tracking
 let eventListeners = [];
 
@@ -525,10 +527,30 @@ async function initializeCollaboration(roomName) {
     // Set up callbacks
     collaborationManager.onConnectionChange = (status) => {
       console.log('Collaboration status:', status);
+      // Track specific sync status for overlay
+      const prevStatus = syncStatus;
+      if (status === 'connecting') {
+        syncStatus = 'connecting';
+      } else if (status === 'connected') {
+        syncStatus = 'syncing'; // Connected but waiting for initial sync
+      } else if (status === 'syncing') {
+        syncStatus = 'syncing';
+      } else if (status === 'synced') {
+        syncStatus = null; // Fully synced, hide overlay
+      } else if (status === 'disconnected') {
+        syncStatus = null;
+      }
+      if (prevStatus !== syncStatus) {
+        console.log('Sync overlay status changed:', prevStatus, '->', syncStatus);
+      }
     };
 
+    let lastPeerCount = 0;
     collaborationManager.onPeersChange = (peers) => {
-      console.log('Connected peers:', peers.length);
+      if (peers.length !== lastPeerCount) {
+        console.log('Connected peers:', peers.length);
+        lastPeerCount = peers.length;
+      }
     };
 
     const serverUrl = parseServerFromUrl();
@@ -970,6 +992,55 @@ function draw() {
     pop();
     pop();
     cursor('wait');
+  }
+
+  // Draw sync overlay when collaboration is connecting/syncing
+  if (syncStatus && !isMapLoading) {
+    push();
+    resetMatrix && resetMatrix();
+    noStroke();
+    // Semi-transparent overlay
+    fill(40, 40, 60, 180);
+    rect(0, 0, width, height);
+
+    // State-specific messages
+    let mainMessage, subMessage;
+    if (syncStatus === 'connecting') {
+      mainMessage = 'Connecting to server';
+      subMessage = 'Establishing WebSocket connection...';
+    } else if (syncStatus === 'syncing') {
+      mainMessage = 'Waiting for sync';
+      subMessage = 'Looking for peers with map data...';
+    } else {
+      mainMessage = 'Synchronizing';
+      subMessage = 'Please wait...';
+    }
+
+    // Main message
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(18);
+    text(mainMessage, width / 2, height / 2 - 20);
+
+    // Animated dots
+    const dots = '.'.repeat((Math.floor(frameCount / 20) % 4));
+    text(dots, width / 2 + textWidth(mainMessage) / 2 + 5, height / 2 - 20);
+
+    // Subtitle
+    textSize(12);
+    fill(180);
+    text(subMessage, width / 2, height / 2 + 10);
+
+    // Spinner
+    push();
+    translate(width / 2, height / 2 + 45);
+    rotate(frameCount * 0.05);
+    stroke(100, 180, 255);
+    strokeWeight(2);
+    noFill();
+    arc(0, 0, 24, 24, 0, PI * 0.7);
+    pop();
+    pop();
   }
 }
 
