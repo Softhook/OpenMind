@@ -4152,6 +4152,15 @@ function cleanup() {
         console.warn('Failed to save on cleanup:', e);
       }
     }
+
+    // Disconnect collaboration manager to clean up awareness
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (e) {
+        console.warn('Failed to disconnect collaboration manager:', e);
+      }
+    }
   } catch (e) {
     console.error('Error during cleanup:', e);
   }
