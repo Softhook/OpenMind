@@ -113,7 +113,7 @@ class CollaborationManager {
 
         // Periodic consistency check timer
         this.consistencyCheckTimer = null;
-        this.consistencyCheckInterval = 3000; // Check every 3 seconds
+        this.consistencyCheckInterval = 10000; // Check every 10 seconds (reduced overhead)
     }
 
     // ============================================================================
@@ -242,8 +242,28 @@ class CollaborationManager {
 
                     if (yjsEmpty && localHasData) {
                         // Room is empty, seed with local data (first user to join)
-                        console.log('CollaborationManager: Room is empty, seeding with local data');
+                        console.log('CollaborationManager: Room is empty, seeding with local data:', this.mindMap.boxes.length, 'boxes');
                         this._syncLocalToYjs();
+                        
+                        // Verify sync succeeded after a short delay
+                        setTimeout(() => {
+                            if (this.yboxes && this.yboxes.size === 0 && 
+                                this.mindMap && this.mindMap.boxes.length > 0) {
+                                console.error('CollaborationManager: Initial sync verification FAILED! Yjs still empty. Retrying...');
+                                this._syncLocalToYjs();
+                                
+                                // Second verification
+                                setTimeout(() => {
+                                    if (this.yboxes && this.yboxes.size === 0) {
+                                        console.error('CollaborationManager: Second sync attempt FAILED! Check network/server.');
+                                    } else {
+                                        console.log('CollaborationManager: Sync recovered on retry');
+                                    }
+                                }, 1000);
+                            } else if (this.yboxes) {
+                                console.log('CollaborationManager: Sync verification OK, Yjs has', this.yboxes.size, 'boxes');
+                            }
+                        }, 500);
                     } else if (!yjsEmpty) {
                         // Room has data, rebuild from Yjs (on any sync transition)
                         console.log('CollaborationManager: Synced with data, rebuilding from Yjs:', this.yboxes.size, 'boxes');
@@ -1118,6 +1138,11 @@ class CollaborationManager {
      * Checks for mismatches between Yjs and local state and reconciles them.
      * This is called periodically when connected and synced to detect and fix
      * synchronization issues that may occur after the initial sync.
+     * 
+     * STRATEGY: Yjs is the source of truth after initial sync.
+     * - Missing boxes from Yjs → Add to Local
+     * - Extra boxes in Local only → These should not exist (rebuild removes them)
+     * 
      * @private
      */
     _performConsistencyCheck() {
@@ -1139,33 +1164,19 @@ class CollaborationManager {
         const onlyInYjs = [...yjsBoxIds].filter(id => !localBoxIds.has(id));
         const onlyInLocal = [...localBoxIds].filter(id => !yjsBoxIds.has(id));
 
-        // If there's a mismatch, reconcile
+        // If there's a mismatch, reconcile with Yjs as authority
         if (onlyInYjs.length > 0 || onlyInLocal.length > 0) {
             console.warn(
                 `CollaborationManager: Consistency check detected mismatch! ` +
                 `Boxes only in Yjs: ${onlyInYjs.length}, ` +
-                `Boxes only in Local: ${onlyInLocal.length}. Reconciling...`
+                `Boxes only in Local: ${onlyInLocal.length}. Rebuilding from Yjs...`
             );
 
             this.isSyncing = true;
             try {
-                // Add missing boxes from Yjs to local
-                for (const id of onlyInYjs) {
-                    const data = this.yboxes.get(id);
-                    if (data) {
-                        this._applyBoxFromYjs(id, data, true); // snap to position
-                    }
-                }
-
-                // Add missing boxes from local to Yjs
-                for (const id of onlyInLocal) {
-                    const box = this.mindMap.getBoxById(id);
-                    if (box) {
-                        this.yboxes.set(id, this._boxToYjsData(box));
-                    }
-                }
-
-                // Rebuild connections to ensure consistency
+                // Yjs is authoritative: rebuild local state from Yjs
+                // This matches the initial sync behavior (_rebuildBoxesFromYjs)
+                this._rebuildBoxesFromYjs();
                 this._rebuildConnectionsFromYjs();
 
                 this.mindMap.isDirty = true;

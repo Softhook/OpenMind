@@ -319,13 +319,9 @@ describe('Periodic Consistency Check', () => {
     });
 
     test('_performConsistencyCheck should reconcile mismatches', () => {
-        // Should add missing boxes from Yjs to local
-        expect(collabCode).toMatch(/for\s*\(\s*const\s+id\s+of\s+onlyInYjs\s*\)/);
-        expect(collabCode).toMatch(/_applyBoxFromYjs\s*\(\s*id,\s*data,\s*true\s*\)/);
-        
-        // Should add missing boxes from local to Yjs
-        expect(collabCode).toMatch(/for\s*\(\s*const\s+id\s+of\s+onlyInLocal\s*\)/);
-        expect(collabCode).toMatch(/this\.yboxes\.set\s*\(\s*id,\s*this\._boxToYjsData/);
+        // Should use Yjs as authority and rebuild from Yjs
+        expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
+        expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
     });
 
     test('should have _startConsistencyCheck method', () => {
@@ -359,6 +355,13 @@ describe('Periodic Consistency Check', () => {
         expect(collabCode).toMatch(/console\.warn\s*\([\s\S]*?Consistency check detected mismatch/);
         expect(collabCode).toMatch(/Boxes only in Yjs/);
         expect(collabCode).toMatch(/Boxes only in Local/);
-        expect(collabCode).toMatch(/Reconciling/);
+        expect(collabCode).toMatch(/Rebuilding from Yjs/);
+    });
+
+    test('_performConsistencyCheck should use Yjs as authority', () => {
+        // Should document that Yjs is source of truth
+        expect(collabCode).toMatch(/STRATEGY.*Yjs is the source of truth/s);
+        // Should call rebuild methods (Yjs authoritative)
+        expect(collabCode).toMatch(/Yjs is authoritative.*rebuild local state from Yjs/s);
     });
 });
