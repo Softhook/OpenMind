@@ -930,6 +930,11 @@ class MindMap {
     if (!MindMap.onBoxChange || !boxes || boxes.length === 0) return;
     for (const box of boxes) {
       if (box) {
+        // IMPORTANT: Sync targetX/targetY to prevent interpolation snap-back
+        // When making local changes, the target must match the new position
+        if (typeof box.targetX !== 'undefined') box.targetX = box.x;
+        if (typeof box.targetY !== 'undefined') box.targetY = box.y;
+
         MindMap.onBoxChange(box);
       }
     }
@@ -2030,10 +2035,20 @@ class MindMap {
 
   /**
    * Gets the last used filename from localStorage
+   * If in a collaborative room, uses the room hash as the filename
    * @returns {string} The last used filename or default
    */
   getLastUsedFilename() {
     try {
+      // Check for collaboration room hash first
+      if (typeof window !== 'undefined' && window.location && window.location.hash) {
+        const hash = window.location.hash.slice(1); // Remove '#'
+        if (hash && hash.startsWith('room-')) {
+          // Use room name as filename (e.g., "room-abc123" -> "room-abc123.json")
+          return hash + '.json';
+        }
+      }
+
       const saved = localStorage.getItem('openmind_last_filename');
       return saved || 'openmind.json';
     } catch (e) {

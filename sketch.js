@@ -660,6 +660,12 @@ function updateCollaborationPresence() {
       selectedIds = [mindMap.selectedBox.id];
     }
     collaborationManager.updateSelection(selectedIds);
+
+    // Broadcast which box is being edited (for lock indicator)
+    const editingBoxId = (mindMap.selectedBox && mindMap.selectedBox.isEditing)
+      ? mindMap.selectedBox.id
+      : null;
+    collaborationManager.updateEditingBox(editingBoxId);
   }
 }
 
@@ -710,6 +716,38 @@ function drawRemoteCursors() {
           rectMode(CENTER);
           rect(box.x, box.y, box.width + 10, box.height + 10, 8);
         }
+      }
+    }
+
+    // Show editing lock indicator - pulsing border with user name
+    if (userState.editingBoxId && mindMap) {
+      const box = mindMap.getBoxById(userState.editingBoxId);
+      if (box) {
+        // Pulsing effect using sin wave
+        const pulse = 0.5 + 0.5 * sin(frameCount * 0.1);
+        const alpha = 150 + pulse * 105;
+
+        // Draw locked/editing border
+        noFill();
+        stroke(red(color), green(color), blue(color), alpha);
+        strokeWeight(4);
+        rectMode(CENTER);
+        rect(box.x, box.y, box.width + 14, box.height + 14, 10);
+
+        // Draw editing indicator tag
+        push();
+        noStroke();
+        fill(color);
+        const tagText = '✏ ' + name;
+        const tagWidth = textWidth(tagText) + 12;
+        const tagX = box.x - box.width / 2;
+        const tagY = box.y - box.height / 2 - 18;
+        rect(tagX, tagY, tagWidth, 16, 4);
+        fill(255);
+        textAlign(LEFT, CENTER);
+        textSize(11);
+        text(tagText, tagX + 6, tagY + 8);
+        pop();
       }
     }
   }
@@ -789,12 +827,15 @@ function setup() {
     addTrackedEventListener(window, 'hashchange', handleUrlChange);
     addTrackedEventListener(window, 'popstate', handleUrlChange);
 
-    // Check if joining a collaboration room - if so, skip localStorage
-    // (state will come from Yjs sync with other peers)
+    // Check if joining a collaboration room
     const roomId = parseRoomFromHash();
 
-    if (!lastLoadedUrlFile && !roomId) {
-      // Try to load from localStorage first (only when NOT joining a room)
+    // ALWAYS load from localStorage first (even when joining a room)
+    // When joining a room, the seed logic in CollaborationManager will:
+    // - If room is empty: push local data to Yjs
+    // - If room has data: Yjs will sync and overwrite local to match room state
+    if (!lastLoadedUrlFile) {
+      // Try to load from localStorage first
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
         try {

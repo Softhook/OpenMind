@@ -58,6 +58,7 @@ class CollaborationManager {
 
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
+    static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
 
     // ============================================================================
     // CONSTRUCTOR
@@ -102,6 +103,9 @@ class CollaborationManager {
 
         // Interpolation
         this.interpolatedCursors = new Map(); // userId -> { x, y, targetX, targetY, lastUpdate }
+
+        // Debounce timers for text sync during editing
+        this.textSyncTimers = new Map(); // boxId -> timeoutId
     }
 
     // ============================================================================
@@ -218,6 +222,20 @@ class CollaborationManager {
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
 
+                // SEED EMPTY ROOM: If Yjs is empty after sync but we have local data, push it
+                // This handles the case where the first user to join has data to share
+                if (synced && this.yboxes && this.mindMap) {
+                    const yjsEmpty = this.yboxes.size === 0;
+                    const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
+
+                    if (yjsEmpty && localHasData) {
+                        console.log('CollaborationManager: Room is empty, seeding with local data');
+                        this._syncLocalToYjs();
+                    } else if (!yjsEmpty) {
+                        console.log('CollaborationManager: Room has data, receiving', this.yboxes.size, 'boxes');
+                    }
+                }
+
                 if (this.onConnectionChange) {
                     this.onConnectionChange(synced ? 'synced' : 'syncing');
                 }
@@ -237,6 +255,14 @@ class CollaborationManager {
      * Undo/redo continues to work after disconnecting.
      */
     disconnect() {
+        // Clear any pending text sync timers to prevent orphaned callbacks
+        if (this.textSyncTimers) {
+            for (const timer of this.textSyncTimers.values()) {
+                clearTimeout(timer);
+            }
+            this.textSyncTimers.clear();
+        }
+
         // Only disconnect the WebSocket provider, NOT the Yjs doc/UndoManager
         if (this.provider) {
             this.provider.disconnect();
@@ -480,6 +506,31 @@ class CollaborationManager {
     syncBoxToYjs(box) {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
+        // Debounce text sync during active editing to reduce network traffic
+        if (box.isEditing) {
+            // Capture boxId, not the box object, to avoid stale reference issues
+            const boxId = box.id;
+
+            // Clear existing timer for this box
+            const existingTimer = this.textSyncTimers.get(boxId);
+            if (existingTimer) clearTimeout(existingTimer);
+
+            // Set new debounced timer
+            const timer = setTimeout(() => {
+                this.textSyncTimers.delete(boxId);
+                // Verify box still exists before syncing
+                if (this.yboxes && this.mindMap) {
+                    const currentBox = this.mindMap.getBoxById(boxId);
+                    if (currentBox) {
+                        this.yboxes.set(boxId, this._boxToYjsData(currentBox));
+                    }
+                }
+            }, CollaborationManager.TEXT_SYNC_DEBOUNCE);
+
+            this.textSyncTimers.set(boxId, timer);
+            return;
+        }
+
         this.yboxes.set(box.id, this._boxToYjsData(box));
     }
 
@@ -642,7 +693,13 @@ class CollaborationManager {
             // Update existing box with validation
             // if (typeof data.x === 'number') box.x = data.x; // Replaced by targetX
             // if (typeof data.y === 'number') box.y = data.y; // Replaced by targetY
-            if (typeof data.text === 'string') box.text = data.text;
+
+            // IMPORTANT: Don't overwrite text while user is actively editing
+            // This prevents lag from causing text loss
+            if (typeof data.text === 'string' && !box.isEditing) {
+                box.text = data.text;
+            }
+
             if (typeof data.width === 'number') box.width = data.width;
             if (typeof data.height === 'number') box.height = data.height;
 
@@ -776,6 +833,15 @@ class CollaborationManager {
     }
 
     /**
+     * Updates which box the local user is currently editing
+     * @param {string|null} boxId - ID of the box being edited, or null if not editing
+     */
+    updateEditingBox(boxId) {
+        if (!this.awareness) return;
+        this.awareness.setLocalStateField('editingBoxId', boxId);
+    }
+
+    /**
      * Gets state of all remote users (cursors, selections) with INTERPOLATED positions
      * @returns {Array<Object>}
      */
@@ -797,7 +863,8 @@ class CollaborationManager {
                     clientId,
                     user: state.user,
                     cursor: cursor,
-                    selectedBoxIds: state.selectedBoxIds || []
+                    selectedBoxIds: state.selectedBoxIds || [],
+                    editingBoxId: state.editingBoxId || null
                 });
             }
         });

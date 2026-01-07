@@ -278,3 +278,17 @@ describe('Optimization & Robustness', () => {
         expect(collabCode).toMatch(/captureTimeout:\s*CollaborationManager\.UNDO_CAPTURE_TIMEOUT/);
     });
 });
+
+describe('Text Editing Protection', () => {
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+
+    test('_applyBoxFromYjs should skip text update when box is being edited', () => {
+        // Should check isEditing before updating text
+        expect(collabCode).toMatch(/if\s*\(\s*typeof\s+data\.text\s*===\s*['"]string['"]\s*&&\s*!box\.isEditing\s*\)/);
+    });
+
+    test('_applyBoxFromYjs should have comment explaining the protection', () => {
+        // Should have explanatory comment
+        expect(collabCode).toMatch(/Don't overwrite text while user is actively editing/);
+    });
+});
