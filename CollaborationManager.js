@@ -1141,10 +1141,11 @@ class CollaborationManager {
 
         // If there's a mismatch, reconcile
         if (onlyInYjs.length > 0 || onlyInLocal.length > 0) {
-            console.warn('CollaborationManager: Consistency check detected mismatch!');
-            console.warn('  Boxes only in Yjs:', onlyInYjs.length);
-            console.warn('  Boxes only in Local:', onlyInLocal.length);
-            console.warn('  Reconciling...');
+            console.warn(
+                `CollaborationManager: Consistency check detected mismatch! ` +
+                `Boxes only in Yjs: ${onlyInYjs.length}, ` +
+                `Boxes only in Local: ${onlyInLocal.length}. Reconciling...`
+            );
 
             this.isSyncing = true;
             try {

@@ -355,9 +355,10 @@ describe('Periodic Consistency Check', () => {
     });
 
     test('_performConsistencyCheck should log warnings on mismatch', () => {
-        // Should log when mismatch is detected
-        expect(collabCode).toMatch(/console\.warn.*Consistency check detected mismatch/);
+        // Should log when mismatch is detected (consolidated into single console.warn)
+        expect(collabCode).toMatch(/console\.warn\s*\([\s\S]*?Consistency check detected mismatch/);
         expect(collabCode).toMatch(/Boxes only in Yjs/);
         expect(collabCode).toMatch(/Boxes only in Local/);
+        expect(collabCode).toMatch(/Reconciling/);
     });
 });
