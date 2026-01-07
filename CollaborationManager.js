@@ -147,7 +147,7 @@ class CollaborationManager {
         }
 
         // If initialization is already in progress, wait for it to complete
-        if (this.isInitializing && this.initializationPromise) {
+        if (this.isInitializing) {
             console.warn('CollaborationManager: Initialization already in progress, waiting...');
             return this.initializationPromise;
         }
@@ -155,47 +155,54 @@ class CollaborationManager {
         this.isInitializing = true;
 
         // Store the initialization promise so concurrent calls can await it
-        this.initializationPromise = (async () => {
-            try {
-                // Load Yjs modules dynamically
-                await this._loadDependencies();
-
-                // Create Yjs document (local, not yet synced)
-                this.ydoc = new this.Y.Doc();
-
-                // Initialize shared types
-                this.yboxes = this.ydoc.getMap('boxes');
-                this.yconnections = this.ydoc.getArray('connections');
-
-                // Create UndoManager - tracks LOCAL changes only
-                this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                    captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
-                });
-
-                // Set up observers for Yjs → local sync (including undo/redo)
-                this._setupObservers();
-
-                // Set up MindMap callbacks for local → Yjs sync
-                this._setupMindMapCallbacks();
-
-                // NOTE: _syncLocalToYjs() is NOT called here.
-                // It should be called explicitly after loading local data
-                // but ONLY if not joining a collaborative room.
-                // When joining a room, the room's state is authoritative.
-
-                this.isInitialized = true;
-                console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
-
-            } catch (error) {
-                console.error('CollaborationManager: Failed to initialize', error);
-                throw error;
-            } finally {
-                this.isInitializing = false;
-                this.initializationPromise = null;
-            }
-        })();
+        this.initializationPromise = this._doInitialize();
 
         return this.initializationPromise;
+    }
+
+    /**
+     * Performs the actual initialization work.
+     * @private
+     * @returns {Promise<void>}
+     */
+    async _doInitialize() {
+        try {
+            // Load Yjs modules dynamically
+            await this._loadDependencies();
+
+            // Create Yjs document (local, not yet synced)
+            this.ydoc = new this.Y.Doc();
+
+            // Initialize shared types
+            this.yboxes = this.ydoc.getMap('boxes');
+            this.yconnections = this.ydoc.getArray('connections');
+
+            // Create UndoManager - tracks LOCAL changes only
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
+                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
+            });
+
+            // Set up observers for Yjs → local sync (including undo/redo)
+            this._setupObservers();
+
+            // Set up MindMap callbacks for local → Yjs sync
+            this._setupMindMapCallbacks();
+
+            // NOTE: _syncLocalToYjs() is NOT called here.
+            // It should be called explicitly after loading local data
+            // but ONLY if not joining a collaborative room.
+            // When joining a room, the room's state is authoritative.
+
+            this.isInitialized = true;
+            console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
+
+        } catch (error) {
+            console.error('CollaborationManager: Failed to initialize', error);
+            throw error;
+        } finally {
+            this.isInitializing = false;
+            this.initializationPromise = null;
+        }
     }
 
     // ============================================================================
