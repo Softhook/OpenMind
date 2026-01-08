@@ -719,18 +719,49 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
     console.log('Collaboration initialized for room:', roomName, 'shouldShareLocalData:', shouldShareLocalData);
 
-    // CRITICAL: If starting collaboration (shouldShareLocalData=true), immediately sync local data
-    // Don't wait for sync handler transition - explicitly push boxes to Yjs
+    // CRITICAL: If starting collaboration (shouldShareLocalData=true), sync local data
+    // Wait for provider to be fully synced before force-syncing to avoid race conditions
     if (shouldShareLocalData && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
-      console.log('Starting collaboration - immediately syncing', mindMap.boxes.length, 'local boxes to Yjs');
+      console.log('Starting collaboration - will sync', mindMap.boxes.length, 'local boxes to Yjs');
 
-      // Wait a brief moment for connection to stabilize, then force sync
-      setTimeout(() => {
-        if (collaborationManager && typeof collaborationManager._syncLocalToYjs === 'function') {
-          collaborationManager._syncLocalToYjs();
-          console.log('Forced sync complete - boxes should now be in Yjs');
+      // Store current manager reference to detect if it changes
+      const currentManager = collaborationManager;
+
+      const doSync = () => {
+        // Verify this is still the active manager and it's connected
+        if (collaborationManager === currentManager &&
+          collaborationManager.isConnected &&
+          typeof collaborationManager._syncLocalToYjs === 'function') {
+          console.log('Provider synced - force syncing local boxes to Yjs...');
+          try {
+            collaborationManager._syncLocalToYjs();
+            console.log('✅ Forced sync complete - boxes now in Yjs');
+          } catch (e) {
+            console.error('Failed to sync local boxes:', e);
+          }
+        } else {
+          console.log('Skipping sync - manager changed or disconnected');
         }
-      }, 100);
+      };
+
+      // If already synced, sync immediately; otherwise wait for synced event with timeout
+      if (collaborationManager.provider && collaborationManager.provider.synced) {
+        doSync();
+      } else {
+        console.log('Waiting for provider to sync before pushing local boxes...');
+
+        // Set 10 second timeout to prevent waiting forever
+        const timeout = setTimeout(() => {
+          console.warn('Sync wait timeout - attempting sync anyway');
+          doSync();
+        }, 10000);
+
+        // Wait for sync event, then clear timeout and sync
+        collaborationManager.provider.once('synced', () => {
+          clearTimeout(timeout);
+          doSync();
+        });
+      }
     }
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
@@ -3004,6 +3035,47 @@ async function handleFileLoad(file) {
     if (mindMap && typeof mindMap.load === 'function') {
       try {
         await mindMap.load(data);
+        console.log('Loaded map from file successfully');
+
+        // CRITICAL: If in a collaborative room, REPLACE room state with loaded file
+        // Clear Yjs first to avoid duplicates, then sync the loaded file
+        if (collaborationManager && collaborationManager.isConnected) {
+          console.log('In collaborative room - replacing room state with loaded file');
+          console.log('  - Clearing old room state...');
+
+          // Clear all Yjs state first to prevent duplicates
+          try {
+            if (collaborationManager.yboxes && collaborationManager.yconnections) {
+              const oldBoxCount = collaborationManager.yboxes.size;
+              const oldConnCount = collaborationManager.yconnections.length;
+
+              // Clear boxes (Map has clear method)
+              collaborationManager.yboxes.clear();
+
+              // Clear connections (Array - delete all items)
+              collaborationManager.yconnections.delete(0, collaborationManager.yconnections.length);
+
+              console.log('  - Cleared', oldBoxCount, 'old boxes and', oldConnCount, 'old connections');
+            }
+          } catch (e) {
+            console.error('Error clearing Yjs state:', e);
+            // Continue anyway - worst case is duplicates
+          }
+
+          console.log('  - Syncing', mindMap.boxes.length, 'boxes from loaded file...');
+
+          // Now sync the loaded file to Yjs
+          try {
+            if (typeof collaborationManager._syncLocalToYjs === 'function') {
+              collaborationManager._syncLocalToYjs();
+              console.log('  ✅ File state now in Yjs - room replaced with loaded file');
+            }
+          } catch (e) {
+            console.error('Error syncing loaded file to Yjs:', e);
+          }
+        }
+
+        resetView();
       } catch (e) {
         throw e;
       }
