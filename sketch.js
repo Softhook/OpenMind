@@ -1139,7 +1139,14 @@ function setup() {
 function setupUIButtons() {
   saveButton = createButton('Save');
   saveButton.position(100, 10);
-  saveButton.mousePressed(() => mindMap.save());
+  saveButton.mousePressed(() => {
+    // If in a collaborative room, use room name as suggested filename
+    if (collaborationManager && collaborationManager.roomName) {
+      const roomFilename = collaborationManager.roomName + '.json';
+      mindMap.setLastUsedFilename(roomFilename);
+    }
+    mindMap.save();
+  });
 
   loadButton = createButton('Load');
   loadButton.position(160, 10);
