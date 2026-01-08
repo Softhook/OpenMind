@@ -1227,48 +1227,6 @@ class CollaborationManager {
     }
 
     /**
-     * Updates the local user's display name
-     * @param {string} name - New display name
-     */
-    setUserName(name) {
-        if (!name || typeof name !== 'string') return;
-
-        // Sanitize: strip HTML tags and trim
-        const sanitized = name.replace(/<[^>]*>/g, '').trim();
-        if (sanitized.length === 0 || sanitized.length > 50) return; // Validate length
-
-        this.userName = sanitized;
-
-        // Persist to localStorage
-        try {
-            localStorage.setItem('openmind_userName', sanitized);
-        } catch (e) {
-            console.warn('CollaborationManager: Could not save userName to localStorage', e);
-        }
-
-        // Update awareness state with new name
-        if (this.awareness) {
-            const currentState = this.awareness.getLocalState() || {};
-            this.awareness.setLocalStateField('user', {
-                ...currentState.user,
-                id: this.userId,
-                name: this.userName,
-                color: this.userColor
-            });
-        }
-
-        console.log('CollaborationManager: Display name changed to:', this.userName);
-    }
-
-    /**
-     * Gets the current user's display name
-     * @returns {string}
-     */
-    getUserName() {
-        return this.userName;
-    }
-
-    /**
      * Gets state of all remote users (cursors, selections) with INTERPOLATED positions
      * @returns {Array<Object>}
      */
@@ -1363,22 +1321,10 @@ class CollaborationManager {
     }
 
     /**
-     * Generates or retrieves the user name
-     * Tries localStorage first, generates random name if not found
+     * Generates a random user name
      * @private
      */
     _generateUserName() {
-        // Try to load saved name from localStorage
-        try {
-            const saved = localStorage.getItem('openmind_userName');
-            if (saved && typeof saved === 'string' && saved.trim().length > 0) {
-                return saved.trim();
-            }
-        } catch (e) {
-            // localStorage not available, fall through to random name
-        }
-
-        // Generate random name
         const adjectives = ['Happy', 'Swift', 'Clever', 'Bright', 'Calm', 'Bold'];
         const nouns = ['Thinker', 'Creator', 'Builder', 'Dreamer', 'Mapper', 'Planner'];
         const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
