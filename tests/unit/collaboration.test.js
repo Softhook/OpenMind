@@ -410,6 +410,14 @@ describe('Local Data Management When Joining Rooms', () => {
         expect(collabCode).toMatch(/_clearLocalData[\s\S]*?console\.log.*Clearing local data/);
     });
 
+    test('_clearLocalData should have error handling', () => {
+        // Should wrap operations in try-catch
+        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?try\s*\{/);
+        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?catch\s*\(/);
+        // Should log errors
+        expect(collabCode).toMatch(/console\.error.*Failed to clear local data/);
+    });
+
     test('sync handler should check shouldShareLocalData flag', () => {
         // Should check the flag when deciding to share or clear data
         expect(collabCode).toMatch(/if\s*\([^)]*this\.shouldShareLocalData/);
@@ -454,25 +462,29 @@ describe('Sketch.js Integration for Local Data Management', () => {
         expect(sketchCode).toMatch(/console\.log.*shouldShareLocalData/);
     });
 
-    test('shareSession should set flag when starting collaboration', () => {
-        // Should set window._startingCollaboration flag
-        expect(sketchCode).toMatch(/window\._startingCollaboration\s*=\s*true/);
+    test('shareSession should use URL parameter for mode', () => {
+        // Should use URL parameter mode=start instead of global flag
+        expect(sketchCode).toMatch(/window\.location\.hash\s*=\s*`room=\$\{room\}&mode=start`/);
     });
 
-    test('handleUrlChange should check and clear the flag', () => {
-        // Should check window._startingCollaboration
-        expect(sketchCode).toMatch(/window\._startingCollaboration\s*===\s*true/);
-        // Should clear the flag after reading
-        expect(sketchCode).toMatch(/window\._startingCollaboration\s*=\s*false/);
+    test('parseRoomFromHash should return room info object', () => {
+        // Should return object with room and isStarting properties
+        expect(sketchCode).toMatch(/function parseRoomFromHash\s*\(\s*\)\s*\{/);
+        expect(sketchCode).toMatch(/room:.*isStarting/s);
     });
 
-    test('handleUrlChange should pass flag to initializeCollaboration', () => {
-        // Should pass shouldShareLocalData to initializeCollaboration
-        expect(sketchCode).toMatch(/initializeCollaboration\s*\([^)]*shouldShareLocalData/);
+    test('parseRoomFromHash should check mode parameter', () => {
+        // Should check if mode=start in URL
+        expect(sketchCode).toMatch(/params\.get\s*\(\s*['"]mode['"]\s*\)\s*===\s*['"]start['"]/);
     });
 
-    test('setup should pass false when joining from URL', () => {
-        // When joining from URL at startup, should explicitly pass false
-        expect(sketchCode).toMatch(/initializeCollaboration\s*\(\s*roomId\s*,\s*false\s*\)/);
+    test('handleUrlChange should use roomInfo.isStarting', () => {
+        // Should extract isStarting from roomInfo object
+        expect(sketchCode).toMatch(/roomInfo\s*\?\s*roomInfo\.isStarting/);
+    });
+
+    test('setup should use roomInfo.isStarting for initialization', () => {
+        // When joining from URL at startup, should use flag from URL
+        expect(sketchCode).toMatch(/roomInfo\s*\?\s*roomInfo\.isStarting/);
     });
 });

@@ -1069,20 +1069,34 @@ class CollaborationManager {
     _clearLocalData() {
         if (!this.mindMap) return;
 
-        console.log('CollaborationManager: Clearing local data -', this.mindMap.boxes.length, 'boxes and', this.mindMap.connections.length, 'connections');
+        try {
+            // Safely get counts before clearing
+            const boxCount = this.mindMap.boxes?.length || 0;
+            const connCount = this.mindMap.connections?.length || 0;
+            
+            console.log('CollaborationManager: Clearing local data -', boxCount, 'boxes and', connCount, 'connections');
 
-        // Clear all boxes
-        this.mindMap.boxes = [];
-        this.mindMap.connections = [];
+            // Clear all boxes and connections
+            this.mindMap.boxes = [];
+            this.mindMap.connections = [];
 
-        // Clear selections using optional chaining for safety
-        this.mindMap.selectedBox = null;
-        this.mindMap.selectedConnection = null;
-        this.mindMap.selectedBoxes?.clear();
-        this.mindMap.selectedConnections?.clear();
+            // Clear selections using optional chaining for safety
+            this.mindMap.selectedBox = null;
+            this.mindMap.selectedConnection = null;
+            this.mindMap.selectedBoxes?.clear();
+            this.mindMap.selectedConnections?.clear();
 
-        // Mark for redraw
-        this.mindMap.isDirty = true;
+            // Mark for redraw
+            this.mindMap.isDirty = true;
+        } catch (error) {
+            console.error('CollaborationManager: Failed to clear local data:', error);
+            // Ensure at minimum we mark for redraw even if clearing failed
+            try {
+                if (this.mindMap) this.mindMap.isDirty = true;
+            } catch (e) {
+                // Ignore nested error
+            }
+        }
     }
 
     /**
