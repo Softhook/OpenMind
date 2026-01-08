@@ -13,22 +13,23 @@ const path = require('path');
 const textBoxCode = fs.readFileSync(path.join(__dirname, '../../TextBox.js'), 'utf8');
 const connectionCode = fs.readFileSync(path.join(__dirname, '../../Connection.js'), 'utf8');
 const mindMapCode = fs.readFileSync(path.join(__dirname, '../../MindMap.js'), 'utf8');
+const utilsCode = fs.readFileSync(path.join(__dirname, '../../utils.js'), 'utf8');
 
 describe('TextBox UUID Implementation', () => {
-    test('constructor should generate ID using TextBox.generateUUID()', () => {
-        // Verify the constructor includes ID generation via helper
-        expect(textBoxCode).toMatch(/constructor\s*\([^)]*\)\s*\{[^}]*this\.id\s*=\s*TextBox\.generateUUID\(\)/s);
+    test('constructor should generate ID using Utils.generateUUID()', () => {
+        // Verify the constructor includes ID generation via shared Utils
+        expect(textBoxCode).toMatch(/constructor\s*\([^)]*\)\s*\{[^}]*this\.id\s*=\s*Utils\.generateUUID\(\)/s);
     });
 
-    test('generateUUID static method should exist with fallback support', () => {
-        // Verify generateUUID method exists
-        expect(textBoxCode).toMatch(/static\s+generateUUID\s*\(\)\s*\{/);
+    test('Utils.generateUUID should exist with fallback support', () => {
+        // Verify generateUUID function exists in utils.js
+        expect(utilsCode).toMatch(/function\s+generateUUID\s*\(\)\s*\{/);
         // Verify it tries crypto.randomUUID first
-        expect(textBoxCode).toMatch(/crypto\.randomUUID\s*\(\)/);
+        expect(utilsCode).toMatch(/crypto\.randomUUID\s*\(\)/);
         // Verify it has a fallback with crypto.getRandomValues
-        expect(textBoxCode).toMatch(/crypto\.getRandomValues/);
+        expect(utilsCode).toMatch(/crypto\.getRandomValues/);
         // Verify it has a Math.random fallback for edge cases
-        expect(textBoxCode).toMatch(/Math\.random\(\)/);
+        expect(utilsCode).toMatch(/Math\.random\(\)/);
     });
 
     test('toJSON should include id field', () => {
@@ -121,16 +122,16 @@ describe('Code Quality', () => {
 // ============================================================================
 
 describe('UUID Format Validation', () => {
-    test('generateUUID should produce valid UUID v4 format', () => {
+    test('Utils.generateUUID should produce valid UUID v4 format', () => {
         // UUID v4 sets specific bits: version 4 (0100) at position 12-15
         // and variant bits (10xx) at position 16-17
-        expect(textBoxCode).toMatch(/bytes\[6\].*0x0f.*0x40/); // Version 4
-        expect(textBoxCode).toMatch(/bytes\[8\].*0x3f.*0x80/); // RFC 4122 variant
+        expect(utilsCode).toMatch(/bytes\[6\].*0x0f.*0x40/); // Version 4
+        expect(utilsCode).toMatch(/bytes\[8\].*0x3f.*0x80/); // RFC 4122 variant
     });
 
-    test('generateUUID should produce proper hex format with dashes', () => {
+    test('Utils.generateUUID should produce proper hex format with dashes', () => {
         // Should produce format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        expect(textBoxCode).toMatch(/hex\.slice\(0,\s*8\).*hex\.slice\(8,\s*12\).*hex\.slice\(12,\s*16\)/);
+        expect(utilsCode).toMatch(/hex\.slice\(0,\s*8\).*hex\.slice\(8,\s*12\).*hex\.slice\(12,\s*16\)/);
     });
 
     test('fromJSON should only accept string IDs', () => {
@@ -138,6 +139,7 @@ describe('UUID Format Validation', () => {
         expect(textBoxCode).toMatch(/typeof\s*data\.id\s*===\s*['"]string['"]/);
     });
 });
+
 
 describe('Paste ID Exclusion', () => {
     test('paste logic should exclude original ID from copied data', () => {
@@ -223,9 +225,9 @@ describe('Error Handling', () => {
         expect(textBoxCode).toMatch(/console\.warn\s*\(\s*['"]Invalid box data/);
     });
 
-    test('generateUUID should catch crypto.randomUUID errors', () => {
-        // Should have try-catch around crypto.randomUUID
-        expect(textBoxCode).toMatch(/try\s*\{[^}]*crypto\.randomUUID\(\)[^}]*\}\s*catch/s);
+    test('Utils.generateUUID should catch crypto.randomUUID errors', () => {
+        // Should have try-catch around crypto.randomUUID in utils.js
+        expect(utilsCode).toMatch(/try\s*\{[^}]*crypto\.randomUUID\(\)[^}]*\}\s*catch/s);
     });
 });
 

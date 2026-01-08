@@ -22,12 +22,12 @@ const AppConfig = {
     STEP: 1.05,            // Zoom factor per scroll step
     DEFAULT: 1.0           // Default zoom level
   },
-  
+
   // Camera/pan settings
   CAMERA: {
     PAN_MARGIN: 500        // Soft limit margin for panning (pixels)
   },
-  
+
   // UI dimensions
   UI: {
     TOOLBAR_HEIGHT: 40,
@@ -41,23 +41,23 @@ const AppConfig = {
     SAVE_INDICATOR_X: 20,
     SAVE_INDICATOR_Y: 26
   },
-  
+
   // Export settings
   EXPORT: {
     PADDING: 50,           // Padding around content in exports
     MARGIN: 20             // Page margins for PDF export
   },
-  
+
   // Autosave settings
   AUTOSAVE: {
     INTERVAL: 30000        // Autosave interval in milliseconds (30 seconds)
   },
-  
+
   // Visibility handling
   VISIBILITY: {
     DEBOUNCE_MS: 50        // Debounce time for duplicate visibility events
   },
-  
+
   // Timing constants
   TIMING: {
     RESIZE_DEBOUNCE_MS: 16, // ~60fps debounce for resize
@@ -194,15 +194,15 @@ function getClampedZoomFactor(minFactor = 0.5, maxFactor = 2.0) {
 function sanitizeText(text) {
   if (text === null || text === undefined) return '';
   text = String(text);
-  
+
   // Normalize line endings: convert \r\n and \r to \n
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  
+
   // Remove invisible/control characters except newlines and tabs
   // Keep: \n (0x0A), \t (0x09), and printable characters (0x20+)
   // Remove: C0 controls (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F), DEL (0x7F), C1 controls (0x80-0x9F)
   text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F\x80-\x9F]/g, '');
-  
+
   return text;
 }
 
@@ -277,33 +277,33 @@ function distanceToSegment(px, py, x1, y1, x2, y2) {
   if (!areValidCoordinates(px, py) || !areValidCoordinates(x1, y1) || !areValidCoordinates(x2, y2)) {
     return Infinity;
   }
-  
+
   const dx = x2 - x1;
   const dy = y2 - y1;
   const lengthSquared = dx * dx + dy * dy;
-  
+
   if (lengthSquared === 0 || !isFinite(lengthSquared)) {
     // Line segment is a point
     return distance(px, py, x1, y1);
   }
-  
+
   // Calculate projection parameter t
   let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
-  
+
   if (!isValidNumber(t)) {
     return Infinity;
   }
-  
+
   t = clamp(t, 0, 1);
-  
+
   // Find closest point on segment
   const closestX = x1 + t * dx;
   const closestY = y1 + t * dy;
-  
+
   if (!areValidCoordinates(closestX, closestY)) {
     return Infinity;
   }
-  
+
   return distance(px, py, closestX, closestY);
 }
 
@@ -324,12 +324,12 @@ function isPointInRect(px, py, cx, cy, width, height) {
   if (!areValidDimensions(width, height)) {
     return false;
   }
-  
+
   const halfW = width / 2;
   const halfH = height / 2;
-  
+
   return px >= cx - halfW && px <= cx + halfW &&
-         py >= cy - halfH && py <= cy + halfH;
+    py >= cy - halfH && py <= cy + halfH;
 }
 
 /**
@@ -350,12 +350,12 @@ function rectanglesOverlap(r1x1, r1y1, r1x2, r1y2, r2x1, r2y1, r2x2, r2y2) {
   const right1 = Math.max(r1x1, r1x2);
   const top1 = Math.min(r1y1, r1y2);
   const bottom1 = Math.max(r1y1, r1y2);
-  
+
   const left2 = Math.min(r2x1, r2x2);
   const right2 = Math.max(r2x1, r2x2);
   const top2 = Math.min(r2y1, r2y2);
   const bottom2 = Math.max(r2y1, r2y2);
-  
+
   // Check for no overlap
   return !(right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2);
 }
@@ -384,14 +384,14 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
   const segMaxX = Math.max(x1, x2);
   const segMinY = Math.min(y1, y2);
   const segMaxY = Math.max(y1, y2);
-  
+
   if (segMaxX < minRx || segMinX > maxRx || segMaxY < minRy || segMinY > maxRy) {
     return false;
   }
 
   // Quick check: any endpoint inside rect
   if ((x1 >= minRx && x1 <= maxRx && y1 >= minRy && y1 <= maxRy) ||
-      (x2 >= minRx && x2 <= maxRx && y2 >= minRy && y2 <= maxRy)) {
+    (x2 >= minRx && x2 <= maxRx && y2 >= minRy && y2 <= maxRy)) {
     return true;
   }
 
@@ -408,14 +408,14 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
     const o4 = orient(cx, cy, dx, dy, bx, by);
 
     // Collinear overlap cases
-    if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) && 
-         Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
-        (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) && 
-         Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
-        (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) && 
-         Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
-        (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) && 
-         Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
+    if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) &&
+      Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
+      (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) &&
+        Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
+      (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) &&
+        Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
+      (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) &&
+        Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
       return true;
     }
 
@@ -445,7 +445,7 @@ function validateColor(color, defaultColor = { r: 255, g: 255, b: 255 }) {
   if (!color || typeof color !== 'object') {
     return { ...defaultColor };
   }
-  
+
   return {
     r: clamp(safeNumber(color.r, defaultColor.r), 0, 255),
     g: clamp(safeNumber(color.g, defaultColor.g), 0, 255),
@@ -554,6 +554,44 @@ function deepClone(obj) {
 }
 
 // ============================================================================
+// UUID GENERATION
+// ============================================================================
+
+/**
+ * Generates a unique identifier (UUID v4)
+ * Uses crypto.randomUUID() when available, falls back to manual generation
+ * for older browsers (Safari < 15.4) or non-HTTPS contexts
+ * @returns {string} UUID string
+ */
+function generateUUID() {
+  // Use native crypto.randomUUID if available (Safari 15.4+, HTTPS required)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // Fall through to manual generation
+    }
+  }
+
+  // Fallback: generate UUID v4 manually
+  // Uses crypto.getRandomValues if available, otherwise Math.random
+  const getRandomValues = (typeof crypto !== 'undefined' && crypto.getRandomValues)
+    ? (arr) => crypto.getRandomValues(arr)
+    : (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); return arr; };
+
+  const bytes = new Uint8Array(16);
+  getRandomValues(bytes);
+
+  // Set version (4) and variant (RFC 4122)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC 4122
+
+  // Convert to hex string with dashes
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+// ============================================================================
 // ERROR HANDLING UTILITIES
 // ============================================================================
 
@@ -582,7 +620,7 @@ function safeExecute(fn, defaultValue = null, context = '') {
  * @returns {Function} Wrapped function
  */
 function wrapWithErrorHandler(fn, context = '') {
-  return function(...args) {
+  return function (...args) {
     try {
       return fn.apply(this, args);
     } catch (e) {
@@ -602,7 +640,7 @@ if (typeof window !== 'undefined') {
   window.OpenMindUtils = {
     // Configuration
     AppConfig,
-    
+
     // Validation
     isValidNumber,
     areValidCoordinates,
@@ -614,12 +652,12 @@ if (typeof window !== 'undefined') {
     clamp,
     getCurrentZoom,
     getClampedZoomFactor,
-    
+
     // String
     sanitizeText,
     isWhitespace,
     safeString,
-    
+
     // Geometry
     distance,
     distanceSquared,
@@ -627,22 +665,25 @@ if (typeof window !== 'undefined') {
     isPointInRect,
     rectanglesOverlap,
     segmentIntersectsRect,
-    
+
     // Color
     validateColor,
     colorToRGBA,
-    
+
     // Array/Object
     safeForEach,
     safeFilter,
     safeMap,
     deepClone,
-    
+
+    // UUID
+    generateUUID,
+
     // Error handling
     safeExecute,
     wrapWithErrorHandler
   };
-  
+
   // Also expose commonly used utilities via simpler aliases for backward compatibility
   window.AppConfig = AppConfig;
   window.Utils = window.OpenMindUtils;

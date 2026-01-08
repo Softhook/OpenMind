@@ -31,32 +31,13 @@ class Connection {
   }
 
   /**
-   * Helper to check if a number is valid (uses Utils if available)
-   * @private
-   */
-  static _isValidNumber(value) {
-    if (typeof Utils !== 'undefined' && Utils.isValidNumber) {
-      return Utils.isValidNumber(value);
-    }
-    return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
-  }
-
-  /**
-   * Helper to check if coordinates are valid
-   * @private
-   */
-  static _areValidCoordinates(x, y) {
-    return Connection._isValidNumber(x) && Connection._isValidNumber(y);
-  }
-
-  /**
    * Gets the world-space position of the arrow head (end point at toBox edge)
    * @returns {Object|null} Point with x and y coordinates, or null if invalid
    */
   getArrowHeadPosition() {
     if (!this.fromBox || !this.toBox) return null;
     const end = this.toBox.getConnectionPoint(this.fromBox);
-    if (!end || !Connection._areValidCoordinates(end.x, end.y)) return null;
+    if (!end || !Utils.areValidCoordinates(end.x, end.y)) return null;
     return end;
   }
 
@@ -67,16 +48,14 @@ class Connection {
   isMouseOverArrowHead() {
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    if (!Connection._areValidCoordinates(mx, my)) return false;
+    if (!Utils.areValidCoordinates(mx, my)) return false;
     const end = this.getArrowHeadPosition();
     if (!end) return false;
     // Scale hit radius slightly with zoom so it's usable at different scales
     const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
     const safeZoom = Math.max(0.25, Math.min(4, currentZoom));
     const hitR = 10 / Math.sqrt(safeZoom);
-    const d = typeof Utils !== 'undefined' && Utils.distance
-      ? Utils.distance(mx, my, end.x, end.y)
-      : dist(mx, my, end.x, end.y);
+    const d = Utils.distance(mx, my, end.x, end.y);
     return d <= hitR;
   }
 
@@ -97,8 +76,8 @@ class Connection {
 
     // Validate connection points using shared utility
     if (!start || !end ||
-      !Connection._areValidCoordinates(start.x, start.y) ||
-      !Connection._areValidCoordinates(end.x, end.y)) {
+      !Utils.areValidCoordinates(start.x, start.y) ||
+      !Utils.areValidCoordinates(end.x, end.y)) {
       pop();
       return;
     }
@@ -118,7 +97,7 @@ class Connection {
     let angle = atan2(end.y - start.y, end.x - start.x);
 
     // Validate angle
-    if (!Connection._isValidNumber(angle)) {
+    if (!Utils.isValidNumber(angle)) {
       pop();
       return;
     }
@@ -149,7 +128,7 @@ class Connection {
     // Validate boxes and mouse coordinates
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    if (!this.fromBox || !this.toBox || !Connection._areValidCoordinates(mx, my)) {
+    if (!this.fromBox || !this.toBox || !Utils.areValidCoordinates(mx, my)) {
       return false;
     }
 
@@ -159,8 +138,8 @@ class Connection {
 
     // Validate connection points
     if (!start || !end ||
-      !Connection._areValidCoordinates(start.x, start.y) ||
-      !Connection._areValidCoordinates(end.x, end.y)) {
+      !Utils.areValidCoordinates(start.x, start.y) ||
+      !Utils.areValidCoordinates(end.x, end.y)) {
       return false;
     }
 
@@ -171,7 +150,6 @@ class Connection {
 
   /**
    * Calculates distance from a point to a line segment
-   * Uses shared utility if available, otherwise falls back to inline implementation
    * @param {number} px - Point X
    * @param {number} py - Point Y
    * @param {number} x1 - Segment start X
@@ -181,47 +159,7 @@ class Connection {
    * @returns {number} Distance in pixels
    */
   distanceToSegment(px, py, x1, y1, x2, y2) {
-    // Use shared utility if available
-    if (typeof Utils !== 'undefined' && Utils.distanceToSegment) {
-      return Utils.distanceToSegment(px, py, x1, y1, x2, y2);
-    }
-
-    // Validate all inputs
-    if (!Connection._areValidCoordinates(px, py) ||
-      !Connection._areValidCoordinates(x1, y1) ||
-      !Connection._areValidCoordinates(x2, y2)) {
-      return Infinity;
-    }
-
-    let dx = x2 - x1;
-    let dy = y2 - y1;
-    let lengthSquared = dx * dx + dy * dy;
-
-    if (lengthSquared === 0 || !isFinite(lengthSquared)) {
-      // Line segment is a point or invalid
-      return dist(px, py, x1, y1);
-    }
-
-    // Calculate projection parameter t
-    let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
-
-    // Validate t
-    if (!Connection._isValidNumber(t)) {
-      return Infinity;
-    }
-
-    t = constrain(t, 0, 1);
-
-    // Find closest point on segment
-    let closestX = x1 + t * dx;
-    let closestY = y1 + t * dy;
-
-    // Validate closest point
-    if (!Connection._areValidCoordinates(closestX, closestY)) {
-      return Infinity;
-    }
-
-    return dist(px, py, closestX, closestY);
+    return Utils.distanceToSegment(px, py, x1, y1, x2, y2);
   }
 
   /**
@@ -287,7 +225,7 @@ class Connection {
     // Fallback to index-based lookup (legacy compatibility)
     if ((!fromBox || !toBox) && Array.isArray(boxesOrMap)) {
       const boxes = boxesOrMap;
-      const isValidNum = Connection._isValidNumber;
+      const isValidNum = Utils.isValidNumber;
 
       if (isValidNum(data.from) && isValidNum(data.to) &&
         data.from >= 0 && data.to >= 0 &&

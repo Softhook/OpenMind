@@ -22,33 +22,6 @@ class MindMap {
     CONNECTOR_DOT: { r: 100, g: 150, b: 255 }
   };
 
-  /**
-   * Helper to check if a number is valid (uses Utils if available)
-   * @private
-   */
-  static _isValidNumber(value) {
-    if (typeof Utils !== 'undefined' && Utils.isValidNumber) {
-      return Utils.isValidNumber(value);
-    }
-    return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
-  }
-
-  /**
-   * Helper to safely clone an object
-   * @private
-   */
-  static _deepClone(obj) {
-    if (typeof Utils !== 'undefined' && Utils.deepClone) {
-      return Utils.deepClone(obj);
-    }
-    try {
-      return JSON.parse(JSON.stringify(obj));
-    } catch (e) {
-      console.warn('deepClone failed:', e);
-      return obj;
-    }
-  }
-
   // ============================================================================
   // COLLABORATION CALLBACKS
   // ============================================================================
@@ -426,7 +399,7 @@ class MindMap {
     // Find the leftmost left edge (box.x - box.width/2)
     let minLeftEdge = Infinity;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       const leftEdge = box.x - box.width / 2;
       if (leftEdge < minLeftEdge) {
         minLeftEdge = leftEdge;
@@ -437,7 +410,7 @@ class MindMap {
 
     // Align all boxes so their left edge matches the minimum left edge
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       // New center x = minLeftEdge + width/2
       box.x = minLeftEdge + box.width / 2;
     }
@@ -458,7 +431,7 @@ class MindMap {
 
     let maxRightEdge = -Infinity;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       const rightEdge = box.x + box.width / 2;
       if (rightEdge > maxRightEdge) {
         maxRightEdge = rightEdge;
@@ -468,7 +441,7 @@ class MindMap {
     if (!Number.isFinite(maxRightEdge)) return false;
 
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.width)) continue;
+      if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       box.x = maxRightEdge - box.width / 2;
     }
 
@@ -488,7 +461,7 @@ class MindMap {
 
     let minTopEdge = Infinity;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       const topEdge = box.y - box.height / 2;
       if (topEdge < minTopEdge) {
         minTopEdge = topEdge;
@@ -498,7 +471,7 @@ class MindMap {
     if (!Number.isFinite(minTopEdge)) return false;
 
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       box.y = minTopEdge + box.height / 2;
     }
 
@@ -518,7 +491,7 @@ class MindMap {
 
     let maxBottomEdge = -Infinity;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       const bottomEdge = box.y + box.height / 2;
       if (bottomEdge > maxBottomEdge) {
         maxBottomEdge = bottomEdge;
@@ -528,7 +501,7 @@ class MindMap {
     if (!Number.isFinite(maxBottomEdge)) return false;
 
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y) || !MindMap._isValidNumber(box.height)) continue;
+      if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       box.y = maxBottomEdge - box.height / 2;
     }
 
@@ -551,7 +524,7 @@ class MindMap {
     let sumX = 0;
     let validCount = 0;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x)) continue;
+      if (!box || !Utils.isValidNumber(box.x)) continue;
       sumX += box.x;
       validCount++;
     }
@@ -564,7 +537,7 @@ class MindMap {
 
     // Move all selected boxes to the calculated center X
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.x)) continue;
+      if (!box || !Utils.isValidNumber(box.x)) continue;
       box.x = centerX;
     }
 
@@ -585,7 +558,7 @@ class MindMap {
     let sumY = 0;
     let validCount = 0;
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y)) continue;
+      if (!box || !Utils.isValidNumber(box.y)) continue;
       sumY += box.y;
       validCount++;
     }
@@ -596,7 +569,7 @@ class MindMap {
     if (!Number.isFinite(centerY)) return false;
 
     for (const box of boxesToAlign) {
-      if (!box || !MindMap._isValidNumber(box.y)) continue;
+      if (!box || !Utils.isValidNumber(box.y)) continue;
       box.y = centerY;
     }
 
@@ -622,8 +595,8 @@ class MindMap {
     const firstBox = boxes[0];
     const lastBox = boxes[boxes.length - 1];
 
-    if (!MindMap._isValidNumber(firstBox.y) || !MindMap._isValidNumber(firstBox.height) ||
-      !MindMap._isValidNumber(lastBox.y) || !MindMap._isValidNumber(lastBox.height)) {
+    if (!Utils.isValidNumber(firstBox.y) || !Utils.isValidNumber(firstBox.height) ||
+      !Utils.isValidNumber(lastBox.y) || !Utils.isValidNumber(lastBox.height)) {
       return false;
     }
 
@@ -634,7 +607,7 @@ class MindMap {
     // Calculate total height of all boxes
     let totalBoxHeight = 0;
     for (const box of boxes) {
-      if (!MindMap._isValidNumber(box.height)) return false;
+      if (!Utils.isValidNumber(box.height)) return false;
       totalBoxHeight += box.height;
     }
 
@@ -674,8 +647,8 @@ class MindMap {
     const firstBox = boxes[0];
     const lastBox = boxes[boxes.length - 1];
 
-    if (!MindMap._isValidNumber(firstBox.x) || !MindMap._isValidNumber(firstBox.width) ||
-      !MindMap._isValidNumber(lastBox.x) || !MindMap._isValidNumber(lastBox.width)) {
+    if (!Utils.isValidNumber(firstBox.x) || !Utils.isValidNumber(firstBox.width) ||
+      !Utils.isValidNumber(lastBox.x) || !Utils.isValidNumber(lastBox.width)) {
       return false;
     }
 
@@ -686,7 +659,7 @@ class MindMap {
     // Calculate total width of all boxes
     let totalBoxWidth = 0;
     for (const box of boxes) {
-      if (!MindMap._isValidNumber(box.width)) return false;
+      if (!Utils.isValidNumber(box.width)) return false;
       totalBoxWidth += box.width;
     }
 
@@ -727,12 +700,12 @@ class MindMap {
       let maxY = -Infinity;
       for (const box of boxes) {
         if (!box) continue;
-        const halfW = MindMap._isValidNumber(box.width) ? box.width / 2 : 0;
-        const halfH = MindMap._isValidNumber(box.height) ? box.height / 2 : 0;
-        const left = MindMap._isValidNumber(box.x) ? box.x - halfW : null;
-        const right = MindMap._isValidNumber(box.x) ? box.x + halfW : null;
-        const top = MindMap._isValidNumber(box.y) ? box.y - halfH : null;
-        const bottom = MindMap._isValidNumber(box.y) ? box.y + halfH : null;
+        const halfW = Utils.isValidNumber(box.width) ? box.width / 2 : 0;
+        const halfH = Utils.isValidNumber(box.height) ? box.height / 2 : 0;
+        const left = Utils.isValidNumber(box.x) ? box.x - halfW : null;
+        const right = Utils.isValidNumber(box.x) ? box.x + halfW : null;
+        const top = Utils.isValidNumber(box.y) ? box.y - halfH : null;
+        const bottom = Utils.isValidNumber(box.y) ? box.y + halfH : null;
         if (left !== null) minX = Math.min(minX, left);
         if (right !== null) maxX = Math.max(maxX, right);
         if (top !== null) minY = Math.min(minY, top);
@@ -897,7 +870,7 @@ class MindMap {
       const dy = preBounds.centerY - postBounds.centerY;
       if (Number.isFinite(dx) && Number.isFinite(dy)) {
         for (const box of boxesToLayout) {
-          if (!box || !MindMap._isValidNumber(box.x) || !MindMap._isValidNumber(box.y)) continue;
+          if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.y)) continue;
           box.x += dx;
           box.y += dy;
         }

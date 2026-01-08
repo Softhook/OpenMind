@@ -37,86 +37,6 @@ class TextBox {
   static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
 
   /**
-   * Helper to check if a number is valid (uses Utils if available)
-   * @private
-   */
-  static _isValidNumber(value) {
-    if (typeof Utils !== 'undefined' && Utils.isValidNumber) {
-      return Utils.isValidNumber(value);
-    }
-    return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(value);
-  }
-
-  /**
-   * Helper to safely get a positive number
-   * @private
-   */
-  static _safePositiveNumber(value, defaultValue = 1) {
-    if (typeof Utils !== 'undefined' && Utils.safePositiveNumber) {
-      return Utils.safePositiveNumber(value, defaultValue);
-    }
-    return TextBox._isValidNumber(value) && value > 0 ? value : defaultValue;
-  }
-
-  /**
-   * Gets the current zoom level from global scope, with fallback.
-   * @private
-   * @returns {number} Current zoom level, defaults to 1
-   */
-  static _getCurrentZoom() {
-    if (typeof Utils !== 'undefined' && Utils.getCurrentZoom) {
-      return Utils.getCurrentZoom();
-    }
-    return typeof zoom !== 'undefined' && zoom > 0 ? zoom : 1;
-  }
-
-  /**
-   * Gets a clamped zoom factor for UI scaling.
-   * @private
-   * @returns {number} Zoom factor between 0.5 and 2.0
-   */
-  static _getClampedZoomFactor() {
-    if (typeof Utils !== 'undefined' && Utils.getClampedZoomFactor) {
-      return Utils.getClampedZoomFactor();
-    }
-    const currentZoom = TextBox._getCurrentZoom();
-    return Math.max(0.5, Math.min(2.0, currentZoom));
-  }
-
-  /**
-   * Generates a unique identifier (UUID v4)
-   * Uses crypto.randomUUID() when available, falls back to manual generation
-   * for older browsers (Safari < 15.4) or non-HTTPS contexts
-   * @returns {string} UUID string
-   */
-  static generateUUID() {
-    // Use native crypto.randomUUID if available (Safari 15.4+, HTTPS required)
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      try {
-        return crypto.randomUUID();
-      } catch (e) {
-        // Fall through to manual generation
-      }
-    }
-
-    // Fallback: generate UUID v4 manually
-    // Uses crypto.getRandomValues if available, otherwise Math.random
-    const getRandomValues = (typeof crypto !== 'undefined' && crypto.getRandomValues)
-      ? (arr) => crypto.getRandomValues(arr)
-      : (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); return arr; };
-
-    const bytes = new Uint8Array(16);
-    getRandomValues(bytes);
-
-    // Set version (4) and variant (RFC 4122)
-    bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
-    bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC 4122
-
-    // Convert to hex string with dashes
-    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-  }
-  /**
    * Creates a new TextBox
    * @param {number} x - Center X coordinate
    * @param {number} y - Center Y coordinate
@@ -124,13 +44,13 @@ class TextBox {
    */
   constructor(x, y, text = "") {
     // Generate stable unique identifier for collaboration
-    this.id = TextBox.generateUUID();
+    this.id = Utils.generateUUID();
     this.x = x;
     this.y = y;
     // Interpolation targets (init to current pos)
     this.targetX = x;
     this.targetY = y;
-    this.text = TextBox.sanitizeText(text);
+    this.text = Utils.sanitizeText(text);
     this.imageUrl = null;
     this.img = null;
     this.imageLoaded = false;
@@ -421,29 +341,11 @@ class TextBox {
 
   /**
    * Sanitizes text to normalize line endings and remove problematic invisible characters
-   * Uses shared utility if available for consistency
    * @param {string} text - Text to sanitize
    * @returns {string} Sanitized text
    */
   static sanitizeText(text) {
-    // Use shared utility if available
-    if (typeof Utils !== 'undefined' && Utils.sanitizeText) {
-      return Utils.sanitizeText(text);
-    }
-
-    // Fallback implementation
-    if (text === null || text === undefined) return '';
-    text = String(text);
-
-    // Normalize line endings: convert \r\n and \r to \n
-    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-    // Remove invisible/control characters except newlines and tabs
-    // Keep: \n (newline at 0x0A), \t (tab at 0x09), and printable characters (0x20+)
-    // Remove: C0 controls (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F), DEL (0x7F), and C1 controls (0x80-0x9F)
-    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F\x80-\x9F]/g, '');
-
-    return text;
+    return Utils.sanitizeText(text);
   }
 
   /**
@@ -733,7 +635,7 @@ class TextBox {
     push();
 
     // Get zoom factor for UI scaling
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
 
     // INTERPOLATION: Smoothly move towards target if not being dragged
     if (!this.isDragging && !this.isResizing) {
@@ -949,8 +851,8 @@ class TextBox {
     // Hide hover-triggered resize handle during arrow-key navigation
     if (!this.isEditing && ((this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) || this.isResizing)) {
       // Use helper for zoom factor
-      const currentZoom = TextBox._getCurrentZoom();
-      const zoomFactor = TextBox._getClampedZoomFactor();
+      const currentZoom = Utils.getCurrentZoom();
+      const zoomFactor = Utils.getClampedZoomFactor();
       const scaledHandleSize = this.resizeHandleSize / zoomFactor;
 
       let handleX = this.x + this.width / 2 - scaledHandleSize;
@@ -1005,7 +907,7 @@ class TextBox {
    * @returns {Array<Object>} Array of circle positions and properties
    */
   getColorPaletteCircles() {
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const r = this.colorCircleRadius / zoomFactor;
     const spacing = this.colorCircleSpacing / zoomFactor;
     const marginTop = 0; // align top of first circle with top of text box
@@ -1029,7 +931,7 @@ class TextBox {
    * Draws the color palette circles
    */
   drawColorPalette() {
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const circles = this.getColorPaletteCircles();
     push();
     for (const c of circles) {
@@ -1050,7 +952,7 @@ class TextBox {
     const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
     const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
     const circles = this.getColorPaletteCircles();
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     for (const c of circles) {
       if (dist(mx, my, c.x, c.y) <= c.r + 3 / zoomFactor) {
         return c.key;
@@ -1101,7 +1003,7 @@ class TextBox {
    * @returns {string|null} Side name or null if not over any connector
    */
   getConnectorUnderMouse(hitRadius = 10) {
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const scaledHitRadius = hitRadius / Math.sqrt(zoomFactor);
     const pts = this.getConnectorPoints();
     const sides = ['left', 'right', 'top', 'bottom'];
@@ -1122,7 +1024,7 @@ class TextBox {
    * @param {boolean} active - Whether connectors should be highlighted
    */
   drawConnectors(active = false) {
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const pts = this.getConnectorPoints();
     push();
     noStroke();
@@ -1150,7 +1052,7 @@ class TextBox {
    * @returns {boolean} true if mouse is over resize handle
    */
   isMouseOverResizeHandle() {
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const scaledHandleSize = this.resizeHandleSize / zoomFactor;
     let handleX = this.x + this.width / 2 - scaledHandleSize;
     let handleY = this.y + this.height / 2 - scaledHandleSize;
@@ -1260,16 +1162,12 @@ class TextBox {
 
   /**
    * Helper: Checks if a character is whitespace
-   * Uses shared utility if available
    * @param {string} ch - Character to check
    * @returns {boolean} true if whitespace
    * @private
    */
   static isWhitespace(ch) {
-    if (typeof Utils !== 'undefined' && Utils.isWhitespace) {
-      return Utils.isWhitespace(ch);
-    }
-    return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+    return Utils.isWhitespace(ch);
   }
 
   /**
@@ -1530,7 +1428,7 @@ class TextBox {
     }
 
     // Sanitize the character being added (necessary for Enter key which can produce \r on some platforms)
-    char = TextBox.sanitizeText(char);
+    char = Utils.sanitizeText(char);
 
     // If there's a selection, replace it
     if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
@@ -1770,7 +1668,7 @@ class TextBox {
     }
 
     // Sanitize pasted text to normalize line endings and remove invisible characters
-    pastedText = TextBox.sanitizeText(pastedText);
+    pastedText = Utils.sanitizeText(pastedText);
 
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
@@ -2251,12 +2149,12 @@ class TextBox {
     }
 
     // Use shared utility for number validation if available
-    const isValid = TextBox._isValidNumber;
+    const isValid = Utils.isValidNumber;
 
     // Validate required fields with defaults
     let x = isValid(data.x) ? data.x : 100;
     let y = isValid(data.y) ? data.y : 100;
-    let text = data.text != null ? TextBox.sanitizeText(String(data.text)) : 'New Node';
+    let text = data.text != null ? Utils.sanitizeText(String(data.text)) : 'New Node';
 
     let box = new TextBox(x, y, text);
 
@@ -2502,7 +2400,7 @@ class TextBox {
 
     // Draw cursor line and scale stroke with global zoom for visibility
     push();
-    const zoomFactor = TextBox._getClampedZoomFactor();
+    const zoomFactor = Utils.getClampedZoomFactor();
     const cursorColor = TextBox.COLORS.CURSOR;
     stroke(cursorColor.r, cursorColor.g, cursorColor.b);
     strokeWeight(2 / zoomFactor);
