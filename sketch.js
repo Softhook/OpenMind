@@ -21,7 +21,11 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
   EXPORT: { PADDING: 50, MARGIN: 20 },
   AUTOSAVE: { INTERVAL: 30000 },
   VISIBILITY: { DEBOUNCE_MS: 50 },
-  TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 }
+  TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 },
+  STORAGE: { 
+    DEFAULT_KEY: 'openmind_autosave',
+    ROOM_KEY_PREFIX: 'openmind_room_'
+  }
 };
 
 // UI Colors for consistent styling throughout the application
@@ -449,8 +453,8 @@ function handleUrlChange() {
       // User is leaving a room (navigating away) - restore default storage key
       // This ensures autosave goes back to the offline storage location
       if (typeof mindMap.setStorageKey === 'function') {
-        mindMap.setStorageKey('openmind_autosave');
-        console.log('Left room - restored default storage key: openmind_autosave');
+        mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
+        console.log('Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
       }
     }
   }
@@ -516,6 +520,24 @@ function parseRoomFromHash() {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Generates a safe storage key for a collaboration room
+ * Sanitizes the room name to prevent issues with special characters
+ * @param {string} roomName - The room identifier
+ * @returns {string} Sanitized storage key
+ */
+function getRoomStorageKey(roomName) {
+  if (!roomName || typeof roomName !== 'string') {
+    return CONFIG.STORAGE.DEFAULT_KEY;
+  }
+  
+  // Sanitize room name: keep only alphanumeric, dash, underscore
+  // This prevents issues with special characters in localStorage keys
+  const sanitized = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  
+  return CONFIG.STORAGE.ROOM_KEY_PREFIX + sanitized;
 }
 
 /**
@@ -607,11 +629,12 @@ async function initializeCollaboration(roomName) {
     console.log('Collaboration initialized for room:', roomName);
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
-    // When in online mode, autosave goes to 'openmind_room_{roomName}' instead of 'openmind_autosave'
+    // When in online mode, autosave goes to room-specific key instead of default
     // This preserves the user's local work when they return to offline mode
     if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      mindMap.setStorageKey('openmind_room_' + roomName);
-      console.log('Set storage key to: openmind_room_' + roomName);
+      const storageKey = getRoomStorageKey(roomName);
+      mindMap.setStorageKey(storageKey);
+      console.log('Set storage key to:', storageKey);
     }
 
     // Update browser tab title to show room name
