@@ -570,6 +570,13 @@ async function initializeCollaboration(roomName) {
       if (prevStatus !== syncStatus) {
         console.log('Sync overlay status changed:', prevStatus, '->', syncStatus);
       }
+      // Re-layout menu buttons when connection status changes so
+      // the display name input and invite button are positioned correctly.
+      try {
+        layoutMenuButtons();
+      } catch (e) {
+        // Non-fatal: layout may not be available in some test contexts
+      }
     };
 
     let lastPeerCount = 0;
@@ -1747,11 +1754,44 @@ function layoutMenuButtons() {
   // Display name input - only show and position when connected
   if (displayNameInput && collaborationManager && collaborationManager.isConnected) {
     displayNameInput.style('display', 'inline-block');
+    // Ensure the input visually matches the buttons: height, vertical alignment and spacing
+    const refBtn = keyboardControlsButton && keyboardControlsButton.elt ? keyboardControlsButton.elt : null;
+    const btnHeight = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : 28;
+    // Make input match button height and center text vertically
+    displayNameInput.style('height', btnHeight + 'px');
+    displayNameInput.style('line-height', btnHeight + 'px');
+    displayNameInput.style('padding', '0 8px');
+
     // Set placeholder to current name if input is empty
     if (!displayNameInput.value() && collaborationManager.getUserName) {
       displayNameInput.attribute('placeholder', collaborationManager.getUserName() || 'Your name...');
     }
-    displayNameInput.position(x, y); x += 120 + gap;
+
+    // Ensure a reliable left gap from the previous button (some browsers report 0 width briefly)
+    const leftGap = Math.max(8, gap);
+
+    // Determine input width (fall back to configured style or 110px)
+    let inputWidth = 120;
+    try {
+      if (displayNameInput.elt) {
+        // Prefer explicit styled width, then measured offsetWidth
+        const styled = displayNameInput.elt.style && displayNameInput.elt.style.width;
+        if (styled && styled.match(/\d+/)) {
+          inputWidth = parseInt(styled, 10);
+        } else if (displayNameInput.elt.offsetWidth) {
+          inputWidth = displayNameInput.elt.offsetWidth;
+        }
+      }
+    } catch (_) { }
+
+    // Vertical nudge to better align the input with button baseline
+    const btnOffsetH = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : btnHeight;
+    const inputOffsetH = (displayNameInput.elt && displayNameInput.elt.offsetHeight) ? displayNameInput.elt.offsetHeight : btnOffsetH;
+    const yNudge = Math.round((btnOffsetH - inputOffsetH) / 2);
+
+    // Position the input with an explicit gap and vertical nudge
+    displayNameInput.position(x + leftGap, y + yNudge);
+    x += leftGap + inputWidth;
   } else if (displayNameInput) {
     displayNameInput.style('display', 'none');
   }

@@ -40,7 +40,9 @@ class CollaborationManager {
         const isPrivateIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host);
 
         if (isLocalhost) {
-            return `ws://localhost:${CollaborationManager.LOCAL_SERVER_PORT}`;
+            // When running on localhost, prefer connecting to the production websocket server
+            // so local development uses the same production backend unless overridden.
+            return CollaborationManager.PRODUCTION_SERVER;
         }
 
         if (isPrivateIP) {
