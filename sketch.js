@@ -445,6 +445,13 @@ function handleUrlChange() {
     if (newRoom && mindMap) {
       initializeCollaboration(newRoom);
       return; // Don't load file when in collaboration mode
+    } else if (!newRoom && currentRoom && mindMap) {
+      // User is leaving a room (navigating away) - restore default storage key
+      // This ensures autosave goes back to the offline storage location
+      if (typeof mindMap.setStorageKey === 'function') {
+        mindMap.setStorageKey('openmind_autosave');
+        console.log('Left room - restored default storage key: openmind_autosave');
+      }
     }
   }
 
