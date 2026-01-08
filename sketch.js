@@ -22,7 +22,7 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
   AUTOSAVE: { INTERVAL: 30000 },
   VISIBILITY: { DEBOUNCE_MS: 50 },
   TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 },
-  STORAGE: { 
+  STORAGE: {
     DEFAULT_KEY: 'openmind_autosave',
     ROOM_KEY_PREFIX: 'openmind_room_'
   }
@@ -98,6 +98,9 @@ let lastLoadedUrlFile = null;
 let isMapLoading = false;
 // Collaboration sync status for overlay: null, 'connecting', 'server_starting', 'syncing'
 let syncStatus = null;
+
+// Room join confirmation state: { roomName, shouldShareLocalData, hasLocalData } or null
+let roomJoinConfirmation = null;
 // Timeout handles for sync overlay (module scope for proper cleanup)
 let syncConnectionTimeout = null;
 let syncEmptyRoomTimeout = null;
@@ -436,6 +439,12 @@ function namesAreSimilar(name1, name2) {
  * Handler to respond to URL changes (hash/popstate) and initial load.
  */
 function handleUrlChange() {
+  // Clear any pending room join confirmation when URL changes
+  if (roomJoinConfirmation) {
+    console.log('URL changed - clearing pending room join confirmation');
+    roomJoinConfirmation = null;
+  }
+
   // Check for room changes first
   const roomInfo = parseRoomFromHash();
   const newRoom = roomInfo ? roomInfo.room : null;
@@ -450,7 +459,7 @@ function handleUrlChange() {
     if (newRoom && mindMap) {
       // Use the isStarting flag from URL to determine if we should share local data
       const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
-      
+
       initializeCollaboration(newRoom, shouldShareLocalData);
       return; // Don't load file when in collaboration mode
     } else if (!newRoom && currentRoom && mindMap) {
@@ -506,7 +515,7 @@ function parseRoomFromHash() {
 
     // Parse hash as URL parameters (remove leading #)
     const params = new URLSearchParams(hash.substring(1));
-    
+
     // Check for explicit room parameter
     const roomName = params.get('room');
     if (roomName) {
@@ -543,12 +552,56 @@ function getRoomStorageKey(roomName) {
   if (!roomName || typeof roomName !== 'string') {
     return CONFIG.STORAGE.DEFAULT_KEY;
   }
-  
+
   // Sanitize room name: keep only alphanumeric, dash, underscore
   // This prevents issues with special characters in localStorage keys
   const sanitized = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  
+
   return CONFIG.STORAGE.ROOM_KEY_PREFIX + sanitized;
+}
+
+/**
+ * Clears all local mind map state (boxes, connections, selections, etc.)
+ * Called when joining a collaboration room to prevent local data pollution  
+ * @private
+ */
+function _clearLocalState() {
+  if (!mindMap) return;
+
+  console.log('Clearing local state:', mindMap.boxes.length, 'boxes');
+
+  // Reset interaction flags on boxes before clearing to prevent broken UI state
+  for (const box of mindMap.boxes) {
+    if (box.isDragging) box.isDragging = false;
+    if (box.isResizing) box.isResizing = false;
+    if (box.isEditing && typeof box.stopEditing === 'function') {
+      box.stopEditing();
+    }
+  }
+
+  // Clear all local boxes and connections
+  mindMap.boxes = [];
+  mindMap.connections = [];
+
+  // Clear selections
+  mindMap.selectedBox = null;
+  mindMap.selectedConnection = null;
+  if (mindMap.selectedBoxes) mindMap.selectedBoxes.clear();
+  if (mindMap.selectedConnections) mindMap.selectedConnections.clear();
+
+  // Clear navigation and interaction state
+  mindMap.isArrowKeyNavigating = false;
+  mindMap.connectingFrom = null;
+  mindMap.draggingConnection = null;
+
+  // Clear copied state
+  mindMap.copiedBoxes = [];
+  mindMap.copiedConnections = [];
+
+  // Reset dirty flag to prevent unexpected autosave
+  mindMap.isDirty = false;
+
+  console.log('LocalState cleared - room sync will provide authoritative state');
 }
 
 /**
@@ -564,6 +617,30 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
   }
 
   try {
+    // CRITICAL: Clear local state when JOINING a room (not when starting collaboration to share local work)
+    // This prevents users from seeing their local cached boxes that aren't synced to other participants
+    if (!shouldShareLocalData) {
+      const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
+
+      if (hasLocalData) {
+        // Show confirmation dialog - user has local work that will be cleared
+        console.log('User has local boxes, showing confirmation dialog');
+        roomJoinConfirmation = {
+          roomName: roomName,
+          shouldShareLocalData: shouldShareLocalData,
+          hasLocalData: true,
+          boxCount: mindMap.boxes.length
+        };
+        return; // Wait for user confirmation
+      }
+
+      // No local data, proceed with clearing
+      console.log('Joining collaboration room:', roomName, '- clearing local state (no local data)');
+      _clearLocalState();
+    } else {
+      console.log('Starting collaboration room:', roomName, '- preserving local state to share');
+    }
+
     // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
     if (!collaborationManager) {
       collaborationManager = new CollaborationManager(mindMap);
@@ -637,10 +714,24 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     if (serverUrl) {
       console.log('Connecting to custom signaling server:', serverUrl);
     }
-    
+
     // Pass shouldShareLocalData flag to control whether we share our local work
     await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
     console.log('Collaboration initialized for room:', roomName, 'shouldShareLocalData:', shouldShareLocalData);
+
+    // CRITICAL: If starting collaboration (shouldShareLocalData=true), immediately sync local data
+    // Don't wait for sync handler transition - explicitly push boxes to Yjs
+    if (shouldShareLocalData && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
+      console.log('Starting collaboration - immediately syncing', mindMap.boxes.length, 'local boxes to Yjs');
+
+      // Wait a brief moment for connection to stabilize, then force sync
+      setTimeout(() => {
+        if (collaborationManager && typeof collaborationManager._syncLocalToYjs === 'function') {
+          collaborationManager._syncLocalToYjs();
+          console.log('Forced sync complete - boxes should now be in Yjs');
+        }
+      }, 100);
+    }
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
@@ -684,7 +775,7 @@ function shareSession() {
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     console.log('Starting collaboration with', boxCount, 'boxes from local work');
-    
+
     // Use URL parameter to indicate "start" mode (sharing local data)
     // This is more robust than a global flag and survives page refresh/back button
     window.location.hash = `room=${room}&mode=start`;
@@ -987,9 +1078,11 @@ function setup() {
         }
       }
     } else if (!lastLoadedUrlFile && roomId) {
-      // Joining an online room - do not load local cache
-      // The room will be seeded from other users or remain empty if first to join
-      console.log('Joining online room:', roomId, '- skipping localStorage load');
+      // ONLINE MODE: Joining a collaboration room
+      // State clearing now happens in initializeCollaboration() to handle both:
+      // 1. Initial page load with room URL (this code path)
+      // 2. Hash navigation to room URL (handleUrlChange code path)
+      console.log('Detected collaboration room in URL:', roomId, '- skipping localStorage load');
     }
 
     // Create UI buttons
@@ -1318,15 +1411,98 @@ function draw() {
       textSize(14);
       text('Press F5 or ⌘R to refresh', width / 2, height / 2 + 50);
     }
+
+    pop();
+  }
+
+  // Draw room join confirmation overlay when user is about to lose local work
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    push();
+    resetMatrix && resetMatrix();
+    noStroke();
+
+    // Semi-transparent overlay (same as sync overlay)
+    fill(40, 40, 60, 180);
+    rect(0, 0, width, height);
+
+    // App name and version at top
+    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
+    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
+    fill(120);
+    textAlign(CENTER, TOP);
+    textSize(11);
+    text(`${appName} v${versionStr}`, width / 2, 20);
+
+    // Warning icon (⚠️)
+    fill(255, 200, 0);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text('⚠️', width / 2, height / 2 - 80);
+
+    // Main message
+    fill(255);
+    textSize(18);
+    text('Joining Collaboration Room', width / 2, height / 2 - 30);
+
+    // Warning message
+    textSize(13);
+    fill(255, 200, 100);
+    const boxCount = roomJoinConfirmation.boxCount || 0;
+    const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
+    text(`Your current work (${boxText}) will be cleared`, width / 2, height / 2 + 5);
+
+    // Subtitle
+    textSize(12);
+    fill(180);
+    text('The room\'s content will sync instead', width / 2, height / 2 + 30);
+
+    // OK Button
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    // Check if mouse is over button
+    const isOverButton = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+
+    // Button background
+    if (isOverButton) {
+      fill(70, 150, 220); // Hover state
+    } else {
+      fill(60, 130, 200); // Normal state
+    }
+    rect(buttonX, buttonY, buttonWidth, buttonHeight, 4);
+
+    // Button text
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text('OK, Join Room', width / 2, buttonY + buttonHeight / 2);
+
     pop();
   }
 }
 
 /**
  * Updates the mouse cursor based on what the user is hovering over.
- * Sets appropriate cursors for resizing, moving, editing, and other interactions.
- */
+   * Sets appropriate cursors for resizing, moving, editing, and other interactions.
+   */
 function updateCursorForHover() {
+  // PRIORITY: Check if hovering over room join confirmation button
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+      cursor('pointer');
+      return;
+    }
+  }
+
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   if (!validMouse) { cursor('default'); return; }
@@ -2316,6 +2492,34 @@ function mousePressed(e) {
     return;
   }
 
+  // PRIORITY: Handle room join confirmation dialog before anything else
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    // Check if click is on OK button
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+      // User clicked OK - proceed with room join
+      console.log('User confirmed room join - clearing state and connecting');
+
+      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // Clear local state
+      _clearLocalState();
+
+      // Continue with room initialization
+      initializeCollaboration(roomName, shouldShareLocalData);
+      return;
+    }
+  }
+
+  // Don't allow interaction when sync overlay is shown
+  if (syncStatus) return;
+
   if (mindMap) {
     try {
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
@@ -2421,6 +2625,38 @@ function mouseDragged() {
  * Handles key press events
  */
 function keyPressed() {
+  // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    // Enter/Return = Confirm and join room
+    if (keyCode === ENTER || keyCode === RETURN) {
+      console.log('User pressed Enter - confirming room join');
+
+      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
+      roomJoinConfirmation = null;
+
+      _clearLocalState();
+      initializeCollaboration(roomName, shouldShareLocalData);
+      return false;
+    }
+
+    // Escape = Cancel and go back
+    if (keyCode === ESCAPE) {
+      console.log('User pressed Escape - cancelling room join');
+      roomJoinConfirmation = null;
+
+      // Navigate back to previous page
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        window.history.back();
+      } else {
+        // If no history, just clear the hash
+        if (typeof window !== 'undefined') {
+          window.location.hash = '';
+        }
+      }
+      return false;
+    }
+  }
+
   if (keyboardOverlayVisible) {
     const escapeCode = (typeof ESCAPE !== 'undefined') ? ESCAPE : 27;
     if (keyCode === escapeCode || key === 'Escape') {

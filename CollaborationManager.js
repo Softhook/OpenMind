@@ -239,7 +239,7 @@ class CollaborationManager {
 
         // Track connection start time for cold start detection
         this.connectionStartTime = Date.now();
-        
+
         // Store the sharing intent for use in sync handler
         this.shouldShareLocalData = shouldShareLocalData;
 
@@ -1073,7 +1073,7 @@ class CollaborationManager {
             // Safely get counts before clearing
             const boxCount = this.mindMap.boxes?.length || 0;
             const connCount = this.mindMap.connections?.length || 0;
-            
+
             console.log('CollaborationManager: Clearing local data -', boxCount, 'boxes and', connCount, 'connections');
 
             // Clear all boxes and connections
@@ -1112,9 +1112,15 @@ class CollaborationManager {
             console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime / 1000), 's). Using extended verification.');
         }
 
-        console.log('CollaborationManager: Room is empty, seeding with local data:', this.mindMap.boxes.length, 'boxes');
+        console.log('CollaborationManager: Starting collaboration - sharing local data');
+        console.log('  - Local boxes:', this.mindMap.boxes.length, '| Yjs boxes:', this.yboxes.size);
+        console.log('  - Force syncing local state to Yjs...');
+
         this.lastSyncAttemptTime = Date.now();
         this.syncAttemptCount = 1;
+
+        // ALWAYS sync local data when explicitly starting collaboration
+        // This ensures the share button properly uploads all local work
         this._syncLocalToYjs();
 
         // Verify sync with exponential backoff for cold start reliability
@@ -1145,13 +1151,21 @@ class CollaborationManager {
 
     /**
      * Handles starting collaboration when room already has data.
-     * Room wins - sync from room (ignore our local data).
+     * Merge both local and room data - both are valuable.
      * @private
      */
     _handleStartCollaborationRoomHasData() {
-        console.log('CollaborationManager: Room already has data, syncing from room (room is authoritative)');
+        console.log('CollaborationManager: Starting collaboration with existing room data');
+        console.log('  - Local boxes:', this.mindMap.boxes.length, '| Yjs boxes:', this.yboxes.size);
+
+        // First, sync from room to get existing data
         this._rebuildBoxesFromYjs();
         this._rebuildConnectionsFromYjs();
+
+        // Then, sync our local data to add to the room
+        // Yjs uses box IDs as keys, so same IDs will update, different IDs will be added
+        console.log('  - Merging local data into room...');
+        this._syncLocalToYjs();
     }
 
     /**

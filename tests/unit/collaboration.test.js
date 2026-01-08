@@ -439,7 +439,7 @@ describe('Local Data Management When Joining Rooms', () => {
     test('sync handler should seed room when starting collaboration', () => {
         // When room is empty and sharing, should seed with local data
         expect(collabCode).toMatch(/yjsEmpty.*&&.*localHasData.*&&.*this\.shouldShareLocalData/s);
-        expect(collabCode).toMatch(/Room is empty.*seeding with local data/);
+        expect(collabCode).toMatch(/Starting collaboration.*sharing local data/);
         expect(collabCode).toMatch(/_syncLocalToYjs\(\)/);
     });
 });
