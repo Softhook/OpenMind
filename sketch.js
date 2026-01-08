@@ -1001,36 +1001,21 @@ function setupUIButtons() {
   inviteButton.style('color', 'white');
 
   // Display name input - shown when connected to a room
-  // Styled to match buttons visually (green like Start Collaboration)
+  // Styled to match buttons visually
   displayNameInput = createInput('');
   displayNameInput.attribute('placeholder', 'Your name...');
   displayNameInput.style('width', '110px');
+  displayNameInput.style('height', '19px');
   displayNameInput.style('padding', '2px 8px');
   displayNameInput.style('border', 'none');
   displayNameInput.style('border-radius', '3px');
-  displayNameInput.style('background', '#4caf50');
+  displayNameInput.style('background', '#555');
   displayNameInput.style('color', '#fff');
   displayNameInput.style('font-size', '13px');
   displayNameInput.style('font-family', 'inherit');
   displayNameInput.style('display', 'none');
   displayNameInput.style('box-sizing', 'border-box');
-  displayNameInput.style('outline', 'none');
   displayNameInput.position(800, 10);
-
-  // Style placeholder text to be semi-transparent white
-  if (displayNameInput.elt) {
-    displayNameInput.elt.style.setProperty('--placeholder-color', 'rgba(255,255,255,0.7)');
-    // Add inline style for placeholder (works in most browsers)
-    const styleId = 'displayNameInputStyles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        input::placeholder { color: rgba(255,255,255,0.7); }
-      `;
-      document.head.appendChild(style);
-    }
-  }
 
   // Handle Enter key to update name, and stop propagation for all keys
   if (displayNameInput.elt) {
