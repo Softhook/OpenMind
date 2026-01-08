@@ -1,6 +1,6 @@
 {
   "name": "openmind",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Mind mapping application with real-time collaboration support",
   "main": "sketch.js",
   "scripts": {
