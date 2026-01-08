@@ -62,6 +62,12 @@ const AppConfig = {
   TIMING: {
     RESIZE_DEBOUNCE_MS: 16, // ~60fps debounce for resize
     DOUBLE_CLICK_MS: 300    // Double-click threshold
+  },
+
+  // Storage settings
+  STORAGE: {
+    DEFAULT_KEY: 'openmind_autosave',
+    ROOM_KEY_PREFIX: 'openmind_room_'
   }
 };
 
