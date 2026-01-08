@@ -150,7 +150,7 @@ class CollaborationManager {
 
         // If initialization is already in progress, wait for it to complete
         if (this.isInitializing) {
-            console.log('CollaborationManager: Initialization already in progress, waiting...');
+            console.warn('CollaborationManager: Initialization already in progress, waiting...');
             return this.initializationPromise;
         }
 
