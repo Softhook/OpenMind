@@ -1823,17 +1823,11 @@ class TextBox {
          Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
       
       if (positionChanged) {
-        // Sync final position WITHOUT transaction wrapper
-        // This allows UndoManager to capture the change naturally
-        TextBox._notifyChange(this, true);
-        
-        // Close the undo boundary for this continuous operation
-        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-          collaborationManager.stopCapturing();
-        }
+        // Sync final position WITH transaction wrapper for clean undo
+        // This creates a single undo item for the drag operation
+        TextBox._notifyChange(this);
       } else {
         // Position didn't change, just sync to ensure consistency
-        // Use normal sync with transaction wrapper
         TextBox._notifyChange(this);
       }
     }
@@ -2014,17 +2008,11 @@ class TextBox {
       this.y = prevTop + this.height / 2;
       
       if (sizeChanged) {
-        // Sync final size WITHOUT transaction wrapper
-        // This allows UndoManager to capture the change naturally
-        TextBox._notifyChange(this, true);
-        
-        // Close the undo boundary for this continuous operation
-        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-          collaborationManager.stopCapturing();
-        }
+        // Sync final size WITH transaction wrapper for clean undo
+        // This creates a single undo item for the resize operation
+        TextBox._notifyChange(this);
       } else {
         // Size didn't change, just sync to ensure consistency
-        // Use normal sync with transaction wrapper
         TextBox._notifyChange(this);
       }
     }
