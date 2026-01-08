@@ -1705,25 +1705,21 @@ class MindMap {
     // Group all drag/resize operations in a single transaction for grouped undo
     if (wasInteracting) {
       this._wrapInTransaction(() => {
-        // Stop dragging all boxes and collect which ones changed
-        const boxesThatChanged = [];
+        // Stop dragging all boxes
         for (const box of boxesThatWereDragging) {
-          const changed = box.stopDrag(true); // skipSync=true
-          if (changed) {
-            boxesThatChanged.push(box);
-          }
+          box.stopDrag(true); // skipSync=true
         }
         
-        // Stop resizing all boxes and collect which ones changed
+        // Stop resizing all boxes
         for (const box of boxesThatWereResizing) {
-          const changed = box.stopResize(true); // skipSync=true
-          if (changed) {
-            boxesThatChanged.push(box);
-          }
+          box.stopResize(true); // skipSync=true
         }
         
-        // Batch sync all changed boxes
-        this._notifyBoxesChanged(boxesThatChanged);
+        // Batch sync ALL boxes that were interacting (not just those that changed)
+        // This maintains consistency with original behavior and ensures proper
+        // collaborative sync and targetX/targetY updates
+        const allInteractingBoxes = [...boxesThatWereDragging, ...boxesThatWereResizing];
+        this._notifyBoxesChanged(allInteractingBoxes);
       });
       
       this.isArrowKeyNavigating = false;
