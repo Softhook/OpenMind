@@ -863,60 +863,6 @@ class CollaborationManager {
             }
     }
 
-            // Map valid Yjs connections to their current indices (handling potential duplicates)
-            // format: "fromId->toId" => [index1, index2...]
-            const yjsMap = new Map();
-            yjsConns.forEach((c, i) => {
-                if (c && c.fromId && c.toId) {
-                    const key = `${c.fromId}->${c.toId}`;
-                    if (!yjsMap.has(key)) yjsMap.set(key, []);
-                    yjsMap.get(key).push(i);
-                }
-            });
-
-            // Identify connections to keep vs add
-            const toAdd = [];
-
-            for (const conn of localConns) {
-                const key = `${conn.fromId}->${conn.toId}`;
-                if (yjsMap.has(key)) {
-                    // Connection exists in Yjs, keep one instance of it
-                    const indices = yjsMap.get(key);
-                    if (indices.length > 0) {
-                        // consume one index (remove from list so we don't use it again)
-                        indices.shift();
-                        // if list empty, remove key
-                        if (indices.length === 0) yjsMap.delete(key);
-                    } else {
-                        // Should be unreachable if logic is correct
-                        toAdd.push(conn);
-                    }
-                } else {
-                    // Not in Yjs, need to add
-                    toAdd.push(conn);
-                }
-            }
-
-            // Identify connections to delete (anything remaining in yjsMap)
-            // We must collect ALL indices to delete
-            const indicesToDelete = [];
-            for (const indices of yjsMap.values()) {
-                indicesToDelete.push(...indices);
-            }
-
-            // Delete in descending order to avoid index shifting problems
-            indicesToDelete.sort((a, b) => b - a);
-            for (const index of indicesToDelete) {
-                this.yconnections.delete(index, 1);
-            }
-
-            // Add new connections
-            if (toAdd.length > 0) {
-                this.yconnections.push(toAdd);
-            }
-        });
-    }
-
     // ============================================================================
     // YJS → LOCAL SYNCHRONIZATION
     // ============================================================================
