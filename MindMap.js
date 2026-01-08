@@ -1832,6 +1832,12 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
+        // Text editing with action-based undo (captureTimeout: 0)
+        // NOTE: Each keystroke becomes a separate undo step, which is technically correct
+        // but may not match user expectations (e.g., typing "hello" = 5 undo steps).
+        // For better UX, consider implementing word-boundary detection or a small
+        // captureTimeout (e.g., 300ms) specifically for text editing.
+        // Current behavior prioritizes consistency with other action-based operations.
         if (!isRepeat) this.pushUndo();
         // Modifier variants for deletion
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line
