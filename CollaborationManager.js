@@ -58,7 +58,7 @@ class CollaborationManager {
     ];
 
     // Timing constants
-    static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
+    static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
 
     // Sync verification timing - adjusted for free server cold start (30-60s)
@@ -180,6 +180,7 @@ class CollaborationManager {
             this.yconnections = this.ydoc.getArray('connections');
 
             // Create UndoManager - tracks LOCAL changes only
+            // captureTimeout: 0 disables time-based grouping for action-based undo
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
             });
@@ -487,6 +488,32 @@ class CollaborationManager {
      */
     canRedo() {
         return this.undoManager && this.undoManager.redoStack.length > 0;
+    }
+
+    /**
+     * Explicitly closes the current undo stack item.
+     * Call this at the end of continuous operations like dragging to mark the entire
+     * operation as a single undo step.
+     */
+    stopCapturing() {
+        if (this.undoManager) {
+            this.undoManager.stopCapturing();
+        }
+    }
+
+    /**
+     * Executes a function within a Yjs transaction.
+     * All Yjs changes within the callback are grouped as a single undo step.
+     * Use this for atomic operations like creating/deleting boxes, alignment, etc.
+     * @param {Function} callback - Function to execute within the transaction
+     */
+    transact(callback) {
+        if (this.ydoc && typeof callback === 'function') {
+            this.ydoc.transact(callback);
+        } else if (typeof callback === 'function') {
+            // Fallback: just execute the callback if ydoc is not available
+            callback();
+        }
     }
 
     /**

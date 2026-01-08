@@ -384,13 +384,29 @@ class MindMap {
   }
 
   /**
-  * Left-aligns all selected boxes to the leftmost box's left edge.
-  * Requires at least two selected boxes.
+   * Left-aligns all selected boxes to the leftmost box's left edge.
+   * Requires at least two selected boxes.
    */
   leftAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performLeftAlign(boxesToAlign);
+      });
+    } else {
+      this._performLeftAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of left alignment
+   * @private
+   */
+  _performLeftAlign(boxesToAlign) {
     // Find the leftmost left edge (box.x - box.width/2)
     let minLeftEdge = Infinity;
     for (const box of boxesToAlign) {
@@ -413,7 +429,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -424,6 +439,22 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performRightAlign(boxesToAlign);
+      });
+    } else {
+      this._performRightAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of right alignment
+   * @private
+   */
+  _performRightAlign(boxesToAlign) {
     let maxRightEdge = -Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
@@ -443,7 +474,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -454,6 +484,22 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performTopAlign(boxesToAlign);
+      });
+    } else {
+      this._performTopAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of top alignment
+   * @private
+   */
+  _performTopAlign(boxesToAlign) {
     let minTopEdge = Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
@@ -473,7 +519,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -484,6 +529,22 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performBottomAlign(boxesToAlign);
+      });
+    } else {
+      this._performBottomAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of bottom alignment
+   * @private
+   */
+  _performBottomAlign(boxesToAlign) {
     let maxBottomEdge = -Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
@@ -503,7 +564,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -515,6 +575,22 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performCenterAlign(boxesToAlign);
+      });
+    } else {
+      this._performCenterAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of center alignment
+   * @private
+   */
+  _performCenterAlign(boxesToAlign) {
     // Calculate the average X position (center) of all selected boxes
     let sumX = 0;
     let validCount = 0;
@@ -539,7 +615,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -550,6 +625,22 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performHorizontalCenterAlign(boxesToAlign);
+      });
+    } else {
+      this._performHorizontalCenterAlign(boxesToAlign);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of horizontal center alignment
+   * @private
+   */
+  _performHorizontalCenterAlign(boxesToAlign) {
     let sumY = 0;
     let validCount = 0;
     for (const box of boxesToAlign) {
@@ -571,7 +662,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -583,6 +673,22 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     if (boxes.length < 3) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performVerticalDistribute(boxes);
+      });
+    } else {
+      this._performVerticalDistribute(boxes);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of vertical distribution
+   * @private
+   */
+  _performVerticalDistribute(boxes) {
     // Sort by Y position
     boxes.sort((a, b) => a.y - b.y);
 
@@ -623,7 +729,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxes);
-    return true;
   }
 
   /**
@@ -635,6 +740,22 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     if (boxes.length < 3) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performHorizontalDistribute(boxes);
+      });
+    } else {
+      this._performHorizontalDistribute(boxes);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of horizontal distribution
+   * @private
+   */
+  _performHorizontalDistribute(boxes) {
     // Sort by X position
     boxes.sort((a, b) => a.x - b.x);
 
@@ -675,7 +796,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxes);
-    return true;
   }
 
   /**
@@ -688,6 +808,22 @@ class MindMap {
     const boxesToLayout = this._getSelectedBoxes();
     if (boxesToLayout.length < 1) return false;
 
+    // Wrap in transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        this._performHierarchicalLayout(boxesToLayout);
+      });
+    } else {
+      this._performHierarchicalLayout(boxesToLayout);
+    }
+    return true;
+  }
+
+  /**
+   * Internal implementation of hierarchical layout
+   * @private
+   */
+  _performHierarchicalLayout(boxesToLayout) {
     const getBounds = (boxes) => {
       let minX = Infinity;
       let maxX = -Infinity;
@@ -875,7 +1011,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToLayout);
-    return true;
   }
 
   /**
@@ -886,6 +1021,55 @@ class MindMap {
       return [];
     }
     return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
+  }
+
+  /**
+   * Internal implementation of paste operation
+   * @private
+   */
+  _performPaste(offsetX, offsetY) {
+    // Paste all copied boxes with offset and track new boxes
+    const newBoxes = [];
+    for (const boxData of this.copiedBoxes) {
+      // Destructure to exclude id - pasted boxes must get new unique IDs
+      const { id: _excludedId, ...boxDataWithoutId } = boxData;
+      const newBoxData = {
+        ...boxDataWithoutId,
+        x: boxData.x + offsetX,
+        y: boxData.y + offsetY
+      };
+      const newBox = TextBox.fromJSON(newBoxData);
+      if (newBox) {
+        this.boxes.push(newBox);
+        this.addBoxToSelection(newBox);
+        newBoxes.push(newBox);
+      }
+    }
+
+    // Recreate connections between the pasted boxes
+    if (this.copiedConnections && this.copiedConnections.length > 0) {
+      for (const connData of this.copiedConnections) {
+        const fromBox = newBoxes[connData.from];
+        const toBox = newBoxes[connData.to];
+        if (fromBox && toBox) {
+          this.connections.push(new Connection(fromBox, toBox));
+        }
+      }
+    }
+
+    this.isDirty = true;
+
+    // Sync pasted boxes and connections to collaboration
+    for (const box of newBoxes) {
+      if (MindMap.onBoxChange) {
+        MindMap.onBoxChange(box);
+      }
+    }
+    if (newBoxes.length > 0 || (this.copiedConnections && this.copiedConnections.length > 0)) {
+      if (MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
+      }
+    }
   }
 
   /**
@@ -1475,6 +1659,11 @@ class MindMap {
       if (changed && MindMap.onConnectionsChange) {
         MindMap.onConnectionsChange();
       }
+      
+      // Close the undo stack item for the entire reattachment operation
+      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
       return;
     }
 
@@ -1759,47 +1948,13 @@ class MindMap {
             this.selectedBox = null;
           }
 
-          // Paste all copied boxes with offset and track new boxes
-          const newBoxes = [];
-          for (const boxData of this.copiedBoxes) {
-            // Destructure to exclude id - pasted boxes must get new unique IDs
-            const { id: _excludedId, ...boxDataWithoutId } = boxData;
-            const newBoxData = {
-              ...boxDataWithoutId,
-              x: boxData.x + offsetX,
-              y: boxData.y + offsetY
-            };
-            const newBox = TextBox.fromJSON(newBoxData);
-            if (newBox) {
-              this.boxes.push(newBox);
-              this.addBoxToSelection(newBox);
-              newBoxes.push(newBox);
-            }
-          }
-
-          // Recreate connections between the pasted boxes
-          if (this.copiedConnections && this.copiedConnections.length > 0) {
-            for (const connData of this.copiedConnections) {
-              const fromBox = newBoxes[connData.from];
-              const toBox = newBoxes[connData.to];
-              if (fromBox && toBox) {
-                this.connections.push(new Connection(fromBox, toBox));
-              }
-            }
-          }
-
-          this.isDirty = true;
-
-          // Sync pasted boxes and connections to collaboration
-          for (const box of newBoxes) {
-            if (MindMap.onBoxChange) {
-              MindMap.onBoxChange(box);
-            }
-          }
-          if (newBoxes.length > 0 || (this.copiedConnections && this.copiedConnections.length > 0)) {
-            if (MindMap.onConnectionsChange) {
-              MindMap.onConnectionsChange();
-            }
+          // Wrap paste operation in transaction for single undo step
+          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+            collaborationManager.transact(() => {
+              this._performPaste(offsetX, offsetY);
+            });
+          } else {
+            this._performPaste(offsetX, offsetY);
           }
         }
         return;

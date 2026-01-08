@@ -1811,6 +1811,10 @@ class TextBox {
     this.isDragging = false;
     // Notify collaboration system of position change
     TextBox._notifyChange(this);
+    // Close the undo stack item for the entire drag operation
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.stopCapturing();
+    }
   }
 
   /**
@@ -1991,6 +1995,10 @@ class TextBox {
     this.y = prevTop + this.height / 2;
     // Notify collaboration system of size/position change
     TextBox._notifyChange(this);
+    // Close the undo stack item for the entire resize operation
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.stopCapturing();
+    }
   }
 
   // ============================================================================
