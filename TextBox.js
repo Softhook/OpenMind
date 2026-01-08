@@ -1776,6 +1776,9 @@ class TextBox {
     this.isDragging = true;
     this.dragOffsetX = this.x - mx;
     this.dragOffsetY = this.y - my;
+    // Store initial position to detect if drag actually moved the box
+    this._dragStartX = this.x;
+    this._dragStartY = this.y;
   }
 
   /**
@@ -1808,13 +1811,28 @@ class TextBox {
    * Stops dragging the box
    */
   stopDrag() {
+    const wasDragging = this.isDragging;
     this.isDragging = false;
-    // Notify collaboration system of position change
-    TextBox._notifyChange(this);
-    // Close the undo stack item for the entire drag operation
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.stopCapturing();
+    
+    // Check if position actually changed during drag
+    const positionChanged = wasDragging && 
+      (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
+      (Math.abs(this.x - this._dragStartX) > 0.001 || Math.abs(this.y - this._dragStartY) > 0.001);
+    
+    if (positionChanged) {
+      // Notify collaboration system of position change
+      TextBox._notifyChange(this);
+      
+      // Close the undo stack item for the entire drag operation
+      // Only call stopCapturing if we actually moved (prevents capturing unrelated changes)
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
     }
+    
+    // Clean up tracking variables
+    this._dragStartX = undefined;
+    this._dragStartY = undefined;
   }
 
   /**
@@ -1986,18 +2004,31 @@ class TextBox {
    * Stops resizing the box
    */
   stopResize() {
+    const wasResizing = this.isResizing;
     this.isResizing = false;
-    // Preserve the top edge when reflowing dimensions after resize
-    const prevTop = this.y - this.height / 2;
-    // Reflow text immediately using the final width so the height fits without extra clicks
-    this.updateDimensions();
-    // Adjust center so the top remains fixed after height changes
-    this.y = prevTop + this.height / 2;
-    // Notify collaboration system of size/position change
-    TextBox._notifyChange(this);
-    // Close the undo stack item for the entire resize operation
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.stopCapturing();
+    
+    // Check if size actually changed during resize
+    const sizeChanged = wasResizing && 
+      (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
+      (Math.abs(this.width - this.resizeStartWidth) > 0.001 || 
+       Math.abs(this.height - this.resizeStartHeight) > 0.001);
+    
+    if (sizeChanged) {
+      // Preserve the top edge when reflowing dimensions after resize
+      const prevTop = this.y - this.height / 2;
+      // Reflow text immediately using the final width so the height fits without extra clicks
+      this.updateDimensions();
+      // Adjust center so the top remains fixed after height changes
+      this.y = prevTop + this.height / 2;
+      
+      // Notify collaboration system of size/position change
+      TextBox._notifyChange(this);
+      
+      // Close the undo stack item for the entire resize operation
+      // Only call stopCapturing if we actually resized (prevents capturing unrelated changes)
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
     }
   }
 

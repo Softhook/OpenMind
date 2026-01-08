@@ -1667,10 +1667,9 @@ class MindMap {
         MindMap.onConnectionsChange();
       }
       
-      // Always close the undo stack item for the reattachment operation, even if no change occurred.
-      // This is consistent with other continuous operations (drag/resize) which always call stopCapturing.
-      // If no actual change was made, Yjs will simply not create an undo item, so this is safe.
-      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      // Only close undo boundary if connection was actually reattached
+      // This prevents capturing unrelated changes from other users during the drag
+      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
       return;

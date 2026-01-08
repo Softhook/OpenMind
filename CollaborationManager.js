@@ -512,7 +512,11 @@ class CollaborationManager {
             throw new TypeError('transact() requires a function callback');
         }
         
-        if (this.ydoc) {
+        if (this.ydoc && this.undoManager) {
+            // Set origin to undoManager so it knows to track this transaction
+            this.ydoc.transact(callback, this.undoManager);
+        } else if (this.ydoc) {
+            // Fallback without undo manager
             this.ydoc.transact(callback);
         } else {
             // Fallback: just execute the callback if ydoc is not available
