@@ -1161,11 +1161,12 @@ class TextBox {
   /**
    * Notifies collaboration system of changes to this box
    * @param {TextBox} box 
+   * @param {boolean} skipTransactionWrapper - If true, sync without transaction wrapper (for continuous operations)
    * @private
    */
-  static _notifyChange(box) {
+  static _notifyChange(box, skipTransactionWrapper = false) {
     if (typeof MindMap !== 'undefined' && MindMap.onBoxChange && box) {
-      MindMap.onBoxChange(box);
+      MindMap.onBoxChange(box, skipTransactionWrapper);
     }
   }
 
@@ -1815,20 +1816,25 @@ class TextBox {
     this.isDragging = false;
     
     if (wasDragging) {
-      // Always sync final position to ensure consistency
-      TextBox._notifyChange(this);
-      
       // Check if position actually changed during drag
-      // Requires both initial position tracking and actual movement beyond threshold
       const positionChanged = 
         (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
         (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
          Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
       
-      // Only close undo boundary if position actually changed
-      // This prevents capturing unrelated changes from other users
-      if (positionChanged && typeof collaborationManager !== 'undefined' && collaborationManager) {
-        collaborationManager.stopCapturing();
+      if (positionChanged) {
+        // Sync final position WITHOUT transaction wrapper
+        // This allows UndoManager to capture the change naturally
+        TextBox._notifyChange(this, true);
+        
+        // Close the undo boundary for this continuous operation
+        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.stopCapturing();
+        }
+      } else {
+        // Position didn't change, just sync to ensure consistency
+        // Use normal sync with transaction wrapper
+        TextBox._notifyChange(this);
       }
     }
     
@@ -1996,28 +2002,30 @@ class TextBox {
     this.isResizing = false;
     
     if (wasResizing) {
-      // Always reflow and sync final state
-      // Preserve the top edge when reflowing dimensions after resize
-      const prevTop = this.y - this.height / 2;
-      // Reflow text immediately using the final width so the height fits without extra clicks
-      this.updateDimensions();
-      // Adjust center so the top remains fixed after height changes
-      this.y = prevTop + this.height / 2;
-      
-      // Always sync final state to ensure consistency
-      // This is critical for multi-user environments where remote changes
-      // may have occurred during the resize operation
-      TextBox._notifyChange(this);
-      
       // Check if size actually changed during resize
-      // Only close undo boundary if size changed to prevent capturing unrelated changes
       const sizeChanged = 
         (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
         (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
          Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
       
-      if (sizeChanged && typeof collaborationManager !== 'undefined' && collaborationManager) {
-        collaborationManager.stopCapturing();
+      // Always reflow and update position
+      const prevTop = this.y - this.height / 2;
+      this.updateDimensions();
+      this.y = prevTop + this.height / 2;
+      
+      if (sizeChanged) {
+        // Sync final size WITHOUT transaction wrapper
+        // This allows UndoManager to capture the change naturally
+        TextBox._notifyChange(this, true);
+        
+        // Close the undo boundary for this continuous operation
+        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.stopCapturing();
+        }
+      } else {
+        // Size didn't change, just sync to ensure consistency
+        // Use normal sync with transaction wrapper
+        TextBox._notifyChange(this);
       }
     }
   }

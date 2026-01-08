@@ -543,8 +543,8 @@ class CollaborationManager {
         // When a box changes locally, sync to Yjs
         // Note: Using arrow functions which capture `this` automatically
         if (typeof MindMap !== 'undefined') {
-            MindMap.onBoxChange = (box) => {
-                this.syncBoxToYjs(box);
+            MindMap.onBoxChange = (box, skipTransactionWrapper = false) => {
+                this.syncBoxToYjs(box, skipTransactionWrapper);
             };
 
             MindMap.onBoxDelete = (boxId) => {
@@ -712,8 +712,9 @@ class CollaborationManager {
      * Updates a single box in Yjs
      * Call this when a box is created or modified locally
      * @param {TextBox} box 
+     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations that will call stopCapturing)
      */
-    syncBoxToYjs(box) {
+    syncBoxToYjs(box, skipTransactionWrapper = false) {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
         // Debounce text sync during active editing to reduce network traffic
@@ -747,7 +748,14 @@ class CollaborationManager {
             return;
         }
 
-        // For non-editing changes (drag, resize, etc.), sync immediately with transaction origin
+        // For continuous operations (drag/resize), don't wrap in transaction
+        // Let UndoManager capture naturally, then caller will call stopCapturing()
+        if (skipTransactionWrapper) {
+            this.yboxes.set(box.id, this._boxToYjsData(box));
+            return;
+        }
+
+        // For non-editing changes (atomic operations), sync immediately with transaction origin
         if (this.ydoc && this.undoManager) {
             this.ydoc.transact(() => {
                 this.yboxes.set(box.id, this._boxToYjsData(box));
