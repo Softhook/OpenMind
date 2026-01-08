@@ -847,7 +847,7 @@ function setup() {
         try {
           // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
           const maybePromise = mindMap.loadFromLocalStorage();
-          const afterLoad = () => {
+          const afterLoad = async () => {
             try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
             try {
               if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
@@ -857,9 +857,32 @@ function setup() {
                 document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
               }
             } catch (_) { }
-            // Clear undo history after loading to prevent undo from reverting the load
+            
+            // Wait for collaboration manager to be initialized before clearing undo
+            // This ensures boxes are properly synced to Yjs WITH undo tracking
             if (collaborationManager) {
-              collaborationManager.clearUndoHistory();
+              try {
+                // Wait for initialization to complete
+                await collaborationManager.initialize();
+                
+                // Re-sync all boxes to ensure they're in Yjs with proper undo tracking
+                // This fixes issue where boxes loaded before undoManager was ready
+                if (mindMap && mindMap.boxes && MindMap.onBoxChange) {
+                  for (const box of mindMap.boxes) {
+                    if (box && box.id) {
+                      MindMap.onBoxChange(box);
+                    }
+                  }
+                }
+                if (mindMap && MindMap.onConnectionsChange) {
+                  MindMap.onConnectionsChange();
+                }
+                
+                // Clear undo history after loading to prevent undo from reverting the load
+                collaborationManager.clearUndoHistory();
+              } catch (e) {
+                console.warn('Failed to initialize collaboration for undo:', e);
+              }
             }
           };
           if (maybePromise && typeof maybePromise.then === 'function') {
