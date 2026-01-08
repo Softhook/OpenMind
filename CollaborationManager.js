@@ -748,8 +748,9 @@ class CollaborationManager {
             return;
         }
 
-        // For continuous operations (drag/resize), don't wrap in transaction
-        // Let UndoManager capture naturally, then caller will call stopCapturing()
+        // When skipTransactionWrapper=true, we're already inside a transaction
+        // from _wrapInTransaction, so we just sync directly without creating a new transaction
+        // The sync will automatically be part of the parent transaction
         if (skipTransactionWrapper) {
             this.yboxes.set(box.id, this._boxToYjsData(box));
             return;

@@ -1810,31 +1810,38 @@ class TextBox {
 
   /**
    * Stops dragging the box
+   * @param {boolean} skipSync - If true, don't sync changes (caller will handle batch sync)
+   * @returns {boolean} true if position changed during drag
    */
-  stopDrag() {
+  stopDrag(skipSync = false) {
     const wasDragging = this.isDragging;
     this.isDragging = false;
     
+    let positionChanged = false;
     if (wasDragging) {
       // Check if position actually changed during drag
-      const positionChanged = 
+      positionChanged = 
         (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
         (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
          Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
       
-      if (positionChanged) {
-        // Sync final position WITH transaction wrapper for clean undo
-        // This creates a single undo item for the drag operation
-        TextBox._notifyChange(this);
-      } else {
-        // Position didn't change, just sync to ensure consistency
-        TextBox._notifyChange(this);
+      if (!skipSync) {
+        if (positionChanged) {
+          // Sync final position WITH transaction wrapper for clean undo
+          // This creates a single undo item for the drag operation
+          TextBox._notifyChange(this);
+        } else {
+          // Position didn't change, just sync to ensure consistency
+          TextBox._notifyChange(this);
+        }
       }
     }
     
     // Clean up tracking variables
     this._dragStartX = undefined;
     this._dragStartY = undefined;
+    
+    return positionChanged;
   }
 
   /**
@@ -1990,14 +1997,17 @@ class TextBox {
 
   /**
    * Stops resizing the box
+   * @param {boolean} skipSync - If true, don't sync changes (caller will handle batch sync)
+   * @returns {boolean} true if size changed during resize
    */
-  stopResize() {
+  stopResize(skipSync = false) {
     const wasResizing = this.isResizing;
     this.isResizing = false;
     
+    let sizeChanged = false;
     if (wasResizing) {
       // Check if size actually changed during resize
-      const sizeChanged = 
+      sizeChanged = 
         (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
         (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
          Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
@@ -2007,15 +2017,19 @@ class TextBox {
       this.updateDimensions();
       this.y = prevTop + this.height / 2;
       
-      if (sizeChanged) {
-        // Sync final size WITH transaction wrapper for clean undo
-        // This creates a single undo item for the resize operation
-        TextBox._notifyChange(this);
-      } else {
-        // Size didn't change, just sync to ensure consistency
-        TextBox._notifyChange(this);
+      if (!skipSync) {
+        if (sizeChanged) {
+          // Sync final size WITH transaction wrapper for clean undo
+          // This creates a single undo item for the resize operation
+          TextBox._notifyChange(this);
+        } else {
+          // Size didn't change, just sync to ensure consistency
+          TextBox._notifyChange(this);
+        }
       }
     }
+    
+    return sizeChanged;
   }
 
   // ============================================================================

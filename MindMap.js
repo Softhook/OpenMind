@@ -424,7 +424,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -465,7 +465,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -506,7 +506,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -547,7 +547,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -594,7 +594,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -637,7 +637,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -700,7 +700,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxes);
+    this._notifyBoxesChanged(boxes, true);
   }
 
   /**
@@ -763,7 +763,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxes);
+    this._notifyBoxesChanged(boxes, true);
   }
 
   /**
@@ -974,7 +974,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToLayout);
+    this._notifyBoxesChanged(boxesToLayout, true);
   }
 
   /**
@@ -1083,9 +1083,10 @@ class MindMap {
    * Notifies the collaboration system that boxes have changed.
    * Call this after batch operations like alignment/distribution.
    * @param {TextBox[]} boxes - Array of boxes that changed
+   * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (already in one)
    * @private
    */
-  _notifyBoxesChanged(boxes) {
+  _notifyBoxesChanged(boxes, skipTransactionWrapper = false) {
     if (!MindMap.onBoxChange || !boxes || boxes.length === 0) return;
     for (const box of boxes) {
       if (box) {
@@ -1094,7 +1095,7 @@ class MindMap {
         if (typeof box.targetX !== 'undefined') box.targetX = box.x;
         if (typeof box.targetY !== 'undefined') box.targetY = box.y;
 
-        MindMap.onBoxChange(box);
+        MindMap.onBoxChange(box, skipTransactionWrapper);
       }
     }
   }
@@ -1683,24 +1684,59 @@ class MindMap {
     // Stop dragging and resizing all boxes
     // If any box was being dragged or resized, clear navigation mode
     // so arrow keys will enter presentation mode on current box rather than continuing navigation
-    let wasInteracting = false;
+    
+    // Collect boxes that were dragging or resizing to batch sync them in a single transaction
+    const boxesThatWereDragging = [];
+    const boxesThatWereResizing = [];
+    
     for (let box of this.boxes) {
       if (!box) continue;
-      if (box.isDragging || box.isResizing) {
-        wasInteracting = true;
+      if (box.isDragging) {
+        boxesThatWereDragging.push(box);
       }
-      box.stopDrag();
-      box.stopResize();
-      box.stopSelecting();
+      // Note: A box can't be both dragging and resizing at the same time in practice
+      // due to mutually exclusive mouse interactions, but we check separately for clarity
+      else if (box.isResizing) {
+        boxesThatWereResizing.push(box);
+      }
     }
-
+    
+    const wasInteracting = boxesThatWereDragging.length > 0 || boxesThatWereResizing.length > 0;
+    
+    // Group all drag/resize operations in a single transaction for grouped undo
     if (wasInteracting) {
-      this.isArrowKeyNavigating = false;
+      this._wrapInTransaction(() => {
+        // Stop dragging all boxes
+        for (const box of boxesThatWereDragging) {
+          box.stopDrag(true); // skipSync=true
+        }
+        
+        // Stop resizing all boxes
+        for (const box of boxesThatWereResizing) {
+          box.stopResize(true); // skipSync=true
+        }
+        
+        // Batch sync ALL boxes that were interacting (not just those that changed)
+        // This maintains consistency with original behavior and ensures proper
+        // collaborative sync and targetX/targetY updates
+        // Pass skipTransactionWrapper=true since we're already in a transaction
+        const allInteractingBoxes = [...boxesThatWereDragging, ...boxesThatWereResizing];
+        this._notifyBoxesChanged(allInteractingBoxes, true);
+      });
       
-      // NOTE: No need to sync boxes here - stopDrag()/stopResize() already handle syncing
-      // The original code had MindMap.onBoxChange calls here, but with action-based undo
-      // (captureTimeout: 0), this would create duplicate undo items.
-      // Each stopDrag()/stopResize() syncs the box with a transaction, creating 1 undo item.
+      // Close the undo boundary to ensure the transaction is captured as a single undo item
+      // This is important when captureTimeout=0 (action-based undo)
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
+      
+      this.isArrowKeyNavigating = false;
+    }
+    
+    // Stop selecting on all boxes (this doesn't need transaction wrapping)
+    for (let box of this.boxes) {
+      if (!box) continue;
+      box.stopSelecting();
     }
   }
 
@@ -2067,7 +2103,7 @@ class MindMap {
                 changedBoxes.push(box);
               }
             }
-            this._notifyBoxesChanged(changedBoxes);
+            this._notifyBoxesChanged(changedBoxes, true);
           });
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
@@ -2078,7 +2114,7 @@ class MindMap {
             // and makes the undo boundary explicit, which is the goal of action-based undo.
             this._wrapInTransaction(() => {
               this.selectedBox.setBackgroundByKey(colorKey);
-              this._notifyBoxesChanged([this.selectedBox]);
+              this._notifyBoxesChanged([this.selectedBox], true);
             });
           }
         }
