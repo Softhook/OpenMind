@@ -2011,7 +2011,7 @@ class MindMap {
       } else if (this.selectedConnections && this.selectedConnections.size > 0) {
         // Delete all selected connections (multi-selection)
         this.pushUndo();
-        
+
         this._wrapInTransaction(() => {
           this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
           this.clearConnectionSelection();
@@ -2023,7 +2023,7 @@ class MindMap {
             MindMap.onConnectionsChange();
           }
         });
-        
+
         // Clear navigation mode after deleting connections
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
@@ -2066,7 +2066,9 @@ class MindMap {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
-            // Single box color change is already atomic, but wrap for consistency
+            // Wrap for consistency with multi-box color change above.
+            // While a single setBackgroundByKey is atomic, wrapping ensures uniform behavior
+            // and makes the undo boundary explicit, which is the goal of action-based undo.
             this._wrapInTransaction(() => {
               this.selectedBox.setBackgroundByKey(colorKey);
               this._notifyBoxesChanged([this.selectedBox]);
