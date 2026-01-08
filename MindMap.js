@@ -424,7 +424,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -465,7 +465,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -506,7 +506,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -547,7 +547,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -594,7 +594,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -637,7 +637,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToAlign);
+    this._notifyBoxesChanged(boxesToAlign, true);
   }
 
   /**
@@ -700,7 +700,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxes);
+    this._notifyBoxesChanged(boxes, true);
   }
 
   /**
@@ -763,7 +763,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxes);
+    this._notifyBoxesChanged(boxes, true);
   }
 
   /**
@@ -974,7 +974,7 @@ class MindMap {
 
     this.isDirty = true;
     this.isSaved = false;
-    this._notifyBoxesChanged(boxesToLayout);
+    this._notifyBoxesChanged(boxesToLayout, true);
   }
 
   /**
@@ -1083,9 +1083,10 @@ class MindMap {
    * Notifies the collaboration system that boxes have changed.
    * Call this after batch operations like alignment/distribution.
    * @param {TextBox[]} boxes - Array of boxes that changed
+   * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (already in one)
    * @private
    */
-  _notifyBoxesChanged(boxes) {
+  _notifyBoxesChanged(boxes, skipTransactionWrapper = false) {
     if (!MindMap.onBoxChange || !boxes || boxes.length === 0) return;
     for (const box of boxes) {
       if (box) {
@@ -1094,7 +1095,7 @@ class MindMap {
         if (typeof box.targetX !== 'undefined') box.targetX = box.x;
         if (typeof box.targetY !== 'undefined') box.targetY = box.y;
 
-        MindMap.onBoxChange(box);
+        MindMap.onBoxChange(box, skipTransactionWrapper);
       }
     }
   }
@@ -1718,8 +1719,9 @@ class MindMap {
         // Batch sync ALL boxes that were interacting (not just those that changed)
         // This maintains consistency with original behavior and ensures proper
         // collaborative sync and targetX/targetY updates
+        // Pass skipTransactionWrapper=true since we're already in a transaction
         const allInteractingBoxes = [...boxesThatWereDragging, ...boxesThatWereResizing];
-        this._notifyBoxesChanged(allInteractingBoxes);
+        this._notifyBoxesChanged(allInteractingBoxes, true);
       });
       
       this.isArrowKeyNavigating = false;
@@ -2095,7 +2097,7 @@ class MindMap {
                 changedBoxes.push(box);
               }
             }
-            this._notifyBoxesChanged(changedBoxes);
+            this._notifyBoxesChanged(changedBoxes, true);
           });
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
@@ -2106,7 +2108,7 @@ class MindMap {
             // and makes the undo boundary explicit, which is the goal of action-based undo.
             this._wrapInTransaction(() => {
               this.selectedBox.setBackgroundByKey(colorKey);
-              this._notifyBoxesChanged([this.selectedBox]);
+              this._notifyBoxesChanged([this.selectedBox], true);
             });
           }
         }
