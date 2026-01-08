@@ -50,7 +50,6 @@ let menuIsVisible = false;
 let keyboardControlsButton;
 let keyboardOverlay = null;
 let inviteButton = null; // Share button for collaboration
-let displayNameLabel = null; // Label for display name input
 let displayNameInput = null; // Text field for changing display name
 let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
@@ -1001,25 +1000,22 @@ function setupUIButtons() {
   inviteButton.style('background-color', '#4caf50');
   inviteButton.style('color', 'white');
 
-  // Display name label and input - shown when connected to a room
-  displayNameLabel = createSpan('Name:');
-  displayNameLabel.style('color', '#aaa');
-  displayNameLabel.style('font-size', '12px');
-  displayNameLabel.style('margin-right', '6px');
-  displayNameLabel.style('display', 'none');
-  displayNameLabel.position(800, 14);
-
+  // Display name input - shown when connected to a room
+  // Styled to match buttons visually
   displayNameInput = createInput('');
   displayNameInput.attribute('placeholder', 'Your name...');
-  displayNameInput.style('width', '120px');
-  displayNameInput.style('padding', '4px 8px');
-  displayNameInput.style('border', '1px solid #666');
-  displayNameInput.style('border-radius', '4px');
-  displayNameInput.style('background', '#333');
+  displayNameInput.style('width', '110px');
+  displayNameInput.style('height', '19px');
+  displayNameInput.style('padding', '2px 8px');
+  displayNameInput.style('border', 'none');
+  displayNameInput.style('border-radius', '3px');
+  displayNameInput.style('background', '#555');
   displayNameInput.style('color', '#fff');
-  displayNameInput.style('font-size', '12px');
+  displayNameInput.style('font-size', '13px');
+  displayNameInput.style('font-family', 'inherit');
   displayNameInput.style('display', 'none');
-  displayNameInput.position(845, 10);
+  displayNameInput.style('box-sizing', 'border-box');
+  displayNameInput.position(800, 10);
 
   // Handle Enter key to update name, and stop propagation for all keys
   if (displayNameInput.elt) {
@@ -1644,9 +1640,16 @@ function updateMenuVisibility() {
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 &&
     mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
+
+  // Menu band extends full width of screen
   const inButtonsBand = validMouse && mouseY >= 0 &&
-    mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0 && mouseX <= menuRightEdge;
-  const shouldShow = inTrigger || inButtonsBand;
+    mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0;
+
+  // Keep menu visible if the display name input has focus
+  const inputHasFocus = displayNameInput && displayNameInput.elt &&
+    document.activeElement === displayNameInput.elt;
+
+  const shouldShow = inTrigger || inButtonsBand || inputHasFocus;
 
   if (shouldShow !== menuIsVisible) {
     if (shouldShow) showMenuButtons(); else hideMenuButtons();
@@ -1666,9 +1669,8 @@ function showMenuButtons() {
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
   if (inviteButton && inviteButton.style) inviteButton.style('display', 'inline-block');
-  // Show display name label and input only when connected
+  // Show display name input only when connected
   if (collaborationManager && collaborationManager.isConnected) {
-    if (displayNameLabel && displayNameLabel.style) displayNameLabel.style('display', 'inline-block');
     if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'inline-block');
   }
 }
@@ -1684,7 +1686,6 @@ function hideMenuButtons() {
   if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
   if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
   if (inviteButton && inviteButton.style) inviteButton.style('display', 'none');
-  if (displayNameLabel && displayNameLabel.style) displayNameLabel.style('display', 'none');
   if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'none');
 }
 
@@ -1728,20 +1729,16 @@ function layoutMenuButtons() {
     inviteButton.position(x, y); x += w(inviteButton) + gap;
   }
 
-  // Display name label and input - only show and position when connected
-  if (displayNameLabel && displayNameInput && collaborationManager && collaborationManager.isConnected) {
-    displayNameLabel.style('display', 'inline-block');
-    displayNameLabel.position(x, y + 4); x += 40; // Label width ~40px
-
+  // Display name input - only show and position when connected
+  if (displayNameInput && collaborationManager && collaborationManager.isConnected) {
     displayNameInput.style('display', 'inline-block');
     // Set placeholder to current name if input is empty
     if (!displayNameInput.value() && collaborationManager.getUserName) {
       displayNameInput.attribute('placeholder', collaborationManager.getUserName() || 'Your name...');
     }
-    displayNameInput.position(x, y + 2); x += 130 + gap; // +2 for vertical alignment
-  } else {
-    if (displayNameLabel) displayNameLabel.style('display', 'none');
-    if (displayNameInput) displayNameInput.style('display', 'none');
+    displayNameInput.position(x, y); x += 120 + gap;
+  } else if (displayNameInput) {
+    displayNameInput.style('display', 'none');
   }
 
   // Update the hover band to cover to the right of the last button
