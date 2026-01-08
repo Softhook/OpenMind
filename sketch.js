@@ -447,7 +447,12 @@ function handleUrlChange() {
       collaborationManager = null;
     }
     if (newRoom && mindMap) {
-      initializeCollaboration(newRoom);
+      // Check if we're starting collaboration (from button) vs joining (from URL/link)
+      const shouldShareLocalData = window._startingCollaboration === true;
+      // Clear the flag immediately after reading it
+      window._startingCollaboration = false;
+      
+      initializeCollaboration(newRoom, shouldShareLocalData);
       return; // Don't load file when in collaboration mode
     } else if (!newRoom && currentRoom && mindMap) {
       // User is leaving a room (navigating away) - restore default storage key
@@ -543,8 +548,9 @@ function getRoomStorageKey(roomName) {
 /**
  * Initializes collaboration for a given room
  * @param {string} roomName 
+ * @param {boolean} shouldShareLocalData - If true, share local data when starting collaboration. If false (default), only receive from room.
  */
-async function initializeCollaboration(roomName) {
+async function initializeCollaboration(roomName, shouldShareLocalData = false) {
   if (!mindMap || !roomName) return;
   if (typeof CollaborationManager === 'undefined') {
     console.warn('CollaborationManager not loaded');
@@ -625,8 +631,10 @@ async function initializeCollaboration(roomName) {
     if (serverUrl) {
       console.log('Connecting to custom signaling server:', serverUrl);
     }
-    await collaborationManager.connect(roomName, serverUrl);
-    console.log('Collaboration initialized for room:', roomName);
+    
+    // Pass shouldShareLocalData flag to control whether we share our local work
+    await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
+    console.log('Collaboration initialized for room:', roomName, 'shouldShareLocalData:', shouldShareLocalData);
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
@@ -670,6 +678,11 @@ function shareSession() {
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     console.log('Starting collaboration with', boxCount, 'boxes from local work');
+    
+    // Mark that we want to share local data by setting a flag before navigating
+    // This will be picked up by handleUrlChange
+    window._startingCollaboration = true;
+    
     // Setting hash triggers handleUrlChange -> initializeCollaboration
     window.location.hash = `room=${room}`;
   } else {
@@ -1008,7 +1021,8 @@ function setup() {
 
     // Check for collaboration room in URL (roomId already declared above)
     if (roomId) {
-      initializeCollaboration(roomId);
+      // Joining from URL at startup - do NOT share local data (default is false)
+      initializeCollaboration(roomId, false);
     }
   } catch (e) {
     console.error('Setup failed:', e);

@@ -100,6 +100,7 @@ class CollaborationManager {
         this.initializationPromise = null; // Store the initialization promise
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
+        this.shouldShareLocalData = false; // Whether to share local data with room (set when connecting)
 
         // User identity
         this.userId = this._generateUserId();
@@ -223,9 +224,10 @@ class CollaborationManager {
      * Must call initialize() first.
      * @param {string} roomName - Unique room identifier
      * @param {string|null} serverUrl - Optional custom server URL
+     * @param {boolean} shouldShareLocalData - If true, share local data when room is empty. If false, only receive from room. Defaults to false.
      * @returns {Promise<void>}
      */
-    async connect(roomName, serverUrl = null) {
+    async connect(roomName, serverUrl = null, shouldShareLocalData = false) {
         if (!this.isInitialized) {
             await this.initialize();
         }
@@ -237,6 +239,9 @@ class CollaborationManager {
 
         // Track connection start time for cold start detection
         this.connectionStartTime = Date.now();
+        
+        // Store the sharing intent for use in sync handler
+        this.shouldShareLocalData = shouldShareLocalData;
 
         this.roomName = roomName;
         const signalingUrl = serverUrl || CollaborationManager.WEBSOCKET_SERVER;
@@ -290,8 +295,8 @@ class CollaborationManager {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    if (yjsEmpty && localHasData) {
-                        // Room is empty, seed with local data (first user to join)
+                    if (yjsEmpty && localHasData && this.shouldShareLocalData) {
+                        // Room is empty AND we want to share our local data (starting collaboration)
                         const connectionTime = Date.now() - (this.connectionStartTime || 0);
                         const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
 
@@ -306,11 +311,19 @@ class CollaborationManager {
 
                         // Verify sync with exponential backoff for cold start reliability
                         this._verifySyncWithBackoff(1, CollaborationManager.MAX_SYNC_RETRIES, CollaborationManager.SYNC_VERIFICATION_DELAY);
-                    } else if (!yjsEmpty) {
-                        // Room has data, rebuild from Yjs (on any sync transition)
-                        console.log('CollaborationManager: Synced with data, rebuilding from Yjs:', this.yboxes.size, 'boxes');
-                        // IMPORTANT: Rebuild BOXES and connections from Yjs on every sync transition
-                        // The observer only fires on changes, not for existing data at sync time
+                    } else if (yjsEmpty && localHasData && !this.shouldShareLocalData) {
+                        // Room is empty but we're JOINING (not starting) - clear local data
+                        console.log('CollaborationManager: Joining empty room, clearing local data:', this.mindMap.boxes.length, 'boxes');
+                        this._clearLocalData();
+                    } else if (!yjsEmpty && !this.shouldShareLocalData) {
+                        // Room has data and we're joining - clear local data then rebuild from room
+                        console.log('CollaborationManager: Joining room with data, clearing local data then syncing from room');
+                        this._clearLocalData();
+                        this._rebuildBoxesFromYjs();
+                        this._rebuildConnectionsFromYjs();
+                    } else if (!yjsEmpty && this.shouldShareLocalData) {
+                        // Room has data and we wanted to share - just sync from room (room wins)
+                        console.log('CollaborationManager: Room already has data, syncing from room (room is authoritative)');
                         this._rebuildBoxesFromYjs();
                         this._rebuildConnectionsFromYjs();
                     } else if (yjsEmpty && !localHasData) {
@@ -1089,6 +1102,34 @@ class CollaborationManager {
                 this.mindMap.connections.push(new Connection(fromBox, toBox));
             }
         }
+    }
+
+    /**
+     * Clears all local boxes and connections.
+     * Called when joining an existing room to avoid showing local cached data.
+     * @private
+     */
+    _clearLocalData() {
+        if (!this.mindMap) return;
+
+        console.log('CollaborationManager: Clearing local data -', this.mindMap.boxes.length, 'boxes and', this.mindMap.connections.length, 'connections');
+
+        // Clear all boxes
+        this.mindMap.boxes = [];
+        this.mindMap.connections = [];
+
+        // Clear selections
+        this.mindMap.selectedBox = null;
+        this.mindMap.selectedConnection = null;
+        if (this.mindMap.selectedBoxes) {
+            this.mindMap.selectedBoxes.clear();
+        }
+        if (this.mindMap.selectedConnections) {
+            this.mindMap.selectedConnections.clear();
+        }
+
+        // Mark for redraw
+        this.mindMap.isDirty = true;
     }
 
     // ============================================================================
