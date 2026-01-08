@@ -666,6 +666,7 @@ function generateShareLink() {
 function shareSession() {
   if (!collaborationManager || !collaborationManager.isConnected) {
     // Start new session - current map data will be seeded into the room
+    // Log the box count to help debug seeding behavior and track what's being shared
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     console.log('Starting collaboration with', boxCount, 'boxes from local work');
