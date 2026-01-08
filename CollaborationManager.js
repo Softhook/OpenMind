@@ -108,10 +108,6 @@ class CollaborationManager {
         this.onConnectionChange = null;
         this.onPeersChange = null;
         this.onAwarenessChange = null;
-        this.onVersionMismatch = null; // Called when incompatible client detected
-
-        // Version mismatch state
-        this.versionMismatchInfo = null; // {reason, peerVersion}
 
         // Yjs and y-websocket modules (loaded dynamically)
         this.Y = null;
@@ -515,7 +511,7 @@ class CollaborationManager {
         if (typeof callback !== 'function') {
             throw new TypeError('transact() requires a function callback');
         }
-
+        
         if (this.ydoc && this.undoManager) {
             // Set origin to undoManager so it knows to track this transaction
             this.ydoc.transact(callback, this.undoManager);
@@ -821,59 +817,59 @@ class CollaborationManager {
      * @private
      */
     _syncConnectionsToYjsImpl(localConns) {
-        const yjsConns = this.yconnections.toArray();
+            const yjsConns = this.yconnections.toArray();
 
-        // Map valid Yjs connections to their current indices (handling potential duplicates)
-        // format: "fromId->toId" => [index1, index2...]
-        const yjsMap = new Map();
-        yjsConns.forEach((c, i) => {
-            if (c && c.fromId && c.toId) {
-                const key = `${c.fromId}->${c.toId}`;
-                if (!yjsMap.has(key)) yjsMap.set(key, []);
-                yjsMap.get(key).push(i);
-            }
-        });
+            // Map valid Yjs connections to their current indices (handling potential duplicates)
+            // format: "fromId->toId" => [index1, index2...]
+            const yjsMap = new Map();
+            yjsConns.forEach((c, i) => {
+                if (c && c.fromId && c.toId) {
+                    const key = `${c.fromId}->${c.toId}`;
+                    if (!yjsMap.has(key)) yjsMap.set(key, []);
+                    yjsMap.get(key).push(i);
+                }
+            });
 
-        // Identify connections to keep vs add
-        const toAdd = [];
+            // Identify connections to keep vs add
+            const toAdd = [];
 
-        for (const conn of localConns) {
-            const key = `${conn.fromId}->${conn.toId}`;
-            if (yjsMap.has(key)) {
-                // Connection exists in Yjs, keep one instance of it
-                const indices = yjsMap.get(key);
-                if (indices.length > 0) {
-                    // consume one index (remove from list so we don't use it again)
-                    indices.shift();
-                    // if list empty, remove key
-                    if (indices.length === 0) yjsMap.delete(key);
+            for (const conn of localConns) {
+                const key = `${conn.fromId}->${conn.toId}`;
+                if (yjsMap.has(key)) {
+                    // Connection exists in Yjs, keep one instance of it
+                    const indices = yjsMap.get(key);
+                    if (indices.length > 0) {
+                        // consume one index (remove from list so we don't use it again)
+                        indices.shift();
+                        // if list empty, remove key
+                        if (indices.length === 0) yjsMap.delete(key);
+                    } else {
+                        // Should be unreachable if logic is correct
+                        toAdd.push(conn);
+                    }
                 } else {
-                    // Should be unreachable if logic is correct
+                    // Not in Yjs, need to add
                     toAdd.push(conn);
                 }
-            } else {
-                // Not in Yjs, need to add
-                toAdd.push(conn);
             }
-        }
 
-        // Identify connections to delete (anything remaining in yjsMap)
-        // We must collect ALL indices to delete
-        const indicesToDelete = [];
-        for (const indices of yjsMap.values()) {
-            indicesToDelete.push(...indices);
-        }
+            // Identify connections to delete (anything remaining in yjsMap)
+            // We must collect ALL indices to delete
+            const indicesToDelete = [];
+            for (const indices of yjsMap.values()) {
+                indicesToDelete.push(...indices);
+            }
 
-        // Delete in descending order to avoid index shifting problems
-        indicesToDelete.sort((a, b) => b - a);
-        for (const index of indicesToDelete) {
-            this.yconnections.delete(index, 1);
-        }
+            // Delete in descending order to avoid index shifting problems
+            indicesToDelete.sort((a, b) => b - a);
+            for (const index of indicesToDelete) {
+                this.yconnections.delete(index, 1);
+            }
 
-        // Add new connections
-        if (toAdd.length > 0) {
-            this.yconnections.push(toAdd);
-        }
+            // Add new connections
+            if (toAdd.length > 0) {
+                this.yconnections.push(toAdd);
+            }
     }
 
     // ============================================================================
@@ -1100,20 +1096,13 @@ class CollaborationManager {
     _setupAwareness() {
         if (!this.awareness) return;
 
-        // Set local user state including version for compatibility checking
-        const versionInfo = (typeof APP_VERSION !== 'undefined') ? {
-            MAJOR: APP_VERSION.MAJOR,
-            MINOR: APP_VERSION.MINOR,
-            PATCH: APP_VERSION.PATCH
-        } : { MAJOR: 1, MINOR: 0, PATCH: 0 };
-
+        // Set local user state
         this.awareness.setLocalState({
             user: {
                 id: this.userId,
                 name: this.userName,
                 color: this.userColor
             },
-            version: versionInfo,
             cursor: null,
             selectedBoxIds: []
         });
@@ -1122,9 +1111,6 @@ class CollaborationManager {
         this.awareness.on('change', () => {
             try {
                 const remoteUsers = this.getRemoteUsers();
-
-                // Check version compatibility of all peers
-                this._checkPeerVersions();
 
                 // Notify about awareness changes
                 if (this.onAwarenessChange) {
@@ -1139,62 +1125,6 @@ class CollaborationManager {
                 console.error('CollaborationManager: Error in awareness change handler', error);
             }
         });
-    }
-
-    /**
-     * Checks version compatibility of all connected peers
-     * Disconnects and notifies if an incompatible peer is detected
-     * @private
-     */
-    _checkPeerVersions() {
-        if (!this.awareness || typeof APP_VERSION === 'undefined') return;
-
-        const states = this.awareness.getStates();
-        const localClientId = this.awareness.clientID;
-
-        for (const [clientId, state] of states) {
-            // Skip self
-            if (clientId === localClientId) continue;
-
-            // Check peer's version
-            if (state && state.version) {
-                const result = APP_VERSION.checkCompatibility(state.version);
-
-                if (!result.compatible) {
-                    // Determine if WE are the outdated one
-                    const theyAreNewer = state.version.MAJOR > APP_VERSION.MAJOR;
-
-                    if (theyAreNewer) {
-                        // We need to update - disconnect and notify user
-                        console.warn('CollaborationManager: Incompatible version detected. Peer has v' +
-                            `${state.version.MAJOR}.${state.version.MINOR}.${state.version.PATCH}` +
-                            `, we have v${APP_VERSION.toString()}. Disconnecting.`);
-
-                        this.versionMismatchInfo = {
-                            reason: result.reason,
-                            peerVersion: `${state.version.MAJOR}.${state.version.MINOR}.${state.version.PATCH}`,
-                            localVersion: APP_VERSION.toString()
-                        };
-
-                        // Notify via callback
-                        if (this.onVersionMismatch) {
-                            this.onVersionMismatch(this.versionMismatchInfo);
-                        }
-
-                        // Disconnect to prevent data corruption
-                        this.disconnect();
-                        return;
-                    }
-                    // If THEY are older, they'll detect the mismatch and disconnect themselves
-                }
-            } else if (state && state.user) {
-                // Peer exists but has no version info - they're running an old client
-                // We don't disconnect because THEY should detect incompatibility and disconnect
-                // (If they're too old to have version checking, they won't disconnect, but
-                // this is acceptable as we'll eventually phase out those clients)
-                console.log('CollaborationManager: Peer without version info detected (old client):', state.user.name || 'Unknown');
-            }
-        }
     }
 
     /**

@@ -5,9 +5,7 @@
   "main": "sketch.js",
   "scripts": {
     "test": "jest",
-    "start-signaling": "HOST=0.0.0.0 PORT=1234 y-websocket",
-    "sync-version": "node scripts/sync-version.js",
-    "postversion": "node scripts/sync-version.js && git add version.js"
+    "start-signaling": "HOST=0.0.0.0 PORT=1234 y-websocket"
   },
   "devDependencies": {
     "jest": "^29.7.0",
