@@ -1818,20 +1818,20 @@ class TextBox {
     const wasDragging = this.isDragging;
     this.isDragging = false;
     
-    // Check if position actually changed during drag
-    // Requires both initial position tracking and actual movement beyond threshold
-    const positionChanged = wasDragging && 
-      (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
-      (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
-       Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
-    
-    if (positionChanged) {
-      // Notify collaboration system of position change
+    if (wasDragging) {
+      // Always sync final position to ensure consistency
       TextBox._notifyChange(this);
       
-      // Close the undo stack item for the entire drag operation
-      // Only call stopCapturing if we actually moved (prevents capturing unrelated changes)
-      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      // Check if position actually changed during drag
+      // Requires both initial position tracking and actual movement beyond threshold
+      const positionChanged = 
+        (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
+        (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
+         Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
+      
+      // Only close undo boundary if position actually changed
+      // This prevents capturing unrelated changes from other users
+      if (positionChanged && typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
     }
@@ -2013,14 +2013,15 @@ class TextBox {
     const wasResizing = this.isResizing;
     this.isResizing = false;
     
-    // Check if size actually changed during resize
-    // Requires both initial size tracking and actual size change beyond threshold
-    const sizeChanged = wasResizing && 
-      (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
-      (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
-       Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
-    
-    if (sizeChanged) {
+    if (wasResizing) {
+      // Check if size actually changed during resize
+      // Requires both initial size tracking and actual size change beyond threshold
+      const sizeChanged = 
+        (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
+        (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
+         Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
+      
+      // Always reflow and sync final state
       // Preserve the top edge when reflowing dimensions after resize
       const prevTop = this.y - this.height / 2;
       // Reflow text immediately using the final width so the height fits without extra clicks
@@ -2028,12 +2029,12 @@ class TextBox {
       // Adjust center so the top remains fixed after height changes
       this.y = prevTop + this.height / 2;
       
-      // Notify collaboration system of size/position change
+      // Always notify collaboration system of final state
       TextBox._notifyChange(this);
       
-      // Close the undo stack item for the entire resize operation
-      // Only call stopCapturing if we actually resized (prevents capturing unrelated changes)
-      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      // Only close undo boundary if size actually changed
+      // This prevents capturing unrelated changes from other users
+      if (sizeChanged && typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
     }

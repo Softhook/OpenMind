@@ -612,6 +612,8 @@ class CollaborationManager {
         if (this.mindMap.boxes.length > 0) {
             console.log('CollaborationManager: Syncing local state to Yjs, local boxes:', this.mindMap.boxes.length, 'yjs boxes:', this.yboxes.size);
 
+            // Use null origin to prevent this from being tracked in undo
+            // This is initial sync/load, not a user action
             this.ydoc.transact(() => {
                 // Sync boxes - Yjs Map uses box.id as key, so duplicates are impossible
                 for (const box of this.mindMap.boxes) {
@@ -636,7 +638,7 @@ class CollaborationManager {
                         }
                     }
                 }
-            });
+            }, null); // null origin = don't track in undo
         }
     }
 
@@ -729,7 +731,13 @@ class CollaborationManager {
                 // Verify box still exists before syncing
                 if (this.yboxes && this.mindMap) {
                     const currentBox = this.mindMap.getBoxById(boxId);
-                    if (currentBox) {
+                    if (currentBox && this.ydoc && this.undoManager) {
+                        // Wrap in transaction with origin to track in undo
+                        this.ydoc.transact(() => {
+                            this.yboxes.set(boxId, this._boxToYjsData(currentBox));
+                        }, this.undoManager);
+                    } else if (currentBox) {
+                        // Fallback without undo tracking
                         this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                     }
                 }
@@ -739,7 +747,15 @@ class CollaborationManager {
             return;
         }
 
-        this.yboxes.set(box.id, this._boxToYjsData(box));
+        // For non-editing changes (drag, resize, etc.), sync immediately with transaction origin
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this.yboxes.set(box.id, this._boxToYjsData(box));
+            }, this.undoManager);
+        } else {
+            // Fallback without undo tracking
+            this.yboxes.set(box.id, this._boxToYjsData(box));
+        }
     }
 
     /**
@@ -750,7 +766,15 @@ class CollaborationManager {
     deleteBoxFromYjs(boxId) {
         if (!this.yboxes || !boxId || this.isSyncing) return;
 
-        this.yboxes.delete(boxId);
+        // Wrap in transaction with origin to track in undo
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this.yboxes.delete(boxId);
+            }, this.undoManager);
+        } else {
+            // Fallback without undo tracking
+            this.yboxes.delete(boxId);
+        }
     }
 
     /**
@@ -766,8 +790,78 @@ class CollaborationManager {
             .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
 
         // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
-        this.ydoc.transact(() => {
+        // Wrap in transaction with origin to track in undo
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this._syncConnectionsToYjsImpl(localConns);
+            }, this.undoManager);
+        } else if (this.ydoc) {
+            // Fallback without undo tracking
+            this.ydoc.transact(() => {
+                this._syncConnectionsToYjsImpl(localConns);
+            });
+        }
+    }
+
+    /**
+     * Internal implementation of connection sync (called within transaction)
+     * @private
+     */
+    _syncConnectionsToYjsImpl(localConns) {
             const yjsConns = this.yconnections.toArray();
+
+            // Map valid Yjs connections to their current indices (handling potential duplicates)
+            // format: "fromId->toId" => [index1, index2...]
+            const yjsMap = new Map();
+            yjsConns.forEach((c, i) => {
+                if (c && c.fromId && c.toId) {
+                    const key = `${c.fromId}->${c.toId}`;
+                    if (!yjsMap.has(key)) yjsMap.set(key, []);
+                    yjsMap.get(key).push(i);
+                }
+            });
+
+            // Identify connections to keep vs add
+            const toAdd = [];
+
+            for (const conn of localConns) {
+                const key = `${conn.fromId}->${conn.toId}`;
+                if (yjsMap.has(key)) {
+                    // Connection exists in Yjs, keep one instance of it
+                    const indices = yjsMap.get(key);
+                    if (indices.length > 0) {
+                        // consume one index (remove from list so we don't use it again)
+                        indices.shift();
+                        // if list empty, remove key
+                        if (indices.length === 0) yjsMap.delete(key);
+                    } else {
+                        // Should be unreachable if logic is correct
+                        toAdd.push(conn);
+                    }
+                } else {
+                    // Not in Yjs, need to add
+                    toAdd.push(conn);
+                }
+            }
+
+            // Identify connections to delete (anything remaining in yjsMap)
+            // We must collect ALL indices to delete
+            const indicesToDelete = [];
+            for (const indices of yjsMap.values()) {
+                indicesToDelete.push(...indices);
+            }
+
+            // Delete in descending order to avoid index shifting problems
+            indicesToDelete.sort((a, b) => b - a);
+            for (const index of indicesToDelete) {
+                this.yconnections.delete(index, 1);
+            }
+
+            // Add new connections
+            if (toAdd.length > 0) {
+                this.yconnections.push(toAdd);
+            }
+    }
 
             // Map valid Yjs connections to their current indices (handling potential duplicates)
             // format: "fromId->toId" => [index1, index2...]
