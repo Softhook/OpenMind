@@ -599,6 +599,14 @@ async function initializeCollaboration(roomName) {
     await collaborationManager.connect(roomName, serverUrl);
     console.log('Collaboration initialized for room:', roomName);
 
+    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
+    // When in online mode, autosave goes to 'openmind_room_{roomName}' instead of 'openmind_autosave'
+    // This preserves the user's local work when they return to offline mode
+    if (mindMap && typeof mindMap.setStorageKey === 'function') {
+      mindMap.setStorageKey('openmind_room_' + roomName);
+      console.log('Set storage key to: openmind_room_' + roomName);
+    }
+
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
   } catch (e) {
@@ -627,8 +635,10 @@ function generateShareLink() {
  */
 function shareSession() {
   if (!collaborationManager || !collaborationManager.isConnected) {
-    // Start new session
+    // Start new session - current map data will be seeded into the room
     const room = CollaborationManager.generateRoomName();
+    const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
+    console.log('Starting collaboration with', boxCount, 'boxes from local work');
     // Setting hash triggers handleUrlChange -> initializeCollaboration
     window.location.hash = `room=${room}`;
   } else {
