@@ -1751,6 +1751,20 @@ class MindMap {
    * @param {boolean} isRepeat - Whether this is a repeated key press
    */
   handleKeyPressed(key, keyCode, isRepeat = false) {
+    // =========================================================================
+    // TEXT EDITING KEY HANDLING
+    // =========================================================================
+    // With captureTimeout: 0 (action-based undo), each keystroke creates a 
+    // separate undo step. This is technically correct but may not match user 
+    // expectations (e.g., typing "hello" = 5 undo steps).
+    // 
+    // POTENTIAL IMPROVEMENTS for future consideration:
+    // - Implement word-boundary detection to group characters into words
+    // - Add a small captureTimeout (e.g., 300ms) specifically for text editing
+    // - Detect "pause" in typing to create natural undo boundaries
+    // 
+    // Current behavior prioritizes consistency with other action-based operations.
+    // =========================================================================
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
       if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
@@ -1832,12 +1846,6 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
-        // Text editing with action-based undo (captureTimeout: 0)
-        // NOTE: Each keystroke becomes a separate undo step, which is technically correct
-        // but may not match user expectations (e.g., typing "hello" = 5 undo steps).
-        // For better UX, consider implementing word-boundary detection or a small
-        // captureTimeout (e.g., 300ms) specifically for text editing.
-        // Current behavior prioritizes consistency with other action-based operations.
         if (!isRepeat) this.pushUndo();
         // Modifier variants for deletion
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line

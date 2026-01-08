@@ -16,6 +16,10 @@ class TextBox {
   static DRAG_EDGE_THICKNESS = 18;
   static HORIZONTAL_EDGE_WIDTH = 12; // fixed thinner vertical grab area for all boxes
   static LINE_HEIGHT_MULTIPLIER = 1.5;
+  
+  // Change detection threshold for drag/resize operations (in pixels)
+  // Operations with changes smaller than this are considered "no change" for undo purposes
+  static CHANGE_THRESHOLD = 0.001;
 
   // Color constants for consistent styling
   static COLORS = {
@@ -1815,9 +1819,11 @@ class TextBox {
     this.isDragging = false;
     
     // Check if position actually changed during drag
+    // Requires both initial position tracking and actual movement beyond threshold
     const positionChanged = wasDragging && 
       (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
-      (Math.abs(this.x - this._dragStartX) > 0.001 || Math.abs(this.y - this._dragStartY) > 0.001);
+      (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
+       Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
     
     if (positionChanged) {
       // Notify collaboration system of position change
@@ -2008,10 +2014,11 @@ class TextBox {
     this.isResizing = false;
     
     // Check if size actually changed during resize
+    // Requires both initial size tracking and actual size change beyond threshold
     const sizeChanged = wasResizing && 
       (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
-      (Math.abs(this.width - this.resizeStartWidth) > 0.001 || 
-       Math.abs(this.height - this.resizeStartHeight) > 0.001);
+      (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
+       Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
     
     if (sizeChanged) {
       // Preserve the top edge when reflowing dimensions after resize
