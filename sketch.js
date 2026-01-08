@@ -579,6 +579,11 @@ async function initializeCollaboration(roomName) {
       }
     };
 
+    collaborationManager.onVersionMismatch = (mismatchInfo) => {
+      console.warn('Version mismatch detected:', mismatchInfo);
+      syncStatus = 'incompatible';
+    };
+
     const serverUrl = parseServerFromUrl();
     if (serverUrl) {
       console.log('Connecting to custom signaling server:', serverUrl);
@@ -857,14 +862,14 @@ function setup() {
                 document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
               }
             } catch (_) { }
-            
+
             // Wait for collaboration manager to be initialized before clearing undo
             // This ensures boxes are properly synced to Yjs WITH undo tracking
             if (collaborationManager) {
               try {
                 // Wait for initialization to complete
                 await collaborationManager.initialize();
-                
+
                 // Re-sync all boxes to ensure they're in Yjs with proper undo tracking
                 // This fixes issue where boxes loaded before undoManager was ready
                 if (mindMap && mindMap.boxes && MindMap.onBoxChange) {
@@ -877,7 +882,7 @@ function setup() {
                 if (mindMap && MindMap.onConnectionsChange) {
                   MindMap.onConnectionsChange();
                 }
-                
+
                 // Clear undo history after loading to prevent undo from reverting the load
                 collaborationManager.clearUndoHistory();
               } catch (e) {
@@ -1107,7 +1112,20 @@ function draw() {
 
     // State-specific messages
     let mainMessage, subMessage;
-    if (syncStatus === 'connecting') {
+    let showSpinner = true;
+    let showRefreshButton = false;
+
+    if (syncStatus === 'incompatible') {
+      mainMessage = 'Update Required';
+      const mismatchInfo = collaborationManager && collaborationManager.versionMismatchInfo;
+      if (mismatchInfo) {
+        subMessage = `Your version (v${mismatchInfo.localVersion}) is incompatible with peers (v${mismatchInfo.peerVersion})`;
+      } else {
+        subMessage = 'Please refresh to get the latest version';
+      }
+      showSpinner = false;
+      showRefreshButton = true;
+    } else if (syncStatus === 'connecting') {
       mainMessage = 'Connecting to server';
       subMessage = 'Establishing WebSocket connection...';
     } else if (syncStatus === 'server_starting') {
@@ -1121,30 +1139,47 @@ function draw() {
       subMessage = 'Please wait...';
     }
 
+    // App name and version at top
+    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
+    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
+    fill(120);
+    textAlign(CENTER, TOP);
+    textSize(11);
+    text(`${appName} v${versionStr}`, width / 2, 20);
+
     // Main message
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(18);
     text(mainMessage, width / 2, height / 2 - 20);
 
-    // Animated dots
-    const dots = '.'.repeat((Math.floor(frameCount / 20) % 4));
-    text(dots, width / 2 + textWidth(mainMessage) / 2 + 5, height / 2 - 20);
+    // Animated dots (only if not incompatible)
+    if (showSpinner) {
+      const dots = '.'.repeat((Math.floor(frameCount / 20) % 4));
+      text(dots, width / 2 + textWidth(mainMessage) / 2 + 5, height / 2 - 20);
+    }
 
     // Subtitle
     textSize(12);
     fill(180);
     text(subMessage, width / 2, height / 2 + 10);
 
-    // Spinner
-    push();
-    translate(width / 2, height / 2 + 45);
-    rotate(frameCount * 0.05);
-    stroke(100, 180, 255);
-    strokeWeight(2);
-    noFill();
-    arc(0, 0, 24, 24, 0, PI * 0.7);
-    pop();
+    // Spinner or refresh prompt
+    if (showSpinner) {
+      push();
+      translate(width / 2, height / 2 + 45);
+      rotate(frameCount * 0.05);
+      stroke(100, 180, 255);
+      strokeWeight(2);
+      noFill();
+      arc(0, 0, 24, 24, 0, PI * 0.7);
+      pop();
+    } else if (showRefreshButton) {
+      // Show refresh instruction
+      fill(100, 180, 255);
+      textSize(14);
+      text('Press F5 or ⌘R to refresh', width / 2, height / 2 + 50);
+    }
     pop();
   }
 }
