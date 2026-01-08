@@ -1696,17 +1696,11 @@ class MindMap {
 
     if (wasInteracting) {
       this.isArrowKeyNavigating = false;
-
-      // Sync all selected boxes to collaboration after drag/resize
-      if (MindMap.onBoxChange) {
-        for (let box of this.boxes) {
-          if (box && this.selectedBoxes && this.selectedBoxes.has(box)) {
-            MindMap.onBoxChange(box);
-          } else if (box && box === this.selectedBox) {
-            MindMap.onBoxChange(box);
-          }
-        }
-      }
+      
+      // NOTE: No need to sync boxes here - stopDrag()/stopResize() already handle syncing
+      // The original code had MindMap.onBoxChange calls here, but with action-based undo
+      // (captureTimeout: 0), this would create duplicate undo items.
+      // Each stopDrag()/stopResize() syncs the box with a transaction, creating 1 undo item.
     }
   }
 
