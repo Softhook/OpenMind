@@ -384,13 +384,25 @@ class MindMap {
   }
 
   /**
-  * Left-aligns all selected boxes to the leftmost box's left edge.
-  * Requires at least two selected boxes.
+   * Left-aligns all selected boxes to the leftmost box's left edge.
+   * Requires at least two selected boxes.
    */
   leftAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performLeftAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of left alignment
+   * @private
+   */
+  _performLeftAlign(boxesToAlign) {
     // Find the leftmost left edge (box.x - box.width/2)
     let minLeftEdge = Infinity;
     for (const box of boxesToAlign) {
@@ -413,7 +425,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -424,6 +435,18 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performRightAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of right alignment
+   * @private
+   */
+  _performRightAlign(boxesToAlign) {
     let maxRightEdge = -Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
@@ -443,7 +466,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -454,6 +476,18 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performTopAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of top alignment
+   * @private
+   */
+  _performTopAlign(boxesToAlign) {
     let minTopEdge = Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
@@ -473,7 +507,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -484,6 +517,18 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performBottomAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of bottom alignment
+   * @private
+   */
+  _performBottomAlign(boxesToAlign) {
     let maxBottomEdge = -Infinity;
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
@@ -503,7 +548,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -515,6 +559,18 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performCenterAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of center alignment
+   * @private
+   */
+  _performCenterAlign(boxesToAlign) {
     // Calculate the average X position (center) of all selected boxes
     let sumX = 0;
     let validCount = 0;
@@ -539,7 +595,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -550,6 +605,18 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     if (boxesToAlign.length < 2) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performHorizontalCenterAlign(boxesToAlign);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of horizontal center alignment
+   * @private
+   */
+  _performHorizontalCenterAlign(boxesToAlign) {
     let sumY = 0;
     let validCount = 0;
     for (const box of boxesToAlign) {
@@ -571,7 +638,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToAlign);
-    return true;
   }
 
   /**
@@ -583,6 +649,18 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     if (boxes.length < 3) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performVerticalDistribute(boxes);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of vertical distribution
+   * @private
+   */
+  _performVerticalDistribute(boxes) {
     // Sort by Y position
     boxes.sort((a, b) => a.y - b.y);
 
@@ -623,7 +701,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxes);
-    return true;
   }
 
   /**
@@ -635,6 +712,18 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     if (boxes.length < 3) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performHorizontalDistribute(boxes);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of horizontal distribution
+   * @private
+   */
+  _performHorizontalDistribute(boxes) {
     // Sort by X position
     boxes.sort((a, b) => a.x - b.x);
 
@@ -675,7 +764,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxes);
-    return true;
   }
 
   /**
@@ -688,6 +776,18 @@ class MindMap {
     const boxesToLayout = this._getSelectedBoxes();
     if (boxesToLayout.length < 1) return false;
 
+    // Wrap in transaction for single undo step
+    this._wrapInTransaction(() => {
+      this._performHierarchicalLayout(boxesToLayout);
+    });
+    return true;
+  }
+
+  /**
+   * Internal implementation of hierarchical layout
+   * @private
+   */
+  _performHierarchicalLayout(boxesToLayout) {
     const getBounds = (boxes) => {
       let minX = Infinity;
       let maxX = -Infinity;
@@ -875,7 +975,6 @@ class MindMap {
     this.isDirty = true;
     this.isSaved = false;
     this._notifyBoxesChanged(boxesToLayout);
-    return true;
   }
 
   /**
@@ -886,6 +985,98 @@ class MindMap {
       return [];
     }
     return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
+  }
+
+  /**
+   * Wraps an operation in a Yjs transaction for action-based undo.
+   * Falls back to direct execution if collaborationManager is not available.
+   * @param {Function} operation - The operation to execute
+   * @private
+   */
+  _wrapInTransaction(operation) {
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(operation);
+    } else {
+      operation();
+    }
+  }
+
+  /**
+   * Internal implementation of paste operation
+   * @private
+   */
+  _performPaste(offsetX, offsetY) {
+    // Paste all copied boxes with offset and track new boxes
+    const newBoxes = [];
+    for (const boxData of this.copiedBoxes) {
+      // Destructure to exclude id - pasted boxes must get new unique IDs
+      const { id: _excludedId, ...boxDataWithoutId } = boxData;
+      const newBoxData = {
+        ...boxDataWithoutId,
+        x: boxData.x + offsetX,
+        y: boxData.y + offsetY
+      };
+      const newBox = TextBox.fromJSON(newBoxData);
+      if (newBox) {
+        this.boxes.push(newBox);
+        this.addBoxToSelection(newBox);
+        newBoxes.push(newBox);
+      }
+    }
+
+    // Recreate connections between the pasted boxes
+    if (this.copiedConnections && this.copiedConnections.length > 0) {
+      for (const connData of this.copiedConnections) {
+        const fromBox = newBoxes[connData.from];
+        const toBox = newBoxes[connData.to];
+        if (fromBox && toBox) {
+          this.connections.push(new Connection(fromBox, toBox));
+        }
+      }
+    }
+
+    this.isDirty = true;
+
+    // Sync pasted boxes and connections to collaboration
+    for (const box of newBoxes) {
+      if (MindMap.onBoxChange) {
+        MindMap.onBoxChange(box);
+      }
+    }
+    if (newBoxes.length > 0 || (this.copiedConnections && this.copiedConnections.length > 0)) {
+      if (MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
+      }
+    }
+  }
+
+  /**
+   * Internal implementation of box deletion
+   * @private
+   */
+  _performBoxDeletion(boxesToDelete) {
+    for (const box of boxesToDelete) {
+      // Remove connections involving this box
+      this.connections = this.connections.filter(conn =>
+        conn.fromBox !== box && conn.toBox !== box
+      );
+
+      // Remove the box
+      const index = this.boxes.indexOf(box);
+      if (index > -1) {
+        this.boxes.splice(index, 1);
+      }
+
+      // Notify collaboration system of deletion
+      if (MindMap.onBoxDelete && box.id) {
+        MindMap.onBoxDelete(box.id);
+      }
+    }
+
+    // Notify collaboration system of connection changes
+    if (MindMap.onConnectionsChange) {
+      MindMap.onConnectionsChange();
+    }
   }
 
   /**
@@ -1475,6 +1666,12 @@ class MindMap {
       if (changed && MindMap.onConnectionsChange) {
         MindMap.onConnectionsChange();
       }
+      
+      // Only close undo boundary if connection was actually reattached
+      // This prevents capturing unrelated changes from other users during the drag
+      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
       return;
     }
 
@@ -1499,17 +1696,11 @@ class MindMap {
 
     if (wasInteracting) {
       this.isArrowKeyNavigating = false;
-
-      // Sync all selected boxes to collaboration after drag/resize
-      if (MindMap.onBoxChange) {
-        for (let box of this.boxes) {
-          if (box && this.selectedBoxes && this.selectedBoxes.has(box)) {
-            MindMap.onBoxChange(box);
-          } else if (box && box === this.selectedBox) {
-            MindMap.onBoxChange(box);
-          }
-        }
-      }
+      
+      // NOTE: No need to sync boxes here - stopDrag()/stopResize() already handle syncing
+      // The original code had MindMap.onBoxChange calls here, but with action-based undo
+      // (captureTimeout: 0), this would create duplicate undo items.
+      // Each stopDrag()/stopResize() syncs the box with a transaction, creating 1 undo item.
     }
   }
 
@@ -1554,6 +1745,20 @@ class MindMap {
    * @param {boolean} isRepeat - Whether this is a repeated key press
    */
   handleKeyPressed(key, keyCode, isRepeat = false) {
+    // =========================================================================
+    // TEXT EDITING KEY HANDLING
+    // =========================================================================
+    // With captureTimeout: 0 (action-based undo), each keystroke creates a 
+    // separate undo step. This is technically correct but may not match user 
+    // expectations (e.g., typing "hello" = 5 undo steps).
+    // 
+    // POTENTIAL IMPROVEMENTS for future consideration:
+    // - Implement word-boundary detection to group characters into words
+    // - Add a small captureTimeout (e.g., 300ms) specifically for text editing
+    // - Detect "pause" in typing to create natural undo boundaries
+    // 
+    // Current behavior prioritizes consistency with other action-based operations.
+    // =========================================================================
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
       if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
@@ -1759,48 +1964,10 @@ class MindMap {
             this.selectedBox = null;
           }
 
-          // Paste all copied boxes with offset and track new boxes
-          const newBoxes = [];
-          for (const boxData of this.copiedBoxes) {
-            // Destructure to exclude id - pasted boxes must get new unique IDs
-            const { id: _excludedId, ...boxDataWithoutId } = boxData;
-            const newBoxData = {
-              ...boxDataWithoutId,
-              x: boxData.x + offsetX,
-              y: boxData.y + offsetY
-            };
-            const newBox = TextBox.fromJSON(newBoxData);
-            if (newBox) {
-              this.boxes.push(newBox);
-              this.addBoxToSelection(newBox);
-              newBoxes.push(newBox);
-            }
-          }
-
-          // Recreate connections between the pasted boxes
-          if (this.copiedConnections && this.copiedConnections.length > 0) {
-            for (const connData of this.copiedConnections) {
-              const fromBox = newBoxes[connData.from];
-              const toBox = newBoxes[connData.to];
-              if (fromBox && toBox) {
-                this.connections.push(new Connection(fromBox, toBox));
-              }
-            }
-          }
-
-          this.isDirty = true;
-
-          // Sync pasted boxes and connections to collaboration
-          for (const box of newBoxes) {
-            if (MindMap.onBoxChange) {
-              MindMap.onBoxChange(box);
-            }
-          }
-          if (newBoxes.length > 0 || (this.copiedConnections && this.copiedConnections.length > 0)) {
-            if (MindMap.onConnectionsChange) {
-              MindMap.onConnectionsChange();
-            }
-          }
+          // Wrap paste operation in transaction for single undo step
+          this._wrapInTransaction(() => {
+            this._performPaste(offsetX, offsetY);
+          });
         }
         return;
       }
@@ -1834,32 +2001,13 @@ class MindMap {
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
       // Delete selected boxes or connection(s)
       if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-        // Delete all selected boxes
+        // Delete all selected boxes - wrap in transaction for single undo step
         this.pushUndo();
         const boxesToDelete = Array.from(this.selectedBoxes);
 
-        for (const box of boxesToDelete) {
-          // Remove connections involving this box
-          this.connections = this.connections.filter(conn =>
-            conn.fromBox !== box && conn.toBox !== box
-          );
-
-          // Remove the box
-          const index = this.boxes.indexOf(box);
-          if (index > -1) {
-            this.boxes.splice(index, 1);
-          }
-
-          // Notify collaboration system of deletion
-          if (MindMap.onBoxDelete && box.id) {
-            MindMap.onBoxDelete(box.id);
-          }
-        }
-
-        // Notify collaboration system of connection changes
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
-        }
+        this._wrapInTransaction(() => {
+          this._performBoxDeletion(boxesToDelete);
+        });
 
         // Clear selection and navigation mode after deletion
         this.isArrowKeyNavigating = false;
@@ -1870,15 +2018,19 @@ class MindMap {
       } else if (this.selectedConnections && this.selectedConnections.size > 0) {
         // Delete all selected connections (multi-selection)
         this.pushUndo();
-        this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
-        this.clearConnectionSelection();
-        if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
-          this.selectedConnection = null;
-        }
-        // Sync connection deletion to collaboration
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
-        }
+
+        this._wrapInTransaction(() => {
+          this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
+          this.clearConnectionSelection();
+          if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
+            this.selectedConnection = null;
+          }
+          // Sync connection deletion to collaboration
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange();
+          }
+        });
+
         // Clear navigation mode after deleting connections
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
@@ -1886,12 +2038,14 @@ class MindMap {
         this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
-          this.connections.splice(index, 1);
-          this.selectedConnection = null;
-          // Sync connection deletion to collaboration
-          if (MindMap.onConnectionsChange) {
-            MindMap.onConnectionsChange();
-          }
+          this._wrapInTransaction(() => {
+            this.connections.splice(index, 1);
+            this.selectedConnection = null;
+            // Sync connection deletion to collaboration
+            if (MindMap.onConnectionsChange) {
+              MindMap.onConnectionsChange();
+            }
+          });
         }
         // Clear navigation mode after deleting single connection
         this.isArrowKeyNavigating = false;
@@ -1904,20 +2058,28 @@ class MindMap {
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
-          const changedBoxes = [];
-          for (const box of this.selectedBoxes) {
-            if (box && typeof box.setBackgroundByKey === 'function') {
-              box.setBackgroundByKey(colorKey);
-              changedBoxes.push(box);
+          
+          this._wrapInTransaction(() => {
+            const changedBoxes = [];
+            for (const box of this.selectedBoxes) {
+              if (box && typeof box.setBackgroundByKey === 'function') {
+                box.setBackgroundByKey(colorKey);
+                changedBoxes.push(box);
+              }
             }
-          }
-          this._notifyBoxesChanged(changedBoxes);
+            this._notifyBoxesChanged(changedBoxes);
+          });
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
-            this.selectedBox.setBackgroundByKey(colorKey);
-            this._notifyBoxesChanged([this.selectedBox]);
+            // Wrap for consistency with multi-box color change above.
+            // While a single setBackgroundByKey is atomic, wrapping ensures uniform behavior
+            // and makes the undo boundary explicit, which is the goal of action-based undo.
+            this._wrapInTransaction(() => {
+              this.selectedBox.setBackgroundByKey(colorKey);
+              this._notifyBoxesChanged([this.selectedBox]);
+            });
           }
         }
       }

@@ -58,7 +58,7 @@ class CollaborationManager {
     ];
 
     // Timing constants
-    static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
+    static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
 
     // Sync verification timing - adjusted for free server cold start (30-60s)
@@ -180,6 +180,7 @@ class CollaborationManager {
             this.yconnections = this.ydoc.getArray('connections');
 
             // Create UndoManager - tracks LOCAL changes only
+            // captureTimeout: 0 disables time-based grouping for action-based undo
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
             });
@@ -490,6 +491,40 @@ class CollaborationManager {
     }
 
     /**
+     * Explicitly closes the current undo stack item.
+     * Call this at the end of continuous operations like dragging to mark the entire
+     * operation as a single undo step.
+     */
+    stopCapturing() {
+        if (this.undoManager) {
+            this.undoManager.stopCapturing();
+        }
+    }
+
+    /**
+     * Executes a function within a Yjs transaction.
+     * All Yjs changes within the callback are grouped as a single undo step.
+     * Use this for atomic operations like creating/deleting boxes, alignment, etc.
+     * @param {Function} callback - Function to execute within the transaction
+     */
+    transact(callback) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('transact() requires a function callback');
+        }
+        
+        if (this.ydoc && this.undoManager) {
+            // Set origin to undoManager so it knows to track this transaction
+            this.ydoc.transact(callback, this.undoManager);
+        } else if (this.ydoc) {
+            // Fallback without undo manager
+            this.ydoc.transact(callback);
+        } else {
+            // Fallback: just execute the callback if ydoc is not available
+            callback();
+        }
+    }
+
+    /**
      * Clears the undo/redo history.
      * Call this after loading files to prevent undo from reverting the load.
      */
@@ -508,8 +543,8 @@ class CollaborationManager {
         // When a box changes locally, sync to Yjs
         // Note: Using arrow functions which capture `this` automatically
         if (typeof MindMap !== 'undefined') {
-            MindMap.onBoxChange = (box) => {
-                this.syncBoxToYjs(box);
+            MindMap.onBoxChange = (box, skipTransactionWrapper = false) => {
+                this.syncBoxToYjs(box, skipTransactionWrapper);
             };
 
             MindMap.onBoxDelete = (boxId) => {
@@ -577,6 +612,8 @@ class CollaborationManager {
         if (this.mindMap.boxes.length > 0) {
             console.log('CollaborationManager: Syncing local state to Yjs, local boxes:', this.mindMap.boxes.length, 'yjs boxes:', this.yboxes.size);
 
+            // Use null origin to prevent this from being tracked in undo
+            // This is initial sync/load, not a user action
             this.ydoc.transact(() => {
                 // Sync boxes - Yjs Map uses box.id as key, so duplicates are impossible
                 for (const box of this.mindMap.boxes) {
@@ -601,7 +638,7 @@ class CollaborationManager {
                         }
                     }
                 }
-            });
+            }, null); // null origin = don't track in undo
         }
     }
 
@@ -675,8 +712,9 @@ class CollaborationManager {
      * Updates a single box in Yjs
      * Call this when a box is created or modified locally
      * @param {TextBox} box 
+     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations that will call stopCapturing)
      */
-    syncBoxToYjs(box) {
+    syncBoxToYjs(box, skipTransactionWrapper = false) {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
         // Debounce text sync during active editing to reduce network traffic
@@ -694,7 +732,13 @@ class CollaborationManager {
                 // Verify box still exists before syncing
                 if (this.yboxes && this.mindMap) {
                     const currentBox = this.mindMap.getBoxById(boxId);
-                    if (currentBox) {
+                    if (currentBox && this.ydoc && this.undoManager) {
+                        // Wrap in transaction with origin to track in undo
+                        this.ydoc.transact(() => {
+                            this.yboxes.set(boxId, this._boxToYjsData(currentBox));
+                        }, this.undoManager);
+                    } else if (currentBox) {
+                        // Fallback without undo tracking
                         this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                     }
                 }
@@ -704,7 +748,22 @@ class CollaborationManager {
             return;
         }
 
-        this.yboxes.set(box.id, this._boxToYjsData(box));
+        // For continuous operations (drag/resize), don't wrap in transaction
+        // Let UndoManager capture naturally, then caller will call stopCapturing()
+        if (skipTransactionWrapper) {
+            this.yboxes.set(box.id, this._boxToYjsData(box));
+            return;
+        }
+
+        // For non-editing changes (atomic operations), sync immediately with transaction origin
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this.yboxes.set(box.id, this._boxToYjsData(box));
+            }, this.undoManager);
+        } else {
+            // Fallback without undo tracking
+            this.yboxes.set(box.id, this._boxToYjsData(box));
+        }
     }
 
     /**
@@ -715,7 +774,15 @@ class CollaborationManager {
     deleteBoxFromYjs(boxId) {
         if (!this.yboxes || !boxId || this.isSyncing) return;
 
-        this.yboxes.delete(boxId);
+        // Wrap in transaction with origin to track in undo
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this.yboxes.delete(boxId);
+            }, this.undoManager);
+        } else {
+            // Fallback without undo tracking
+            this.yboxes.delete(boxId);
+        }
     }
 
     /**
@@ -731,7 +798,24 @@ class CollaborationManager {
             .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
 
         // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
-        this.ydoc.transact(() => {
+        // Wrap in transaction with origin to track in undo
+        if (this.ydoc && this.undoManager) {
+            this.ydoc.transact(() => {
+                this._syncConnectionsToYjsImpl(localConns);
+            }, this.undoManager);
+        } else if (this.ydoc) {
+            // Fallback without undo tracking
+            this.ydoc.transact(() => {
+                this._syncConnectionsToYjsImpl(localConns);
+            });
+        }
+    }
+
+    /**
+     * Internal implementation of connection sync (called within transaction)
+     * @private
+     */
+    _syncConnectionsToYjsImpl(localConns) {
             const yjsConns = this.yconnections.toArray();
 
             // Map valid Yjs connections to their current indices (handling potential duplicates)
@@ -785,7 +869,6 @@ class CollaborationManager {
             if (toAdd.length > 0) {
                 this.yconnections.push(toAdd);
             }
-        });
     }
 
     // ============================================================================
