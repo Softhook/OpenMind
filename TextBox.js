@@ -15,8 +15,6 @@ class TextBox {
   static CURSOR_BLINK_RATE = 530;
   static DRAG_EDGE_THICKNESS = 18;
   static HORIZONTAL_EDGE_WIDTH = 12; // fixed thinner vertical grab area for all boxes
-  static COLOR_CIRCLE_RADIUS = 8;
-  static COLOR_CIRCLE_SPACING = 3;
   static LINE_HEIGHT_MULTIPLIER = 1.5;
 
   // Color constants for consistent styling
@@ -93,8 +91,6 @@ class TextBox {
     this.selected = false;
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = TextBox.getColorPalette();
-    this.colorCircleRadius = TextBox.COLOR_CIRCLE_RADIUS;
-    this.colorCircleSpacing = TextBox.COLOR_CIRCLE_SPACING;
     // Persistent highlights: array of {start, end, color:{r,g,b,a?}}
     this.highlights = [];
     // Cache for detected links: array of {start, end, url}
@@ -902,64 +898,7 @@ class TextBox {
     pop();
   }
 
-  /**
-   * Computes screen positions for the three color circles on the left edge
-   * @returns {Array<Object>} Array of circle positions and properties
-   */
-  getColorPaletteCircles() {
-    const zoomFactor = Utils.getClampedZoomFactor();
-    const r = this.colorCircleRadius / zoomFactor;
-    const spacing = this.colorCircleSpacing / zoomFactor;
-    const marginTop = 0; // align top of first circle with top of text box
-    // Position the circles on the left side, running vertically down
-    const leftX = this.x - this.width / 2 - r - 4 / zoomFactor;
-    const topY = this.y - this.height / 2 + marginTop + r;
-    const circles = [];
-    for (let i = 0; i < this.colorPalette.length; i++) {
-      circles.push({
-        x: leftX,
-        y: topY + i * (2 * r + spacing),
-        r,
-        key: this.colorPalette[i].key,
-        color: this.colorPalette[i].color
-      });
-    }
-    return circles;
-  }
 
-  /**
-   * Draws the color palette circles
-   */
-  drawColorPalette() {
-    const zoomFactor = Utils.getClampedZoomFactor();
-    const circles = this.getColorPaletteCircles();
-    push();
-    for (const c of circles) {
-      // Circle fill
-      stroke(80, 80, 80);
-      strokeWeight(1 / zoomFactor);
-      fill(c.color.r, c.color.g, c.color.b);
-      circle(c.x, c.y, c.r * 2);
-    }
-    pop();
-  }
-
-  /**
-   * Checks if mouse is over one of the color circles
-   * @returns {string|null} Color key if over a circle, null otherwise
-   */
-  getColorCircleUnderMouse() {
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    const circles = this.getColorPaletteCircles();
-    const zoomFactor = Utils.getClampedZoomFactor();
-    for (const c of circles) {
-      if (dist(mx, my, c.x, c.y) <= c.r + 3 / zoomFactor) {
-        return c.key;
-      }
-    }
-    return null;
-  }
 
   /**
    * Applies a background color by key from the palette

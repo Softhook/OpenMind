@@ -1,11 +1,10 @@
 /**
  * MindMap class - manages the entire mind map including boxes, connections,
- * selection state, undo/redo, and navigation.
+ * selection state, and navigation.
  * Uses shared utilities from utils.js when available.
  */
 class MindMap {
   // Constants for configuration
-  static MAX_UNDO_STACK = 20; // Increased from 5 for better UX
   static ALIGN_TOLERANCE = 12;
 
   // Layout constants
@@ -51,10 +50,6 @@ class MindMap {
     this.connectingFrom = null;
     this.connectingFromInitiatedByKeyboard = false;
     this.draggingConnection = null; // { conn, originalTo }
-
-    // Undo history - optimized with larger stack
-    this.undoStack = [];
-    this.maxUndo = MindMap.MAX_UNDO_STACK;
 
     // Multi-selection of boxes
     this.selectedBoxes = new Set();
