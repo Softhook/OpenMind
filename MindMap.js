@@ -1073,6 +1073,35 @@ class MindMap {
   }
 
   /**
+   * Internal implementation of box deletion
+   * @private
+   */
+  _performBoxDeletion(boxesToDelete) {
+    for (const box of boxesToDelete) {
+      // Remove connections involving this box
+      this.connections = this.connections.filter(conn =>
+        conn.fromBox !== box && conn.toBox !== box
+      );
+
+      // Remove the box
+      const index = this.boxes.indexOf(box);
+      if (index > -1) {
+        this.boxes.splice(index, 1);
+      }
+
+      // Notify collaboration system of deletion
+      if (MindMap.onBoxDelete && box.id) {
+        MindMap.onBoxDelete(box.id);
+      }
+    }
+
+    // Notify collaboration system of connection changes
+    if (MindMap.onConnectionsChange) {
+      MindMap.onConnectionsChange();
+    }
+  }
+
+  /**
    * Notifies the collaboration system that boxes have changed.
    * Call this after batch operations like alignment/distribution.
    * @param {TextBox[]} boxes - Array of boxes that changed
@@ -1989,31 +2018,16 @@ class MindMap {
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
       // Delete selected boxes or connection(s)
       if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-        // Delete all selected boxes
+        // Delete all selected boxes - wrap in transaction for single undo step
         this.pushUndo();
         const boxesToDelete = Array.from(this.selectedBoxes);
 
-        for (const box of boxesToDelete) {
-          // Remove connections involving this box
-          this.connections = this.connections.filter(conn =>
-            conn.fromBox !== box && conn.toBox !== box
-          );
-
-          // Remove the box
-          const index = this.boxes.indexOf(box);
-          if (index > -1) {
-            this.boxes.splice(index, 1);
-          }
-
-          // Notify collaboration system of deletion
-          if (MindMap.onBoxDelete && box.id) {
-            MindMap.onBoxDelete(box.id);
-          }
-        }
-
-        // Notify collaboration system of connection changes
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
+        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            this._performBoxDeletion(boxesToDelete);
+          });
+        } else {
+          this._performBoxDeletion(boxesToDelete);
         }
 
         // Clear selection and navigation mode after deletion
@@ -2025,15 +2039,31 @@ class MindMap {
       } else if (this.selectedConnections && this.selectedConnections.size > 0) {
         // Delete all selected connections (multi-selection)
         this.pushUndo();
-        this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
-        this.clearConnectionSelection();
-        if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
-          this.selectedConnection = null;
+        
+        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
+            this.clearConnectionSelection();
+            if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
+              this.selectedConnection = null;
+            }
+            // Sync connection deletion to collaboration
+            if (MindMap.onConnectionsChange) {
+              MindMap.onConnectionsChange();
+            }
+          });
+        } else {
+          this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
+          this.clearConnectionSelection();
+          if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
+            this.selectedConnection = null;
+          }
+          // Sync connection deletion to collaboration
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange();
+          }
         }
-        // Sync connection deletion to collaboration
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
-        }
+        
         // Clear navigation mode after deleting connections
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
@@ -2041,11 +2071,22 @@ class MindMap {
         this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
-          this.connections.splice(index, 1);
-          this.selectedConnection = null;
-          // Sync connection deletion to collaboration
-          if (MindMap.onConnectionsChange) {
-            MindMap.onConnectionsChange();
+          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+            collaborationManager.transact(() => {
+              this.connections.splice(index, 1);
+              this.selectedConnection = null;
+              // Sync connection deletion to collaboration
+              if (MindMap.onConnectionsChange) {
+                MindMap.onConnectionsChange();
+              }
+            });
+          } else {
+            this.connections.splice(index, 1);
+            this.selectedConnection = null;
+            // Sync connection deletion to collaboration
+            if (MindMap.onConnectionsChange) {
+              MindMap.onConnectionsChange();
+            }
           }
         }
         // Clear navigation mode after deleting single connection
@@ -2059,20 +2100,42 @@ class MindMap {
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
-          const changedBoxes = [];
-          for (const box of this.selectedBoxes) {
-            if (box && typeof box.setBackgroundByKey === 'function') {
-              box.setBackgroundByKey(colorKey);
-              changedBoxes.push(box);
+          
+          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+            collaborationManager.transact(() => {
+              const changedBoxes = [];
+              for (const box of this.selectedBoxes) {
+                if (box && typeof box.setBackgroundByKey === 'function') {
+                  box.setBackgroundByKey(colorKey);
+                  changedBoxes.push(box);
+                }
+              }
+              this._notifyBoxesChanged(changedBoxes);
+            });
+          } else {
+            const changedBoxes = [];
+            for (const box of this.selectedBoxes) {
+              if (box && typeof box.setBackgroundByKey === 'function') {
+                box.setBackgroundByKey(colorKey);
+                changedBoxes.push(box);
+              }
             }
+            this._notifyBoxesChanged(changedBoxes);
           }
-          this._notifyBoxesChanged(changedBoxes);
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
-            this.selectedBox.setBackgroundByKey(colorKey);
-            this._notifyBoxesChanged([this.selectedBox]);
+            // Single box color change is already atomic, but wrap for consistency
+            if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+              collaborationManager.transact(() => {
+                this.selectedBox.setBackgroundByKey(colorKey);
+                this._notifyBoxesChanged([this.selectedBox]);
+              });
+            } else {
+              this.selectedBox.setBackgroundByKey(colorKey);
+              this._notifyBoxesChanged([this.selectedBox]);
+            }
           }
         }
       }
