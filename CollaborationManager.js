@@ -17,7 +17,8 @@ class CollaborationManager {
     // CONSTANTS
     // ============================================================================
 
-    static PRODUCTION_SERVER = 'wss://y-websocket-19go.onrender.com';
+    //static PRODUCTION_SERVER = 'wss://y-websocket-19go.onrender.com';
+    static PRODUCTION_SERVER = 'wss://p01--y-websockets--l9lrvfgkxvzh.code.run';
     static LOCAL_SERVER_PORT = 1234;
 
     static WEBSOCKET_SERVER = (() => {
@@ -59,7 +60,7 @@ class CollaborationManager {
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 100; // ms - merge edits within this window into one undo step
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
-    
+
     // Sync verification timing - adjusted for free server cold start (30-60s)
     static SYNC_VERIFICATION_DELAY = 10000; // ms - delay before first verification (10s for cold start)
     static SYNC_RETRY_DELAY = 5000; // ms - delay between retries (5s for cold start)
@@ -124,7 +125,7 @@ class CollaborationManager {
         // Periodic consistency check timer
         this.consistencyCheckTimer = null;
         this.consistencyCheckInterval = 10000; // Check every 10 seconds (reduced overhead)
-        
+
         // Server state tracking for cold start detection
         this.connectionStartTime = null;
         this.lastSyncAttemptTime = null;
@@ -285,16 +286,16 @@ class CollaborationManager {
                         // Room is empty, seed with local data (first user to join)
                         const connectionTime = Date.now() - (this.connectionStartTime || 0);
                         const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
-                        
+
                         if (isColdStart) {
-                            console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime/1000), 's). Using extended verification.');
+                            console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime / 1000), 's). Using extended verification.');
                         }
-                        
+
                         console.log('CollaborationManager: Room is empty, seeding with local data:', this.mindMap.boxes.length, 'boxes');
                         this.lastSyncAttemptTime = Date.now();
                         this.syncAttemptCount = 1;
                         this._syncLocalToYjs();
-                        
+
                         // Verify sync with exponential backoff for cold start reliability
                         this._verifySyncWithBackoff(1, CollaborationManager.MAX_SYNC_RETRIES, CollaborationManager.SYNC_VERIFICATION_DELAY);
                     } else if (!yjsEmpty) {
@@ -614,23 +615,23 @@ class CollaborationManager {
     _verifySyncWithBackoff(attemptNumber, maxAttempts, delay) {
         setTimeout(() => {
             // Check if sync succeeded
-            if (this.yboxes && this.yboxes.size === 0 && 
+            if (this.yboxes && this.yboxes.size === 0 &&
                 this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
-                
+
                 if (attemptNumber < maxAttempts) {
                     console.log(`CollaborationManager: Sync verification attempt ${attemptNumber}/${maxAttempts} - Yjs still empty, retrying...`);
-                    
+
                     // Retry sync
                     this.syncAttemptCount = attemptNumber + 1;
                     this.lastSyncAttemptTime = Date.now();
                     this._syncLocalToYjs();
-                    
+
                     // Exponential backoff: 10s, 15s, 20s, 25s, 30s, then 5s intervals
                     // This gives server time to warm up from cold start
                     const nextDelay = attemptNumber < CollaborationManager.EXPONENTIAL_BACKOFF_ATTEMPTS
                         ? CollaborationManager.SYNC_VERIFICATION_DELAY + (attemptNumber * CollaborationManager.SYNC_RETRY_DELAY)
                         : CollaborationManager.SYNC_RETRY_DELAY;
-                    
+
                     this._verifySyncWithBackoff(attemptNumber + 1, maxAttempts, nextDelay);
                 } else {
                     const firstAttemptTime = this.connectionStartTime || Date.now() - 60000;
@@ -641,7 +642,7 @@ class CollaborationManager {
             } else if (this.yboxes && this.yboxes.size > 0) {
                 const firstAttemptTime = this.connectionStartTime || this.lastSyncAttemptTime || Date.now();
                 const timeTaken = Date.now() - firstAttemptTime;
-                console.log(`✅ CollaborationManager: Sync verified after ${attemptNumber} attempt(s) in ${Math.round(timeTaken/1000)}s. Yjs has ${this.yboxes.size} boxes.`);
+                console.log(`✅ CollaborationManager: Sync verified after ${attemptNumber} attempt(s) in ${Math.round(timeTaken / 1000)}s. Yjs has ${this.yboxes.size} boxes.`);
                 this.syncAttemptCount = 0;
             }
         }, delay);
@@ -1247,7 +1248,7 @@ class CollaborationManager {
         // Compare Yjs vs Local box IDs
         const yjsBoxIds = new Set();
         this.yboxes.forEach((_, id) => yjsBoxIds.add(id));
-        
+
         const localBoxIds = new Set(this.mindMap.boxes.map(b => b.id));
 
         const onlyInYjs = [...yjsBoxIds].filter(id => !localBoxIds.has(id));
@@ -1257,22 +1258,22 @@ class CollaborationManager {
         if (onlyInYjs.length > 0 || onlyInLocal.length > 0) {
             // IMPORTANT: Check if this might be a pending sync (cold start grace period)
             // Don't destroy user's work if server is still processing the sync
-            const timeSinceLastSync = this.lastSyncAttemptTime 
+            const timeSinceLastSync = this.lastSyncAttemptTime
                 ? Date.now() - this.lastSyncAttemptTime
                 : Number.MAX_SAFE_INTEGER; // If never synced, treat as very old
-            
+
             if (onlyInLocal.length > 0 && timeSinceLastSync < CollaborationManager.COLD_START_GRACE_PERIOD && this.syncAttemptCount > 0) {
                 // Within grace period of active sync attempts - likely cold start delay
                 console.log(
                     `CollaborationManager: Consistency check detected ${onlyInLocal.length} local-only boxes, ` +
-                    `but within ${Math.round((CollaborationManager.COLD_START_GRACE_PERIOD - timeSinceLastSync)/1000)}s grace period of sync attempt. ` +
+                    `but within ${Math.round((CollaborationManager.COLD_START_GRACE_PERIOD - timeSinceLastSync) / 1000)}s grace period of sync attempt. ` +
                     `Retrying sync instead of rebuilding (cold start protection).`
                 );
                 this.lastSyncAttemptTime = Date.now();
                 this._syncLocalToYjs();
                 return; // Don't rebuild yet, give server more time
             }
-            
+
             console.warn(
                 `CollaborationManager: Consistency check detected mismatch! ` +
                 `Boxes only in Yjs: ${onlyInYjs.length}, ` +
