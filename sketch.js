@@ -21,7 +21,11 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
   EXPORT: { PADDING: 50, MARGIN: 20 },
   AUTOSAVE: { INTERVAL: 30000 },
   VISIBILITY: { DEBOUNCE_MS: 50 },
-  TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 }
+  TIMING: { RESIZE_DEBOUNCE_MS: 16, DOUBLE_CLICK_MS: 300 },
+  STORAGE: { 
+    DEFAULT_KEY: 'openmind_autosave',
+    ROOM_KEY_PREFIX: 'openmind_room_'
+  }
 };
 
 // UI Colors for consistent styling throughout the application
@@ -445,6 +449,13 @@ function handleUrlChange() {
     if (newRoom && mindMap) {
       initializeCollaboration(newRoom);
       return; // Don't load file when in collaboration mode
+    } else if (!newRoom && currentRoom && mindMap) {
+      // User is leaving a room (navigating away) - restore default storage key
+      // This ensures autosave goes back to the offline storage location
+      if (typeof mindMap.setStorageKey === 'function') {
+        mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
+        console.log('Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
+      }
     }
   }
 
@@ -509,6 +520,24 @@ function parseRoomFromHash() {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Generates a safe storage key for a collaboration room
+ * Sanitizes the room name to prevent issues with special characters
+ * @param {string} roomName - The room identifier
+ * @returns {string} Sanitized storage key
+ */
+function getRoomStorageKey(roomName) {
+  if (!roomName || typeof roomName !== 'string') {
+    return CONFIG.STORAGE.DEFAULT_KEY;
+  }
+  
+  // Sanitize room name: keep only alphanumeric, dash, underscore
+  // This prevents issues with special characters in localStorage keys
+  const sanitized = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  
+  return CONFIG.STORAGE.ROOM_KEY_PREFIX + sanitized;
 }
 
 /**
@@ -599,6 +628,15 @@ async function initializeCollaboration(roomName) {
     await collaborationManager.connect(roomName, serverUrl);
     console.log('Collaboration initialized for room:', roomName);
 
+    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
+    // When in online mode, autosave goes to room-specific key instead of default
+    // This preserves the user's local work when they return to offline mode
+    if (mindMap && typeof mindMap.setStorageKey === 'function') {
+      const storageKey = getRoomStorageKey(roomName);
+      mindMap.setStorageKey(storageKey);
+      console.log('Set storage key to:', storageKey);
+    }
+
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
   } catch (e) {
@@ -627,8 +665,11 @@ function generateShareLink() {
  */
 function shareSession() {
   if (!collaborationManager || !collaborationManager.isConnected) {
-    // Start new session
+    // Start new session - current map data will be seeded into the room
+    // Log the box count to help debug seeding behavior and track what's being shared
     const room = CollaborationManager.generateRoomName();
+    const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
+    console.log('Starting collaboration with', boxCount, 'boxes from local work');
     // Setting hash triggers handleUrlChange -> initializeCollaboration
     window.location.hash = `room=${room}`;
   } else {
@@ -849,12 +890,15 @@ function setup() {
     // Check if joining a collaboration room
     const roomId = parseRoomFromHash();
 
-    // ALWAYS load from localStorage first (even when joining a room)
-    // When joining a room, the seed logic in CollaborationManager will:
-    // - If room is empty: push local data to Yjs
-    // - If room has data: Yjs will sync and overwrite local to match room state
-    if (!lastLoadedUrlFile) {
-      // Try to load from localStorage first
+    // CRITICAL: When joining an online room, do NOT load from localStorage
+    // This prevents users from bringing their local cached data into collaborative sessions
+    // 
+    // Behavior:
+    // - ONLINE (roomId present): Skip localStorage, start with empty canvas
+    //   The room's state will sync from other users or remain empty if first to join
+    // - OFFLINE (no roomId): Load from localStorage to restore previous work
+    if (!lastLoadedUrlFile && !roomId) {
+      // Try to load from localStorage (offline mode only)
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
         try {
@@ -909,7 +953,7 @@ function setup() {
           console.warn('Error while loading from localStorage:', e);
         }
       } else {
-        // Create initial boxes as examples only if no autosave exists AND not joining room
+        // Create initial boxes as examples only if no autosave exists (offline mode)
         mindMap.addBox(new TextBox(300, 200, "Idea"));
         mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
         mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
@@ -925,6 +969,10 @@ function setup() {
           }, 200);
         }
       }
+    } else if (!lastLoadedUrlFile && roomId) {
+      // Joining an online room - do not load local cache
+      // The room will be seeded from other users or remain empty if first to join
+      console.log('Joining online room:', roomId, '- skipping localStorage load');
     }
 
     // Create UI buttons
