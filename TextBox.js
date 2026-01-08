@@ -1801,13 +1801,9 @@ class TextBox {
       this.x = mx + this.dragOffsetX;
       this.y = my + this.dragOffsetY;
 
-      // Throttled sync during drag for real-time collaboration
-      // Sync at most every 100ms to avoid overwhelming the network
-      const now = typeof millis === 'function' ? millis() : Date.now();
-      if (!this._lastDragSyncTime || now - this._lastDragSyncTime >= 100) {
-        this._lastDragSyncTime = now;
-        TextBox._notifyChange(this);
-      }
+      // DON'T sync during drag - only sync final state at stopDrag()
+      // This prevents creating undo items without proper origin tracking
+      // and avoids network overhead during continuous operation
     }
   }
 
@@ -1902,8 +1898,7 @@ class TextBox {
           // Recompute center so left/top remain fixed while bottom-right moves
           this.x = this.resizeStartLeft + this.width / 2;
           this.y = this.resizeStartTop + this.height / 2;
-          // Throttled sync for image resize
-          this._throttledResizeSync();
+          // DON'T sync during resize - only sync at stopResize()
           return;
         }
       }
@@ -1935,20 +1930,7 @@ class TextBox {
       this.x = this.resizeStartLeft + this.width / 2;
       this.y = this.resizeStartTop + this.height / 2;
 
-      // Throttled sync during resize for real-time collaboration
-      this._throttledResizeSync();
-    }
-  }
-
-  /**
-   * Throttled sync helper for resize operations
-   * @private
-   */
-  _throttledResizeSync() {
-    const now = typeof millis === 'function' ? millis() : Date.now();
-    if (!this._lastResizeSyncTime || now - this._lastResizeSyncTime >= 100) {
-      this._lastResizeSyncTime = now;
-      TextBox._notifyChange(this);
+      // DON'T sync during resize - only sync final state at stopResize()
     }
   }
 
@@ -2014,13 +1996,6 @@ class TextBox {
     this.isResizing = false;
     
     if (wasResizing) {
-      // Check if size actually changed during resize
-      // Requires both initial size tracking and actual size change beyond threshold
-      const sizeChanged = 
-        (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
-        (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
-         Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
-      
       // Always reflow and sync final state
       // Preserve the top edge when reflowing dimensions after resize
       const prevTop = this.y - this.height / 2;
@@ -2029,11 +2004,18 @@ class TextBox {
       // Adjust center so the top remains fixed after height changes
       this.y = prevTop + this.height / 2;
       
-      // Always notify collaboration system of final state
+      // Always sync final state to ensure consistency
+      // This is critical for multi-user environments where remote changes
+      // may have occurred during the resize operation
       TextBox._notifyChange(this);
       
-      // Only close undo boundary if size actually changed
-      // This prevents capturing unrelated changes from other users
+      // Check if size actually changed during resize
+      // Only close undo boundary if size changed to prevent capturing unrelated changes
+      const sizeChanged = 
+        (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
+        (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
+         Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
+      
       if (sizeChanged && typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
