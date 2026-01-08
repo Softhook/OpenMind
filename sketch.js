@@ -4153,10 +4153,10 @@ function cleanup() {
       }
     }
 
-    // Disconnect collaboration manager to clean up awareness
+    // Fully destroy collaboration manager to clean up awareness on page unload
     if (collaborationManager) {
       try {
-        collaborationManager.disconnect();
+        collaborationManager.destroy();
       } catch (e) {
         console.warn('Failed to disconnect collaboration manager:', e);
       }

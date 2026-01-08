@@ -124,7 +124,8 @@ class CollaborationManager {
 
         // Periodic consistency check timer
         this.consistencyCheckTimer = null;
-        this.consistencyCheckInterval = 10000; // Check every 10 seconds (reduced overhead)
+        this.consistencyCheckInterval = 30000; // Check every 30 seconds (reduced overhead)
+        this.consecutiveSyncedChecks = 0; // Track consecutive checks with no mismatches
 
         // Server state tracking for cold start detection
         this.connectionStartTime = null;
@@ -1290,8 +1291,19 @@ class CollaborationManager {
 
                 this.mindMap.isDirty = true;
                 console.log('CollaborationManager: Consistency check reconciliation complete');
+                // Reset synced check counter since we had a mismatch
+                this.consecutiveSyncedChecks = 0;
             } finally {
                 this.isSyncing = false;
+            }
+        } else {
+            // Everything is in sync - increment counter
+            this.consecutiveSyncedChecks++;
+
+            // After 3 consecutive successful checks, stop the timer (stable state)
+            if (this.consecutiveSyncedChecks >= 3) {
+                console.log('CollaborationManager: Stable sync detected after 3 checks, disabling periodic consistency check');
+                this._stopConsistencyCheck();
             }
         }
     }
@@ -1305,11 +1317,14 @@ class CollaborationManager {
             return; // Already running
         }
 
+        // Reset consecutive check counter for this sync session
+        this.consecutiveSyncedChecks = 0;
+
         this.consistencyCheckTimer = setInterval(() => {
             this._performConsistencyCheck();
         }, this.consistencyCheckInterval);
 
-        console.log('CollaborationManager: Started consistency check timer');
+        console.log('CollaborationManager: Started consistency check timer (30s interval)');
     }
 
     /**

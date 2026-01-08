@@ -1907,6 +1907,10 @@ class MindMap {
         if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
           this.selectedConnection = null;
         }
+        // Sync connection deletion to collaboration
+        if (MindMap.onConnectionsChange) {
+          MindMap.onConnectionsChange();
+        }
         // Clear navigation mode after deleting connections
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
