@@ -1724,6 +1724,12 @@ class MindMap {
         this._notifyBoxesChanged(allInteractingBoxes, true);
       });
       
+      // Close the undo boundary to ensure the transaction is captured as a single undo item
+      // This is important when captureTimeout=0 (action-based undo)
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
+      
       this.isArrowKeyNavigating = false;
     }
     
