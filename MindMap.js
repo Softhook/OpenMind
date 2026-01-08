@@ -1693,7 +1693,9 @@ class MindMap {
       if (box.isDragging) {
         boxesThatWereDragging.push(box);
       }
-      if (box.isResizing) {
+      // Note: A box can't be both dragging and resizing at the same time in practice
+      // due to mutually exclusive mouse interactions, but we check separately for clarity
+      else if (box.isResizing) {
         boxesThatWereResizing.push(box);
       }
     }
