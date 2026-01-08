@@ -1683,24 +1683,54 @@ class MindMap {
     // Stop dragging and resizing all boxes
     // If any box was being dragged or resized, clear navigation mode
     // so arrow keys will enter presentation mode on current box rather than continuing navigation
-    let wasInteracting = false;
+    
+    // Collect boxes that were dragging or resizing to batch sync them in a single transaction
+    const boxesThatWereDragging = [];
+    const boxesThatWereResizing = [];
+    
     for (let box of this.boxes) {
       if (!box) continue;
-      if (box.isDragging || box.isResizing) {
-        wasInteracting = true;
+      if (box.isDragging) {
+        boxesThatWereDragging.push(box);
       }
-      box.stopDrag();
-      box.stopResize();
-      box.stopSelecting();
+      if (box.isResizing) {
+        boxesThatWereResizing.push(box);
+      }
     }
-
+    
+    const wasInteracting = boxesThatWereDragging.length > 0 || boxesThatWereResizing.length > 0;
+    
+    // Group all drag/resize operations in a single transaction for grouped undo
     if (wasInteracting) {
-      this.isArrowKeyNavigating = false;
+      this._wrapInTransaction(() => {
+        // Stop dragging all boxes and collect which ones changed
+        const boxesThatChanged = [];
+        for (const box of boxesThatWereDragging) {
+          const changed = box.stopDrag(true); // skipSync=true
+          if (changed) {
+            boxesThatChanged.push(box);
+          }
+        }
+        
+        // Stop resizing all boxes and collect which ones changed
+        for (const box of boxesThatWereResizing) {
+          const changed = box.stopResize(true); // skipSync=true
+          if (changed) {
+            boxesThatChanged.push(box);
+          }
+        }
+        
+        // Batch sync all changed boxes
+        this._notifyBoxesChanged(boxesThatChanged);
+      });
       
-      // NOTE: No need to sync boxes here - stopDrag()/stopResize() already handle syncing
-      // The original code had MindMap.onBoxChange calls here, but with action-based undo
-      // (captureTimeout: 0), this would create duplicate undo items.
-      // Each stopDrag()/stopResize() syncs the box with a transaction, creating 1 undo item.
+      this.isArrowKeyNavigating = false;
+    }
+    
+    // Stop selecting on all boxes (this doesn't need transaction wrapping)
+    for (let box of this.boxes) {
+      if (!box) continue;
+      box.stopSelecting();
     }
   }
 
