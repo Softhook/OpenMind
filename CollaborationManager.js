@@ -100,6 +100,7 @@ class CollaborationManager {
         this.initializationPromise = null; // Store the initialization promise
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
+        this.shouldShareLocalData = false; // Whether to share local data with room (set when connecting)
 
         // User identity
         this.userId = this._generateUserId();
@@ -223,9 +224,10 @@ class CollaborationManager {
      * Must call initialize() first.
      * @param {string} roomName - Unique room identifier
      * @param {string|null} serverUrl - Optional custom server URL
+     * @param {boolean} shouldShareLocalData - If true, share local data when room is empty. If false, only receive from room. Defaults to false.
      * @returns {Promise<void>}
      */
-    async connect(roomName, serverUrl = null) {
+    async connect(roomName, serverUrl = null, shouldShareLocalData = false) {
         if (!this.isInitialized) {
             await this.initialize();
         }
@@ -237,6 +239,9 @@ class CollaborationManager {
 
         // Track connection start time for cold start detection
         this.connectionStartTime = Date.now();
+        
+        // Store the sharing intent for use in sync handler
+        this.shouldShareLocalData = shouldShareLocalData;
 
         this.roomName = roomName;
         const signalingUrl = serverUrl || CollaborationManager.WEBSOCKET_SERVER;
@@ -290,51 +295,16 @@ class CollaborationManager {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    if (yjsEmpty && localHasData) {
-                        // Room is empty, seed with local data (first user to join)
-                        const connectionTime = Date.now() - (this.connectionStartTime || 0);
-                        const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
-
-                        if (isColdStart) {
-                            console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime / 1000), 's). Using extended verification.');
-                        }
-
-                        console.log('CollaborationManager: Room is empty, seeding with local data:', this.mindMap.boxes.length, 'boxes');
-                        this.lastSyncAttemptTime = Date.now();
-                        this.syncAttemptCount = 1;
-                        this._syncLocalToYjs();
-
-                        // Verify sync with exponential backoff for cold start reliability
-                        this._verifySyncWithBackoff(1, CollaborationManager.MAX_SYNC_RETRIES, CollaborationManager.SYNC_VERIFICATION_DELAY);
-                    } else if (!yjsEmpty) {
-                        // Room has data, rebuild from Yjs (on any sync transition)
-                        console.log('CollaborationManager: Synced with data, rebuilding from Yjs:', this.yboxes.size, 'boxes');
-                        // IMPORTANT: Rebuild BOXES and connections from Yjs on every sync transition
-                        // The observer only fires on changes, not for existing data at sync time
-                        this._rebuildBoxesFromYjs();
-                        this._rebuildConnectionsFromYjs();
+                    if (yjsEmpty && localHasData && this.shouldShareLocalData) {
+                        this._handleStartCollaborationWithData();
+                    } else if (yjsEmpty && localHasData && !this.shouldShareLocalData) {
+                        this._handleJoinEmptyRoom();
+                    } else if (!yjsEmpty && !this.shouldShareLocalData) {
+                        this._handleJoinRoomWithData();
+                    } else if (!yjsEmpty && this.shouldShareLocalData) {
+                        this._handleStartCollaborationRoomHasData();
                     } else if (yjsEmpty && !localHasData) {
-                        // Race condition: sync fired before local data loaded
-                        // Retry multiple times to catch late-loading data
-                        console.log('CollaborationManager: Both empty, scheduling sync retries...');
-                        let retryCount = 0;
-                        const maxRetries = 5;
-                        const retryInterval = 500;
-
-                        const attemptSync = () => {
-                            retryCount++;
-                            if (this.yboxes && this.yboxes.size === 0 &&
-                                this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
-                                console.log('CollaborationManager: Retry', retryCount, '- seeding with local data');
-                                this._syncLocalToYjs();
-                            } else if (retryCount < maxRetries) {
-                                this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
-                            } else {
-                                console.log('CollaborationManager: Sync retries exhausted, room may be empty');
-                            }
-                        };
-
-                        this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
+                        this._handleBothEmpty();
                     }
                 }
 
@@ -1089,6 +1059,126 @@ class CollaborationManager {
                 this.mindMap.connections.push(new Connection(fromBox, toBox));
             }
         }
+    }
+
+    /**
+     * Clears all local boxes and connections.
+     * Called when joining an existing room to avoid showing local cached data.
+     * @private
+     */
+    _clearLocalData() {
+        if (!this.mindMap) return;
+
+        try {
+            // Safely get counts before clearing
+            const boxCount = this.mindMap.boxes?.length || 0;
+            const connCount = this.mindMap.connections?.length || 0;
+            
+            console.log('CollaborationManager: Clearing local data -', boxCount, 'boxes and', connCount, 'connections');
+
+            // Clear all boxes and connections
+            this.mindMap.boxes = [];
+            this.mindMap.connections = [];
+
+            // Clear selections using optional chaining for safety
+            this.mindMap.selectedBox = null;
+            this.mindMap.selectedConnection = null;
+            this.mindMap.selectedBoxes?.clear();
+            this.mindMap.selectedConnections?.clear();
+
+            // Mark for redraw
+            this.mindMap.isDirty = true;
+        } catch (error) {
+            console.error('CollaborationManager: Failed to clear local data:', error);
+            // Ensure at minimum we mark for redraw even if clearing failed
+            try {
+                if (this.mindMap) this.mindMap.isDirty = true;
+            } catch (e) {
+                // Ignore nested error
+            }
+        }
+    }
+
+    /**
+     * Handles starting collaboration when we have local data to share.
+     * Room is empty, we want to seed it with our local data.
+     * @private
+     */
+    _handleStartCollaborationWithData() {
+        const connectionTime = Date.now() - (this.connectionStartTime || 0);
+        const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
+
+        if (isColdStart) {
+            console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime / 1000), 's). Using extended verification.');
+        }
+
+        console.log('CollaborationManager: Room is empty, seeding with local data:', this.mindMap.boxes.length, 'boxes');
+        this.lastSyncAttemptTime = Date.now();
+        this.syncAttemptCount = 1;
+        this._syncLocalToYjs();
+
+        // Verify sync with exponential backoff for cold start reliability
+        this._verifySyncWithBackoff(1, CollaborationManager.MAX_SYNC_RETRIES, CollaborationManager.SYNC_VERIFICATION_DELAY);
+    }
+
+    /**
+     * Handles joining an empty room (not starting collaboration).
+     * Clear local data to show empty canvas.
+     * @private
+     */
+    _handleJoinEmptyRoom() {
+        console.log('CollaborationManager: Joining empty room, clearing local data:', this.mindMap.boxes.length, 'boxes');
+        this._clearLocalData();
+    }
+
+    /**
+     * Handles joining a room that already has data.
+     * Clear local data then sync from room.
+     * @private
+     */
+    _handleJoinRoomWithData() {
+        console.log('CollaborationManager: Joining room with data, clearing local data then syncing from room');
+        this._clearLocalData();
+        this._rebuildBoxesFromYjs();
+        this._rebuildConnectionsFromYjs();
+    }
+
+    /**
+     * Handles starting collaboration when room already has data.
+     * Room wins - sync from room (ignore our local data).
+     * @private
+     */
+    _handleStartCollaborationRoomHasData() {
+        console.log('CollaborationManager: Room already has data, syncing from room (room is authoritative)');
+        this._rebuildBoxesFromYjs();
+        this._rebuildConnectionsFromYjs();
+    }
+
+    /**
+     * Handles race condition where both room and local are empty.
+     * Retry multiple times to catch late-loading data.
+     * @private
+     */
+    _handleBothEmpty() {
+        console.log('CollaborationManager: Both empty, scheduling sync retries...');
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryInterval = 500;
+
+        const attemptSync = () => {
+            retryCount++;
+            if (this.yboxes && this.yboxes.size === 0 &&
+                this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
+                console.log('CollaborationManager: Retry', retryCount, '- seeding with local data');
+                this._syncLocalToYjs();
+            } else if (retryCount < maxRetries) {
+                this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
+            } else {
+                console.log('CollaborationManager: Sync retries exhausted, room may be empty');
+            }
+        };
+
+        this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
     }
 
     // ============================================================================

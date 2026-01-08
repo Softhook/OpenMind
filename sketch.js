@@ -437,7 +437,8 @@ function namesAreSimilar(name1, name2) {
  */
 function handleUrlChange() {
   // Check for room changes first
-  const newRoom = parseRoomFromHash();
+  const roomInfo = parseRoomFromHash();
+  const newRoom = roomInfo ? roomInfo.room : null;
   const currentRoom = collaborationManager ? collaborationManager.roomName : null;
 
   if (newRoom !== currentRoom) {
@@ -447,7 +448,10 @@ function handleUrlChange() {
       collaborationManager = null;
     }
     if (newRoom && mindMap) {
-      initializeCollaboration(newRoom);
+      // Use the isStarting flag from URL to determine if we should share local data
+      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+      
+      initializeCollaboration(newRoom, shouldShareLocalData);
       return; // Don't load file when in collaboration mode
     } else if (!newRoom && currentRoom && mindMap) {
       // User is leaving a room (navigating away) - restore default storage key
@@ -492,32 +496,39 @@ function parseServerFromUrl() {
 }
 
 /**
- * Parses room ID from URL hash
- * @returns {string|null} Room name or null if not in a room
+ * Parses room ID and mode from URL hash
+ * @returns {Object|null} Object with {room: string, isStarting: boolean} or null if not in a room
  */
 function parseRoomFromHash() {
   try {
     const hash = window.location.hash;
+    if (!hash || hash.length <= 1) return null;
 
-    // Explicit room parameter
-    const match = hash.match(/room=([^&]+)/);
-    if (match) return decodeURIComponent(match[1]);
+    // Parse hash as URL parameters (remove leading #)
+    const params = new URLSearchParams(hash.substring(1));
+    
+    // Check for explicit room parameter
+    const roomName = params.get('room');
+    if (roomName) {
+      // Check if mode=start is present (indicates user clicked "Start Collaboration")
+      const isStarting = params.get('mode') === 'start';
+      return { room: decodeURIComponent(roomName), isStarting };
+    }
 
-    // If server override is present, treat the entire hash as a room name (if it's not a file)
-    // Check raw params directly since parseServerFromUrl only returns valid URLs now
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('server') && hash.length > 1) {
-      // Remove the leading #
+    // Legacy support: If server override is present, treat the entire hash as a room name (if it's not a file)
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('server')) {
       let h = decodeURIComponent(hash.substring(1));
       // Basic sanity check: allow alphanumeric room names (and standard URL safe chars)
       // Reject if it looks like a file (ends in .json) just in case
       if (!h.toLowerCase().endsWith('.json')) {
-        return h;
+        return { room: h, isStarting: false };
       }
     }
 
     return null;
   } catch (e) {
+    console.warn('Error parsing room from hash:', e);
     return null;
   }
 }
@@ -543,8 +554,9 @@ function getRoomStorageKey(roomName) {
 /**
  * Initializes collaboration for a given room
  * @param {string} roomName 
+ * @param {boolean} shouldShareLocalData - If true, share local data when starting collaboration. If false (default), only receive from room.
  */
-async function initializeCollaboration(roomName) {
+async function initializeCollaboration(roomName, shouldShareLocalData = false) {
   if (!mindMap || !roomName) return;
   if (typeof CollaborationManager === 'undefined') {
     console.warn('CollaborationManager not loaded');
@@ -625,8 +637,10 @@ async function initializeCollaboration(roomName) {
     if (serverUrl) {
       console.log('Connecting to custom signaling server:', serverUrl);
     }
-    await collaborationManager.connect(roomName, serverUrl);
-    console.log('Collaboration initialized for room:', roomName);
+    
+    // Pass shouldShareLocalData flag to control whether we share our local work
+    await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
+    console.log('Collaboration initialized for room:', roomName, 'shouldShareLocalData:', shouldShareLocalData);
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
@@ -670,8 +684,10 @@ function shareSession() {
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     console.log('Starting collaboration with', boxCount, 'boxes from local work');
-    // Setting hash triggers handleUrlChange -> initializeCollaboration
-    window.location.hash = `room=${room}`;
+    
+    // Use URL parameter to indicate "start" mode (sharing local data)
+    // This is more robust than a global flag and survives page refresh/back button
+    window.location.hash = `room=${room}&mode=start`;
   } else {
     // Copy link
     const url = generateShareLink();
@@ -888,7 +904,8 @@ function setup() {
     addTrackedEventListener(window, 'popstate', handleUrlChange);
 
     // Check if joining a collaboration room
-    const roomId = parseRoomFromHash();
+    const roomInfo = parseRoomFromHash();
+    const roomId = roomInfo ? roomInfo.room : null;
 
     // CRITICAL: When joining an online room, do NOT load from localStorage
     // This prevents users from bringing their local cached data into collaborative sessions
@@ -1006,9 +1023,12 @@ function setup() {
       console.warn('Failed to setup drag/drop handlers:', e);
     }
 
-    // Check for collaboration room in URL (roomId already declared above)
+    // Check for collaboration room in URL
     if (roomId) {
-      initializeCollaboration(roomId);
+      // Use the isStarting flag from URL to determine behavior
+      // When joining from URL at startup, this will typically be false (not starting)
+      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+      initializeCollaboration(roomId, shouldShareLocalData);
     }
   } catch (e) {
     console.error('Setup failed:', e);
