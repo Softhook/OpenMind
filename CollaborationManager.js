@@ -508,9 +508,13 @@ class CollaborationManager {
      * @param {Function} callback - Function to execute within the transaction
      */
     transact(callback) {
-        if (this.ydoc && typeof callback === 'function') {
+        if (typeof callback !== 'function') {
+            throw new TypeError('transact() requires a function callback');
+        }
+        
+        if (this.ydoc) {
             this.ydoc.transact(callback);
-        } else if (typeof callback === 'function') {
+        } else {
             // Fallback: just execute the callback if ydoc is not available
             callback();
         }

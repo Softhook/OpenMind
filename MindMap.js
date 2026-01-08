@@ -392,13 +392,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performLeftAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performLeftAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -440,13 +436,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performRightAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performRightAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -485,13 +477,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performTopAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performTopAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -530,13 +518,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performBottomAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performBottomAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -576,13 +560,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performCenterAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performCenterAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -626,13 +606,9 @@ class MindMap {
     if (boxesToAlign.length < 2) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performHorizontalCenterAlign(boxesToAlign);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performHorizontalCenterAlign(boxesToAlign);
-    }
+    });
     return true;
   }
 
@@ -674,13 +650,9 @@ class MindMap {
     if (boxes.length < 3) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performVerticalDistribute(boxes);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performVerticalDistribute(boxes);
-    }
+    });
     return true;
   }
 
@@ -741,13 +713,9 @@ class MindMap {
     if (boxes.length < 3) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performHorizontalDistribute(boxes);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performHorizontalDistribute(boxes);
-    }
+    });
     return true;
   }
 
@@ -809,13 +777,9 @@ class MindMap {
     if (boxesToLayout.length < 1) return false;
 
     // Wrap in transaction for single undo step
-    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(() => {
-        this._performHierarchicalLayout(boxesToLayout);
-      });
-    } else {
+    this._wrapInTransaction(() => {
       this._performHierarchicalLayout(boxesToLayout);
-    }
+    });
     return true;
   }
 
@@ -1021,6 +985,20 @@ class MindMap {
       return [];
     }
     return Array.from(this.selectedBoxes).filter(b => b !== null && b !== undefined);
+  }
+
+  /**
+   * Wraps an operation in a Yjs transaction for action-based undo.
+   * Falls back to direct execution if collaborationManager is not available.
+   * @param {Function} operation - The operation to execute
+   * @private
+   */
+  _wrapInTransaction(operation) {
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(operation);
+    } else {
+      operation();
+    }
   }
 
   /**
@@ -1689,8 +1667,10 @@ class MindMap {
         MindMap.onConnectionsChange();
       }
       
-      // Close the undo stack item for the entire reattachment operation
-      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
+      // Always close the undo stack item for the reattachment operation, even if no change occurred.
+      // This is consistent with other continuous operations (drag/resize) which always call stopCapturing.
+      // If no actual change was made, Yjs will simply not create an undo item, so this is safe.
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
       return;
@@ -1978,13 +1958,9 @@ class MindMap {
           }
 
           // Wrap paste operation in transaction for single undo step
-          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-            collaborationManager.transact(() => {
-              this._performPaste(offsetX, offsetY);
-            });
-          } else {
+          this._wrapInTransaction(() => {
             this._performPaste(offsetX, offsetY);
-          }
+          });
         }
         return;
       }
@@ -2022,13 +1998,9 @@ class MindMap {
         this.pushUndo();
         const boxesToDelete = Array.from(this.selectedBoxes);
 
-        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-          collaborationManager.transact(() => {
-            this._performBoxDeletion(boxesToDelete);
-          });
-        } else {
+        this._wrapInTransaction(() => {
           this._performBoxDeletion(boxesToDelete);
-        }
+        });
 
         // Clear selection and navigation mode after deletion
         this.isArrowKeyNavigating = false;
@@ -2040,19 +2012,7 @@ class MindMap {
         // Delete all selected connections (multi-selection)
         this.pushUndo();
         
-        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-          collaborationManager.transact(() => {
-            this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
-            this.clearConnectionSelection();
-            if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
-              this.selectedConnection = null;
-            }
-            // Sync connection deletion to collaboration
-            if (MindMap.onConnectionsChange) {
-              MindMap.onConnectionsChange();
-            }
-          });
-        } else {
+        this._wrapInTransaction(() => {
           this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
           this.clearConnectionSelection();
           if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
@@ -2062,7 +2022,7 @@ class MindMap {
           if (MindMap.onConnectionsChange) {
             MindMap.onConnectionsChange();
           }
-        }
+        });
         
         // Clear navigation mode after deleting connections
         this.isArrowKeyNavigating = false;
@@ -2071,23 +2031,14 @@ class MindMap {
         this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
-          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-            collaborationManager.transact(() => {
-              this.connections.splice(index, 1);
-              this.selectedConnection = null;
-              // Sync connection deletion to collaboration
-              if (MindMap.onConnectionsChange) {
-                MindMap.onConnectionsChange();
-              }
-            });
-          } else {
+          this._wrapInTransaction(() => {
             this.connections.splice(index, 1);
             this.selectedConnection = null;
             // Sync connection deletion to collaboration
             if (MindMap.onConnectionsChange) {
               MindMap.onConnectionsChange();
             }
-          }
+          });
         }
         // Clear navigation mode after deleting single connection
         this.isArrowKeyNavigating = false;
@@ -2101,18 +2052,7 @@ class MindMap {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           
-          if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-            collaborationManager.transact(() => {
-              const changedBoxes = [];
-              for (const box of this.selectedBoxes) {
-                if (box && typeof box.setBackgroundByKey === 'function') {
-                  box.setBackgroundByKey(colorKey);
-                  changedBoxes.push(box);
-                }
-              }
-              this._notifyBoxesChanged(changedBoxes);
-            });
-          } else {
+          this._wrapInTransaction(() => {
             const changedBoxes = [];
             for (const box of this.selectedBoxes) {
               if (box && typeof box.setBackgroundByKey === 'function') {
@@ -2121,21 +2061,16 @@ class MindMap {
               }
             }
             this._notifyBoxesChanged(changedBoxes);
-          }
+          });
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
             // Single box color change is already atomic, but wrap for consistency
-            if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-              collaborationManager.transact(() => {
-                this.selectedBox.setBackgroundByKey(colorKey);
-                this._notifyBoxesChanged([this.selectedBox]);
-              });
-            } else {
+            this._wrapInTransaction(() => {
               this.selectedBox.setBackgroundByKey(colorKey);
               this._notifyBoxesChanged([this.selectedBox]);
-            }
+            });
           }
         }
       }
