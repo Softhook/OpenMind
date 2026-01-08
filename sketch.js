@@ -849,12 +849,15 @@ function setup() {
     // Check if joining a collaboration room
     const roomId = parseRoomFromHash();
 
-    // ALWAYS load from localStorage first (even when joining a room)
-    // When joining a room, the seed logic in CollaborationManager will:
-    // - If room is empty: push local data to Yjs
-    // - If room has data: Yjs will sync and overwrite local to match room state
-    if (!lastLoadedUrlFile) {
-      // Try to load from localStorage first
+    // CRITICAL: When joining an online room, do NOT load from localStorage
+    // This prevents users from bringing their local cached data into collaborative sessions
+    // 
+    // Behavior:
+    // - ONLINE (roomId present): Skip localStorage, start with empty canvas
+    //   The room's state will sync from other users or remain empty if first to join
+    // - OFFLINE (no roomId): Load from localStorage to restore previous work
+    if (!lastLoadedUrlFile && !roomId) {
+      // Try to load from localStorage (offline mode only)
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
         try {
@@ -909,7 +912,7 @@ function setup() {
           console.warn('Error while loading from localStorage:', e);
         }
       } else {
-        // Create initial boxes as examples only if no autosave exists AND not joining room
+        // Create initial boxes as examples only if no autosave exists (offline mode)
         mindMap.addBox(new TextBox(300, 200, "Idea"));
         mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
         mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
@@ -925,6 +928,10 @@ function setup() {
           }, 200);
         }
       }
+    } else if (!lastLoadedUrlFile && roomId) {
+      // Joining an online room - do not load local cache
+      // The room will be seeded from other users or remain empty if first to join
+      console.log('Joining online room:', roomId, '- skipping localStorage load');
     }
 
     // Create UI buttons
