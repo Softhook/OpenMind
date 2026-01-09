@@ -140,6 +140,7 @@ class TextBox {
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
     this.cachedLineCharMap = null;  // Maps wrapped line indices to original text positions
+    this.cachedText = null;  // Cached text reference for quick validation
 
     // Click detection for double-click
     this.lastClickTime = 0;
@@ -519,6 +520,7 @@ class TextBox {
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines && 
         this.cachedWidth === currentWidth && 
+        this.cachedText !== null &&
         this.cachedText === this.text) {
       return this.cachedWrappedLines;
     }

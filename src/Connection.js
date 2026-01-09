@@ -71,10 +71,13 @@ class Connection {
     if (!this.fromBox || !this.toBox) return null;
 
     // Check if cache is valid (boxes haven't moved)
-    const fromMoved = this._lastFromBoxX !== this.fromBox.x || this._lastFromBoxY !== this.fromBox.y;
-    const toMoved = this._lastToBoxX !== this.toBox.x || this._lastToBoxY !== this.toBox.y;
+    // Only check movement if cache exists and positions were tracked
+    const fromMoved = this._lastFromBoxX !== null && 
+                      (this._lastFromBoxX !== this.fromBox.x || this._lastFromBoxY !== this.fromBox.y);
+    const toMoved = this._lastToBoxX !== null && 
+                    (this._lastToBoxX !== this.toBox.x || this._lastToBoxY !== this.toBox.y);
     
-    // Return cached result if boxes haven't moved
+    // Return cached result if cache exists and boxes haven't moved
     if (this._cachedEndpoints && !fromMoved && !toMoved) {
       return this._cachedEndpoints;
     }
