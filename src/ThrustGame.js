@@ -44,6 +44,10 @@ class ThrustGame {
     COOLDOWN: 15             // Frames between shots
   };
   
+  static TIMING = {
+    FRAME_TIME_MS: 1000 / 60  // Milliseconds per frame at 60fps
+  };
+  
   static COLORS = {
     BACKGROUND: { r: 10, g: 10, b: 30 },       // Dark space background
     PLAYER_LOCAL: { r: 100, g: 200, b: 255 },  // Cyan for local player
@@ -298,6 +302,8 @@ class ThrustGame {
   checkCollisions() {
     // Check local bullets against remote players
     for (const bullet of this.bullets) {
+      if (bullet.lifetime <= 0) continue; // Skip already-hit bullets
+      
       for (const [clientId, remotePlayer] of this.remotePlayers) {
         if (!remotePlayer.alive) continue;
         
@@ -310,7 +316,7 @@ class ThrustGame {
           bullet.lifetime = 0;
           this.score++;
           // In multiplayer, the hit player would handle their own death
-          break;
+          break; // Stop checking this bullet against other players
         }
       }
     }
@@ -387,7 +393,7 @@ class ThrustGame {
     if (!this.player.alive) return;
     
     const now = Date.now();
-    if (now - this.lastFireTime < ThrustGame.BULLET.COOLDOWN * 16.67) return;  // Convert frames to ms (~60fps)
+    if (now - this.lastFireTime < ThrustGame.BULLET.COOLDOWN * ThrustGame.TIMING.FRAME_TIME_MS) return;
     
     this.lastFireTime = now;
     
