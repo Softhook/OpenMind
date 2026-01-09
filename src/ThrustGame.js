@@ -34,7 +34,9 @@ class ThrustGame {
   static PLAYER = {
     SIZE: 15,                // Player ship triangle size (in world space)
     RESPAWN_TIME: 3000,      // Milliseconds before respawn after death
-    INVULNERABLE_TIME: 2000  // Invulnerability after spawn (ms)
+    INVULNERABLE_TIME: 2000, // Invulnerability after spawn (ms)
+    FLAME_BASE_LENGTH: 15,   // Base thrust flame length
+    FLAME_VARIATION: 5       // Random variation in flame length
   };
   
   static BULLET = {
@@ -516,7 +518,7 @@ class ThrustGame {
     if (!this.active) return;
     
     push();
-    resetMatrix && resetMatrix();
+    resetMatrix();
     
     fill(ThrustGame.COLORS.UI_TEXT);
     textAlign(LEFT, TOP);
@@ -585,23 +587,24 @@ class ThrustGame {
     }
     
     // Draw ship as triangle
+    const halfSize = ThrustGame.PLAYER.SIZE / 2;
     noStroke();
     fill(color.r, color.g, color.b);
     triangle(
       ThrustGame.PLAYER.SIZE, 0,
-      -ThrustGame.PLAYER.SIZE / 2, -ThrustGame.PLAYER.SIZE / 2,
-      -ThrustGame.PLAYER.SIZE / 2, ThrustGame.PLAYER.SIZE / 2
+      -halfSize, -halfSize,
+      -halfSize, halfSize
     );
     
     // Draw thrust flame if thrusting
     if (showThrust) {
       const flame = ThrustGame.COLORS.THRUST_FLAME;
       fill(flame.r, flame.g, flame.b);
-      const flameLength = 15 + Math.random() * 5;
+      const flameLength = ThrustGame.PLAYER.FLAME_BASE_LENGTH + Math.random() * ThrustGame.PLAYER.FLAME_VARIATION;
       triangle(
-        -ThrustGame.PLAYER.SIZE / 2, -5,
-        -ThrustGame.PLAYER.SIZE / 2, 5,
-        -ThrustGame.PLAYER.SIZE / 2 - flameLength, 0
+        -halfSize, -5,
+        -halfSize, 5,
+        -halfSize - flameLength, 0
       );
     }
     
