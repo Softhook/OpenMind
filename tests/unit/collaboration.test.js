@@ -10,10 +10,10 @@ const fs = require('fs');
 const path = require('path');
 
 // Read the source files for structural verification
-const textBoxCode = fs.readFileSync(path.join(__dirname, '../../TextBox.js'), 'utf8');
-const connectionCode = fs.readFileSync(path.join(__dirname, '../../Connection.js'), 'utf8');
-const mindMapCode = fs.readFileSync(path.join(__dirname, '../../MindMap.js'), 'utf8');
-const utilsCode = fs.readFileSync(path.join(__dirname, '../../utils.js'), 'utf8');
+const textBoxCode = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
+const connectionCode = fs.readFileSync(path.join(__dirname, '../../src/Connection.js'), 'utf8');
+const mindMapCode = fs.readFileSync(path.join(__dirname, '../../src/MindMap.js'), 'utf8');
+const utilsCode = fs.readFileSync(path.join(__dirname, '../../src/utils.js'), 'utf8');
 
 describe('TextBox UUID Implementation', () => {
     test('constructor should generate ID using Utils.generateUUID()', () => {
@@ -206,7 +206,7 @@ describe('Unified Undo System (Yjs UndoManager)', () => {
 
     test('CollaborationManager should have initialize method', () => {
         // Verify initialize method exists for unified undo system
-        const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+        const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
         expect(collabCode).toMatch(/async initialize\s*\(\)/);
     });
 });
@@ -252,7 +252,7 @@ describe('MindMap Integration', () => {
 });
 
 describe('Optimization & Robustness', () => {
-    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
     test('syncConnectionsToYjs should use optimized diff logic', () => {
         // Should NOT use the O(n^2) while-loop clear pattern
@@ -282,7 +282,7 @@ describe('Optimization & Robustness', () => {
 });
 
 describe('Text Editing Protection', () => {
-    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
     test('_applyBoxFromYjs should skip text update when box is being edited', () => {
         // Should check isEditing before updating text
@@ -296,7 +296,7 @@ describe('Text Editing Protection', () => {
 });
 
 describe('Periodic Consistency Check', () => {
-    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
     test('should have consistencyCheckTimer and consistencyCheckInterval in constructor', () => {
         // Should initialize consistency check properties
@@ -371,7 +371,7 @@ describe('Periodic Consistency Check', () => {
 });
 
 describe('Local Data Management When Joining Rooms', () => {
-    const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+    const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
     test('connect should accept shouldShareLocalData parameter', () => {
         // Should have shouldShareLocalData parameter with default false
@@ -445,7 +445,7 @@ describe('Local Data Management When Joining Rooms', () => {
 });
 
 describe('Sketch.js Integration for Local Data Management', () => {
-    const sketchCode = fs.readFileSync(path.join(__dirname, '../../sketch.js'), 'utf8');
+    const sketchCode = fs.readFileSync(path.join(__dirname, '../../src/sketch.js'), 'utf8');
 
     test('initializeCollaboration should accept shouldShareLocalData parameter', () => {
         // Should have parameter with default false

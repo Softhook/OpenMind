@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const packagePath = path.join(__dirname, '..', 'package.json');
-const versionPath = path.join(__dirname, '..', 'version.js');
+const versionPath = path.join(__dirname, '..', 'src', 'version.js');
 
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 const [major, minor, patch] = pkg.version.split('.').map(Number);

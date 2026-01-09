@@ -23,7 +23,7 @@ const sandbox = {
 };
 
 // Load and run utils.js in the sandbox
-const utilsCode = fs.readFileSync(path.join(__dirname, '../../utils.js'), 'utf8');
+const utilsCode = fs.readFileSync(path.join(__dirname, '../../src/utils.js'), 'utf8');
 const script = new vm.Script(utilsCode);
 script.runInNewContext(sandbox);
 
@@ -282,7 +282,7 @@ describe('Array Utilities', () => {
     test('should create a deep copy', () => {
       const original = { a: 1, b: { c: 2 } };
       const clone = deepClone(original);
-      
+
       expect(clone).toEqual(original);
       expect(clone).not.toBe(original);
       expect(clone.b).not.toBe(original.b);

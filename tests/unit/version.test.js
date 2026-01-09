@@ -6,8 +6,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Read the source files
-const versionCode = fs.readFileSync(path.join(__dirname, '../../version.js'), 'utf8');
-const collabCode = fs.readFileSync(path.join(__dirname, '../../CollaborationManager.js'), 'utf8');
+const versionCode = fs.readFileSync(path.join(__dirname, '../../src/version.js'), 'utf8');
+const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
 describe('Version Constants', () => {
     test('version.js should define APP_VERSION with MAJOR, MINOR, PATCH', () => {
