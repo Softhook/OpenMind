@@ -651,9 +651,9 @@ class ThrustGame {
     if (typeof color === 'string') {
       // Parse hex color (e.g., "#ff6464")
       const hex = color.replace('#', '');
-      r = parseInt(hex.substr(0, 2), 16);
-      g = parseInt(hex.substr(2, 2), 16);
-      b = parseInt(hex.substr(4, 2), 16);
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
     } else {
       r = color.r;
       g = color.g;
@@ -796,16 +796,19 @@ class ThrustGame {
         
         // Update remote bullets from this player
         if (state.thrustGame.bullets && Array.isArray(state.thrustGame.bullets)) {
-          // Remove old bullets from this client
+          // Track current bullet IDs for this client
+          const currentBulletIds = new Set(state.thrustGame.bullets.map(b => b.id).filter(id => id != null));
+          
+          // Remove bullets that are no longer in the update
           for (const [bulletId, bullet] of this.remoteBullets) {
-            if (bullet.clientId === clientId) {
+            if (bullet.clientId === clientId && !currentBulletIds.has(bulletId)) {
               this.remoteBullets.delete(bulletId);
             }
           }
           
-          // Add current bullets
+          // Add or update current bullets
           for (const bullet of state.thrustGame.bullets) {
-            if (bullet.id) {
+            if (bullet.id != null) {
               this.remoteBullets.set(bullet.id, {
                 x: bullet.x,
                 y: bullet.y,
@@ -870,11 +873,9 @@ class ThrustGame {
    * @param {Object} bullet - Bullet object
    */
   broadcastBullet(bullet) {
-    // Bullets are now broadcasted as part of player state in broadcastPlayerState
-    // This method is kept for compatibility but triggers an immediate broadcast
-    if (this.collaborationManager && this.collaborationManager.awareness) {
-      this.broadcastPlayerState();
-    }
+    // Bullets are broadcasted as part of player state in broadcastPlayerState
+    // The update() method already throttles broadcasts to ~100ms intervals
+    // No need to broadcast immediately here - will be sent in next update cycle
   }
 }
 
