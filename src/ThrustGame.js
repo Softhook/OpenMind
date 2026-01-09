@@ -223,6 +223,9 @@ class ThrustGame {
   update() {
     if (!this.active) return;
     
+    // Sync keyboard state to catch any missed events
+    this.syncKeyboardState();
+    
     // Handle respawn timing
     if (!this.player.alive) {
       if (Date.now() >= this.player.respawnTime) {
@@ -450,6 +453,37 @@ class ThrustGame {
       this.keys.up = false;
     } else if (keyCode === 40) {  // Down
       this.keys.down = false;
+    }
+  }
+  
+  /**
+   * Syncs keyboard state with p5.js keyIsDown() to catch any missed events
+   * This provides a fallback mechanism for stuck keys
+   */
+  syncKeyboardState() {
+    if (!this.active) return;
+    
+    // Check actual key state and sync with our tracked state
+    // This catches any missed keyup events
+    if (typeof keyIsDown === 'function') {
+      const actualLeft = keyIsDown(37);
+      const actualRight = keyIsDown(39);
+      const actualUp = keyIsDown(38);
+      const actualDown = keyIsDown(40);
+      
+      // If our state says key is pressed but p5 says it's not, clear it
+      if (this.keys.left && !actualLeft) {
+        this.keys.left = false;
+      }
+      if (this.keys.right && !actualRight) {
+        this.keys.right = false;
+      }
+      if (this.keys.up && !actualUp) {
+        this.keys.up = false;
+      }
+      if (this.keys.down && !actualDown) {
+        this.keys.down = false;
+      }
     }
   }
   
