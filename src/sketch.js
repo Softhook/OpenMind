@@ -1076,8 +1076,12 @@ function setup() {
  * Creates all UI buttons and file input
  */
 function setupUIButtons() {
+  loadButton = createButton('Load');
+  loadButton.position(100, 10);
+  loadButton.mousePressed(triggerFileLoad);
+
   saveButton = createButton('Save');
-  saveButton.position(100, 10);
+  saveButton.position(160, 10);
   saveButton.mousePressed(() => {
     // If in a collaborative room, use room name as suggested filename
     if (collaborationManager && collaborationManager.roomName) {
@@ -1088,11 +1092,8 @@ function setupUIButtons() {
   });
 
   importTextButton = createButton('Import Text');
-  importTextButton.position(160, 10);
+  importTextButton.position(260, 10);
   importTextButton.mousePressed(triggerTextImport);
-
-  loadButton = createButton('Load');
-  loadButton.position(260, 10);
   loadButton.mousePressed(triggerFileLoad);
 
   exportPNGButton = createButton('Export PNG');
@@ -1842,7 +1843,7 @@ function hideMenuButtons() {
 
 /**
  * Positions all menu buttons horizontally with proper spacing.
- * Order: Save, Import Text, Load, Export PNG, Export PDF, Export Text, Keyboard Controls
+ * Order: Load, Save, Import Text, Export PNG, Export PDF, Export Text, Keyboard Controls
  */
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
@@ -1850,9 +1851,9 @@ function layoutMenuButtons() {
   const gap = CONFIG.UI.BUTTON_GAP;
 
   // Ensure buttons are displayed to get proper widths
+  loadButton.style('display', 'inline-block');
   saveButton.style('display', 'inline-block');
   importTextButton.style('display', 'inline-block');
-  loadButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   exportTextButton.style('display', 'inline-block');
@@ -1861,9 +1862,9 @@ function layoutMenuButtons() {
   const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
 
   let x = startX;
+  loadButton.position(x, y); x += w(loadButton) + gap;
   saveButton.position(x, y); x += w(saveButton) + gap;
   importTextButton.position(x, y); x += w(importTextButton) + gap;
-  loadButton.position(x, y); x += w(loadButton) + gap;
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
@@ -2888,48 +2889,59 @@ function parseTextIntoSections(lines) {
   const isHeading = (line) => {
     if (!line || line.length === 0) return false;
     
-    // Must end with sentence-ending punctuation
-    const endsWithPunctuation = /[.!?]$/.test(line);
-    if (!endsWithPunctuation) return false;
+    // Check for numbered list format (e.g., "1.", "2.", "3. My method")
+    const hasNumberPrefix = /^\d+\.\s+/.test(line);
     
-    // Length check
-    const isShort = line.length < HEADING_MAX_LENGTH;
+    // Remove number prefix for further analysis if present
+    const lineWithoutNumber = hasNumberPrefix ? line.replace(/^\d+\.\s+/, '') : line;
+    
+    // Must end with sentence-ending punctuation OR have a number prefix (numbered lists)
+    const endsWithPunctuation = /[.!?]$/.test(line);
+    if (!endsWithPunctuation && !hasNumberPrefix) return false;
+    
+    // Length check - use line without number prefix for length calculation
+    const isShort = lineWithoutNumber.length < HEADING_MAX_LENGTH;
     if (!isShort) return false;
     
     // No internal sentence-ending punctuation (indicates multiple sentences)
-    const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
+    // Check the line without number prefix
+    const textToCheck = lineWithoutNumber.replace(/[.!?]$/, '');
+    const hasInternalPunctuation = /[.!?]/.test(textToCheck);
     if (hasInternalPunctuation) return false;
     
     // Word count analysis (filter empty strings from consecutive spaces)
-    const wordCount = line.split(/\s+/).filter(Boolean).length;
+    // Count words in the line without number prefix
+    const wordCount = lineWithoutNumber.split(/\s+/).filter(Boolean).length;
     
     // Additional heuristics that increase heading likelihood
-    const hasCommas = line.includes(',');
-    const hasSemicolon = line.includes(';');
-    const hasColon = line.includes(':');
-    const isVeryShort = line.length < HEADING_VERY_SHORT;
+    const hasCommas = lineWithoutNumber.includes(',');
+    const hasSemicolon = lineWithoutNumber.includes(';');
+    const hasColon = lineWithoutNumber.includes(':');
+    const isVeryShort = lineWithoutNumber.length < HEADING_VERY_SHORT;
     
     // Title case detection (most words start with capital letter)
-    const words = line.replace(/[.!?]$/, '').split(/\s+/).filter(Boolean);
+    const words = lineWithoutNumber.replace(/[.!?]$/, '').split(/\s+/).filter(Boolean);
     const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length;
     const isTitleCase = capitalizedWords >= Math.ceil(words.length * TITLE_CASE_THRESHOLD);
     
     // All caps detection (entire line is uppercase, common in headings)
     // Using regex-only approach for better performance
-    const isAllCaps = /^[A-Z\s.!?]+$/.test(line) && /[A-Z]/.test(line);
+    const isAllCaps = /^[A-Z\s.!?]+$/.test(lineWithoutNumber) && /[A-Z]/.test(lineWithoutNumber);
     
     // Core heading criteria with more flexibility
     // A line is likely a heading if:
-    // 1. It passes basic checks (punctuation, length, no internal punctuation)
+    // 1. It passes basic checks (punctuation OR number prefix, length, no internal punctuation)
     // 2. Word count is reasonable (2-10 words)
     // 3. AND one of:
-    //    a) It's very short (< 50 chars)
-    //    b) It has no complex punctuation (commas, semicolons, colons) AND ≤7 words
-    //    c) It's in title case or all caps
+    //    a) It has a number prefix (numbered list item)
+    //    b) It's very short (< 50 chars)
+    //    c) It has no complex punctuation (commas, semicolons, colons) AND ≤7 words
+    //    d) It's in title case or all caps
     const hasComplexPunctuation = hasCommas || hasSemicolon || hasColon;
     const reasonableWordCount = wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS;
     
     const isLikelyHeading = reasonableWordCount && (
+      hasNumberPrefix ||
       isVeryShort ||
       (!hasComplexPunctuation && wordCount <= HEADING_SIMPLE_MAX_WORDS) ||
       isTitleCase ||
