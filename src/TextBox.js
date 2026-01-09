@@ -59,7 +59,8 @@ class TextBox {
     CURSOR: { r: 0, g: 0, b: 255 },
     SELECTION_HIGHLIGHT: { r: 255, g: 100, b: 100, a: 100 },
     DIM_OVERLAY: { r: 255, g: 255, b: 255, a: 150 },
-    DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 }
+    DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 },
+    SHADOW: { r: 0, g: 0, b: 0, a: 20 }  // Subtle shadow/dim effect
   };
 
   // Regex pattern to detect URLs (http, https, file://, and local paths)
@@ -841,7 +842,8 @@ class TextBox {
 
         push();
         noStroke();
-        fill(0, 0, 0, 20); // subtle dark dim for draggable frame
+        const shadow = TextBox.COLORS.SHADOW;
+        fill(shadow.r, shadow.g, shadow.b, shadow.a); // subtle dark dim for draggable frame
 
         // For image boxes, the whole interior is draggable — dim the interior
         if (this.imageUrl) {
@@ -903,7 +905,8 @@ class TextBox {
 
           // Set color based on whether character is in a link
           if (isInLink) {
-            fill(0, 100, 220); // Blue for links
+            const linkColor = TextBox.COLORS.LINK_TEXT;
+            fill(linkColor.r, linkColor.g, linkColor.b); // Blue for links
           } else {
             fill(0); // Black for regular text
           }
@@ -949,7 +952,8 @@ class TextBox {
       let cy = handleY + scaledHandleSize / 2;
 
       // Draw shadow for depth
-      fill(0, 0, 0, 20);
+      const shadow = TextBox.COLORS.SHADOW;
+      fill(shadow.r, shadow.g, shadow.b, shadow.a);
       noStroke();
       circle(cx + 0.5 / currentZoom, cy + 1 / currentZoom, scaledHandleSize * 1.2);
 

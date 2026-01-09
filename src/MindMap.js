@@ -1,25 +1,61 @@
 /**
- * MindMap class - manages the entire mind map including boxes, connections,
- * selection state, and navigation.
- * Uses shared utilities from utils.js when available.
+ * MindMap class - Core data structure and interaction manager for the mind map.
+ *
+ * This class is the central controller for mind map data, managing all boxes,
+ * connections, selection states, and user interactions.
+ *
+ * Key Features:
+ * - Box and connection management (add, delete, modify)
+ * - Multi-selection support for batch operations
+ * - Alignment algorithms (left, right, top, bottom, center, distribute)
+ * - Hierarchical layout for automatic graph organization
+ * - Keyboard navigation with arrow keys (depth-first traversal)
+ * - Copy/paste with connection preservation
+ * - Animated camera panning to focused elements
+ * - Real-time collaboration callbacks for Yjs sync
+ * - Save/load functionality with JSON serialization
+ *
+ * Architecture:
+ * - Contains arrays of TextBox and Connection objects
+ * - Provides high-level operations that coordinate box/connection changes
+ * - Integrates with CollaborationManager via static callbacks
+ * - Uses Utils for geometry calculations and validation
+ *
+ * Dependencies:
+ * - TextBox class for individual nodes
+ * - Connection class for arrows between nodes
+ * - Utils for shared geometry, validation, and logging utilities
+ * - p5.js for drawing operations (via draw() method)
+ *
+ * Navigation Priority System (for arrow-key navigation):
+ * - Red boxes (priority 1): Highest priority, visited first
+ * - Orange boxes (priority 2): Medium priority
+ * - White/other boxes (priority 999): Lowest priority
  */
 class MindMap {
-  // Constants for configuration
+  // ============================================================================
+  // STATIC CONSTANTS
+  // ============================================================================
+
+  // Alignment tolerance: boxes within this pixel distance are snapped together
   static ALIGN_TOLERANCE = 12;
 
-  // Layout constants
+  // Layout constants for hierarchical/automatic arrangement
   static LAYOUT = {
-    HORIZONTAL_SPACING: 200,
-    VERTICAL_SPACING: 120,
-    START_X: 100,
-    START_Y: 100
+    HORIZONTAL_SPACING: 200,  // Pixels between boxes horizontally
+    VERTICAL_SPACING: 120,    // Pixels between boxes vertically
+    START_X: 100,             // Initial X position for layout
+    START_Y: 100              // Initial Y position for layout
   };
 
-  // Color constants for consistent styling
+  // Color constants for connection preview lines
   static COLORS = {
-    CONNECTING_LINE: { r: 100, g: 100, b: 255 },
-    CONNECTOR_DOT: { r: 100, g: 150, b: 255 }
+    CONNECTING_LINE: { r: 100, g: 100, b: 255 },  // Blue line when creating connection
+    CONNECTOR_DOT: { r: 100, g: 150, b: 255 }     // Blue dot at connection endpoints
   };
+
+  // Stroke weight for connection preview (in pixels)
+  static STROKE_WEIGHT_PREVIEW = 2;
 
   // ============================================================================
   // COLLABORATION CALLBACKS
@@ -301,7 +337,7 @@ class MindMap {
         const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
         stroke(lineColor.r, lineColor.g, lineColor.b);
-        strokeWeight(2);
+        strokeWeight(MindMap.STROKE_WEIGHT_PREVIEW);
         line(start.x, start.y, worldMouseX(), worldMouseY());
         noStroke();
         fill(dotColor.r, dotColor.g, dotColor.b);
@@ -322,7 +358,7 @@ class MindMap {
         const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
         stroke(lineColor.r, lineColor.g, lineColor.b);
-        strokeWeight(2);
+        strokeWeight(MindMap.STROKE_WEIGHT_PREVIEW);
         line(from.x, from.y, mx, my);
         // Arrow head at mouse
         const angle = atan2(my - from.y, mx - from.x);
