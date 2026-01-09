@@ -262,30 +262,12 @@ function worldMouseX() {
 
 /**
  * Parse the current window location to find a candidate JSON file path.
- * Supports `?file=...`, `#hash` (auto-append .json) and direct pathname ending with .json
- * @returns {string|null}
+ * @see UrlUtils.parseFileFromLocation for implementation
  */
 function parseFileFromLocation() {
-  if (typeof window === 'undefined' || !window.location) return null;
-  const searchParams = window.location.search ? new URLSearchParams(window.location.search) : null;
-  const hash = window.location.hash || '';
-  const path = window.location.pathname || '';
-
-  if (searchParams && searchParams.get('file')) {
-    return decodeURIComponent(searchParams.get('file'));
-  }
-  if (hash && hash.length > 1) {
-    let h = decodeURIComponent(hash.substring(1));
-    // Ignore collaboration room hashes or if server override is present
-    if (h.startsWith('room=') || (searchParams && (searchParams.get('server')))) return null;
-
-    if (h && !h.toLowerCase().endsWith('.json')) h = h + '.json';
-    return h;
-  }
-  if (path && path.toLowerCase().endsWith('.json')) {
-    return path.startsWith('/') ? path : ('/' + path);
-  }
-  return null;
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.parseFileFromLocation()
+    : null;
 }
 
 /**
@@ -398,70 +380,22 @@ async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
 
 /**
  * Extracts a normalized map name from a full path or name
- * @param {string} pathOrName - Full path or name
- * @returns {string} Normalized name
+ * @see UrlUtils.extractMapName for implementation
  */
 function extractMapName(pathOrName) {
-  if (!pathOrName || typeof pathOrName !== 'string') return '';
-
-  // Extract basename (remove path) - handle both / and \ separators
-  let name = pathOrName;
-  const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
-  if (lastSlash >= 0) {
-    name = name.substring(lastSlash + 1);
-  }
-
-  // Remove URL-related characters (hash, query params)
-  name = name.replace(/[?#].*$/, '');
-
-  // Remove .json extension
-  name = name.replace(/\.json$/i, '');
-  // Normalize whitespace and case
-  return name.trim().toLowerCase();
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.extractMapName(pathOrName)
+    : (pathOrName || '').toLowerCase();
 }
 
 /**
- * Checks if two map names are similar (handles prefaced maps with same ending)
- * @param {string} name1 - First name
- * @param {string} name2 - Second name
- * @returns {boolean} true if names match or one ends with the other (with separator)
+ * Checks if two map names are similar
+ * @see UrlUtils.namesAreSimilar for implementation
  */
 function namesAreSimilar(name1, name2) {
-  if (!name1 || !name2) return false;
-  name1 = name1.toLowerCase();
-  name2 = name2.toLowerCase();
-
-  // Exact match
-  if (name1 === name2) return true;
-
-  // Check if one name ends with the other, but only if preceded by a separator
-  // This prevents false matches like 'important' matching 'ant'
-  // Separators: dash, underscore, space
-  const separators = ['-', '_', ' '];
-
-  if (name1.length > name2.length) {
-    // Check if name1 ends with name2 and has a separator before it
-    if (name1.endsWith(name2)) {
-      const prefixLength = name1.length - name2.length;
-      if (prefixLength > 0) {  // Ensure we have at least one character for separator
-        const charBeforeSuffix = name1[prefixLength - 1];
-        if (separators.includes(charBeforeSuffix)) return true;
-      }
-    }
-  }
-
-  if (name2.length > name1.length) {
-    // Check if name2 ends with name1 and has a separator before it
-    if (name2.endsWith(name1)) {
-      const prefixLength = name2.length - name1.length;
-      if (prefixLength > 0) {  // Ensure we have at least one character for separator
-        const charBeforeSuffix = name2[prefixLength - 1];
-        if (separators.includes(charBeforeSuffix)) return true;
-      }
-    }
-  }
-
-  return false;
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.namesAreSimilar(name1, name2)
+    : name1 === name2;
 }
 
 /**
@@ -512,81 +446,32 @@ function handleUrlChange() {
 
 /**
  * Parses server URL from query params
- * @returns {string|null} Server URL or null
+ * @see UrlUtils.parseServerFromUrl for implementation
  */
 function parseServerFromUrl() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const server = params.get('server');
-    if (!server) return null;
-
-    // If it's a full URL, return it
-    if (server.startsWith('ws://') || server.startsWith('wss://')) {
-      return server;
-    }
-
-    // If it's a keyword like 'public' or 'demo', return null 
-    // effectively letting CollaborationManager's internal logic handle the override
-    return null;
-  } catch (e) {
-    return null;
-  }
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.parseServerFromUrl()
+    : null;
 }
 
 /**
  * Parses room ID and mode from URL hash
- * @returns {Object|null} Object with {room: string, isStarting: boolean} or null if not in a room
+ * @see UrlUtils.parseRoomFromHash for implementation
  */
 function parseRoomFromHash() {
-  try {
-    const hash = window.location.hash;
-    if (!hash || hash.length <= 1) return null;
-
-    // Parse hash as URL parameters (remove leading #)
-    const params = new URLSearchParams(hash.substring(1));
-
-    // Check for explicit room parameter
-    const roomName = params.get('room');
-    if (roomName) {
-      // Check if mode=start is present (indicates user clicked "Start Collaboration")
-      const isStarting = params.get('mode') === 'start';
-      return { room: decodeURIComponent(roomName), isStarting };
-    }
-
-    // Legacy support: If server override is present, treat the entire hash as a room name (if it's not a file)
-    const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.has('server')) {
-      let h = decodeURIComponent(hash.substring(1));
-      // Basic sanity check: allow alphanumeric room names (and standard URL safe chars)
-      // Reject if it looks like a file (ends in .json) just in case
-      if (!h.toLowerCase().endsWith('.json')) {
-        return { room: h, isStarting: false };
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.warn('Error parsing room from hash:', e);
-    return null;
-  }
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.parseRoomFromHash()
+    : null;
 }
 
 /**
  * Generates a safe storage key for a collaboration room
- * Sanitizes the room name to prevent issues with special characters
- * @param {string} roomName - The room identifier
- * @returns {string} Sanitized storage key
+ * @see UrlUtils.getRoomStorageKey for implementation
  */
 function getRoomStorageKey(roomName) {
-  if (!roomName || typeof roomName !== 'string') {
-    return CONFIG.STORAGE.DEFAULT_KEY;
-  }
-
-  // Sanitize room name: keep only alphanumeric, dash, underscore
-  // This prevents issues with special characters in localStorage keys
-  const sanitized = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
-
-  return CONFIG.STORAGE.ROOM_KEY_PREFIX + sanitized;
+  return typeof UrlUtils !== 'undefined'
+    ? UrlUtils.getRoomStorageKey(roomName, CONFIG)
+    : CONFIG.STORAGE.ROOM_KEY_PREFIX + roomName;
 }
 
 /**

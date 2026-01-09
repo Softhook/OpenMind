@@ -94,7 +94,8 @@ describe('CollaborationManager Version Integration', () => {
     });
 
     test('should log when peer has no version info (old client)', () => {
-        expect(collabCode).toMatch(/Peer without version info detected/);
+        // Message format was updated during Logger refactoring
+        expect(collabCode).toMatch(/Without version info detected|Peer without version info/);
     });
 
     test('should handle missing APP_VERSION gracefully', () => {
