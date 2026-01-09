@@ -2731,9 +2731,9 @@ async function importTextAsDiagram(text) {
   const IMPORT_LAYOUT = {
     START_X: 300,
     START_Y: 200,
-    HORIZONTAL_SPACING: 350, // Space between heading columns
-    VERTICAL_SPACING: 150,   // Space between paragraph rows
-    BOX_WIDTH: 280           // Standard box width
+    HORIZONTAL_SPACING: 450,   // Space between heading columns (increased for wider boxes)
+    VERTICAL_SPACING: 30,      // Gap between paragraph boxes
+    PARAGRAPH_BOX_WIDTH: 400   // Wider boxes for imported paragraphs
   };
 
   // Clear current selection
@@ -2758,10 +2758,18 @@ async function importTextAsDiagram(text) {
     // Create heading box (orange - key 2)
     const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
     headingBox.setBackgroundByKey('orange'); // Key 2 = orange (see TextBox color constants)
+    
+    // Set wider width for heading and force dimensions update
+    headingBox.width = IMPORT_LAYOUT.PARAGRAPH_BOX_WIDTH;
+    headingBox.userResized = true; // Prevent auto-shrinking
+    headingBox.updateDimensions();
+    
     mindMap.boxes.push(headingBox);
     allNewBoxes.push(headingBox);
 
-    let currentY = IMPORT_LAYOUT.START_Y + IMPORT_LAYOUT.VERTICAL_SPACING;
+    // Start positioning paragraphs below the heading
+    // Account for heading's actual height + spacing
+    let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
     let previousParagraphBox = null;
 
     // Create paragraph boxes vertically under the heading
@@ -2775,7 +2783,15 @@ async function importTextAsDiagram(text) {
       
       // Create paragraph box (white/default color)
       const paragraphBox = new TextBox(currentX, currentY, paragraph);
-      // paragraphBox already has default white background
+      
+      // Set wider width for paragraph and force dimensions update
+      paragraphBox.width = IMPORT_LAYOUT.PARAGRAPH_BOX_WIDTH;
+      paragraphBox.userResized = true; // Prevent auto-shrinking
+      paragraphBox.updateDimensions();
+      
+      // Adjust Y position to account for the box's height (boxes are centered on Y)
+      paragraphBox.y = currentY + paragraphBox.height / 2;
+      
       mindMap.boxes.push(paragraphBox);
       allNewBoxes.push(paragraphBox);
 
@@ -2787,8 +2803,9 @@ async function importTextAsDiagram(text) {
         mindMap.connections.push(new Connection(headingBox, paragraphBox));
       }
 
+      // Move Y position for next paragraph: current box bottom + spacing
+      currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
       previousParagraphBox = paragraphBox;
-      currentY += IMPORT_LAYOUT.VERTICAL_SPACING;
     }
 
     // Move to next column for the next section
