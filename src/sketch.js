@@ -1094,7 +1094,6 @@ function setupUIButtons() {
   importTextButton = createButton('Import Text');
   importTextButton.position(260, 10);
   importTextButton.mousePressed(triggerTextImport);
-  loadButton.mousePressed(triggerFileLoad);
 
   exportPNGButton = createButton('Export PNG');
   exportPNGButton.position(320, 10);
@@ -2903,14 +2902,14 @@ function parseTextIntoSections(lines) {
     const isShort = lineWithoutNumber.length < HEADING_MAX_LENGTH;
     if (!isShort) return false;
     
+    // Remove ending punctuation once for reuse
+    const textWithoutEnding = lineWithoutNumber.replace(/[.!?]$/, '');
+    
     // No internal sentence-ending punctuation (indicates multiple sentences)
-    // Check the line without number prefix
-    const textToCheck = lineWithoutNumber.replace(/[.!?]$/, '');
-    const hasInternalPunctuation = /[.!?]/.test(textToCheck);
+    const hasInternalPunctuation = /[.!?]/.test(textWithoutEnding);
     if (hasInternalPunctuation) return false;
     
     // Word count analysis (filter empty strings from consecutive spaces)
-    // Count words in the line without number prefix
     const wordCount = lineWithoutNumber.split(/\s+/).filter(Boolean).length;
     
     // Additional heuristics that increase heading likelihood
@@ -2920,7 +2919,7 @@ function parseTextIntoSections(lines) {
     const isVeryShort = lineWithoutNumber.length < HEADING_VERY_SHORT;
     
     // Title case detection (most words start with capital letter)
-    const words = lineWithoutNumber.replace(/[.!?]$/, '').split(/\s+/).filter(Boolean);
+    const words = textWithoutEnding.split(/\s+/).filter(Boolean);
     const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length;
     const isTitleCase = capitalizedWords >= Math.ceil(words.length * TITLE_CASE_THRESHOLD);
     
