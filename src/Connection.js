@@ -46,6 +46,13 @@ class Connection {
     this.toBox = toBox;
     this.arrowSize = Connection.ARROW_SIZE;
     this.selected = false;
+    
+    // Cache for connection endpoints
+    this._cachedEndpoints = null;
+    this._lastFromBoxX = null;
+    this._lastFromBoxY = null;
+    this._lastToBoxX = null;
+    this._lastToBoxY = null;
   }
 
   // ============================================================================
@@ -56,12 +63,23 @@ class Connection {
    * Gets the connection endpoints on the edges of the boxes.
    * Calculates where the connection line should start and end based on
    * the positions of the two boxes.
+   * Uses caching to avoid recalculating when boxes haven't moved.
    * @returns {Object|null} Object with {start, end} points, or null if invalid
    * @private
    */
   _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
 
+    // Check if cache is valid (boxes haven't moved)
+    const fromMoved = this._lastFromBoxX !== this.fromBox.x || this._lastFromBoxY !== this.fromBox.y;
+    const toMoved = this._lastToBoxX !== this.toBox.x || this._lastToBoxY !== this.toBox.y;
+    
+    // Return cached result if boxes haven't moved
+    if (this._cachedEndpoints && !fromMoved && !toMoved) {
+      return this._cachedEndpoints;
+    }
+
+    // Recalculate endpoints
     const start = this.fromBox.getConnectionPoint(this.toBox);
     const end = this.toBox.getConnectionPoint(this.fromBox);
 
@@ -72,7 +90,14 @@ class Connection {
       return null;
     }
 
-    return { start, end };
+    // Update cache
+    this._cachedEndpoints = { start, end };
+    this._lastFromBoxX = this.fromBox.x;
+    this._lastFromBoxY = this.fromBox.y;
+    this._lastToBoxX = this.toBox.x;
+    this._lastToBoxY = this.toBox.y;
+
+    return this._cachedEndpoints;
   }
 
   /**
