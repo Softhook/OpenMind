@@ -180,6 +180,15 @@ class ThrustGame {
     this.score = 0;
     this.deaths = 0;
     
+    // Clear all key states to prevent stuck keys
+    this.keys = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      space: false
+    };
+    
     // Announce to multiplayer if connected
     if (this.collaborationManager && this.collaborationManager.isConnected) {
       this.broadcastPlayerState();
@@ -187,15 +196,18 @@ class ThrustGame {
   }
   
   /**
-   * Stops the game
+   * Stops the game and cleans up state
    */
   stop() {
+    // Set inactive first
     this.active = false;
+    
+    // Clear all game state
     this.bullets = [];
     this.remotePlayers.clear();
     this.remoteBullets.clear();
     
-    // Clear keyboard state
+    // Force clear all keyboard states to prevent stuck keys
     this.keys = {
       left: false,
       right: false,
@@ -429,8 +441,7 @@ class ThrustGame {
    * @param {number} keyCode - The key code
    */
   handleKeyReleased(keyCode) {
-    if (!this.active) return;
-    
+    // Always handle key releases to prevent stuck keys, even when inactive
     if (keyCode === 37) {  // Left
       this.keys.left = false;
     } else if (keyCode === 39) {  // Right
