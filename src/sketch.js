@@ -1812,6 +1812,7 @@ function updateMenuVisibility() {
 function showMenuButtons() {
   // Guard if setup failed and buttons are not yet created
   if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
+  if (importTextButton && importTextButton.style) importTextButton.style('display', 'inline-block');
   if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
