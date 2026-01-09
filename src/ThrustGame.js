@@ -81,6 +81,7 @@ class ThrustGame {
   };
   
   static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
+  static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
   
   // ============================================================================
   // CONSTRUCTOR
@@ -791,7 +792,7 @@ class ThrustGame {
             angle: state.thrustGame.angle,
             alive: state.thrustGame.alive,
             name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
-            color: state.user?.color || '#ff6464'
+            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR
           });
         } else {
           const player = this.remotePlayers.get(clientId);
@@ -802,7 +803,7 @@ class ThrustGame {
           player.angle = state.thrustGame.angle;
           player.alive = state.thrustGame.alive;
           player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
-          player.color = state.user?.color || '#ff6464';
+          player.color = state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR;
         }
         
         // Update remote bullets from this player
