@@ -178,7 +178,9 @@ const CameraUtils = {
      */
     isBoxVisible(box, viewportWidth, viewportHeight, margin = 200) {
         if (!box || box.x == null || box.y == null || box.width == null || box.height == null) {
-            return true; // Draw invalid boxes to see what's wrong
+            // Invalid box - skip rendering for performance
+            // (would show errors in console from box.draw() if we tried to render)
+            return false;
         }
 
         // Convert viewport bounds to world space
@@ -207,7 +209,8 @@ const CameraUtils = {
      */
     isConnectionVisible(conn, viewportWidth, viewportHeight, margin = 200) {
         if (!conn || !conn.fromBox || !conn.toBox) {
-            return true; // Draw invalid connections to see what's wrong
+            // Invalid connection - skip rendering for performance
+            return false;
         }
 
         // If either box is visible, draw the connection

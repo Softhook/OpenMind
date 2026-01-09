@@ -452,10 +452,11 @@ class TextBox {
   updateDimensions() {
     if (this.text == null) this.text = '';
 
-    // Invalidate cache
+    // Invalidate all caches when dimensions change
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
     this.cachedLineCharMap = null;
+    this.cachedText = null;  // Invalidate text reference cache
     this.cachedLinks = null; // Invalidate links cache when text changes
     // If this box is an image, keep current width/height (do not reflow based on text)
     if (this.imageUrl) {
