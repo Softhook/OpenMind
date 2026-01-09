@@ -138,6 +138,9 @@ class CollaborationManager {
         this.connectionStartTime = null;
         this.lastSyncAttemptTime = null;
         this.syncAttemptCount = 0;
+
+        // Flag to trigger resetView once after first receiving remote boxes
+        this.hasTriggeredInitialZoom = false;
     }
 
     // ============================================================================
@@ -375,6 +378,7 @@ class CollaborationManager {
         this.roomName = null;
         this.isConnected = false;
         this.lastSyncedState = false; // Reset sync state tracking
+        this.hasTriggeredInitialZoom = false; // Reset so next room join will auto-zoom
 
         console.log('CollaborationManager: Disconnected from room (local undo still works)');
 
@@ -881,6 +885,15 @@ class CollaborationManager {
                 // Redraw after changes
                 if (this.mindMap) {
                     this.mindMap.isDirty = true;
+
+                    // Auto-zoom once when first receiving remote boxes
+                    if (!this.hasTriggeredInitialZoom && this.mindMap.boxes.length > 0) {
+                        this.hasTriggeredInitialZoom = true;
+                        console.log('CollaborationManager: First boxes received, triggering resetView');
+                        if (typeof resetView === 'function') {
+                            resetView();
+                        }
+                    }
                 }
             } finally {
                 this.isSyncing = false;
