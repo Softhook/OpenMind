@@ -44,6 +44,10 @@ class ThrustGame {
     COOLDOWN: 15             // Frames between shots
   };
   
+  static COLLISION = {
+    RADIUS: 20 + 4           // Player size + bullet size for collision detection
+  };
+  
   static TIMING = {
     FRAME_TIME_MS: 1000 / 60  // Milliseconds per frame at 60fps
   };
@@ -306,7 +310,11 @@ class ThrustGame {
    */
   checkCollisions() {
     // Check local bullets against remote players
-    for (const bullet of this.bullets) {
+    // Process backwards so we can safely splice
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+      let bulletHit = false;
+      
       for (const [clientId, remotePlayer] of this.remotePlayers) {
         if (!remotePlayer.alive) continue;
         
@@ -314,10 +322,11 @@ class ThrustGame {
         const dy = bullet.y - remotePlayer.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < ThrustGame.PLAYER.SIZE + ThrustGame.BULLET.SIZE) {
-          // Hit! Remove bullet and notify of kill
-          bullet.lifetime = 0;
+        if (dist < ThrustGame.COLLISION.RADIUS) {
+          // Hit! Remove bullet immediately and increment score
+          this.bullets.splice(i, 1);
           this.score++;
+          bulletHit = true;
           // In multiplayer, the hit player would handle their own death
           break; // Stop checking this bullet against other players
         }
@@ -331,7 +340,7 @@ class ThrustGame {
         const dy = bullet.y - this.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < ThrustGame.PLAYER.SIZE + ThrustGame.BULLET.SIZE) {
+        if (dist < ThrustGame.COLLISION.RADIUS) {
           // Hit! Player dies
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
