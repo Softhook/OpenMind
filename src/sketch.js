@@ -90,6 +90,8 @@ let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
 
+// Easter egg: Thrust game
+let thrustGame = null; // ThrustGame instance
 
 // Autosave state
 let autosaveTimer = null;
@@ -1240,6 +1242,13 @@ function draw() {
         // Draw remote users' cursors (in world space)
         drawRemoteCursors();
       }
+      
+      // Draw thrust game in world space (if active)
+      if (thrustGame && thrustGame.active) {
+        thrustGame.update();
+        thrustGame.draw();
+      }
+      
       pop();
 
       // Update our presence (cursor position, selection) if connected - throttled internally
@@ -1248,6 +1257,15 @@ function draw() {
       }
     } catch (e) {
       console.error('Error drawing mindmap:', e);
+    }
+    
+    // Draw thrust game UI overlay (in screen space)
+    if (thrustGame && thrustGame.active) {
+      try {
+        thrustGame.drawUI();
+      } catch (e) {
+        console.error('Error drawing thrust game UI:', e);
+      }
     }
 
     // Draw save indicator (in screen space, not world space)
@@ -2169,6 +2187,30 @@ function mouseDragged() {
  * Handles key press events
  */
 function keyPressed() {
+  // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
+  // Check for uppercase T (which means Shift+T was pressed)
+  if (key === 'T') {
+    if (!thrustGame) {
+      // Initialize thrust game on first activation with mindMap reference
+      thrustGame = new ThrustGame(collaborationManager, mindMap);
+    }
+    
+    if (thrustGame.active) {
+      // Stop the game
+      thrustGame.stop();
+    } else {
+      // Start the game
+      thrustGame.start();
+    }
+    return false;
+  }
+  
+  // If thrust game is active, route keyboard events to it
+  if (thrustGame && thrustGame.active) {
+    thrustGame.handleKeyPressed(key, keyCode);
+    return false; // Prevent default and stop propagation
+  }
+  
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     // Enter/Return = Confirm and join room
@@ -2423,6 +2465,12 @@ function keyPressed() {
  * Handles key release events
  */
 function keyReleased() {
+  // Route to thrust game if active
+  if (thrustGame && thrustGame.active) {
+    thrustGame.handleKeyReleased(keyCode);
+    return false;
+  }
+  
   // Stop fallback repeat on key release
   KeyRepeat.stop(keyCode);
 }
