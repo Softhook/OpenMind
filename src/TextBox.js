@@ -517,6 +517,7 @@ class TextBox {
 
     // Use cache if width and text haven't changed
     // Check width first (cheap) then text reference (cheap) before expensive operations
+    // Note: text is always a string at this point due to normalization above
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines && 
         this.cachedWidth === currentWidth && 

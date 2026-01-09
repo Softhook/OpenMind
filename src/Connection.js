@@ -71,15 +71,23 @@ class Connection {
     if (!this.fromBox || !this.toBox) return null;
 
     // Check if cache is valid (boxes haven't moved)
-    // Only check movement if cache exists and positions were tracked
-    const fromMoved = this._lastFromBoxX !== null && 
-                      (this._lastFromBoxX !== this.fromBox.x || this._lastFromBoxY !== this.fromBox.y);
-    const toMoved = this._lastToBoxX !== null && 
-                    (this._lastToBoxX !== this.toBox.x || this._lastToBoxY !== this.toBox.y);
+    // Cache is valid only if:
+    // 1. Cached endpoints exist
+    // 2. Position tracking has been initialized (not first call)
+    // 3. Boxes haven't moved since last cache
+    const hasValidCache = this._cachedEndpoints !== null && 
+                          this._lastFromBoxX !== null;
     
-    // Return cached result if cache exists and boxes haven't moved
-    if (this._cachedEndpoints && !fromMoved && !toMoved) {
-      return this._cachedEndpoints;
+    if (hasValidCache) {
+      const fromMoved = this._lastFromBoxX !== this.fromBox.x || 
+                        this._lastFromBoxY !== this.fromBox.y;
+      const toMoved = this._lastToBoxX !== this.toBox.x || 
+                      this._lastToBoxY !== this.toBox.y;
+      
+      // Return cached result if boxes haven't moved
+      if (!fromMoved && !toMoved) {
+        return this._cachedEndpoints;
+      }
     }
 
     // Recalculate endpoints
