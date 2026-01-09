@@ -383,13 +383,53 @@ class ThrustGame {
       bullet.y += bullet.vy;
       bullet.lifetime--;
       
-      // No screen wrapping - bullets just expire
+      // Check collision with boxes
+      if (this.checkBulletBoxCollision(bullet)) {
+        // Remove bullet on collision with box
+        this.bullets.splice(i, 1);
+        continue;
+      }
       
       // Remove expired bullets
       if (bullet.lifetime <= 0) {
         this.bullets.splice(i, 1);
       }
     }
+  }
+  
+  /**
+   * Checks if a bullet collides with any box
+   * @param {Object} bullet - Bullet to check
+   * @returns {boolean} true if bullet collides with a box
+   */
+  checkBulletBoxCollision(bullet) {
+    if (!this.mindMap || !this.mindMap.boxes) return false;
+    
+    const bulletRadius = ThrustGame.BULLET.SIZE;
+    
+    for (const box of this.mindMap.boxes) {
+      if (!box) continue;
+      
+      // Get box bounds
+      const boxLeft = box.x - box.width / 2;
+      const boxRight = box.x + box.width / 2;
+      const boxTop = box.y - box.height / 2;
+      const boxBottom = box.y + box.height / 2;
+      
+      // Check if bullet circle collides with box rectangle
+      const closestX = Math.max(boxLeft, Math.min(bullet.x, boxRight));
+      const closestY = Math.max(boxTop, Math.min(bullet.y, boxBottom));
+      
+      const distX = bullet.x - closestX;
+      const distY = bullet.y - closestY;
+      const distSq = distX * distX + distY * distY;
+      
+      if (distSq < bulletRadius * bulletRadius) {
+        return true; // Collision detected
+      }
+    }
+    
+    return false;
   }
   
   /**
@@ -401,6 +441,12 @@ class ThrustGame {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
       let bulletHit = false;
+      
+      // Check collision with boxes first
+      if (this.checkBulletBoxCollision(bullet)) {
+        this.bullets.splice(i, 1);
+        continue;
+      }
       
       for (const [clientId, remotePlayer] of this.remotePlayers) {
         if (!remotePlayer.alive) continue;
@@ -423,15 +469,23 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
+        // Check bullet collision with boxes
+        if (this.checkBulletBoxCollision(bullet)) {
+          this.remoteBullets.delete(bulletId);
+          continue;
+        }
+        
         const dx = bullet.x - this.player.x;
         const dy = bullet.y - this.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
         if (dist < ThrustGame.COLLISION.RADIUS) {
-          // Hit! Player dies
+          // Hit! Player dies and respawns - enemy bullets kill player
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
           this.deaths++;
+          // Remove the bullet that hit us
+          this.remoteBullets.delete(bulletId);
           break;
         }
       }
@@ -558,7 +612,7 @@ class ThrustGame {
     // Draw remote players with their custom colors and names
     for (const [clientId, remotePlayer] of this.remotePlayers) {
       if (remotePlayer.alive) {
-        this.drawPlayer(remotePlayer, remotePlayer.color, false, false, remotePlayer.name);
+        this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
     
@@ -791,6 +845,7 @@ class ThrustGame {
             vy: state.thrustGame.vy || 0,
             angle: state.thrustGame.angle,
             alive: state.thrustGame.alive,
+            thrusting: state.thrustGame.thrusting || false,
             name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
             color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR
           });
@@ -802,6 +857,7 @@ class ThrustGame {
           player.vy = state.thrustGame.vy || 0;
           player.angle = state.thrustGame.angle;
           player.alive = state.thrustGame.alive;
+          player.thrusting = state.thrustGame.thrusting || false;
           player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
           player.color = state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR;
         }
@@ -866,6 +922,7 @@ class ThrustGame {
       vy: this.player.vy,
       angle: this.player.angle,
       alive: this.player.alive,
+      thrusting: this.keys.up, // Add thrust state for visual display
       bullets: this.bullets.map(b => ({
         id: b.id,
         x: b.x,

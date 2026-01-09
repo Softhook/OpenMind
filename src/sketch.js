@@ -789,6 +789,9 @@ function updateCollaborationPresence() {
 function drawRemoteCursors() {
   // Early exit if somehow called without valid manager (defensive check)
   if (!collaborationManager) return;
+  
+  // Don't draw cursors if thrust game is active - spaceships replace cursors
+  if (thrustGame && thrustGame.active) return;
 
   const users = collaborationManager.getRemoteUsers();
   if (!users || users.length === 0) return;
