@@ -2859,10 +2859,12 @@ function parseTextIntoSections(lines) {
   let currentParagraphLines = [];
 
   // Heading detection thresholds - extracted as constants for maintainability
-  const HEADING_MAX_LENGTH = 80;        // Max characters for heading
-  const HEADING_VERY_SHORT = 50;        // Very short lines are more likely headings
-  const HEADING_MIN_WORDS = 2;          // Min words for a heading (relaxed from 3)
-  const HEADING_MAX_WORDS = 10;         // Max words for a heading (relaxed from 8)
+  const HEADING_MAX_LENGTH = 80;            // Max characters for heading
+  const HEADING_VERY_SHORT = 50;            // Very short lines are more likely headings
+  const HEADING_MIN_WORDS = 2;              // Min words for a heading (relaxed from 3)
+  const HEADING_MAX_WORDS = 10;             // Max words for a heading (relaxed from 8)
+  const HEADING_SIMPLE_MAX_WORDS = 7;       // Max words for simple headings (no complex punctuation)
+  const TITLE_CASE_THRESHOLD = 0.6;         // 60% of words must be capitalized for title case
 
   const isHeading = (line) => {
     if (!line || line.length === 0) return false;
@@ -2879,8 +2881,8 @@ function parseTextIntoSections(lines) {
     const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
     if (hasInternalPunctuation) return false;
     
-    // Word count analysis
-    const wordCount = line.split(/\s+/).length;
+    // Word count analysis (filter empty strings from consecutive spaces)
+    const wordCount = line.split(/\s+/).filter(Boolean).length;
     
     // Additional heuristics that increase heading likelihood
     const hasCommas = line.includes(',');
@@ -2889,12 +2891,13 @@ function parseTextIntoSections(lines) {
     const isVeryShort = line.length < HEADING_VERY_SHORT;
     
     // Title case detection (most words start with capital letter)
-    const words = line.replace(/[.!?]$/, '').split(/\s+/);
+    const words = line.replace(/[.!?]$/, '').split(/\s+/).filter(Boolean);
     const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length;
-    const isTitleCase = capitalizedWords >= Math.ceil(words.length * 0.6); // 60%+ capitalized
+    const isTitleCase = capitalizedWords >= Math.ceil(words.length * TITLE_CASE_THRESHOLD);
     
     // All caps detection (entire line is uppercase, common in headings)
-    const isAllCaps = line.toUpperCase() === line && /[A-Z]/.test(line);
+    // Using regex-only approach for better performance
+    const isAllCaps = /^[A-Z\s.!?]+$/.test(line) && /[A-Z]/.test(line);
     
     // Core heading criteria with more flexibility
     // A line is likely a heading if:
@@ -2902,14 +2905,14 @@ function parseTextIntoSections(lines) {
     // 2. Word count is reasonable (2-10 words)
     // 3. AND one of:
     //    a) It's very short (< 50 chars)
-    //    b) It has no complex punctuation (commas, semicolons, colons) AND reasonable word count
+    //    b) It has no complex punctuation (commas, semicolons, colons) AND ≤7 words
     //    c) It's in title case or all caps
     const hasComplexPunctuation = hasCommas || hasSemicolon || hasColon;
     const reasonableWordCount = wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS;
     
     const isLikelyHeading = reasonableWordCount && (
       isVeryShort ||
-      (!hasComplexPunctuation && wordCount <= 7) ||
+      (!hasComplexPunctuation && wordCount <= HEADING_SIMPLE_MAX_WORDS) ||
       isTitleCase ||
       isAllCaps
     );
