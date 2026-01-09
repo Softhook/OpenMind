@@ -45,14 +45,26 @@ The game features realistic physics simulation:
 
 ## Multiplayer Support
 
-The game is designed with multiplayer support in mind. When connected to a collaboration room:
+The game includes full multiplayer support through the CollaborationManager's awareness protocol. When connected to a collaboration room:
 
-- Other players appear as red ships
-- You can shoot and hit other players
-- Remote players' bullets can destroy your ship
-- Player count is shown in the top right
+- **Player Ships**: Other players appear as ships colored with their default user color (the color assigned to them in the collaboration session)
+- **Player Labels**: Each remote ship displays the player's name above it for easy identification
+- **Bullet Colors**: 
+  - Your own bullets are drawn in **black**
+  - Enemy bullets are drawn in **red**
+- **Collision Detection**: Full collision detection between ships and bullets
+- **Real-time Sync**: Player positions, velocities, angles, and bullets are synchronized in real-time
+- **Player Count**: The number of active players is shown in the top right corner
+- **Zero Overhead**: When the game is not active, it consumes no resources
 
-**Note**: Full multiplayer synchronization is a work in progress. The infrastructure is in place but requires additional implementation in the CollaborationManager.
+### How It Works
+
+The thrust game uses Yjs awareness protocol (the same system used for cursor presence) to broadcast game state:
+- Each player's position, velocity, angle, and alive status
+- All active bullets with their positions and velocities
+- Updates are throttled to ~100ms intervals to balance responsiveness and bandwidth
+
+When you fire a bullet, it appears immediately for you and is synced to other players. Remote players see your ship in your assigned collaboration color, making it easy to identify who's who in the game.
 
 ## Technical Details
 
