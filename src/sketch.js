@@ -2831,12 +2831,23 @@ async function importTextAsDiagram(text) {
 /**
  * Parses lines of text into sections with headings and paragraphs.
  * 
- * A heading is defined as:
- * - A single sentence (ends with . ! ? or is a short standalone line)
- * - Relatively short (< 100 characters for single-sentence detection)
+ * Enhanced algorithm with improved heuristics:
  * 
- * Paragraphs are multi-line blocks of text under each heading.
- * Page breaks (multiple empty lines) are preserved to separate sections.
+ * **Heading Detection:**
+ * - Short standalone sentence (ends with . ! ?)
+ * - Length < 80 characters (configurable)
+ * - Word count 2-10 words (more flexible)
+ * - No internal sentence-ending punctuation
+ * - Bonus indicators: all caps, title case, no commas
+ * 
+ * **Paragraph Detection:**
+ * - Multi-line text blocks between headings
+ * - Separated by single empty lines
+ * - Each paragraph rendered as individual box
+ * 
+ * **Page Breaks:**
+ * - Multiple consecutive empty lines (2+) create section boundaries
+ * - Forces new heading for next content
  * 
  * @param {string[]} lines - Array of trimmed text lines
  * @returns {Array<{heading: string, paragraphs: string[]}>} Parsed sections
@@ -2850,34 +2861,58 @@ function parseTextIntoSections(lines) {
   // Heading detection thresholds - extracted as constants for maintainability
   const HEADING_MAX_LENGTH = 80;        // Max characters for heading
   const HEADING_VERY_SHORT = 50;        // Very short lines are more likely headings
-  const HEADING_MIN_WORDS = 3;          // Min words for a heading
-  const HEADING_MAX_WORDS = 8;          // Max words for a heading
+  const HEADING_MIN_WORDS = 2;          // Min words for a heading (relaxed from 3)
+  const HEADING_MAX_WORDS = 10;         // Max words for a heading (relaxed from 8)
 
   const isHeading = (line) => {
     if (!line || line.length === 0) return false;
     
-    // Check if it's a single sentence (ends with sentence-ending punctuation)
+    // Must end with sentence-ending punctuation
     const endsWithPunctuation = /[.!?]$/.test(line);
+    if (!endsWithPunctuation) return false;
     
-    // Short lines without internal punctuation are likely headings
+    // Length check
     const isShort = line.length < HEADING_MAX_LENGTH;
-    const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
+    if (!isShort) return false;
     
-    // Additional heuristics for heading detection:
-    // - Capital letters at start (already required for good text)
-    // - Few words (3-8 words is typical for a heading)
-    // - No commas (headings are usually simple phrases)
+    // No internal sentence-ending punctuation (indicates multiple sentences)
+    const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
+    if (hasInternalPunctuation) return false;
+    
+    // Word count analysis
     const wordCount = line.split(/\s+/).length;
+    
+    // Additional heuristics that increase heading likelihood
     const hasCommas = line.includes(',');
+    const hasSemicolon = line.includes(';');
+    const hasColon = line.includes(':');
     const isVeryShort = line.length < HEADING_VERY_SHORT;
     
-    // A line is a heading if:
-    // 1. It ends with punctuation
-    // 2. It's relatively short (< HEADING_MAX_LENGTH chars)
-    // 3. It doesn't have internal sentence-ending punctuation
-    // 4. Either: it's very short OR has few words and no commas
-    const isLikelyHeading = endsWithPunctuation && isShort && !hasInternalPunctuation &&
-                           (isVeryShort || (wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS && !hasCommas));
+    // Title case detection (most words start with capital letter)
+    const words = line.replace(/[.!?]$/, '').split(/\s+/);
+    const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length;
+    const isTitleCase = capitalizedWords >= Math.ceil(words.length * 0.6); // 60%+ capitalized
+    
+    // All caps detection (entire line is uppercase, common in headings)
+    const isAllCaps = line.toUpperCase() === line && /[A-Z]/.test(line);
+    
+    // Core heading criteria with more flexibility
+    // A line is likely a heading if:
+    // 1. It passes basic checks (punctuation, length, no internal punctuation)
+    // 2. Word count is reasonable (2-10 words)
+    // 3. AND one of:
+    //    a) It's very short (< 50 chars)
+    //    b) It has no complex punctuation (commas, semicolons, colons) AND reasonable word count
+    //    c) It's in title case or all caps
+    const hasComplexPunctuation = hasCommas || hasSemicolon || hasColon;
+    const reasonableWordCount = wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS;
+    
+    const isLikelyHeading = reasonableWordCount && (
+      isVeryShort ||
+      (!hasComplexPunctuation && wordCount <= 7) ||
+      isTitleCase ||
+      isAllCaps
+    );
     
     return isLikelyHeading;
   };
@@ -2904,17 +2939,6 @@ function parseTextIntoSections(lines) {
         sections.push({
           heading: currentHeading,
           paragraphs: [''] // Placeholder - filtered during box creation
-        });
-      } else {
-        sections.push({
-          heading: currentHeading,
-          paragraphs: currentParagraphs
-        });
-      }
-    }
-    currentHeading = null;
-    currentParagraphs = [];
-  };
         });
       } else {
         sections.push({
