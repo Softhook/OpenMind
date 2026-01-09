@@ -118,6 +118,9 @@ class ThrustGame {
     this.score = 0;
     this.deaths = 0;
     
+    // Multiplayer state
+    this.multiplayerInitialized = false;
+    
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
       this.setupMultiplayer();
@@ -725,9 +728,17 @@ class ThrustGame {
       return;
     }
     
+    // Only set up once to avoid duplicate event listeners
+    if (this.multiplayerInitialized) {
+      return;
+    }
+    this.multiplayerInitialized = true;
+    
     // Listen for awareness changes to get remote player updates
     this.collaborationManager.awareness.on('change', () => {
-      this.updateRemotePlayers();
+      if (this.active) {
+        this.updateRemotePlayers();
+      }
     });
     
     // Initial update to populate remote players
@@ -738,6 +749,9 @@ class ThrustGame {
    * Updates remote players based on awareness state
    */
   updateRemotePlayers() {
+    // Only update if game is active to ensure zero overhead when inactive
+    if (!this.active) return;
+    
     if (!this.collaborationManager || !this.collaborationManager.awareness) {
       return;
     }
