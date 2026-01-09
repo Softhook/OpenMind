@@ -83,6 +83,6 @@ While editing a text box:
 - Click a connection to select it
 - With a connection selected, press Space to reverse its direction
 
-## Easter Egg: Thrust Game 🎮
+## Easter Egg 🎮
 
-OpenMind includes a hidden mini-game! Press **Shift+T** to launch a classic thrust-based space shooter. Use arrow keys to fly your ship, spacebar to fire bullets, and try to survive against gravity and other players in multiplayer mode. Press **Shift+T** again to return to your mind map. [Read more about the game →](docs/ThrustGame.md)
+OpenMind includes a hidden mini-game!
