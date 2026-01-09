@@ -298,11 +298,22 @@ class MindMap {
     // Update animations
     this.update();
 
+    // Get viewport dimensions for culling
+    const viewportWidth = typeof width !== 'undefined' ? width : 800;
+    const viewportHeight = typeof height !== 'undefined' ? height : 600;
+    const useCulling = typeof CameraUtils !== 'undefined' && CameraUtils.isBoxVisible;
+
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
       for (let conn of this.connections) {
         if (!conn) continue;
         if (this.draggingConnection && this.draggingConnection.conn === conn) continue;
+        
+        // Skip off-screen connections for better performance
+        if (useCulling && !CameraUtils.isConnectionVisible(conn, viewportWidth, viewportHeight)) {
+          continue;
+        }
+        
         try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
       }
     }
@@ -311,6 +322,16 @@ class MindMap {
     if (this.boxes) {
       for (let box of this.boxes) {
         if (!box) continue;
+        
+        // Skip off-screen boxes for better performance
+        // Always draw selected boxes and boxes being edited
+        if (useCulling && 
+            !box.selected && 
+            !box.isEditing && 
+            !CameraUtils.isBoxVisible(box, viewportWidth, viewportHeight)) {
+          continue;
+        }
+        
         try {
           // Pass navigation state to box for dimming effect
           box.draw(this.isArrowKeyNavigating && this.selectedBox !== box);
@@ -324,6 +345,12 @@ class MindMap {
         if (!box) continue;
         // Don't show connectors if the box is being edited
         if (box.isEditing) continue;
+        
+        // Skip off-screen boxes for connector dots
+        if (useCulling && !CameraUtils.isBoxVisible(box, viewportWidth, viewportHeight)) {
+          continue;
+        }
+        
         const active = this.connectingFrom && this.connectingFrom.box === box;
         // During arrow-key navigation (presentation), don't show hover-triggered connectors
         if ((!this.isArrowKeyNavigating && box.isMouseOver()) || active) {

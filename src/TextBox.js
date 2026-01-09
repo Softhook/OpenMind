@@ -514,9 +514,12 @@ class TextBox {
     if (text == null) text = '';
     text = String(text);
 
-    // Use cache if width hasn't changed
+    // Use cache if width and text haven't changed
+    // Check width first (cheap) then text reference (cheap) before expensive operations
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
-    if (this.cachedWrappedLines && this.cachedWidth === currentWidth && this.text === text) {
+    if (this.cachedWrappedLines && 
+        this.cachedWidth === currentWidth && 
+        this.cachedText === this.text) {
       return this.cachedWrappedLines;
     }
 
@@ -705,10 +708,11 @@ class TextBox {
       lineCharMap = [0];
     }
 
-    // Cache the results
+    // Cache the results including text reference for quick cache validation
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
     this.cachedLineCharMap = lineCharMap;
+    this.cachedText = this.text;
     return result;
   }
 

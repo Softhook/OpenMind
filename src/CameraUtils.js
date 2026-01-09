@@ -160,6 +160,59 @@ const CameraUtils = {
         this.x = centerX - wx * newZoom;
         this.y = centerY - wy * newZoom;
         this.zoom = newZoom;
+    },
+
+
+    // ============================================================================
+    // VIEWPORT CULLING
+    // ============================================================================
+
+    /**
+     * Checks if a box is visible in the current viewport
+     * Includes a margin to prevent pop-in/pop-out during pan
+     * @param {Object} box - Box with x, y, width, height properties
+     * @param {number} viewportWidth - Viewport width in screen pixels
+     * @param {number} viewportHeight - Viewport height in screen pixels
+     * @param {number} margin - Extra margin in world space (default: 200)
+     * @returns {boolean} true if box is visible or near visible area
+     */
+    isBoxVisible(box, viewportWidth, viewportHeight, margin = 200) {
+        if (!box || box.x == null || box.y == null || box.width == null || box.height == null) {
+            return true; // Draw invalid boxes to see what's wrong
+        }
+
+        // Convert viewport bounds to world space
+        const worldLeft = this.worldX(0) - margin;
+        const worldRight = this.worldX(viewportWidth) + margin;
+        const worldTop = this.worldY(0) - margin;
+        const worldBottom = this.worldY(viewportHeight) + margin;
+
+        // Box bounds in world space
+        const boxLeft = box.x - box.width / 2;
+        const boxRight = box.x + box.width / 2;
+        const boxTop = box.y - box.height / 2;
+        const boxBottom = box.y + box.height / 2;
+
+        // Check if box intersects viewport (with margin)
+        return !(boxRight < worldLeft || boxLeft > worldRight || boxBottom < worldTop || boxTop > worldBottom);
+    },
+
+    /**
+     * Checks if a connection is visible in the current viewport
+     * @param {Object} conn - Connection with fromBox and toBox
+     * @param {number} viewportWidth - Viewport width in screen pixels
+     * @param {number} viewportHeight - Viewport height in screen pixels
+     * @param {number} margin - Extra margin in world space (default: 200)
+     * @returns {boolean} true if connection is visible or near visible area
+     */
+    isConnectionVisible(conn, viewportWidth, viewportHeight, margin = 200) {
+        if (!conn || !conn.fromBox || !conn.toBox) {
+            return true; // Draw invalid connections to see what's wrong
+        }
+
+        // If either box is visible, draw the connection
+        return this.isBoxVisible(conn.fromBox, viewportWidth, viewportHeight, margin) ||
+               this.isBoxVisible(conn.toBox, viewportWidth, viewportHeight, margin);
     }
 };
 
