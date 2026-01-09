@@ -2733,7 +2733,7 @@ async function importTextAsDiagram(text) {
     START_Y: 200,
     HORIZONTAL_SPACING: 450,   // Space between heading columns (increased for wider boxes)
     VERTICAL_SPACING: 30,      // Gap between paragraph boxes
-    PARAGRAPH_BOX_WIDTH: 400   // Wider boxes for imported paragraphs
+    IMPORTED_BOX_WIDTH: 400    // Width for imported heading and paragraph boxes
   };
 
   // Clear current selection
@@ -2759,16 +2759,17 @@ async function importTextAsDiagram(text) {
     const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
     headingBox.setBackgroundByKey('orange'); // Key 2 = orange (see TextBox color constants)
     
-    // Set wider width for heading and force dimensions update
-    headingBox.width = IMPORT_LAYOUT.PARAGRAPH_BOX_WIDTH;
-    headingBox.userResized = true; // Prevent auto-shrinking
+    // Set fixed width for imported boxes to ensure consistent layout
+    // Mark as userResized to prevent auto-shrinking when text changes
+    headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+    headingBox.userResized = true;
     headingBox.updateDimensions();
     
     mindMap.boxes.push(headingBox);
     allNewBoxes.push(headingBox);
 
     // Start positioning paragraphs below the heading
-    // Account for heading's actual height + spacing
+    // currentY represents the top edge where the next box should start
     let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
     let previousParagraphBox = null;
 
@@ -2781,15 +2782,16 @@ async function importTextAsDiagram(text) {
         continue;
       }
       
-      // Create paragraph box (white/default color)
+      // Create paragraph box (white/default color) at temporary position
       const paragraphBox = new TextBox(currentX, currentY, paragraph);
       
-      // Set wider width for paragraph and force dimensions update
-      paragraphBox.width = IMPORT_LAYOUT.PARAGRAPH_BOX_WIDTH;
-      paragraphBox.userResized = true; // Prevent auto-shrinking
+      // Set fixed width for imported boxes to ensure consistent layout
+      paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+      paragraphBox.userResized = true;
       paragraphBox.updateDimensions();
       
-      // Adjust Y position to account for the box's height (boxes are centered on Y)
+      // Adjust Y to center position: top edge + half box height
+      // (TextBox positions are center-based, but we calculate from top edge for clarity)
       paragraphBox.y = currentY + paragraphBox.height / 2;
       
       mindMap.boxes.push(paragraphBox);
@@ -2803,7 +2805,7 @@ async function importTextAsDiagram(text) {
         mindMap.connections.push(new Connection(headingBox, paragraphBox));
       }
 
-      // Move Y position for next paragraph: current box bottom + spacing
+      // Calculate next box's top edge: current box bottom + gap
       currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
       previousParagraphBox = paragraphBox;
     }
