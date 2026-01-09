@@ -2889,11 +2889,13 @@ function parseTextIntoSections(lines) {
     if (!line || line.length === 0) return false;
     
     // Check for numbered list format including decimal numbering
-    // Matches: "1.", "2.", "3.1", "4.1.2", "1.2.3.4" etc.
-    const hasNumberPrefix = /^\d+(\.\d+)*\.?\s+/.test(line);
+    // Matches: "1. ", "2. ", "4.1 ", "2.3.1 ", etc.
+    // Pattern explanation: number, optionally followed by .number groups, then space
+    const numberPrefixPattern = /^\d+(\.\d+)*\s+/;
+    const hasNumberPrefix = numberPrefixPattern.test(line);
     
     // Remove number prefix for further analysis if present
-    const lineWithoutNumber = hasNumberPrefix ? line.replace(/^\d+(\.\d+)*\.?\s+/, '') : line;
+    const lineWithoutNumber = hasNumberPrefix ? line.replace(numberPrefixPattern, '') : line;
     
     // Must end with sentence-ending punctuation OR have a number prefix (numbered lists)
     const endsWithPunctuation = /[.!?]$/.test(line);
