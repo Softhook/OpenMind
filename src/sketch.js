@@ -74,8 +74,10 @@ const UI_COLORS = {
 let mindMap;
 let collaborationManager = null; // CollaborationManager for real-time sync
 let saveButton;
+let importTextButton;
 let loadButton;
 let fileInput;
+let importTextFileInput;
 let exportPNGButton;
 let exportPDFButton;
 let exportTextButton;
@@ -1085,29 +1087,33 @@ function setupUIButtons() {
     mindMap.save();
   });
 
+  importTextButton = createButton('Import Text');
+  importTextButton.position(160, 10);
+  importTextButton.mousePressed(triggerTextImport);
+
   loadButton = createButton('Load');
-  loadButton.position(160, 10);
+  loadButton.position(260, 10);
   loadButton.mousePressed(triggerFileLoad);
 
   exportPNGButton = createButton('Export PNG');
-  exportPNGButton.position(220, 10);
+  exportPNGButton.position(320, 10);
   exportPNGButton.mousePressed(exportPNG);
 
   exportPDFButton = createButton('Export PDF');
-  exportPDFButton.position(330, 10);
+  exportPDFButton.position(430, 10);
   exportPDFButton.mousePressed(exportPDF);
 
   exportTextButton = createButton('Export Text');
-  exportTextButton.position(430, 10);
+  exportTextButton.position(530, 10);
   exportTextButton.mousePressed(exportText);
 
   keyboardControlsButton = createButton('Keyboard Controls');
-  keyboardControlsButton.position(530, 10);
+  keyboardControlsButton.position(630, 10);
   keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
   keyboardControlsButton.attribute('aria-expanded', 'false');
 
   inviteButton = createButton('Start Collaboration');
-  inviteButton.position(680, 10);
+  inviteButton.position(780, 10);
   inviteButton.mousePressed(shareSession);
   inviteButton.style('background-color', '#4caf50');
   inviteButton.style('color', 'white');
@@ -1187,6 +1193,12 @@ function setupUIButtons() {
   fileInput = createFileInput(handleFileLoad);
   fileInput.position(-200, -200);
   fileInput.style('display', 'none');
+
+  // Create hidden file input for importing text
+  importTextFileInput = createFileInput(handleTextImport);
+  importTextFileInput.position(-200, -200);
+  importTextFileInput.style('display', 'none');
+  importTextFileInput.attribute('accept', '.txt,.md,.text');
 }
 
 /**
@@ -1817,6 +1829,7 @@ function showMenuButtons() {
  */
 function hideMenuButtons() {
   if (saveButton && saveButton.style) saveButton.style('display', 'none');
+  if (importTextButton && importTextButton.style) importTextButton.style('display', 'none');
   if (loadButton && loadButton.style) loadButton.style('display', 'none');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
@@ -1828,7 +1841,7 @@ function hideMenuButtons() {
 
 /**
  * Positions all menu buttons horizontally with proper spacing.
- * Order: Load, Save, Export PNG, Export PDF, Export Text, Keyboard Controls
+ * Order: Save, Import Text, Load, Export PNG, Export PDF, Export Text, Keyboard Controls
  */
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
@@ -1836,8 +1849,9 @@ function layoutMenuButtons() {
   const gap = CONFIG.UI.BUTTON_GAP;
 
   // Ensure buttons are displayed to get proper widths
-  loadButton.style('display', 'inline-block');
   saveButton.style('display', 'inline-block');
+  importTextButton.style('display', 'inline-block');
+  loadButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   exportTextButton.style('display', 'inline-block');
@@ -1846,8 +1860,9 @@ function layoutMenuButtons() {
   const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
 
   let x = startX;
-  loadButton.position(x, y); x += w(loadButton) + gap;
   saveButton.position(x, y); x += w(saveButton) + gap;
+  importTextButton.position(x, y); x += w(importTextButton) + gap;
+  loadButton.position(x, y); x += w(loadButton) + gap;
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
@@ -2592,6 +2607,321 @@ async function handleFileLoad(file) {
   } finally {
     isMapLoading = false;
   }
+}
+
+/**
+ * Triggers the hidden text import file input to open a file selection dialog.
+ * Used when the Import Text button is clicked.
+ */
+function triggerTextImport() {
+  try {
+    if (importTextFileInput && importTextFileInput.elt && typeof importTextFileInput.elt.click === 'function') {
+      importTextFileInput.elt.click();
+    } else if (importTextFileInput && typeof importTextFileInput.elt === 'undefined' && typeof importTextFileInput.click === 'function') {
+      importTextFileInput.click();
+    } else {
+      console.warn('Text import input not available');
+    }
+  } catch (e) {
+    console.warn('Failed to trigger text import input:', e);
+  }
+}
+
+/**
+ * Handles importing text from a file and converting it into a diagram.
+ * Detects headings (single-sentence lines) and paragraphs, then creates:
+ * - Orange boxes (key 2) for headings, placed horizontally
+ * - White boxes for paragraphs, arranged vertically under each heading
+ * - Connections between sequential paragraphs
+ * @param {Object} file - p5.js file object with text content
+ */
+async function handleTextImport(file) {
+  if (!file) {
+    console.error('No file provided');
+    alert('Please select a valid text file');
+    return;
+  }
+
+  // Validate file type
+  const isTextFile = file.type.includes('text') || 
+                     file.name.endsWith('.txt') || 
+                     file.name.endsWith('.md') ||
+                     file.name.endsWith('.text');
+  
+  if (!isTextFile) {
+    console.error('Invalid file type:', file.type);
+    alert('Please select a text file (.txt, .md, or .text)');
+    return;
+  }
+
+  try {
+    // Get the text data
+    let textContent = file.data;
+    if (!textContent || typeof textContent !== 'string') {
+      throw new Error('File content is empty or invalid');
+    }
+
+    // Import the text and create diagram
+    await importTextAsDiagram(textContent);
+
+    // Reset file input
+    try {
+      if (importTextFileInput && importTextFileInput.elt) {
+        importTextFileInput.elt.value = '';
+      } else if (importTextFileInput && typeof importTextFileInput.value === 'function') {
+        importTextFileInput.value('');
+      }
+    } catch (e) {
+      console.warn('Failed to reset text import input value:', e);
+    }
+  } catch (e) {
+    console.error('Failed to import text:', e);
+    alert('Failed to import text: ' + e.message);
+  }
+}
+
+/**
+ * Converts imported text into a mind map diagram.
+ * 
+ * Algorithm:
+ * 1. Sanitize and parse the text into sections (headings + paragraphs)
+ * 2. Detect headings: single-sentence lines (ending with . ! ?)
+ * 3. Group paragraphs under their respective headings
+ * 4. Place headings horizontally with orange boxes (key 2)
+ * 5. Place paragraphs vertically under each heading with white boxes
+ * 6. Connect sequential paragraphs with arrows
+ * 7. Maintain good spacing between all elements
+ * 
+ * @param {string} text - The raw text content to import
+ */
+async function importTextAsDiagram(text) {
+  if (!mindMap) {
+    throw new Error('MindMap not initialized');
+  }
+
+  // Sanitize the text using the existing utility
+  const sanitizedText = Utils.sanitizeText(text);
+  
+  // Split into lines and remove empty lines at start/end
+  let lines = sanitizedText.split('\n').map(line => line.trim());
+  
+  // Remove leading and trailing empty lines
+  while (lines.length > 0 && lines[0] === '') {
+    lines.shift();
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+
+  if (lines.length === 0) {
+    alert('No content found in the text file');
+    return;
+  }
+
+  // Parse the text into sections with headings and paragraphs
+  const sections = parseTextIntoSections(lines);
+
+  if (sections.length === 0) {
+    alert('No valid content found to import');
+    return;
+  }
+
+  // Layout configuration
+  const START_X = 300;
+  const START_Y = 200;
+  const HORIZONTAL_SPACING = 350; // Space between heading columns
+  const VERTICAL_SPACING = 150;   // Space between paragraph rows
+  const BOX_WIDTH = 280;           // Standard box width
+
+  // Clear current selection
+  mindMap.clearBoxSelection();
+  if (mindMap.selectedBox) {
+    mindMap.selectedBox.stopEditing();
+    mindMap.selectedBox = null;
+  }
+
+  // Create all boxes and track them for undo
+  mindMap.pushUndo();
+
+  const allNewBoxes = [];
+  let currentX = START_X;
+
+  // Process each section
+  for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
+    const section = sections[sectionIdx];
+    const heading = section.heading;
+    const paragraphs = section.paragraphs;
+
+    // Create heading box (orange - key 2)
+    const headingBox = new TextBox(currentX, START_Y, heading);
+    headingBox.setBackgroundByKey('orange'); // Key 2 = orange
+    mindMap.boxes.push(headingBox);
+    allNewBoxes.push(headingBox);
+
+    let currentY = START_Y + VERTICAL_SPACING;
+    let previousParagraphBox = null;
+
+    // Create paragraph boxes vertically under the heading
+    for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
+      const paragraph = paragraphs[paraIdx];
+      
+      // Create paragraph box (white/default color)
+      const paragraphBox = new TextBox(currentX, currentY, paragraph);
+      // paragraphBox already has default white background
+      mindMap.boxes.push(paragraphBox);
+      allNewBoxes.push(paragraphBox);
+
+      // Connect this paragraph to the previous one
+      if (previousParagraphBox) {
+        mindMap.connections.push(new Connection(previousParagraphBox, paragraphBox));
+      } else {
+        // First paragraph: connect to heading
+        mindMap.connections.push(new Connection(headingBox, paragraphBox));
+      }
+
+      previousParagraphBox = paragraphBox;
+      currentY += VERTICAL_SPACING;
+    }
+
+    // Move to next column for the next section
+    currentX += HORIZONTAL_SPACING;
+  }
+
+  // Mark map as dirty and unsaved
+  mindMap.isDirty = true;
+  mindMap.isSaved = false;
+
+  // Sync all new boxes to collaboration system
+  if (MindMap.onBoxChange) {
+    for (const box of allNewBoxes) {
+      if (box && box.id) {
+        MindMap.onBoxChange(box);
+      }
+    }
+  }
+
+  // Sync connections
+  if (MindMap.onConnectionsChange) {
+    MindMap.onConnectionsChange();
+  }
+
+  // Save to localStorage
+  try {
+    mindMap.saveToLocalStorage();
+  } catch (e) {
+    console.warn('Failed to autosave after text import:', e);
+  }
+
+  // Reset view to show all imported content
+  try {
+    resetView();
+  } catch (e) {
+    console.warn('resetView failed after text import:', e);
+  }
+}
+
+/**
+ * Parses lines of text into sections with headings and paragraphs.
+ * 
+ * A heading is defined as:
+ * - A single sentence (ends with . ! ? or is a short standalone line)
+ * - Relatively short (< 100 characters for single-sentence detection)
+ * 
+ * Paragraphs are multi-line blocks of text under each heading.
+ * Page breaks (multiple empty lines) are preserved to separate sections.
+ * 
+ * @param {string[]} lines - Array of trimmed text lines
+ * @returns {Array<{heading: string, paragraphs: string[]}>} Parsed sections
+ */
+function parseTextIntoSections(lines) {
+  const sections = [];
+  let currentHeading = null;
+  let currentParagraphs = [];
+  let currentParagraphLines = [];
+
+  const isHeading = (line) => {
+    if (!line || line.length === 0) return false;
+    
+    // Check if it's a single sentence (ends with sentence-ending punctuation)
+    const endsWithPunctuation = /[.!?]$/.test(line);
+    
+    // Short lines without internal punctuation are likely headings
+    const isShort = line.length < 100;
+    const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
+    
+    return endsWithPunctuation && isShort && !hasInternalPunctuation;
+  };
+
+  const finishParagraph = () => {
+    if (currentParagraphLines.length > 0) {
+      const paragraph = currentParagraphLines.join('\n').trim();
+      if (paragraph) {
+        currentParagraphs.push(paragraph);
+      }
+      currentParagraphLines = [];
+    }
+  };
+
+  const finishSection = () => {
+    if (currentHeading && currentParagraphs.length > 0) {
+      sections.push({
+        heading: currentHeading,
+        paragraphs: currentParagraphs
+      });
+    }
+    currentHeading = null;
+    currentParagraphs = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Empty line - could be paragraph break or section break
+    if (line === '') {
+      // Check for page break (multiple consecutive empty lines)
+      let emptyLineCount = 1;
+      while (i + 1 < lines.length && lines[i + 1] === '') {
+        emptyLineCount++;
+        i++;
+      }
+
+      // Finish current paragraph
+      finishParagraph();
+
+      // If multiple empty lines (page break), finish section
+      if (emptyLineCount >= 2) {
+        finishSection();
+      }
+      continue;
+    }
+
+    // Check if this line is a heading
+    if (isHeading(line)) {
+      // Finish previous paragraph and section
+      finishParagraph();
+      finishSection();
+      
+      // Start new section with this heading
+      currentHeading = line;
+      continue;
+    }
+
+    // Regular line - part of a paragraph
+    // If we don't have a heading yet, treat the first substantial content as heading
+    if (!currentHeading) {
+      currentHeading = line;
+      continue;
+    }
+
+    // Add line to current paragraph
+    currentParagraphLines.push(line);
+  }
+
+  // Finish any remaining content
+  finishParagraph();
+  finishSection();
+
+  return sections;
 }
 
 /**
