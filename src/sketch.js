@@ -74,8 +74,10 @@ const UI_COLORS = {
 let mindMap;
 let collaborationManager = null; // CollaborationManager for real-time sync
 let saveButton;
+let importTextButton;
 let loadButton;
 let fileInput;
+let importTextFileInput;
 let exportPNGButton;
 let exportPDFButton;
 let exportTextButton;
@@ -1074,8 +1076,12 @@ function setup() {
  * Creates all UI buttons and file input
  */
 function setupUIButtons() {
+  loadButton = createButton('Load');
+  loadButton.position(100, 10);
+  loadButton.mousePressed(triggerFileLoad);
+
   saveButton = createButton('Save');
-  saveButton.position(100, 10);
+  saveButton.position(160, 10);
   saveButton.mousePressed(() => {
     // If in a collaborative room, use room name as suggested filename
     if (collaborationManager && collaborationManager.roomName) {
@@ -1085,29 +1091,29 @@ function setupUIButtons() {
     mindMap.save();
   });
 
-  loadButton = createButton('Load');
-  loadButton.position(160, 10);
-  loadButton.mousePressed(triggerFileLoad);
+  importTextButton = createButton('Import Text');
+  importTextButton.position(260, 10);
+  importTextButton.mousePressed(() => TextImporter.triggerImport(importTextFileInput));
 
   exportPNGButton = createButton('Export PNG');
-  exportPNGButton.position(220, 10);
+  exportPNGButton.position(320, 10);
   exportPNGButton.mousePressed(exportPNG);
 
   exportPDFButton = createButton('Export PDF');
-  exportPDFButton.position(330, 10);
+  exportPDFButton.position(430, 10);
   exportPDFButton.mousePressed(exportPDF);
 
   exportTextButton = createButton('Export Text');
-  exportTextButton.position(430, 10);
+  exportTextButton.position(530, 10);
   exportTextButton.mousePressed(exportText);
 
   keyboardControlsButton = createButton('Keyboard Controls');
-  keyboardControlsButton.position(530, 10);
+  keyboardControlsButton.position(630, 10);
   keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
   keyboardControlsButton.attribute('aria-expanded', 'false');
 
   inviteButton = createButton('Start Collaboration');
-  inviteButton.position(680, 10);
+  inviteButton.position(780, 10);
   inviteButton.mousePressed(shareSession);
   inviteButton.style('background-color', '#4caf50');
   inviteButton.style('color', 'white');
@@ -1187,6 +1193,12 @@ function setupUIButtons() {
   fileInput = createFileInput(handleFileLoad);
   fileInput.position(-200, -200);
   fileInput.style('display', 'none');
+
+  // Create hidden file input for importing text
+  importTextFileInput = createFileInput((file) => TextImporter.handleFileImport(file, importTextFileInput));
+  importTextFileInput.position(-200, -200);
+  importTextFileInput.style('display', 'none');
+  importTextFileInput.attribute('accept', '.txt,.md,.text');
 }
 
 /**
@@ -1800,6 +1812,7 @@ function updateMenuVisibility() {
 function showMenuButtons() {
   // Guard if setup failed and buttons are not yet created
   if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
+  if (importTextButton && importTextButton.style) importTextButton.style('display', 'inline-block');
   if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
@@ -1817,6 +1830,7 @@ function showMenuButtons() {
  */
 function hideMenuButtons() {
   if (saveButton && saveButton.style) saveButton.style('display', 'none');
+  if (importTextButton && importTextButton.style) importTextButton.style('display', 'none');
   if (loadButton && loadButton.style) loadButton.style('display', 'none');
   if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
   if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
@@ -1828,7 +1842,7 @@ function hideMenuButtons() {
 
 /**
  * Positions all menu buttons horizontally with proper spacing.
- * Order: Load, Save, Export PNG, Export PDF, Export Text, Keyboard Controls
+ * Order: Load, Save, Import Text, Export PNG, Export PDF, Export Text, Keyboard Controls
  */
 function layoutMenuButtons() {
   const startX = CONFIG.UI.BUTTON_START_X;
@@ -1838,6 +1852,7 @@ function layoutMenuButtons() {
   // Ensure buttons are displayed to get proper widths
   loadButton.style('display', 'inline-block');
   saveButton.style('display', 'inline-block');
+  importTextButton.style('display', 'inline-block');
   exportPNGButton.style('display', 'inline-block');
   exportPDFButton.style('display', 'inline-block');
   exportTextButton.style('display', 'inline-block');
@@ -1848,6 +1863,7 @@ function layoutMenuButtons() {
   let x = startX;
   loadButton.position(x, y); x += w(loadButton) + gap;
   saveButton.position(x, y); x += w(saveButton) + gap;
+  importTextButton.position(x, y); x += w(importTextButton) + gap;
   exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
   exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
   exportTextButton.position(x, y); x += w(exportTextButton) + gap;
@@ -2593,6 +2609,7 @@ async function handleFileLoad(file) {
     isMapLoading = false;
   }
 }
+
 
 /**
  * Handle files/URLs dropped onto the canvas. Supports image files and image URLs.
