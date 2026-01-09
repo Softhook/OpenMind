@@ -516,8 +516,11 @@ class TextBox {
     text = String(text);
 
     // Use cache if width and text haven't changed
-    // Text reference check works because JavaScript string concatenation creates new strings,
-    // so this.text changes reference when modified (addChar, removeChar, etc.)
+    // Text reference check works because:
+    // 1. JavaScript string concatenation creates new string objects
+    // 2. All text mutation methods (addChar, removeChar, etc.) use concatenation
+    // 3. updateDimensions() invalidates cache when called directly
+    // 4. Direct assignment (box.text = ...) should be followed by updateDimensions()
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines && 
         this.cachedWidth === currentWidth && 
