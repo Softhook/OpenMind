@@ -416,7 +416,7 @@ class ThrustGame {
   checkBulletBoxCollision(bullet) {
     if (!this.mindMap || !this.mindMap.boxes) return false;
     
-    const bulletRadius = ThrustGame.BULLET.SIZE;
+    const bulletRadius = ThrustGame.BULLET.SIZE; // SIZE is defined as radius (4 pixels)
     
     for (const box of this.mindMap.boxes) {
       if (!box) continue;
@@ -428,13 +428,16 @@ class ThrustGame {
       const boxBottom = box.y + box.height / 2;
       
       // Check if bullet circle collides with box rectangle
+      // Find closest point on rectangle to bullet center
       const closestX = Math.max(boxLeft, Math.min(bullet.x, boxRight));
       const closestY = Math.max(boxTop, Math.min(bullet.y, boxBottom));
       
+      // Calculate squared distance (avoids sqrt for performance)
       const distX = bullet.x - closestX;
       const distY = bullet.y - closestY;
       const distSq = distX * distX + distY * distY;
       
+      // Compare squared distance to squared radius
       if (distSq < bulletRadius * bulletRadius) {
         return true; // Collision detected
       }
