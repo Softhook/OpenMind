@@ -277,23 +277,28 @@ class ThrustGame {
    * Updates all bullets (movement and lifetime)
    */
   updateBullets() {
-    // Update local bullets
-    this.bullets = this.bullets.filter(bullet => {
+    const canvasWidth = typeof width !== 'undefined' ? width : 800;
+    const canvasHeight = typeof height !== 'undefined' ? height : 600;
+    
+    // Update bullets in place and remove expired ones
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+      
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
       bullet.lifetime--;
       
       // Wrap around screen
-      const canvasWidth = typeof width !== 'undefined' ? width : 800;
-      const canvasHeight = typeof height !== 'undefined' ? height : 600;
-      
       if (bullet.x < 0) bullet.x = canvasWidth;
       if (bullet.x > canvasWidth) bullet.x = 0;
       if (bullet.y < 0) bullet.y = canvasHeight;
       if (bullet.y > canvasHeight) bullet.y = 0;
       
-      return bullet.lifetime > 0;
-    });
+      // Remove expired bullets
+      if (bullet.lifetime <= 0) {
+        this.bullets.splice(i, 1);
+      }
+    }
   }
   
   /**
@@ -302,8 +307,6 @@ class ThrustGame {
   checkCollisions() {
     // Check local bullets against remote players
     for (const bullet of this.bullets) {
-      if (bullet.lifetime <= 0) continue; // Skip already-hit bullets
-      
       for (const [clientId, remotePlayer] of this.remotePlayers) {
         if (!remotePlayer.alive) continue;
         
@@ -351,14 +354,14 @@ class ThrustGame {
   handleKeyPressed(key, keyCode) {
     if (!this.active) return;
     
-    // Arrow keys
-    if (keyCode === 37 || keyCode === LEFT_ARROW) {  // Left
+    // Arrow keys (use numeric codes for reliability)
+    if (keyCode === 37) {  // Left
       this.keys.left = true;
-    } else if (keyCode === 39 || keyCode === RIGHT_ARROW) {  // Right
+    } else if (keyCode === 39) {  // Right
       this.keys.right = true;
-    } else if (keyCode === 38 || keyCode === UP_ARROW) {  // Up
+    } else if (keyCode === 38) {  // Up
       this.keys.up = true;
-    } else if (keyCode === 40 || keyCode === DOWN_ARROW) {  // Down
+    } else if (keyCode === 40) {  // Down
       this.keys.down = true;
     }
     
@@ -375,13 +378,13 @@ class ThrustGame {
   handleKeyReleased(keyCode) {
     if (!this.active) return;
     
-    if (keyCode === 37 || keyCode === LEFT_ARROW) {
+    if (keyCode === 37) {  // Left
       this.keys.left = false;
-    } else if (keyCode === 39 || keyCode === RIGHT_ARROW) {
+    } else if (keyCode === 39) {  // Right
       this.keys.right = false;
-    } else if (keyCode === 38 || keyCode === UP_ARROW) {
+    } else if (keyCode === 38) {  // Up
       this.keys.up = false;
-    } else if (keyCode === 40 || keyCode === DOWN_ARROW) {
+    } else if (keyCode === 40) {  // Down
       this.keys.down = false;
     }
   }
