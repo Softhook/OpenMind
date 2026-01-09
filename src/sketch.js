@@ -2847,10 +2847,26 @@ function parseTextIntoSections(lines) {
     const endsWithPunctuation = /[.!?]$/.test(line);
     
     // Short lines without internal punctuation are likely headings
-    const isShort = line.length < 100;
+    const isShort = line.length < 80; // Reduced threshold for better detection
     const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
     
-    return endsWithPunctuation && isShort && !hasInternalPunctuation;
+    // Additional heuristics for heading detection:
+    // - Capital letters at start (already required for good text)
+    // - Few words (3-8 words is typical for a heading)
+    // - No commas (headings are usually simple phrases)
+    const wordCount = line.split(/\s+/).length;
+    const hasCommas = line.includes(',');
+    const isVeryShort = line.length < 50; // Very short lines are more likely headings
+    
+    // A line is a heading if:
+    // 1. It ends with punctuation
+    // 2. It's relatively short (< 80 chars)
+    // 3. It doesn't have internal sentence-ending punctuation
+    // 4. Either: it's very short (<50 chars) OR has few words (3-8) and no commas
+    const isLikelyHeading = endsWithPunctuation && isShort && !hasInternalPunctuation &&
+                           (isVeryShort || (wordCount >= 3 && wordCount <= 8 && !hasCommas));
+    
+    return isLikelyHeading;
   };
 
   const finishParagraph = () => {
@@ -2864,11 +2880,24 @@ function parseTextIntoSections(lines) {
   };
 
   const finishSection = () => {
-    if (currentHeading && currentParagraphs.length > 0) {
-      sections.push({
-        heading: currentHeading,
-        paragraphs: currentParagraphs
-      });
+    // Finish any pending paragraph first
+    finishParagraph();
+    
+    if (currentHeading) {
+      // If we have a heading but no paragraphs, create a section with the heading as a single paragraph
+      if (currentParagraphs.length === 0) {
+        // For a heading-only section, we still want to include it
+        // This handles cases where headings appear at the end or standalone
+        sections.push({
+          heading: currentHeading,
+          paragraphs: [''] // Empty paragraph to maintain structure
+        });
+      } else {
+        sections.push({
+          heading: currentHeading,
+          paragraphs: currentParagraphs
+        });
+      }
     }
     currentHeading = null;
     currentParagraphs = [];
@@ -2898,8 +2927,7 @@ function parseTextIntoSections(lines) {
 
     // Check if this line is a heading
     if (isHeading(line)) {
-      // Finish previous paragraph and section
-      finishParagraph();
+      // Finish previous section
       finishSection();
       
       // Start new section with this heading
@@ -2919,7 +2947,6 @@ function parseTextIntoSections(lines) {
   }
 
   // Finish any remaining content
-  finishParagraph();
   finishSection();
 
   return sections;
