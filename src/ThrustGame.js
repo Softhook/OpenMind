@@ -62,6 +62,14 @@ class ThrustGame {
     SPACE: 32
   };
   
+  // Key mapping for state synchronization
+  static KEY_MAP = [
+    { name: 'left', code: 37 },
+    { name: 'right', code: 39 },
+    { name: 'up', code: 38 },
+    { name: 'down', code: 40 }
+  ];
+  
   static COLORS = {
     BACKGROUND: { r: 10, g: 10, b: 30 },       // Dark space background
     PLAYER_LOCAL: { r: 100, g: 200, b: 255 },  // Cyan for local player
@@ -476,18 +484,8 @@ class ThrustGame {
     if (!this.active) return;
     if (typeof keyIsDown !== 'function') return;
     
-    const K = ThrustGame.KEY_CODES;
-    
-    // Map of key names to their codes
-    const keyMap = [
-      { name: 'left', code: K.LEFT },
-      { name: 'right', code: K.RIGHT },
-      { name: 'up', code: K.UP },
-      { name: 'down', code: K.DOWN }
-    ];
-    
-    // Check each key and clear if stuck
-    for (const { name, code } of keyMap) {
+    // Check each key and clear if stuck (uses pre-allocated KEY_MAP)
+    for (const { name, code } of ThrustGame.KEY_MAP) {
       if (this.keys[name] && !keyIsDown(code)) {
         this.keys[name] = false;
       }
