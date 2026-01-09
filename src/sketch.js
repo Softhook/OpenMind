@@ -1,3 +1,32 @@
+/**
+ * sketch.js - Main p5.js application entry point for OpenMind
+ * 
+ * This file serves as the central coordinator for the mind mapping application,
+ * managing the p5.js lifecycle, user interactions, UI rendering, and integration
+ * with the collaboration system.
+ * 
+ * Key Responsibilities:
+ * - p5.js lifecycle (setup, draw, event handlers)
+ * - Camera/viewport management (pan, zoom)
+ * - User input handling (mouse, keyboard, touch)
+ * - UI rendering (toolbar, buttons, overlays)
+ * - Save/load functionality
+ * - Collaboration integration and room management
+ * - URL routing for file loading and room joining
+ * 
+ * Architecture:
+ * - Uses global p5.js instance mode (functions defined at top level)
+ * - Coordinates between MindMap (data/logic) and p5.js (rendering/input)
+ * - Manages CollaborationManager lifecycle for real-time sync
+ * - Implements camera transformation system for infinite canvas
+ * 
+ * Dependencies:
+ * - p5.js for rendering and event handling
+ * - MindMap for mind map data and logic
+ * - CollaborationManager for real-time collaboration (optional)
+ * - Utils for shared utilities
+ */
+
 // ============================================================================
 // CONFIGURATION CONSTANTS
 // ============================================================================
@@ -441,7 +470,7 @@ function namesAreSimilar(name1, name2) {
 function handleUrlChange() {
   // Clear any pending room join confirmation when URL changes
   if (roomJoinConfirmation) {
-    console.log('URL changed - clearing pending room join confirmation');
+    Utils.Logger.state('[Room] URL changed - clearing pending room join confirmation');
     roomJoinConfirmation = null;
   }
 
@@ -467,7 +496,7 @@ function handleUrlChange() {
       // This ensures autosave goes back to the offline storage location
       if (typeof mindMap.setStorageKey === 'function') {
         mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
-        console.log('Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
+        Utils.Logger.state('[Room] Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
       }
     }
   }
@@ -568,7 +597,7 @@ function getRoomStorageKey(roomName) {
 function _clearLocalState() {
   if (!mindMap) return;
 
-  console.log('Clearing local state:', mindMap.boxes.length, 'boxes');
+  Utils.Logger.state('[Room] Clearing local state:', mindMap.boxes.length, 'boxes');
 
   // Reset interaction flags on boxes before clearing to prevent broken UI state
   for (const box of mindMap.boxes) {
@@ -601,7 +630,7 @@ function _clearLocalState() {
   // Reset dirty flag to prevent unexpected autosave
   mindMap.isDirty = false;
 
-  console.log('LocalState cleared - room sync will provide authoritative state');
+  Utils.Logger.state('[Room] Local state cleared - room sync will provide authoritative state');
 }
 
 /**
@@ -624,7 +653,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
 
       if (hasLocalData) {
         // Show confirmation dialog - user has local work that will be cleared
-        console.log('User has local boxes, showing confirmation dialog');
+        Utils.Logger.collab('[Room] User has local boxes, showing confirmation dialog');
         roomJoinConfirmation = {
           roomName: roomName,
           shouldShareLocalData: shouldShareLocalData,
@@ -635,10 +664,10 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
       }
 
       // No local data, proceed with clearing
-      console.log('Joining collaboration room:', roomName, '- clearing local state (no local data)');
+      Utils.Logger.collab('[Room] Joining collaboration room:', roomName, '- clearing local state (no local data)');
       _clearLocalState();
     } else {
-      console.log('Starting collaboration room:', roomName, '- preserving local state to share');
+      Utils.Logger.collab('[Room] Starting collaboration room:', roomName, '- preserving local state to share');
     }
 
     // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
@@ -653,7 +682,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     if (syncEmptyRoomTimeout) clearTimeout(syncEmptyRoomTimeout);
 
     collaborationManager.onConnectionChange = (status) => {
-      console.log('Collaboration status:', status);
+      Utils.Logger.collab('[Connection]', status);
       // Track specific sync status for overlay
       const prevStatus = syncStatus;
       if (status === 'connecting') {
@@ -661,7 +690,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         // Detect slow connection (server cold start on Render)
         syncConnectionTimeout = setTimeout(() => {
           if (syncStatus === 'connecting') {
-            console.log('Connection slow - server may be starting up');
+            Utils.Logger.network('[Connection] Slow - server may be starting up');
             syncStatus = 'server_starting';
           }
         }, 5000);
@@ -671,7 +700,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         // Start empty room timeout - if no sync after 5s, assume empty room
         syncEmptyRoomTimeout = setTimeout(() => {
           if (syncStatus === 'syncing') {
-            console.log('Sync timeout: Assuming empty room, dismissing overlay');
+            Utils.Logger.state('[Sync] Timeout - assuming empty room, dismissing overlay');
             syncStatus = null;
           }
         }, 5000);
@@ -686,7 +715,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         syncStatus = null;
       }
       if (prevStatus !== syncStatus) {
-        console.log('Sync overlay status changed:', prevStatus, '->', syncStatus);
+        Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
       }
       // Re-layout menu buttons when connection status changes so
       // the display name input and invite button are positioned correctly.
@@ -700,7 +729,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     let lastPeerCount = 0;
     collaborationManager.onPeersChange = (peers) => {
       if (peers.length !== lastPeerCount) {
-        console.log('Connected peers:', peers.length);
+        Utils.Logger.collab('[Peers] Connected:', peers.length);
         lastPeerCount = peers.length;
       }
     };
@@ -712,17 +741,17 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
 
     const serverUrl = parseServerFromUrl();
     if (serverUrl) {
-      console.log('Connecting to custom signaling server:', serverUrl);
+      Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
 
     // Pass shouldShareLocalData flag to control whether we share our local work
     await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
-    console.log('Collaboration initialized for room:', roomName, 'shouldShareLocalData:', shouldShareLocalData);
+    Utils.Logger.collab('[Room] Initialized:', roomName, 'shareLocal:', shouldShareLocalData);
 
     // CRITICAL: If starting collaboration (shouldShareLocalData=true), sync local data
     // Wait for provider to be fully synced before force-syncing to avoid race conditions
     if (shouldShareLocalData && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
-      console.log('Starting collaboration - will sync', mindMap.boxes.length, 'local boxes to Yjs');
+      Utils.Logger.collab('[Sync] Starting - will sync', mindMap.boxes.length, 'local boxes to Yjs');
 
       // Store current manager reference to detect if it changes
       const currentManager = collaborationManager;
@@ -732,15 +761,15 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         if (collaborationManager === currentManager &&
           collaborationManager.isConnected &&
           typeof collaborationManager._syncLocalToYjs === 'function') {
-          console.log('Provider synced - force syncing local boxes to Yjs...');
+          Utils.Logger.collab('[Sync] Provider synced - force syncing local boxes to Yjs...');
           try {
             collaborationManager._syncLocalToYjs();
-            console.log('✅ Forced sync complete - boxes now in Yjs');
+            Utils.Logger.collab('[Sync] ✅ Forced sync complete - boxes now in Yjs');
           } catch (e) {
             console.error('Failed to sync local boxes:', e);
           }
         } else {
-          console.log('Skipping sync - manager changed or disconnected');
+          Utils.Logger.state('[Sync] Skipping - manager changed or disconnected');
         }
       };
 
@@ -748,7 +777,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
       if (collaborationManager.provider && collaborationManager.provider.synced) {
         doSync();
       } else {
-        console.log('Waiting for provider to sync before pushing local boxes...');
+        Utils.Logger.collab('[Sync] Waiting for provider to sync before pushing local boxes...');
 
         // Set 10 second timeout to prevent waiting forever
         const timeout = setTimeout(() => {
@@ -770,7 +799,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     if (mindMap && typeof mindMap.setStorageKey === 'function') {
       const storageKey = getRoomStorageKey(roomName);
       mindMap.setStorageKey(storageKey);
-      console.log('Set storage key to:', storageKey);
+      Utils.Logger.state('[Storage] Set key to:', storageKey);
     }
 
     // Update browser tab title to show room name
@@ -805,7 +834,7 @@ function shareSession() {
     // Log the box count to help debug seeding behavior and track what's being shared
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
-    console.log('Starting collaboration with', boxCount, 'boxes from local work');
+    Utils.Logger.collab('[Session] Starting with', boxCount, 'boxes from local work');
 
     // Use URL parameter to indicate "start" mode (sharing local data)
     // This is more robust than a global flag and survives page refresh/back button
@@ -1113,7 +1142,7 @@ function setup() {
       // State clearing now happens in initializeCollaboration() to handle both:
       // 1. Initial page load with room URL (this code path)
       // 2. Hash navigation to room URL (handleUrlChange code path)
-      console.log('Detected collaboration room in URL:', roomId, '- skipping localStorage load');
+      Utils.Logger.state('[Load] Detected collaboration room in URL:', roomId, '- skipping localStorage load');
     }
 
     // Create UI buttons
@@ -2541,7 +2570,7 @@ function mousePressed(e) {
     if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
       // User clicked OK - proceed with room join
-      console.log('User confirmed room join - clearing state and connecting');
+      Utils.Logger.state('[Room] User confirmed join - clearing state and connecting');
 
       const { roomName, shouldShareLocalData } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
@@ -2667,7 +2696,7 @@ function keyPressed() {
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     // Enter/Return = Confirm and join room
     if (keyCode === ENTER || keyCode === RETURN) {
-      console.log('User pressed Enter - confirming room join');
+      Utils.Logger.state('[Room] User pressed Enter - confirming join');
 
       const { roomName, shouldShareLocalData } = roomJoinConfirmation;
       roomJoinConfirmation = null;
@@ -2679,7 +2708,7 @@ function keyPressed() {
 
     // Escape = Cancel and go back
     if (keyCode === ESCAPE) {
-      console.log('User pressed Escape - cancelling room join');
+      Utils.Logger.state('[Room] User pressed Escape - cancelling join');
       roomJoinConfirmation = null;
 
       // Navigate back to previous page
@@ -3035,13 +3064,13 @@ async function handleFileLoad(file) {
     if (mindMap && typeof mindMap.load === 'function') {
       try {
         await mindMap.load(data);
-        console.log('Loaded map from file successfully');
+        Utils.Logger.state('[File] Loaded map from file successfully');
 
         // CRITICAL: If in a collaborative room, REPLACE room state with loaded file
         // Clear Yjs first to avoid duplicates, then sync the loaded file
         if (collaborationManager && collaborationManager.isConnected) {
-          console.log('In collaborative room - replacing room state with loaded file');
-          console.log('  - Clearing old room state...');
+          Utils.Logger.state('[File] In collaborative room - replacing room state with loaded file');
+          Utils.Logger.state('[File] - Clearing old room state...');
 
           // Clear all Yjs state first to prevent duplicates
           try {
@@ -3055,20 +3084,20 @@ async function handleFileLoad(file) {
               // Clear connections (Array - delete all items)
               collaborationManager.yconnections.delete(0, collaborationManager.yconnections.length);
 
-              console.log('  - Cleared', oldBoxCount, 'old boxes and', oldConnCount, 'old connections');
+              Utils.Logger.state('[File] - Cleared', oldBoxCount, 'old boxes and', oldConnCount, 'old connections');
             }
           } catch (e) {
             console.error('Error clearing Yjs state:', e);
             // Continue anyway - worst case is duplicates
           }
 
-          console.log('  - Syncing', mindMap.boxes.length, 'boxes from loaded file...');
+          Utils.Logger.state('[File] - Syncing', mindMap.boxes.length, 'boxes from loaded file...');
 
           // Now sync the loaded file to Yjs
           try {
             if (typeof collaborationManager._syncLocalToYjs === 'function') {
               collaborationManager._syncLocalToYjs();
-              console.log('  ✅ File state now in Yjs - room replaced with loaded file');
+              Utils.Logger.state('[File] ✅ File state now in Yjs - room replaced with loaded file');
             }
           } catch (e) {
             console.error('Error syncing loaded file to Yjs:', e);

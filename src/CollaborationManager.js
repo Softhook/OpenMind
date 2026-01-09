@@ -160,7 +160,7 @@ class CollaborationManager {
 
         // If initialization is already in progress, wait for it to complete
         if (this.isInitializing) {
-            console.log('CollaborationManager: Initialization already in progress, waiting...');
+            Utils.Logger.debug('[Init] Already in progress, waiting...');
             return this.initializationPromise;
         }
 
@@ -207,7 +207,7 @@ class CollaborationManager {
             // When joining a room, the room's state is authoritative.
 
             this.isInitialized = true;
-            console.log('CollaborationManager: Initialized (Yjs ready, not yet connected)');
+            Utils.Logger.collab('[Init] Initialized (Yjs ready, not yet connected)');
 
         } catch (error) {
             console.error('CollaborationManager: Failed to initialize', error);
@@ -263,7 +263,7 @@ class CollaborationManager {
 
             // Track connection state - set isConnected based on actual WebSocket status
             this.provider.on('status', ({ status }) => {
-                console.log('CollaborationManager: Connection status:', status);
+                Utils.Logger.network('[Connection] Status:', status);
                 const wasConnected = this.isConnected;
                 this.isConnected = (status === 'connected');
 
@@ -279,7 +279,7 @@ class CollaborationManager {
 
             // Track sync state
             this.provider.on('synced', ({ synced }) => {
-                console.log('CollaborationManager: Sync status:', synced);
+                Utils.Logger.state('[Sync] Status:', synced);
 
                 // Detect transition from not-synced to synced (initial sync or resync)
                 const isResync = synced && !this.lastSyncedState;
@@ -287,7 +287,7 @@ class CollaborationManager {
 
                 // FORCE connection state to true if synced (fixes split-brain issue)
                 if (synced && !this.isConnected) {
-                    console.log('CollaborationManager: Synced implies connected. Forcing state.');
+                    Utils.Logger.state('[Sync] Synced implies connected - forcing state');
                     this.isConnected = true;
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
@@ -325,7 +325,7 @@ class CollaborationManager {
                 }
             });
 
-            console.log(`CollaborationManager: Connecting to room "${roomName}"...`);
+            Utils.Logger.collab(`[Room] Connecting to "${roomName}"...`);
 
         } catch (error) {
             console.error('CollaborationManager: Failed to connect', error);
@@ -380,7 +380,7 @@ class CollaborationManager {
         this.lastSyncedState = false; // Reset sync state tracking
         this.hasTriggeredInitialZoom = false; // Reset so next room join will auto-zoom
 
-        console.log('CollaborationManager: Disconnected from room (local undo still works)');
+        Utils.Logger.collab('[Disconnect] Left room (local undo still works)');
 
         if (this.onConnectionChange) {
             this.onConnectionChange('disconnected');
@@ -414,7 +414,7 @@ class CollaborationManager {
         // Clear MindMap callbacks
         this._clearMindMapCallbacks();
 
-        console.log('CollaborationManager: Destroyed');
+        Utils.Logger.collab('[Destroy] Collaboration manager destroyed');
     }
 
     /**
@@ -427,7 +427,7 @@ class CollaborationManager {
         if (this.undoManager.undoStack.length === 0) return false;
 
         this.undoManager.undo();
-        console.log('CollaborationManager: Undo performed');
+        Utils.Logger.debug('[Undo] Performed');
 
         // Trigger redraw
         if (this.mindMap) {
@@ -445,7 +445,7 @@ class CollaborationManager {
         if (this.undoManager.redoStack.length === 0) return false;
 
         this.undoManager.redo();
-        console.log('CollaborationManager: Redo performed');
+        Utils.Logger.debug('[Redo] Performed');
 
         // Trigger redraw
         if (this.mindMap) {
@@ -511,7 +511,7 @@ class CollaborationManager {
     clearUndoHistory() {
         if (this.undoManager) {
             this.undoManager.clear();
-            console.log('CollaborationManager: Undo history cleared');
+            Utils.Logger.debug('[Undo] History cleared');
         }
     }
 
@@ -568,7 +568,7 @@ class CollaborationManager {
             const websocketModule = await import('https://esm.sh/y-websocket@1.5.0?deps=yjs@13.6.18');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
-            console.log('CollaborationManager: Dependencies loaded via ESM.sh (Websockets)');
+            Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets)');
         } catch (error) {
             console.error('CollaborationManager: Failed to load dependencies', error);
             throw new Error('Failed to load collaboration dependencies. Internet connection required.');
@@ -590,7 +590,7 @@ class CollaborationManager {
         // Always sync local boxes to Yjs - Yjs will merge by ID
         // Same IDs update existing entries, different IDs are added
         if (this.mindMap.boxes.length > 0) {
-            console.log('CollaborationManager: Syncing local state to Yjs, local boxes:', this.mindMap.boxes.length, 'yjs boxes:', this.yboxes.size);
+            Utils.Logger.state('[Sync] Local to Yjs - local:', this.mindMap.boxes.length, 'yjs:', this.yboxes.size);
 
             // Use null origin to prevent this from being tracked in undo
             // This is initial sync/load, not a user action
@@ -637,7 +637,7 @@ class CollaborationManager {
                 this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
 
                 if (attemptNumber < maxAttempts) {
-                    console.log(`CollaborationManager: Sync verification attempt ${attemptNumber}/${maxAttempts} - Yjs still empty, retrying...`);
+                    Utils.Logger.state(`[Sync] Verification attempt ${attemptNumber}/${maxAttempts} - Yjs empty, retrying...`);
 
                     // Retry sync
                     this.syncAttemptCount = attemptNumber + 1;
@@ -660,7 +660,7 @@ class CollaborationManager {
             } else if (this.yboxes && this.yboxes.size > 0) {
                 const firstAttemptTime = this.connectionStartTime || this.lastSyncAttemptTime || Date.now();
                 const timeTaken = Date.now() - firstAttemptTime;
-                console.log(`✅ CollaborationManager: Sync verified after ${attemptNumber} attempt(s) in ${Math.round(timeTaken / 1000)}s. Yjs has ${this.yboxes.size} boxes.`);
+                Utils.Logger.collab(`✅ [Sync] Verified after ${attemptNumber} attempt(s) in ${Math.round(timeTaken / 1000)}s - ${this.yboxes.size} boxes`);
                 this.syncAttemptCount = 0;
             }
         }, delay);
@@ -889,7 +889,7 @@ class CollaborationManager {
                     // Auto-zoom once when first receiving remote boxes
                     if (!this.hasTriggeredInitialZoom && this.mindMap.boxes.length > 0) {
                         this.hasTriggeredInitialZoom = true;
-                        console.log('CollaborationManager: First boxes received, triggering resetView');
+                        Utils.Logger.collab('[Zoom] First boxes received, triggering resetView');
                         if (typeof resetView === 'function') {
                             resetView();
                         }
@@ -1023,7 +1023,7 @@ class CollaborationManager {
     _rebuildBoxesFromYjs() {
         if (!this.mindMap || !this.yboxes) return;
 
-        console.log('CollaborationManager: Rebuilding boxes from Yjs, count:', this.yboxes.size);
+        Utils.Logger.state('[Rebuild] Rebuilding from Yjs, count:', this.yboxes.size);
 
         // Track which local boxes exist in Yjs
         const yjsBoxIds = new Set();
@@ -1039,7 +1039,7 @@ class CollaborationManager {
         this.mindMap.boxes = this.mindMap.boxes.filter(box => {
             if (!box || !box.id) return false;
             if (yjsBoxIds.has(box.id)) return true;
-            console.log('CollaborationManager: Removing local-only box:', box.id);
+            Utils.Logger.debug('[Cleanup] Removing local-only box:', box.id);
             return false;
         });
 
@@ -1087,7 +1087,7 @@ class CollaborationManager {
             const boxCount = this.mindMap.boxes?.length || 0;
             const connCount = this.mindMap.connections?.length || 0;
 
-            console.log('CollaborationManager: Clearing local data -', boxCount, 'boxes and', connCount, 'connections');
+            Utils.Logger.state('[Clear] Clearing local data -', boxCount, 'boxes,', connCount, 'connections');
 
             // Clear all boxes and connections
             this.mindMap.boxes = [];
@@ -1122,12 +1122,12 @@ class CollaborationManager {
         const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
 
         if (isColdStart) {
-            console.log('CollaborationManager: Cold start detected (connection took', Math.round(connectionTime / 1000), 's). Using extended verification.');
+            Utils.Logger.collab('[ColdStart] Detected (', Math.round(connectionTime / 1000), 's). Using extended verification');
         }
 
-        console.log('CollaborationManager: Starting collaboration - sharing local data');
-        console.log('  - Local boxes:', this.mindMap.boxes.length, '| Yjs boxes:', this.yboxes.size);
-        console.log('  - Force syncing local state to Yjs...');
+        Utils.Logger.collab('[Start] Sharing local data');
+        Utils.Logger.state('  - Local:', this.mindMap.boxes.length, '| Yjs:', this.yboxes.size);
+        Utils.Logger.state('  - Force syncing local state to Yjs...');
 
         this.lastSyncAttemptTime = Date.now();
         this.syncAttemptCount = 1;
@@ -1146,7 +1146,7 @@ class CollaborationManager {
      * @private
      */
     _handleJoinEmptyRoom() {
-        console.log('CollaborationManager: Joining empty room, clearing local data:', this.mindMap.boxes.length, 'boxes');
+        Utils.Logger.collab('[Join] Empty room, clearing', this.mindMap.boxes.length, 'local boxes');
         this._clearLocalData();
     }
 
@@ -1156,7 +1156,7 @@ class CollaborationManager {
      * @private
      */
     _handleJoinRoomWithData() {
-        console.log('CollaborationManager: Joining room with data, clearing local data then syncing from room');
+        Utils.Logger.collab('[Join] Room has data, clearing local then syncing from room');
         this._clearLocalData();
         this._rebuildBoxesFromYjs();
         this._rebuildConnectionsFromYjs();
@@ -1168,8 +1168,8 @@ class CollaborationManager {
      * @private
      */
     _handleStartCollaborationRoomHasData() {
-        console.log('CollaborationManager: Starting collaboration with existing room data');
-        console.log('  - Local boxes:', this.mindMap.boxes.length, '| Yjs boxes:', this.yboxes.size);
+        Utils.Logger.collab('[Start] Collaboration with existing room data');
+        Utils.Logger.state('  - Local:', this.mindMap.boxes.length, '| Yjs:', this.yboxes.size);
 
         // First, sync from room to get existing data
         this._rebuildBoxesFromYjs();
@@ -1177,7 +1177,7 @@ class CollaborationManager {
 
         // Then, sync our local data to add to the room
         // Yjs uses box IDs as keys, so same IDs will update, different IDs will be added
-        console.log('  - Merging local data into room...');
+        Utils.Logger.state('  - Merging local data into room...');
         this._syncLocalToYjs();
     }
 
@@ -1187,7 +1187,7 @@ class CollaborationManager {
      * @private
      */
     _handleBothEmpty() {
-        console.log('CollaborationManager: Both empty, scheduling sync retries...');
+        Utils.Logger.collab('[Empty] Both empty, scheduling sync retries...');
         let retryCount = 0;
         const maxRetries = 5;
         const retryInterval = 500;
@@ -1196,12 +1196,12 @@ class CollaborationManager {
             retryCount++;
             if (this.yboxes && this.yboxes.size === 0 &&
                 this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
-                console.log('CollaborationManager: Retry', retryCount, '- seeding with local data');
+                Utils.Logger.state('[Retry]', retryCount, '- seeding with local data');
                 this._syncLocalToYjs();
             } else if (retryCount < maxRetries) {
                 this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
             } else {
-                console.log('CollaborationManager: Sync retries exhausted, room may be empty');
+                Utils.Logger.state('[Retry] Exhausted, room may be empty');
             }
         };
 
@@ -1311,7 +1311,7 @@ class CollaborationManager {
                 // We don't disconnect because THEY should detect incompatibility and disconnect
                 // (If they're too old to have version checking, they won't disconnect, but
                 // this is acceptable as we'll eventually phase out those clients)
-                console.log('CollaborationManager: Peer without version info detected (old client):', state.user.name || 'Unknown');
+                Utils.Logger.collab('[Peer] Without version info detected (old client):', state.user.name || 'Unknown');
             }
         }
     }
@@ -1376,7 +1376,7 @@ class CollaborationManager {
             });
         }
 
-        console.log('CollaborationManager: Display name changed to:', this.userName);
+        Utils.Logger.collab('[DisplayName] Changed to:', this.userName);
     }
 
     /**
@@ -1617,7 +1617,7 @@ class CollaborationManager {
                 this._rebuildConnectionsFromYjs();
 
                 this.mindMap.isDirty = true;
-                console.log('CollaborationManager: Consistency check reconciliation complete');
+                Utils.Logger.state('[Consistency] Reconciliation complete');
                 // Reset synced check counter since we had a mismatch
                 this.consecutiveSyncedChecks = 0;
             } finally {
@@ -1629,7 +1629,7 @@ class CollaborationManager {
 
             // After 3 consecutive successful checks, stop the timer (stable state)
             if (this.consecutiveSyncedChecks >= 3) {
-                console.log('CollaborationManager: Stable sync detected after 3 checks, disabling periodic consistency check');
+                Utils.Logger.state('[Consistency] Stable sync detected, disabling periodic check');
                 this._stopConsistencyCheck();
             }
         }
@@ -1651,7 +1651,7 @@ class CollaborationManager {
             this._performConsistencyCheck();
         }, this.consistencyCheckInterval);
 
-        console.log('CollaborationManager: Started consistency check timer (30s interval)');
+        Utils.Logger.debug('[Consistency] Started timer (30s interval)');
     }
 
     /**
@@ -1662,7 +1662,7 @@ class CollaborationManager {
         if (this.consistencyCheckTimer) {
             clearInterval(this.consistencyCheckTimer);
             this.consistencyCheckTimer = null;
-            console.log('CollaborationManager: Stopped consistency check timer');
+            Utils.Logger.debug('[Consistency] Stopped timer');
         }
     }
 
