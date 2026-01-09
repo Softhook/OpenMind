@@ -1,28 +1,46 @@
 /**
- * Connection class - represents a directional arrow connection between two boxes
- * Uses shared utilities from utils.js when available for validation and geometry
+ * Connection class - represents a directional arrow connection between two boxes.
+ * 
+ * Features:
+ * - Directional arrows showing data flow from one box to another
+ * - Visual feedback for selection state
+ * - Mouse interaction for selection and reattachment
+ * - Automatic edge-to-edge routing between boxes
+ * 
+ * Dependencies:
+ * - Uses shared utilities from utils.js for validation, geometry, and rendering
+ * - Requires p5.js for drawing operations
  */
 class Connection {
-  // Constants
-  static ARROW_SIZE = 12;
-  static HIT_THRESHOLD = 7; // pixels for click detection
-  static STROKE_WEIGHT_NORMAL = 2;
-  static STROKE_WEIGHT_SELECTED = 3;
+  // ============================================================================
+  // STATIC CONSTANTS
+  // ============================================================================
+
+  // Visual constants
+  static ARROW_SIZE = 12;              // Size of arrow head in pixels
+  static HIT_THRESHOLD = 7;            // Hit detection radius for line clicks
+  static STROKE_WEIGHT_NORMAL = 2;     // Line thickness when not selected
+  static STROKE_WEIGHT_SELECTED = 3;   // Line thickness when selected
 
   // Color constants for consistent styling
   static COLORS = {
-    NORMAL: 80,
-    SELECTED: { r: 100, g: 150, b: 255 }
+    NORMAL: 80,                        // Gray for normal state
+    SELECTED: { r: 100, g: 150, b: 255 } // Blue for selected state
   };
 
+  // ============================================================================
+  // CONSTRUCTOR
+  // ============================================================================
+
   /**
-   * Creates a new Connection between two boxes
-   * @param {TextBox} fromBox - Source box
-   * @param {TextBox} toBox - Target box
+   * Creates a new Connection between two boxes.
+   * The connection is directional, flowing from fromBox to toBox.
+   * @param {TextBox} fromBox - Source box (tail of arrow)
+   * @param {TextBox} toBox - Target box (head of arrow)
    */
   constructor(fromBox, toBox) {
     if (!fromBox || !toBox) {
-      console.error('Connection requires valid boxes');
+      Utils.Logger.error('[Connection] Constructor called with invalid boxes:', { fromBox, toBox });
     }
     this.fromBox = fromBox;
     this.toBox = toBox;
@@ -30,126 +48,161 @@ class Connection {
     this.selected = false;
   }
 
+  // ============================================================================
+  // HELPER METHODS
+  // ============================================================================
+
   /**
-   * Gets the world-space position of the arrow head (end point at toBox edge)
-   * @returns {Object|null} Point with x and y coordinates, or null if invalid
+   * Gets the connection endpoints on the edges of the boxes.
+   * Calculates where the connection line should start and end based on
+   * the positions of the two boxes.
+   * @returns {Object|null} Object with {start, end} points, or null if invalid
+   * @private
    */
-  getArrowHeadPosition() {
+  _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
+
+    const start = this.fromBox.getConnectionPoint(this.toBox);
     const end = this.toBox.getConnectionPoint(this.fromBox);
-    if (!end || !Utils.areValidCoordinates(end.x, end.y)) return null;
-    return end;
-  }
 
-  /**
-   * Checks if mouse is over the arrow head (for reattachment)
-   * @returns {boolean} true if mouse is over arrow head
-   */
-  isMouseOverArrowHead() {
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    if (!Utils.areValidCoordinates(mx, my)) return false;
-    const end = this.getArrowHeadPosition();
-    if (!end) return false;
-    // Scale hit radius slightly with zoom so it's usable at different scales
-    const currentZoom = typeof zoom !== 'undefined' ? zoom : 1;
-    const safeZoom = Math.max(0.25, Math.min(4, currentZoom));
-    const hitR = 10 / Math.sqrt(safeZoom);
-    const d = Utils.distance(mx, my, end.x, end.y);
-    return d <= hitR;
-  }
-
-  /**
-   * Draws the connection (line and arrow head)
-   */
-  draw() {
-    // Validate boxes exist
-    if (!this.fromBox || !this.toBox) {
-      return;
-    }
-
-    push();
-
-    // Get connection points on the edges of the boxes
-    let start = this.fromBox.getConnectionPoint(this.toBox);
-    let end = this.toBox.getConnectionPoint(this.fromBox);
-
-    // Validate connection points using shared utility
+    // Validate both connection points
     if (!start || !end ||
       !Utils.areValidCoordinates(start.x, start.y) ||
       !Utils.areValidCoordinates(end.x, end.y)) {
-      pop();
-      return;
+      return null;
     }
 
-    // Draw line
-    if (this.selected) {
-      const c = Connection.COLORS.SELECTED;
-      stroke(c.r, c.g, c.b);
-      strokeWeight(Connection.STROKE_WEIGHT_SELECTED);
+    return { start, end };
+  }
+
+  /**
+   * Gets the world-space position of the arrow head (end point at toBox edge).
+   * This is where the visual arrow tip appears.
+   * @returns {Object|null} Point with x and y coordinates, or null if invalid
+   */
+  getArrowHeadPosition() {
+    const endpoints = this._getConnectionEndpoints();
+    return endpoints ? endpoints.end : null;
+  }
+
+  /**
+   * Checks if mouse is over the arrow head (for reattachment).
+   * The hit radius scales with zoom to remain usable at different zoom levels.
+   * @returns {boolean} true if mouse is over arrow head
+   */
+  isMouseOverArrowHead() {
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) return false;
+
+    const end = this.getArrowHeadPosition();
+    if (!end) return false;
+
+    // Scale hit radius with zoom for better usability
+    // At higher zoom, smaller hit radius; at lower zoom, larger hit radius
+    const currentZoom = Utils.getCurrentZoom();
+    const safeZoom = Utils.clamp(currentZoom, 0.25, 4);
+    const hitRadius = 10 / Math.sqrt(safeZoom);
+
+    const distance = Utils.distance(mx, my, end.x, end.y);
+    return distance <= hitRadius;
+  }
+
+  /**
+   * Applies styling colors based on selection state.
+   * Consolidates the duplicate color logic from draw().
+   * @param {boolean} isStroke - If true, apply stroke; if false, apply fill
+   * @private
+   */
+  _applySelectionStyle(isStroke = true) {
+    const color = this.selected ? Connection.COLORS.SELECTED : Connection.COLORS.NORMAL;
+    const weight = this.selected ? Connection.STROKE_WEIGHT_SELECTED : Connection.STROKE_WEIGHT_NORMAL;
+
+    if (isStroke) {
+      Utils.applyStroke(color, weight);
     } else {
-      stroke(Connection.COLORS.NORMAL);
-      strokeWeight(Connection.STROKE_WEIGHT_NORMAL);
+      Utils.applyFill(color);
     }
+  }
+
+  // ============================================================================
+  // RENDERING
+  // ============================================================================
+
+  /**
+   * Draws the connection with a line and arrow head.
+   * The arrow points from fromBox to toBox.
+   * Visual appearance differs based on selection state.
+   */
+  draw() {
+    // Get validated connection endpoints
+    const endpoints = this._getConnectionEndpoints();
+    if (!endpoints) return;
+
+    const { start, end } = endpoints;
+
+    push();
+
+    // Draw the connection line with appropriate styling
+    this._applySelectionStyle(true); // true = stroke
     line(start.x, start.y, end.x, end.y);
 
-    // Draw arrow head
-    let angle = atan2(end.y - start.y, end.x - start.x);
-
-    // Validate angle
+    // Calculate arrow head angle
+    // atan2 gives us the angle from start to end point
+    const angle = atan2(end.y - start.y, end.x - start.x);
     if (!Utils.isValidNumber(angle)) {
       pop();
       return;
     }
 
-    if (this.selected) {
-      const c = Connection.COLORS.SELECTED;
-      fill(c.r, c.g, c.b);
-    } else {
-      fill(Connection.COLORS.NORMAL);
-    }
+    // Draw arrow head as a filled triangle
+    this._applySelectionStyle(false); // false = fill
     noStroke();
     push();
-    translate(end.x, end.y);
-    rotate(angle);
-    triangle(0, 0,
-      -this.arrowSize, -this.arrowSize / 2,
-      -this.arrowSize, this.arrowSize / 2);
+    translate(end.x, end.y);  // Move to arrow tip position
+    rotate(angle);            // Rotate to point in connection direction
+
+    // Draw triangle pointing right (before rotation)
+    // The rotation aligns it with the connection angle
+    triangle(
+      0, 0,                                    // Tip of arrow (at end point)
+      -this.arrowSize, -this.arrowSize / 2,   // Top back corner
+      -this.arrowSize, this.arrowSize / 2     // Bottom back corner
+    );
     pop();
 
     pop();
   }
 
+  // ============================================================================
+  // INTERACTION
+  // ============================================================================
+
   /**
-   * Checks if mouse is over the connection line
+   * Checks if mouse is over the connection line.
+   * Uses point-to-segment distance for accurate hit detection.
    * @returns {boolean} true if mouse is over the line
    */
   isMouseOver() {
-    // Validate boxes and mouse coordinates
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    if (!this.fromBox || !this.toBox || !Utils.areValidCoordinates(mx, my)) {
+    // Get validated mouse coordinates in world space
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) {
       return false;
     }
 
-    // Check if mouse is near the line
-    let start = this.fromBox.getConnectionPoint(this.toBox);
-    let end = this.toBox.getConnectionPoint(this.fromBox);
+    // Get validated connection endpoints
+    const endpoints = this._getConnectionEndpoints();
+    if (!endpoints) return false;
 
-    // Validate connection points
-    if (!start || !end ||
-      !Utils.areValidCoordinates(start.x, start.y) ||
-      !Utils.areValidCoordinates(end.x, end.y)) {
-      return false;
-    }
+    const { start, end } = endpoints;
 
-    // Distance from point to line segment
-    let d = this.distanceToSegment(mx, my, start.x, start.y, end.x, end.y);
-    return d < Connection.HIT_THRESHOLD;
+    // Calculate distance from mouse to line segment
+    const distance = this.distanceToSegment(mx, my, start.x, start.y, end.x, end.y);
+    return distance < Connection.HIT_THRESHOLD;
   }
 
   /**
-   * Calculates distance from a point to a line segment
+   * Calculates distance from a point to a line segment.
+   * Delegates to Utils for the actual calculation.
    * @param {number} px - Point X
    * @param {number} py - Point Y
    * @param {number} x1 - Segment start X
@@ -162,82 +215,101 @@ class Connection {
     return Utils.distanceToSegment(px, py, x1, y1, x2, y2);
   }
 
-  /**
-   * Reverses the connection direction (swaps from and to boxes)
-   */
-  reverse() {
-    // Swap from and to boxes
-    let temp = this.fromBox;
-    this.fromBox = this.toBox;
-    this.toBox = temp;
-  }
+  // ============================================================================
+  // MANIPULATION
+  // ============================================================================
 
   /**
-   * Serializes the connection to JSON
-   * Uses box IDs for stable references (required for collaboration)
-   * Also includes legacy indices for backward compatibility
+   * Reverses the connection direction.
+   * After reversing, the arrow points in the opposite direction.
+   */
+  reverse() {
+    // Swap from and to boxes using destructuring
+    [this.fromBox, this.toBox] = [this.toBox, this.fromBox];
+  }
+
+  // ============================================================================
+  // SERIALIZATION
+  // ============================================================================
+
+  /**
+   * Serializes the connection to JSON format.
+   * 
+   * Uses a dual-reference system:
+   * - ID-based (fromId/toId): Stable references for collaboration and modern maps
+   * - Index-based (from/to): Legacy support for older saved maps
+   * 
    * @param {Array<TextBox>} boxes - Array of all boxes (for legacy indexing)
-   * @returns {Object} JSON representation with from/to box IDs and legacy indices
+   * @returns {Object} JSON representation with from/to box IDs and indices
    */
   toJSON(boxes) {
     return {
-      // New: ID-based references (stable for collaboration)
+      // Modern: ID-based references (required for Yjs collaboration)
       fromId: this.fromBox ? this.fromBox.id : null,
       toId: this.toBox ? this.toBox.id : null,
-      // Legacy: index-based references (for backward compatibility with older maps)
+
+      // Legacy: index-based references (backward compatibility)
       from: boxes.indexOf(this.fromBox),
       to: boxes.indexOf(this.toBox)
     };
   }
 
   /**
-   * Creates a Connection from JSON data
-   * Supports both ID-based (new) and index-based (legacy) formats
+   * Creates a Connection from JSON data.
+   * 
+   * Supports two formats for backward compatibility:
+   * 1. ID-based (modern): Uses fromId/toId with a Map or Array lookup
+   * 2. Index-based (legacy): Uses from/to numeric indices into an Array
+   * 
+   * The ID-based approach is preferred as it's stable across edits and
+   * required for Yjs collaboration. Index-based is kept for loading old maps.
+   * 
    * @param {Object} data - JSON data with fromId/toId or from/to indices
-   * @param {Array<TextBox>|Map<string, TextBox>} boxesOrMap - Array of boxes (legacy) or Map of id->box (new)
-   * @returns {Connection|null} New Connection instance or null if invalid
+   * @param {Array<TextBox>|Map<string, TextBox>} boxesOrMap - Array of boxes (legacy) or Map of id->box (modern)
+   * @returns {Connection|null} New Connection instance or null if boxes not found
    */
   static fromJSON(data, boxesOrMap) {
     // Validate inputs
     if (!data || !boxesOrMap) {
-      console.warn('Invalid connection data or boxes');
+      Utils.Logger.error('[Connection] fromJSON: Invalid connection data or boxes');
       return null;
     }
 
     let fromBox = null;
     let toBox = null;
 
-    // Check if we received a Map (new ID-based approach)
     const isMap = boxesOrMap instanceof Map;
 
-    // Try ID-based lookup first (preferred for collaboration)
+    // Strategy 1: Try ID-based lookup (modern, preferred)
     if (data.fromId && data.toId) {
       if (isMap) {
+        // Direct Map lookup (fastest)
         fromBox = boxesOrMap.get(data.fromId);
         toBox = boxesOrMap.get(data.toId);
       } else if (Array.isArray(boxesOrMap)) {
-        // Search array by ID
+        // Array search by ID (slower but supports old code)
         fromBox = boxesOrMap.find(b => b && b.id === data.fromId);
         toBox = boxesOrMap.find(b => b && b.id === data.toId);
       }
     }
 
-    // Fallback to index-based lookup (legacy compatibility)
+    // Strategy 2: Fallback to index-based lookup (legacy compatibility)
     if ((!fromBox || !toBox) && Array.isArray(boxesOrMap)) {
       const boxes = boxesOrMap;
-      const isValidNum = Utils.isValidNumber;
+      const isValidIndex = (idx) =>
+        Utils.isValidNumber(idx) && idx >= 0 && idx < boxes.length;
 
-      if (isValidNum(data.from) && isValidNum(data.to) &&
-        data.from >= 0 && data.to >= 0 &&
-        data.from < boxes.length && data.to < boxes.length) {
+      if (isValidIndex(data.from) && isValidIndex(data.to)) {
+        // Only use index-based if ID-based didn't work
         fromBox = fromBox || boxes[data.from];
         toBox = toBox || boxes[data.to];
       }
     }
 
-    // Validate boxes exist
+    // Final validation
     if (!fromBox || !toBox) {
-      console.warn('Referenced boxes do not exist');
+      Utils.Logger.error('[Connection] fromJSON: Referenced boxes do not exist:',
+        { fromId: data.fromId, toId: data.toId, from: data.from, to: data.to });
       return null;
     }
 

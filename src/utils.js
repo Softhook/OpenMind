@@ -232,6 +232,185 @@ function safeString(value) {
 }
 
 // ============================================================================
+// MOUSE COORDINATE UTILITIES
+// ============================================================================
+
+/**
+ * Gets the current mouse coordinates in world space.
+ * World space accounts for camera panning and zoom transformations.
+ * Falls back to screen space if worldMouseX/worldMouseY functions are not available.
+ * @returns {{x: number, y: number}} Mouse coordinates in world space
+ */
+function getWorldMouseCoordinates() {
+  const x = typeof worldMouseX === 'function' ? worldMouseX() :
+    (typeof mouseX !== 'undefined' ? mouseX : 0);
+  const y = typeof worldMouseY === 'function' ? worldMouseY() :
+    (typeof mouseY !== 'undefined' ? mouseY : 0);
+  return { x, y };
+}
+
+/**
+ * Gets the current mouse coordinates in screen space (pixels on canvas).
+ * Does NOT account for camera transformations.
+ * @returns {{x: number, y: number}} Mouse coordinates in screen space
+ */
+function getMouseCoordinates() {
+  const x = typeof mouseX !== 'undefined' ? mouseX : 0;
+  const y = typeof mouseY !== 'undefined' ? mouseY : 0;
+  return { x, y };
+}
+
+// ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
+
+/**
+ * Structured logging utility with filtering and categorization.
+ * Provides consistent logging format across the application with the ability
+ * to enable/disable specific categories.
+ */
+const Logger = {
+  // Log categories that can be independently enabled/disabled
+  categories: {
+    COLLAB: true,      // Collaboration/sync related logs
+    STATE: true,       // State management logs
+    UI: false,         // UI interaction logs (verbose, usually disabled)
+    NETWORK: true,     // Network/connection logs
+    ERROR: true,       // Error logs (always recommended)
+    DEBUG: false       // Debug logs (verbose, disabled in production)
+  },
+
+  /**
+   * Logs a message with a category prefix
+   * @param {string} category - Category name (e.g., 'COLLAB', 'STATE')
+   * @param {...any} args - Arguments to log
+   */
+  log(category, ...args) {
+    if (this.categories[category]) {
+      console.log(`[${category}]`, ...args);
+    }
+  },
+
+  /**
+   * Logs a collaboration-related message
+   * @param {...any} args - Arguments to log
+   */
+  collab(...args) {
+    this.log('COLLAB', ...args);
+  },
+
+  /**
+   * Logs a state management message
+   * @param {...any} args - Arguments to log
+   */
+  state(...args) {
+    this.log('STATE', ...args);
+  },
+
+  /**
+   * Logs a UI interaction message
+   * @param {...any} args - Arguments to log
+   */
+  ui(...args) {
+    this.log('UI', ...args);
+  },
+
+  /**
+   * Logs a network/connection message
+   * @param {...any} args - Arguments to log
+   */
+  network(...args) {
+    this.log('NETWORK', ...args);
+  },
+
+  /**
+   * Logs an error (always shown regardless of category settings)
+   * @param {...any} args - Arguments to log
+   */
+  error(...args) {
+    console.error('[ERROR]', ...args);
+  },
+
+  /**
+   * Logs a debug message (useful for development)
+   * @param {...any} args - Arguments to log
+   */
+  debug(...args) {
+    this.log('DEBUG', ...args);
+  },
+
+  /**
+   * Enables a logging category
+   * @param {string} category - Category to enable
+   */
+  enable(category) {
+    if (category in this.categories) {
+      this.categories[category] = true;
+    }
+  },
+
+  /**
+   * Disables a logging category
+   * @param {string} category - Category to disable
+   */
+  disable(category) {
+    if (category in this.categories) {
+      this.categories[category] = false;
+    }
+  },
+
+  /**
+   * Enables all logging categories
+   */
+  enableAll() {
+    for (const category in this.categories) {
+      this.categories[category] = true;
+    }
+  },
+
+  /**
+   * Disables all logging categories except ERROR
+   */
+  disableAll() {
+    for (const category in this.categories) {
+      this.categories[category] = (category === 'ERROR');
+    }
+  }
+};
+
+// ============================================================================
+// RENDERING UTILITIES
+// ============================================================================
+
+/**
+ * Applies stroke styling to the current p5.js context.
+ * Handles both grayscale and RGB color values.
+ * @param {number|Object} color - Grayscale value (0-255) or RGB object {r, g, b}
+ * @param {number} weight - Stroke weight in pixels
+ */
+function applyStroke(color, weight = 1) {
+  if (typeof color === 'number') {
+    stroke(color);
+  } else if (color && typeof color === 'object') {
+    stroke(color.r, color.g, color.b);
+  }
+  strokeWeight(weight);
+}
+
+/**
+ * Applies fill styling to the current p5.js context.
+ * Handles both grayscale and RGB color values.
+ * @param {number|Object} color - Grayscale value (0-255) or RGB object {r, g, b}
+ */
+function applyFill(color) {
+  if (typeof color === 'number') {
+    fill(color);
+  } else if (color && typeof color === 'object') {
+    fill(color.r, color.g, color.b);
+  }
+}
+
+// ============================================================================
 // GEOMETRY UTILITIES  
 // ============================================================================
 
@@ -663,6 +842,17 @@ if (typeof window !== 'undefined') {
     sanitizeText,
     isWhitespace,
     safeString,
+
+    // Mouse coordinates
+    getWorldMouseCoordinates,
+    getMouseCoordinates,
+
+    // Logging
+    Logger,
+
+    // Rendering
+    applyStroke,
+    applyFill,
 
     // Geometry
     distance,

@@ -1,28 +1,53 @@
 /**
- * TextBox class - represents a text node in the mind map with editing capabilities,
- * resizing, text wrapping, and visual styling.
- * Uses shared utilities from utils.js when available.
+ * TextBox class - represents a text node in the mind map.
+ *
+ * This is a core component providing rich text editing, visual styling, and
+ * interactive features for mind map nodes.
+ *
+ * Key Features:
+ * - Rich text editing with cursor positioning and text selection
+ * - Automatic text wrapping with smart word/space preservation
+ * - Resizable boxes with user-controlled or auto-sizing
+ * - Image and PDF attachment support
+ * - Hyperlink detection and click-to-open
+ * - Text highlighting with color customization
+ * - Drag-and-drop with edge/center region detection
+ * - Connection points for arrows
+ * - Color palette for node backgrounds
+ *
+ * Dependencies:
+ * - Uses shared utilities from utils.js for validation and text processing
+ * - Requires p5.js for all rendering operations
+ * - Uses pdf.js (optional) for PDF preview rendering
  */
 class TextBox {
-  // Constants
-  static PADDING = 12;
-  static MIN_WIDTH = 150;
-  static MIN_HEIGHT = 40;
-  static MAX_WIDTH = 280;
-  static FONT_SIZE = 14;
-  static CORNER_RADIUS = 6;
-  static RESIZE_HANDLE_SIZE = 18;
-  static CURSOR_BLINK_RATE = 530;
-  static DRAG_EDGE_THICKNESS = 18;
-  static HORIZONTAL_EDGE_WIDTH = 12; // fixed thinner vertical grab area for all boxes
-  static LINE_HEIGHT_MULTIPLIER = 1.5;
-  static CONNECTOR_RADIUS = 7;
-  static CONNECTOR_RADIUS_ACTIVE = 7;
-  static MIN_CENTER_EDIT_ZONE = 20; // Minimum size of the central area reserved for text editing (not dragging)
+  // ============================================================================
+  // STATIC CONSTANTS
+  // ============================================================================
+
+  // Size and spacing constants
+  static PADDING = 12;                      // Internal padding around text
+  static MIN_WIDTH = 150;                   // Minimum box width
+  static MIN_HEIGHT = 40;                   // Minimum box height
+  static MAX_WIDTH = 280;                   // Maximum auto-width for boxes
+  static FONT_SIZE = 14;                    // Default font size
+  static CORNER_RADIUS = 6;                 // Rounded corner radius
+  static LINE_HEIGHT_MULTIPLIER = 1.5;      // Line height as multiple of font size
+
+  // Interaction constants
+  static RESIZE_HANDLE_SIZE = 18;           // Size of resize handle in corner
+  static CURSOR_BLINK_RATE = 530;           // Cursor blink interval in ms
+  static DRAG_EDGE_THICKNESS = 18;          // Thickness of draggable edge regions
+  static HORIZONTAL_EDGE_WIDTH = 12;        // Fixed thinner width for vertical grab areas
+  static MIN_CENTER_EDIT_ZONE = 20;         // Min central area for text editing (not dragging)
 
   // Change detection threshold for drag/resize operations (in pixels)
   // Operations with changes smaller than this are considered "no change" for undo purposes
   static CHANGE_THRESHOLD = 0.001;
+
+  // Connection point constants
+  static CONNECTOR_RADIUS = 7;              // Radius of connection dots
+  static CONNECTOR_RADIUS_ACTIVE = 7;       // Radius when actively connecting
 
   // Color constants for consistent styling
   static COLORS = {
@@ -39,71 +64,104 @@ class TextBox {
 
   // Regex pattern to detect URLs (http, https, file://, and local paths)
   // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
-  static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>\"\')\]]+|(?:\.{0,2}\/)[^\s<>\"\')\]]+/gi;
+  static URL_PATTERN = /(?:https?:\/\/|file:\/\/)[^\s<>"')\]]+|(?:\.{0,2}\/)[^\s<>"')\]]+/gi;
+
+  // ============================================================================
+  // CONSTRUCTOR
+  // ============================================================================
 
   /**
-   * Creates a new TextBox
-   * @param {number} x - Center X coordinate
-   * @param {number} y - Center Y coordinate
-   * @param {string} text - Initial text content
+   * Creates a new TextBox.
+   * Initializes all state including position, text content, dimensions,
+   * editing state, and interaction flags.
+   * @param {number} x - Center X coordinate in world space
+   * @param {number} y - Center Y coordinate in world space
+   * @param {string} text - Initial text content (will be sanitized)
    */
   constructor(x, y, text = "") {
     // Generate stable unique identifier for collaboration
     this.id = Utils.generateUUID();
+
+    // Position and dimensions
     this.x = x;
     this.y = y;
-    // Interpolation targets (init to current pos)
-    this.targetX = x;
+    this.targetX = x;  // Interpolation target for smooth movement
     this.targetY = y;
+
+    // Content
     this.text = Utils.sanitizeText(text);
+
+    // Image attachment state
     this.imageUrl = null;
     this.img = null;
     this.imageLoaded = false;
     this.imageLoadError = false;
+
+    // Layout configuration
     this.padding = TextBox.PADDING;
     this.minWidth = TextBox.MIN_WIDTH;
     this.minHeight = TextBox.MIN_HEIGHT;
     this.maxWidth = TextBox.MAX_WIDTH;
     this.fontSize = TextBox.FONT_SIZE;
-    this.isEditing = false;
-    this.isDragging = false;
-    this.dragOffsetX = 0;
-    this.dragOffsetY = 0;
     this.cornerRadius = TextBox.CORNER_RADIUS;
+
+    // Editing state
+    this.isEditing = false;
     this.cursorPosition = this.text.length;
     this.selectionStart = -1;
     this.selectionEnd = -1;
-    this.resizeHandleSize = TextBox.RESIZE_HANDLE_SIZE;
+    this.isSelecting = false;
+    this.selectionAnchor = -1;
+
+    // Cursor blink animation
+    this.cursorBlinkTime = 0;
+    this.cursorVisible = true;
+    this.cursorBlinkRate = TextBox.CURSOR_BLINK_RATE;
+
+    // Drag state
+    this.isDragging = false;
+    this.dragOffsetX = 0;
+    this.dragOffsetY = 0;
+    this.dragEdgeThickness = TextBox.DRAG_EDGE_THICKNESS;
+
+    // Resize state
     this.isResizing = false;
+    this.resizeHandleSize = TextBox.RESIZE_HANDLE_SIZE;
     this.resizeStartX = 0;
     this.resizeStartY = 0;
     this.resizeStartWidth = 0;
     this.resizeStartHeight = 0;
     this.resizeStartLeft = 0;
     this.resizeStartTop = 0;
-    this.userResized = false;
+    this.userResized = false;  // Tracks if user manually resized (vs. auto-sizing)
+
+    // Text wrapping cache
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
-    this.cachedLineCharMap = null;
-    this.isSelecting = false;
-    this.selectionAnchor = -1;
+    this.cachedLineCharMap = null;  // Maps wrapped line indices to original text positions
+
+    // Click detection for double-click
     this.lastClickTime = 0;
     this.lastClickX = 0;
     this.lastClickY = 0;
     this.doubleClickThreshold = 300;
-    this.cursorBlinkTime = 0;
-    this.cursorVisible = true;
-    this.cursorBlinkRate = TextBox.CURSOR_BLINK_RATE;
-    this.dragEdgeThickness = TextBox.DRAG_EDGE_THICKNESS;
+
+    // Visual state
     this.selected = false;
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = TextBox.getColorPalette();
-    // Persistent highlights: array of {start, end, color:{r,g,b,a?}}
-    this.highlights = [];
-    // Cache for detected links: array of {start, end, url}
-    this.cachedLinks = null;
+
+    // Text features
+    this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
+    this.cachedLinks = null;    // Cached array of {start, end, url}
+
+    // Calculate initial dimensions
     this.updateDimensions();
   }
+
+  // ============================================================================
+  // MEDIA ATTACHMENT (IMAGES AND PDFs)
+  // ============================================================================
 
   /**
    * Load an image from a URL and attach it to this box.
@@ -212,8 +270,13 @@ class TextBox {
     }
   }
 
+  // ============================================================================
+  // COLOR PALETTE
+  // ============================================================================
+
   /**
-   * Gets the default color palette for boxes
+   * Gets the default color palette for boxes.
+   * Provides a simple set of background colors users can choose from.
    * @returns {Array<Object>} Array of color palette entries with key and color
    */
   static getColorPalette() {
@@ -223,6 +286,10 @@ class TextBox {
       { key: 'red', color: { r: 255, g: 140, b: 140 } }
     ];
   }
+
+  // ============================================================================
+  // HYPERLINK DETECTION AND HANDLING
+  // ============================================================================
 
   /**
    * Detects all hyperlinks in the text
@@ -329,18 +396,20 @@ class TextBox {
   }
 
   /**
-   * Checks if the mouse is currently over a link
+   * Checks if the mouse is currently over a clickable link in this box.
    * @returns {boolean} true if mouse is over a link
    */
   isMouseOverLink() {
     if (this.imageUrl) return false;
     if (!this.isMouseOver()) return false;
 
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     return this.getLinkAtMouse(mx, my) !== null;
   }
+
+  // ============================================================================
+  // TEXT UTILITIES
+  // ============================================================================
 
   /**
    * Sanitizes text to normalize line endings and remove problematic invisible characters
@@ -367,7 +436,16 @@ class TextBox {
   }
 
   /**
-   * Recalculates box dimensions based on text content
+   * Recalculates box dimensions based on text content.
+   * 
+   * Dimension calculation strategy:
+   * - For image boxes: preserve user-set dimensions
+   * - For text boxes:
+   *   - Width: auto-size to content (up to MAX_WIDTH) unless user-resized
+   *   - Height: always reflow to fit wrapped lines at current width
+   * 
+   * This ensures boxes grow/shrink naturally with content while respecting
+   * user customization.
    */
   updateDimensions() {
     if (this.text == null) this.text = '';
@@ -415,12 +493,19 @@ class TextBox {
     this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
   }
 
-  // ============================================================================
-  // TEXT WRAPPING AND LAYOUT
-  // ============================================================================
-
   /**
-   * Wraps text to fit within the box width
+   * Wraps text to fit within the box width.
+   * 
+   * This is a complex algorithm that:
+   * - Preserves all whitespace (leading, trailing, inter-word spaces)
+   * - Breaks lines word by word when possible
+   * - Breaks long words character-by-character when needed
+   * - Maintains accurate mapping from wrapped lines back to original text (for cursor positioning)
+   * - Caches results to avoid redundant wrapping on every frame
+   * 
+   * The line-to-char mapping (cachedLineCharMap) is critical for cursor and selection
+   * positioning in the visual display.
+   * 
    * @param {string} text - Text to wrap
    * @returns {Array<string>} Array of wrapped text lines
    */
@@ -956,8 +1041,7 @@ class TextBox {
     for (let side of sides) {
       const p = pts[side];
       if (!p) continue;
-      const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-      const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+      const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
       if (dist(mx, my, p.x, p.y) <= scaledHitRadius) {
         return side;
       }
@@ -984,28 +1068,38 @@ class TextBox {
     pop();
   }
 
-  isMouseOver() {
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
-    return mx > this.x - this.width / 2 &&
-      mx < this.x + this.width / 2 &&
-      my > this.y - this.height / 2 &&
-      my < this.y + this.height / 2;
-  }
+  // ============================================================================
+  // MOUSE INTERACTION & HIT TESTING
+  // ============================================================================
 
   /**
-   * Checks if mouse is over the resize handle
+   * Checks if the mouse is currently over this box.
+   * Uses world coordinates for accurate hit detection.
+   * @returns {boolean} true if mouse is over the box rectangle
+   */
+  isMouseOver() {
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    return Utils.isPointInRect(mx, my, this.x, this.y, this.width, this.height);
+  }
+
+  // ============================================================================
+  // RESIZE HANDLE INTERACTION
+  // ============================================================================
+
+  /**
+   * Checks if mouse is over the resize handle (bottom-right corner).
+   * The handle is only visible and interactive when the box is selected.
    * @returns {boolean} true if mouse is over resize handle
    */
   isMouseOverResizeHandle() {
+    if (!this.selected) return false;
     const zoomFactor = Utils.getClampedZoomFactor();
     const scaledHandleSize = this.resizeHandleSize / zoomFactor;
     let handleX = this.x + this.width / 2 - scaledHandleSize;
     let handleY = this.y + this.height / 2 - scaledHandleSize;
     let cx = handleX + scaledHandleSize / 2;
     let cy = handleY + scaledHandleSize / 2;
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     // Use circular hit detection for the circular handle
     let distance = dist(mx, my, cx, cy);
     return distance < scaledHandleSize / 2;
@@ -1026,8 +1120,7 @@ class TextBox {
     const verticalEdgeWidth = min(edgeThresholdX, TextBox.HORIZONTAL_EDGE_WIDTH);
     const edgeThresholdY = min(this.dragEdgeThickness, maxEdgeY);
 
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
 
     // For image boxes, the entire interior should behave like the edge-draggable area
     if (this.imageUrl) {
