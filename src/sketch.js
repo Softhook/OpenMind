@@ -2728,11 +2728,13 @@ async function importTextAsDiagram(text) {
   }
 
   // Layout configuration
-  const START_X = 300;
-  const START_Y = 200;
-  const HORIZONTAL_SPACING = 350; // Space between heading columns
-  const VERTICAL_SPACING = 150;   // Space between paragraph rows
-  const BOX_WIDTH = 280;           // Standard box width
+  const IMPORT_LAYOUT = {
+    START_X: 300,
+    START_Y: 200,
+    HORIZONTAL_SPACING: 350, // Space between heading columns
+    VERTICAL_SPACING: 150,   // Space between paragraph rows
+    BOX_WIDTH: 280           // Standard box width
+  };
 
   // Clear current selection
   mindMap.clearBoxSelection();
@@ -2745,7 +2747,7 @@ async function importTextAsDiagram(text) {
   mindMap.pushUndo();
 
   const allNewBoxes = [];
-  let currentX = START_X;
+  let currentX = IMPORT_LAYOUT.START_X;
 
   // Process each section
   for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
@@ -2754,17 +2756,22 @@ async function importTextAsDiagram(text) {
     const paragraphs = section.paragraphs;
 
     // Create heading box (orange - key 2)
-    const headingBox = new TextBox(currentX, START_Y, heading);
-    headingBox.setBackgroundByKey('orange'); // Key 2 = orange
+    const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
+    headingBox.setBackgroundByKey('orange'); // Key 2 = orange (see TextBox color constants)
     mindMap.boxes.push(headingBox);
     allNewBoxes.push(headingBox);
 
-    let currentY = START_Y + VERTICAL_SPACING;
+    let currentY = IMPORT_LAYOUT.START_Y + IMPORT_LAYOUT.VERTICAL_SPACING;
     let previousParagraphBox = null;
 
     // Create paragraph boxes vertically under the heading
     for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
       const paragraph = paragraphs[paraIdx];
+      
+      // Skip empty paragraphs (these are placeholders for heading-only sections)
+      if (!paragraph || paragraph.trim() === '') {
+        continue;
+      }
       
       // Create paragraph box (white/default color)
       const paragraphBox = new TextBox(currentX, currentY, paragraph);
@@ -2781,11 +2788,11 @@ async function importTextAsDiagram(text) {
       }
 
       previousParagraphBox = paragraphBox;
-      currentY += VERTICAL_SPACING;
+      currentY += IMPORT_LAYOUT.VERTICAL_SPACING;
     }
 
     // Move to next column for the next section
-    currentX += HORIZONTAL_SPACING;
+    currentX += IMPORT_LAYOUT.HORIZONTAL_SPACING;
   }
 
   // Mark map as dirty and unsaved
@@ -2840,6 +2847,12 @@ function parseTextIntoSections(lines) {
   let currentParagraphs = [];
   let currentParagraphLines = [];
 
+  // Heading detection thresholds - extracted as constants for maintainability
+  const HEADING_MAX_LENGTH = 80;        // Max characters for heading
+  const HEADING_VERY_SHORT = 50;        // Very short lines are more likely headings
+  const HEADING_MIN_WORDS = 3;          // Min words for a heading
+  const HEADING_MAX_WORDS = 8;          // Max words for a heading
+
   const isHeading = (line) => {
     if (!line || line.length === 0) return false;
     
@@ -2847,7 +2860,7 @@ function parseTextIntoSections(lines) {
     const endsWithPunctuation = /[.!?]$/.test(line);
     
     // Short lines without internal punctuation are likely headings
-    const isShort = line.length < 80; // Reduced threshold for better detection
+    const isShort = line.length < HEADING_MAX_LENGTH;
     const hasInternalPunctuation = /[.!?]/.test(line.slice(0, -1));
     
     // Additional heuristics for heading detection:
@@ -2856,15 +2869,15 @@ function parseTextIntoSections(lines) {
     // - No commas (headings are usually simple phrases)
     const wordCount = line.split(/\s+/).length;
     const hasCommas = line.includes(',');
-    const isVeryShort = line.length < 50; // Very short lines are more likely headings
+    const isVeryShort = line.length < HEADING_VERY_SHORT;
     
     // A line is a heading if:
     // 1. It ends with punctuation
-    // 2. It's relatively short (< 80 chars)
+    // 2. It's relatively short (< HEADING_MAX_LENGTH chars)
     // 3. It doesn't have internal sentence-ending punctuation
-    // 4. Either: it's very short (<50 chars) OR has few words (3-8) and no commas
+    // 4. Either: it's very short OR has few words and no commas
     const isLikelyHeading = endsWithPunctuation && isShort && !hasInternalPunctuation &&
-                           (isVeryShort || (wordCount >= 3 && wordCount <= 8 && !hasCommas));
+                           (isVeryShort || (wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS && !hasCommas));
     
     return isLikelyHeading;
   };
@@ -2884,13 +2897,24 @@ function parseTextIntoSections(lines) {
     finishParagraph();
     
     if (currentHeading) {
-      // If we have a heading but no paragraphs, create a section with the heading as a single paragraph
+      // If we have a heading but no paragraphs, create a section with an empty paragraph placeholder
+      // The empty paragraph acts as a marker and will be filtered out during box creation
+      // This maintains consistent data structure and prevents heading-only sections from being lost
       if (currentParagraphs.length === 0) {
-        // For a heading-only section, we still want to include it
-        // This handles cases where headings appear at the end or standalone
         sections.push({
           heading: currentHeading,
-          paragraphs: [''] // Empty paragraph to maintain structure
+          paragraphs: [''] // Placeholder - filtered during box creation
+        });
+      } else {
+        sections.push({
+          heading: currentHeading,
+          paragraphs: currentParagraphs
+        });
+      }
+    }
+    currentHeading = null;
+    currentParagraphs = [];
+  };
         });
       } else {
         sections.push({
