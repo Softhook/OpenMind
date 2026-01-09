@@ -1498,8 +1498,8 @@ class CollaborationManager {
         }
 
         // Generate random name
-        const adjectives = ['Happy', 'Swift', 'Clever', 'Bright', 'Calm', 'Bold'];
-        const nouns = ['Thinker', 'Creator', 'Builder', 'Dreamer', 'Mapper', 'Planner'];
+        const adjectives = ['Pert', 'Dank', 'Sleepy', 'Dour', 'Wry', 'Crass', 'Fierce'];
+        const nouns = ['Urchin', 'Wren', 'Stoat', 'Vole', 'Puffin', 'Shrew', 'Newt', 'Mouse', 'Rat', 'Badger', 'Rabbit', 'Cat', 'Dog', 'Robin'];
         const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
         return `${adj} ${noun}`;
