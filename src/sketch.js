@@ -88,22 +88,18 @@ let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
 
+
 // Autosave state
 let autosaveTimer = null;
 
-// Camera/zoom state
-let camX = 0;
-let camY = 0;
-let zoom = 1;
+// ============================================================================
+// CAMERA STATE
+// ============================================================================
+// Consolidated camera state object for cleaner dependencies.
+// Legacy globals (camX, camY, zoom) are kept in sync for backward compatibility.
 
-// Panning state
-let isPanning = false;
-let panStartMouseX = 0;
-let panStartMouseY = 0;
-let panStartCamX = 0;
-let panStartCamY = 0;
-let rightPanActive = false; // true if current pan initiated by right mouse button
-let suppressNextRightClick = false; // avoid triggering right-click action after a pan drag
+// Legacy globals (kept for backward compatibility during transition)
+
 
 // Multi-box selection drag state
 let isSelectingMultiple = false;
@@ -253,11 +249,12 @@ const KeyRepeat = {
  * Converts mouse X position from screen space to world space
  * @returns {number} World X coordinate
  */
+/**
+ * Converts mouse X position from screen space to world space
+ * @returns {number} World X coordinate
+ */
 function worldMouseX() {
-  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber)
-    ? Utils.safePositiveNumber(zoom, 1)
-    : (zoom > 0 ? zoom : 1);
-  return (mouseX - camX) / safeZoom;
+  return CameraUtils.worldX(mouseX);
 }
 
 /**
@@ -870,10 +867,7 @@ function drawRemoteCursors() {
  * @returns {number} World Y coordinate
  */
 function worldMouseY() {
-  const safeZoom = (typeof Utils !== 'undefined' && Utils.safePositiveNumber)
-    ? Utils.safePositiveNumber(zoom, 1)
-    : (zoom > 0 ? zoom : 1);
-  return (mouseY - camY) / safeZoom;
+  return CameraUtils.worldY(mouseY);
 }
 
 /**
@@ -881,7 +875,7 @@ function worldMouseY() {
  * @see Utils.screenX for centralized implementation
  */
 function screenX(worldX) {
-  return typeof Utils !== 'undefined' ? Utils.screenX(worldX) : worldX * zoom + camX;
+  return CameraUtils.screenX(worldX);
 }
 
 /**
@@ -889,7 +883,7 @@ function screenX(worldX) {
  * @see Utils.screenY for centralized implementation
  */
 function screenY(worldY) {
-  return typeof Utils !== 'undefined' ? Utils.screenY(worldY) : worldY * zoom + camY;
+  return CameraUtils.screenY(worldY);
 }
 
 // ============================================================================
@@ -1206,8 +1200,8 @@ function draw() {
     try {
       // Draw scene with camera transform
       push();
-      translate(camX, camY);
-      scale(zoom);
+      translate(CameraUtils.x, CameraUtils.y);
+      scale(CameraUtils.zoom);
       mindMap.draw();
 
       // Draw selection rectangle if selecting multiple boxes
@@ -1462,7 +1456,7 @@ function updateCursorForHover() {
   const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
   const noSelection = !mindMap.selectedBox && !mindMap.selectedConnection && !hasMulti;
   if (mindMap.draggingConnection) { cursor('grabbing'); return; }
-  if (isPanning) { cursor('grabbing'); return; }
+  if (CameraUtils.isPanning) { cursor('grabbing'); return; }
 
   if (!isEditing && keyIsDown(32)) { cursor('grab'); return; }
 
@@ -1739,8 +1733,8 @@ function handlePageBecameVisible() {
     }
 
     // Reset any drag/pan states that might be stuck
-    isPanning = false;
-    rightPanActive = false;
+    // Reset any drag/pan states that might be stuck
+    CameraUtils.endPan();
     isSelectingMultiple = false;
 
     // Reset interaction states in mindMap
@@ -2058,13 +2052,9 @@ function mousePressed(e) {
       const rightDown = (typeof mouseButton !== 'undefined' && mouseButton === RIGHT);
 
       // Panning with spacebar OR right mouse when nothing is selected
+      // Panning with spacebar OR right mouse when nothing is selected
       if ((spaceHeld && !isEditing) || (rightDown && noSelection && !isEditing)) {
-        isPanning = true;
-        panStartMouseX = mouseX;
-        panStartMouseY = mouseY;
-        panStartCamX = camX;
-        panStartCamY = camY;
-        rightPanActive = !!rightDown;
+        CameraUtils.startPan(mouseX, mouseY, !!rightDown);
         return false;
       }
 
@@ -2090,17 +2080,17 @@ function mousePressed(e) {
  */
 function mouseReleased() {
   if (keyboardOverlayVisible) return false;
-  if (isPanning) {
+
+  if (CameraUtils.isPanning) {
     // If we were panning with right mouse, suppress the subsequent right-click action if it moved
-    if (rightPanActive) {
-      const dx = mouseX - panStartMouseX;
-      const dy = mouseY - panStartMouseY;
+    if (CameraUtils.rightPanActive) {
+      const dx = mouseX - CameraUtils.panStartMouseX;
+      const dy = mouseY - CameraUtils.panStartMouseY;
       if (dx * dx + dy * dy > 9) { // >3px movement
-        suppressNextRightClick = true;
+        CameraUtils.suppressNextRightClick = true;
       }
     }
-    isPanning = false;
-    rightPanActive = false;
+    CameraUtils.endPan();
     return;
   }
 
@@ -2125,10 +2115,10 @@ function mouseReleased() {
  */
 function mouseDragged() {
   if (keyboardOverlayVisible) return false;
-  if (isPanning) {
+
+  if (CameraUtils.isPanning) {
     // Screen-space pan with soft limits
-    camX = panStartCamX + (mouseX - panStartMouseX);
-    camY = panStartCamY + (mouseY - panStartMouseY);
+    CameraUtils.updatePan(mouseX, mouseY);
     applyCameraSoftBounds();
     return false;
   }
@@ -2448,8 +2438,8 @@ function createNewBox() {
   } else {
     // Mouse not over canvas - create at center of current viewport in world space
     // Convert viewport center to world coords
-    x = (width / 2 - camX) / zoom;
-    y = (height / 2 - camY) / zoom;
+    x = (width / 2 - CameraUtils.x) / CameraUtils.zoom;
+    y = (height / 2 - CameraUtils.y) / CameraUtils.zoom;
   }
 
   mindMap.addBox(new TextBox(x, y, ""));
@@ -2624,8 +2614,8 @@ function handleCanvasDrop(e) {
       sx = e.clientX;
       sy = e.clientY;
     }
-    const wx = (sx - camX) / zoom;
-    const wy = (sy - camY) / zoom;
+    const wx = CameraUtils.worldX(sx);
+    const wy = CameraUtils.worldY(sy);
 
     // Get text data early (must be done synchronously in drop handler)
     const textUriList = dt.getData('text/uri-list') || '';
@@ -3061,17 +3051,9 @@ function mouseWheel(event) {
   if (!overCanvas) return;
 
   // Compute world point under mouse before zoom
-  const wx = worldMouseX();
-  const wy = worldMouseY();
-
   // Zoom in (negative deltaY) or out (positive)
   const factor = event.deltaY < 0 ? CONFIG.ZOOM.STEP : 1 / CONFIG.ZOOM.STEP;
-  const newZoom = constrain(zoom * factor, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
-
-  // Adjust camera to keep the world point under the cursor stationary
-  camX = mouseX - wx * newZoom;
-  camY = mouseY - wy * newZoom;
-  zoom = newZoom;
+  CameraUtils.zoomAt(factor, mouseX, mouseY, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
 
   // Prevent page scroll
   return false;
@@ -3082,33 +3064,80 @@ function mouseWheel(event) {
 // ============================================================================
 
 /**
- * Gets the bounding box of all content in world space
+ * Gets the bounding box of all content in world space.
+ * Can be used as a pure function by passing boxes array, or uses
+ * global mindMap.boxes for backward compatibility.
+ * 
+ * @param {Array} [boxes] - Optional array of boxes to calculate bounds for.
+ *                         If not provided, uses mindMap.boxes.
+ * @param {Object} [defaultBounds] - Optional default bounds if no boxes exist.
  * @returns {Object} Bounds with minX, maxX, minY, maxY properties
  */
-function getContentBounds() {
-  if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
-    return { minX: 0, maxX: width, minY: 0, maxY: height };
+function getContentBounds(boxes = null, defaultBounds = null) {
+  // Use provided boxes or fall back to mindMap.boxes
+  const boxArray = boxes || (mindMap && mindMap.boxes) || [];
+
+  // Return default bounds if no content
+  if (!boxArray || boxArray.length === 0) {
+    if (defaultBounds) return defaultBounds;
+    // Use canvas dimensions as default (width/height may be p5.js globals)
+    const w = typeof width !== 'undefined' ? width : 800;
+    const h = typeof height !== 'undefined' ? height : 600;
+    return { minX: 0, maxX: w, minY: 0, maxY: h };
   }
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (let box of mindMap.boxes) {
-    if (!box) continue;
-    const left = box.x - box.width / 2;
-    const right = box.x + box.width / 2;
-    const top = box.y - box.height / 2;
-    const bottom = box.y + box.height / 2;
 
-    minX = min(minX, left);
-    maxX = max(maxX, right);
-    minY = min(minY, top);
-    maxY = max(maxY, bottom);
+  for (let box of boxArray) {
+    if (!box) continue;
+
+    // Validate box dimensions
+    if (!Number.isFinite(box.x) || !Number.isFinite(box.y)) continue;
+
+    const halfW = Number.isFinite(box.width) ? box.width / 2 : 0;
+    const halfH = Number.isFinite(box.height) ? box.height / 2 : 0;
+
+    const left = box.x - halfW;
+    const right = box.x + halfW;
+    const top = box.y - halfH;
+    const bottom = box.y + halfH;
+
+    minX = Math.min(minX, left);
+    maxX = Math.max(maxX, right);
+    minY = Math.min(minY, top);
+    maxY = Math.max(maxY, bottom);
+  }
+
+  // If all boxes were invalid, return default
+  if (minX === Infinity) {
+    const w = typeof width !== 'undefined' ? width : 800;
+    const h = typeof height !== 'undefined' ? height : 600;
+    return defaultBounds || { minX: 0, maxX: w, minY: 0, maxY: h };
   }
 
   return { minX, maxX, minY, maxY };
 }
 
-function getSelectionBounds() {
-  if (!mindMap) return null;
+/**
+ * Gets the bounding box of the current selection in world space.
+ * Can be used as a pure function by passing selection objects, or uses
+ * global mindMap selections for backward compatibility.
+ * 
+ * @param {Object} [selection] - Optional selection object with:
+ *   - boxes: Set or Array of selected boxes
+ *   - connections: Set or Array of selected connections
+ *   If not provided, uses mindMap's selected items.
+ * @returns {Object|null} Bounds with minX, maxX, minY, maxY, or null if nothing selected
+ */
+function getSelectionBounds(selection = null) {
+  // Get selection from parameter or fall back to mindMap
+  const sel = selection || {
+    boxes: mindMap?.selectedBoxes || (mindMap?.selectedBox ? [mindMap.selectedBox] : []),
+    connections: mindMap?.selectedConnections || (mindMap?.selectedConnection ? [mindMap.selectedConnection] : [])
+  };
+
+  // Early return if no mindMap and no selection provided
+  if (!selection && !mindMap) return null;
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -3145,20 +3174,22 @@ function getSelectionBounds() {
     if (end) considerPoint(end.x, end.y);
   };
 
-  if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
-    for (const box of mindMap.selectedBoxes) {
+  // Process boxes
+  const boxes = sel.boxes;
+  if (boxes) {
+    const boxIter = boxes[Symbol.iterator] ? boxes : [boxes];
+    for (const box of boxIter) {
       considerBox(box);
     }
-  } else if (mindMap.selectedBox) {
-    considerBox(mindMap.selectedBox);
   }
 
-  if (mindMap.selectedConnections && mindMap.selectedConnections.size > 0) {
-    for (const conn of mindMap.selectedConnections) {
+  // Process connections
+  const connections = sel.connections;
+  if (connections) {
+    const connIter = connections[Symbol.iterator] ? connections : [connections];
+    for (const conn of connIter) {
       considerConnection(conn);
     }
-  } else if (mindMap.selectedConnection) {
-    considerConnection(mindMap.selectedConnection);
   }
 
   if (minX === Infinity || minY === Infinity) {
@@ -3173,13 +3204,13 @@ function applyCameraSoftBounds() {
 
   const bounds = getContentBounds();
   const margin = CONFIG.CAMERA.PAN_MARGIN;
-  const minCamX = -bounds.maxX * zoom - margin;
-  const maxCamX = -bounds.minX * zoom + width + margin;
-  const minCamY = -bounds.maxY * zoom - margin;
-  const maxCamY = -bounds.minY * zoom + height + margin;
+  const minCamX = -bounds.maxX * CameraUtils.zoom - margin;
+  const maxCamX = -bounds.minX * CameraUtils.zoom + width + margin;
+  const minCamY = -bounds.maxY * CameraUtils.zoom - margin;
+  const maxCamY = -bounds.minY * CameraUtils.zoom + height + margin;
 
-  camX = constrain(camX, minCamX, maxCamX);
-  camY = constrain(camY, minCamY, maxCamY);
+  CameraUtils.x = constrain(CameraUtils.x, minCamX, maxCamX);
+  CameraUtils.y = constrain(CameraUtils.y, minCamY, maxCamY);
 }
 
 /**
@@ -3187,9 +3218,13 @@ function applyCameraSoftBounds() {
  * @param {number} worldX - World X coordinate
  * @param {number} worldY - World Y coordinate
  */
+/**
+ * Centers the camera on a specific world position without changing zoom
+ * @param {number} worldX - World X coordinate
+ * @param {number} worldY - World Y coordinate
+ */
 function centerCameraOn(worldX, worldY) {
-  camX = width / 2 - worldX * zoom;
-  camY = height / 2 - worldY * zoom;
+  CameraUtils.centerOn(worldX, worldY, width, height);
   applyCameraSoftBounds();
 }
 
@@ -3202,9 +3237,7 @@ function resetView() {
   }
   if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
     // No content - reset to default
-    camX = 0;
-    camY = 0;
-    zoom = 1;
+    CameraUtils.reset();
     return;
   }
 
@@ -3218,11 +3251,10 @@ function resetView() {
   const margin = 1.1;
   const zoomX = width / (contentWidth * margin);
   const zoomY = height / (contentHeight * margin);
-  zoom = constrain(min(zoomX, zoomY), CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
+  CameraUtils.zoom = constrain(min(zoomX, zoomY), CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
 
   // Center the content in viewport
-  camX = width / 2 - centerX * zoom;
-  camY = height / 2 - centerY * zoom;
+  CameraUtils.centerOn(centerX, centerY, width, height);
   applyCameraSoftBounds();
 }
 
@@ -3241,16 +3273,16 @@ function setMaxZoom() {
     if (!Number.isFinite(targetZoom) || targetZoom <= 0) {
       targetZoom = CONFIG.ZOOM.MAX;
     }
-    zoom = constrain(targetZoom, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
+    CameraUtils.zoom = constrain(targetZoom, CONFIG.ZOOM.MIN, CONFIG.ZOOM.MAX);
     const centerX = (selectionBounds.minX + selectionBounds.maxX) / 2;
     const centerY = (selectionBounds.minY + selectionBounds.maxY) / 2;
     centerCameraOn(centerX, centerY);
     return;
   }
-  const prevZoom = zoom || 1;
-  const worldCenterX = (width / 2 - camX) / prevZoom;
-  const worldCenterY = (height / 2 - camY) / prevZoom;
-  zoom = CONFIG.ZOOM.MAX;
+  const prevZoom = CameraUtils.zoom || 1;
+  const worldCenterX = (width / 2 - CameraUtils.x) / prevZoom;
+  const worldCenterY = (height / 2 - CameraUtils.y) / prevZoom;
+  CameraUtils.zoom = CONFIG.ZOOM.MAX;
   centerCameraOn(worldCenterX, worldCenterY);
 }
 
@@ -4017,7 +4049,7 @@ function drawSelectionRectangle() {
   fill(selColors.fill.r, selColors.fill.g, selColors.fill.b, selColors.fill.a);
   // Border
   stroke(selColors.stroke.r, selColors.stroke.g, selColors.stroke.b);
-  strokeWeight(2 / zoom);
+  strokeWeight(2 / CameraUtils.zoom);
   rect(x1, y1, x2 - x1, y2 - y1);
   pop();
 }

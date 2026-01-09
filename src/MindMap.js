@@ -233,14 +233,14 @@ class MindMap {
    */
   update() {
     // Handle pan animation
-    if ((this.isPanAnimating || this.isZoomAnimating) && typeof centerCameraOn === 'function') {
+    // Handle pan animation
+    if ((this.isPanAnimating || this.isZoomAnimating) && typeof CameraUtils !== 'undefined') {
+      const widthVal = typeof width !== 'undefined' ? width : 800;
+      const heightVal = typeof height !== 'undefined' ? height : 600;
+
       // Get current camera position in world space
-      const currentWorldX = typeof camX !== 'undefined' && typeof width !== 'undefined' && typeof zoom !== 'undefined'
-        ? (width / 2 - camX) / zoom
-        : 0;
-      const currentWorldY = typeof camY !== 'undefined' && typeof height !== 'undefined' && typeof zoom !== 'undefined'
-        ? (height / 2 - camY) / zoom
-        : 0;
+      const currentWorldX = (widthVal / 2 - CameraUtils.x) / CameraUtils.zoom;
+      const currentWorldY = (heightVal / 2 - CameraUtils.y) / CameraUtils.zoom;
 
       // Determine pan interpolation
       const dx = this.panTargetX - currentWorldX;
@@ -248,7 +248,7 @@ class MindMap {
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       // Determine zoom interpolation
-      const currentZoom = (typeof zoom !== 'undefined') ? zoom : 1;
+      const currentZoom = CameraUtils.zoom;
       const targetZoom = (this.zoomTarget != null) ? this.zoomTarget : currentZoom;
       const dz = targetZoom - currentZoom;
 
@@ -261,7 +261,7 @@ class MindMap {
           newZoom = targetZoom;
         }
         // Apply new zoom immediately so centerCameraOn uses correct scale
-        zoom = constrain(newZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
+        CameraUtils.zoom = constrain(newZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
           (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
       }
 
@@ -279,11 +279,15 @@ class MindMap {
       }
 
       // Center camera on interpolated world point using the (possibly) updated zoom
-      centerCameraOn(newWorldX, newWorldY);
+      if (typeof centerCameraOn === 'function') {
+        centerCameraOn(newWorldX, newWorldY);
+      } else {
+        CameraUtils.centerOn(newWorldX, newWorldY, widthVal, heightVal);
+      }
 
       // Update animation flags
       if (this.isPanAnimating && distance < 1) this.isPanAnimating = false;
-      if (this.isZoomAnimating && Math.abs(targetZoom - zoom) < 0.001) this.isZoomAnimating = false;
+      if (this.isZoomAnimating && Math.abs(targetZoom - CameraUtils.zoom) < 0.001) this.isZoomAnimating = false;
     }
   }
 
@@ -1388,8 +1392,10 @@ class MindMap {
       // Instant pan
       if (typeof centerCameraOn === 'function') {
         if (targetZoom != null && Number.isFinite(targetZoom)) {
-          zoom = constrain(targetZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
-            (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
+          if (typeof CameraUtils !== 'undefined') {
+            CameraUtils.zoom = constrain(targetZoom, (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MIN) ? CONFIG.ZOOM.MIN : 0.2,
+              (typeof CONFIG !== 'undefined' && CONFIG.ZOOM && CONFIG.ZOOM.MAX) ? CONFIG.ZOOM.MAX : 3.0);
+          }
         }
         centerCameraOn(box.x, box.y);
       }

@@ -170,6 +170,9 @@ function clamp(value, min, max) {
  * @returns {number} Current zoom level
  */
 function getCurrentZoom(defaultZoom = 1) {
+  if (typeof CameraUtils !== 'undefined') {
+    return CameraUtils.zoom;
+  }
   if (typeof zoom !== 'undefined' && isValidNumber(zoom) && zoom > 0) {
     return zoom;
   }
@@ -268,6 +271,9 @@ function getMouseCoordinates() {
  * @returns {number} X coordinate in screen space (pixels)
  */
 function screenX(worldX) {
+  if (typeof CameraUtils !== 'undefined') {
+    return CameraUtils.screenX(worldX);
+  }
   const z = typeof zoom !== 'undefined' ? zoom : 1;
   const cx = typeof camX !== 'undefined' ? camX : 0;
   return worldX * z + cx;
@@ -281,6 +287,9 @@ function screenX(worldX) {
  * @returns {number} Y coordinate in screen space (pixels)
  */
 function screenY(worldY) {
+  if (typeof CameraUtils !== 'undefined') {
+    return CameraUtils.screenY(worldY);
+  }
   const z = typeof zoom !== 'undefined' ? zoom : 1;
   const cy = typeof camY !== 'undefined' ? camY : 0;
   return worldY * z + cy;
