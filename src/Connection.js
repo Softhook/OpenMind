@@ -51,8 +51,12 @@ class Connection {
     this._cachedEndpoints = null;
     this._lastFromBoxX = null;
     this._lastFromBoxY = null;
+    this._lastFromBoxWidth = null;
+    this._lastFromBoxHeight = null;
     this._lastToBoxX = null;
     this._lastToBoxY = null;
+    this._lastToBoxWidth = null;
+    this._lastToBoxHeight = null;
   }
 
   // ============================================================================
@@ -70,25 +74,33 @@ class Connection {
   _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
 
-    // Check if cache is valid (boxes haven't moved)
+    // Check if cache is valid (boxes haven't moved or resized)
     // Cache is valid only if:
     // 1. Cached endpoints exist
-    // 2. All position tracking has been initialized (not first call)
-    // 3. Boxes haven't moved since last cache
+    // 2. All tracking has been initialized (not first call)
+    // 3. Boxes haven't moved or changed size since last cache
     const hasValidCache = this._cachedEndpoints !== null && 
                           this._lastFromBoxX !== null &&
                           this._lastFromBoxY !== null &&
+                          this._lastFromBoxWidth !== null &&
+                          this._lastFromBoxHeight !== null &&
                           this._lastToBoxX !== null &&
-                          this._lastToBoxY !== null;
+                          this._lastToBoxY !== null &&
+                          this._lastToBoxWidth !== null &&
+                          this._lastToBoxHeight !== null;
     
     if (hasValidCache) {
-      const fromMoved = this._lastFromBoxX !== this.fromBox.x || 
-                        this._lastFromBoxY !== this.fromBox.y;
-      const toMoved = this._lastToBoxX !== this.toBox.x || 
-                      this._lastToBoxY !== this.toBox.y;
+      const fromChanged = this._lastFromBoxX !== this.fromBox.x || 
+                          this._lastFromBoxY !== this.fromBox.y ||
+                          this._lastFromBoxWidth !== this.fromBox.width ||
+                          this._lastFromBoxHeight !== this.fromBox.height;
+      const toChanged = this._lastToBoxX !== this.toBox.x || 
+                        this._lastToBoxY !== this.toBox.y ||
+                        this._lastToBoxWidth !== this.toBox.width ||
+                        this._lastToBoxHeight !== this.toBox.height;
       
-      // Return cached result if boxes haven't moved
-      if (!fromMoved && !toMoved) {
+      // Return cached result if boxes haven't changed
+      if (!fromChanged && !toChanged) {
         return this._cachedEndpoints;
       }
     }
@@ -104,12 +116,16 @@ class Connection {
       return null;
     }
 
-    // Update cache
+    // Update cache with position and size
     this._cachedEndpoints = { start, end };
     this._lastFromBoxX = this.fromBox.x;
     this._lastFromBoxY = this.fromBox.y;
+    this._lastFromBoxWidth = this.fromBox.width;
+    this._lastFromBoxHeight = this.fromBox.height;
     this._lastToBoxX = this.toBox.x;
     this._lastToBoxY = this.toBox.y;
+    this._lastToBoxWidth = this.toBox.width;
+    this._lastToBoxHeight = this.toBox.height;
 
     return this._cachedEndpoints;
   }

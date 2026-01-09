@@ -302,6 +302,32 @@ class MindMap {
     const viewportWidth = typeof width !== 'undefined' ? width : 800;
     const viewportHeight = typeof height !== 'undefined' ? height : 600;
     const useCulling = typeof CameraUtils !== 'undefined' && CameraUtils.isBoxVisible;
+    
+    // Cache viewport bounds once per frame to avoid redundant coordinate transformations
+    let viewportBounds = null;
+    const isBoxVisibleFast = (box) => {
+      if (!box || box.x == null || box.y == null || box.width == null || box.height == null) {
+        return false;
+      }
+      const boxLeft = box.x - box.width / 2;
+      const boxRight = box.x + box.width / 2;
+      const boxTop = box.y - box.height / 2;
+      const boxBottom = box.y + box.height / 2;
+      return !(boxRight < viewportBounds.worldLeft || 
+               boxLeft > viewportBounds.worldRight || 
+               boxBottom < viewportBounds.worldTop || 
+               boxTop > viewportBounds.worldBottom);
+    };
+    
+    if (useCulling) {
+      const margin = 200;
+      viewportBounds = {
+        worldLeft: CameraUtils.worldX(0) - margin,
+        worldRight: CameraUtils.worldX(viewportWidth) + margin,
+        worldTop: CameraUtils.worldY(0) - margin,
+        worldBottom: CameraUtils.worldY(viewportHeight) + margin
+      };
+    }
 
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
@@ -310,8 +336,12 @@ class MindMap {
         if (this.draggingConnection && this.draggingConnection.conn === conn) continue;
         
         // Skip off-screen connections for better performance
-        if (useCulling && !CameraUtils.isConnectionVisible(conn, viewportWidth, viewportHeight)) {
-          continue;
+        if (useCulling && viewportBounds) {
+          const fromVisible = isBoxVisibleFast(conn.fromBox);
+          const toVisible = isBoxVisibleFast(conn.toBox);
+          if (!fromVisible && !toVisible) {
+            continue;
+          }
         }
         
         try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
@@ -324,11 +354,13 @@ class MindMap {
         if (!box) continue;
         
         // Skip off-screen boxes for better performance
+        // Check cheap conditions first (selected, editing) before expensive visibility check
         // Always draw selected boxes and boxes being edited
-        if (useCulling && 
-            !box.selected && 
+        if (!box.selected && 
             !box.isEditing && 
-            !CameraUtils.isBoxVisible(box, viewportWidth, viewportHeight)) {
+            useCulling && 
+            viewportBounds &&
+            !isBoxVisibleFast(box)) {
           continue;
         }
         
@@ -347,7 +379,7 @@ class MindMap {
         if (box.isEditing) continue;
         
         // Skip off-screen boxes for connector dots
-        if (useCulling && !CameraUtils.isBoxVisible(box, viewportWidth, viewportHeight)) {
+        if (useCulling && viewportBounds && !isBoxVisibleFast(box)) {
           continue;
         }
         
