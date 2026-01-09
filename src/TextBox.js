@@ -2218,7 +2218,7 @@ class TextBox {
   static fromJSON(data) {
     // Validate input data
     if (!data || typeof data !== 'object') {
-      console.warn('Invalid box data');
+      Utils.Logger.error('[TextBox] fromJSON: Invalid box data');
       return null;
     }
 

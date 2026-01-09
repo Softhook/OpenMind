@@ -113,20 +113,20 @@ class MindMap {
   addConnection(fromBox, toBox) {
     // Validate inputs
     if (!fromBox || !toBox) {
-      console.warn('Cannot create connection: invalid boxes');
+      Utils.Logger.error('[MindMap] addConnection: Invalid boxes');
       return;
     }
 
     // Prevent self-connections
     if (fromBox === toBox) {
-      console.warn('Cannot create connection to self');
+      Utils.Logger.error('[MindMap] addConnection: Cannot create self-connection');
       return;
     }
 
     // Check if connection already exists (same direction)
     for (let conn of this.connections) {
       if (conn.fromBox === fromBox && conn.toBox === toBox) {
-        console.warn('Connection already exists');
+        Utils.Logger.error('[MindMap] addConnection: Connection already exists');
         return;
       }
     }
@@ -1450,8 +1450,7 @@ class MindMap {
     // The flag will be cleared when actually editing text or other interactions.
 
     // Validate mouse coordinates using shared utility if available
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     const validCoords = typeof Utils !== 'undefined' && Utils.areValidCoordinates
       ? Utils.areValidCoordinates(mx, my)
       : (mx != null && my != null && !isNaN(mx) && !isNaN(my));
@@ -1667,7 +1666,7 @@ class MindMap {
       if (changed && MindMap.onConnectionsChange) {
         MindMap.onConnectionsChange();
       }
-      
+
       // Only close undo boundary if connection was actually reattached
       // This prevents capturing unrelated changes from other users during the drag
       if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
@@ -1684,11 +1683,11 @@ class MindMap {
     // Stop dragging and resizing all boxes
     // If any box was being dragged or resized, clear navigation mode
     // so arrow keys will enter presentation mode on current box rather than continuing navigation
-    
+
     // Collect boxes that were dragging or resizing to batch sync them in a single transaction
     const boxesThatWereDragging = [];
     const boxesThatWereResizing = [];
-    
+
     for (let box of this.boxes) {
       if (!box) continue;
       if (box.isDragging) {
@@ -1700,9 +1699,9 @@ class MindMap {
         boxesThatWereResizing.push(box);
       }
     }
-    
+
     const wasInteracting = boxesThatWereDragging.length > 0 || boxesThatWereResizing.length > 0;
-    
+
     // Group all drag/resize operations in a single transaction for grouped undo
     if (wasInteracting) {
       this._wrapInTransaction(() => {
@@ -1710,12 +1709,12 @@ class MindMap {
         for (const box of boxesThatWereDragging) {
           box.stopDrag(true); // skipSync=true
         }
-        
+
         // Stop resizing all boxes
         for (const box of boxesThatWereResizing) {
           box.stopResize(true); // skipSync=true
         }
-        
+
         // Batch sync ALL boxes that were interacting (not just those that changed)
         // This maintains consistency with original behavior and ensures proper
         // collaborative sync and targetX/targetY updates
@@ -1723,16 +1722,16 @@ class MindMap {
         const allInteractingBoxes = [...boxesThatWereDragging, ...boxesThatWereResizing];
         this._notifyBoxesChanged(allInteractingBoxes, true);
       });
-      
+
       // Close the undo boundary to ensure the transaction is captured as a single undo item
       // This is important when captureTimeout=0 (action-based undo)
       if (typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
-      
+
       this.isArrowKeyNavigating = false;
     }
-    
+
     // Stop selecting on all boxes (this doesn't need transaction wrapping)
     for (let box of this.boxes) {
       if (!box) continue;
@@ -1745,8 +1744,7 @@ class MindMap {
    */
   handleMouseDragged() {
     // Validate mouse coordinates
-    const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-    const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
@@ -1984,8 +1982,7 @@ class MindMap {
         // Paste copied box(es) and their connections at cursor position
         if (this.copiedBoxes && this.copiedBoxes.length > 0) {
           this.pushUndo();
-          const mx = typeof worldMouseX === 'function' ? worldMouseX() : mouseX;
-          const my = typeof worldMouseY === 'function' ? worldMouseY() : mouseY;
+          const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
 
           // Calculate offset from first copied box to paste location
           const firstBox = this.copiedBoxes[0];
@@ -2094,7 +2091,7 @@ class MindMap {
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
           this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
-          
+
           this._wrapInTransaction(() => {
             const changedBoxes = [];
             for (const box of this.selectedBoxes) {
@@ -2143,7 +2140,7 @@ class MindMap {
   fromJSON(data) {
     // Validate input data
     if (!data || typeof data !== 'object') {
-      console.error('Invalid data format');
+      Utils.Logger.error('[MindMap] fromJSON: Invalid data format');
       return;
     }
 
