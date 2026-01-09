@@ -80,6 +80,8 @@ class ThrustGame {
     UI_TEXT: 255                                // White text
   };
   
+  static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
+  
   // ============================================================================
   // CONSTRUCTOR
   // ============================================================================
@@ -651,9 +653,18 @@ class ThrustGame {
     if (typeof color === 'string') {
       // Parse hex color (e.g., "#ff6464")
       const hex = color.replace('#', '');
-      r = parseInt(hex.slice(0, 2), 16);
-      g = parseInt(hex.slice(2, 4), 16);
-      b = parseInt(hex.slice(4, 6), 16);
+      // Validate hex format (should be 6 characters)
+      if (hex.length === 6 && /^[0-9A-Fa-f]{6}$/.test(hex)) {
+        r = parseInt(hex.slice(0, 2), 16);
+        g = parseInt(hex.slice(2, 4), 16);
+        b = parseInt(hex.slice(4, 6), 16);
+      } else {
+        // Fallback to default remote player color if invalid
+        const fallback = ThrustGame.COLORS.PLAYER_REMOTE;
+        r = fallback.r;
+        g = fallback.g;
+        b = fallback.b;
+      }
     } else {
       r = color.r;
       g = color.g;
@@ -779,7 +790,7 @@ class ThrustGame {
             vy: state.thrustGame.vy || 0,
             angle: state.thrustGame.angle,
             alive: state.thrustGame.alive,
-            name: state.user?.name || 'Player',
+            name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
             color: state.user?.color || '#ff6464'
           });
         } else {
@@ -790,14 +801,14 @@ class ThrustGame {
           player.vy = state.thrustGame.vy || 0;
           player.angle = state.thrustGame.angle;
           player.alive = state.thrustGame.alive;
-          player.name = state.user?.name || 'Player';
+          player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
           player.color = state.user?.color || '#ff6464';
         }
         
         // Update remote bullets from this player
         if (state.thrustGame.bullets && Array.isArray(state.thrustGame.bullets)) {
           // Track current bullet IDs for this client
-          const currentBulletIds = new Set(state.thrustGame.bullets.map(b => b.id).filter(id => id != null));
+          const currentBulletIds = new Set(state.thrustGame.bullets.map(b => b.id).filter(id => id !== null && id !== undefined));
           
           // Remove bullets that are no longer in the update
           for (const [bulletId, bullet] of this.remoteBullets) {
@@ -808,7 +819,7 @@ class ThrustGame {
           
           // Add or update current bullets
           for (const bullet of state.thrustGame.bullets) {
-            if (bullet.id != null) {
+            if (bullet.id !== null && bullet.id !== undefined) {
               this.remoteBullets.set(bullet.id, {
                 x: bullet.x,
                 y: bullet.y,
