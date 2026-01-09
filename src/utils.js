@@ -260,6 +260,46 @@ function getMouseCoordinates() {
   return { x, y };
 }
 
+/**
+ * Converts a world X coordinate to screen space.
+ * Screen space = world space * zoom + camera offset
+ *
+ * @param {number} worldX - X coordinate in world space
+ * @returns {number} X coordinate in screen space (pixels)
+ */
+function screenX(worldX) {
+  const z = typeof zoom !== 'undefined' ? zoom : 1;
+  const cx = typeof camX !== 'undefined' ? camX : 0;
+  return worldX * z + cx;
+}
+
+/**
+ * Converts a world Y coordinate to screen space.
+ * Screen space = world space * zoom + camera offset
+ *
+ * @param {number} worldY - Y coordinate in world space
+ * @returns {number} Y coordinate in screen space (pixels)
+ */
+function screenY(worldY) {
+  const z = typeof zoom !== 'undefined' ? zoom : 1;
+  const cy = typeof camY !== 'undefined' ? camY : 0;
+  return worldY * z + cy;
+}
+
+/**
+ * Converts world coordinates to screen coordinates.
+ *
+ * @param {number} worldX - X in world space
+ * @param {number} worldY - Y in world space
+ * @returns {{x: number, y: number}} Coordinates in screen space
+ */
+function worldToScreen(worldX, worldY) {
+  return {
+    x: screenX(worldX),
+    y: screenY(worldY)
+  };
+}
+
 // ============================================================================
 // LOGGING UTILITIES
 // ============================================================================
@@ -843,9 +883,12 @@ if (typeof window !== 'undefined') {
     isWhitespace,
     safeString,
 
-    // Mouse coordinates
+    // Mouse coordinates and camera transforms
     getWorldMouseCoordinates,
     getMouseCoordinates,
+    screenX,
+    screenY,
+    worldToScreen,
 
     // Logging
     Logger,

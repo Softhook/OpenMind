@@ -993,20 +993,18 @@ function worldMouseY() {
 
 /**
  * Converts world X coordinate to screen space
- * @param {number} worldX - World X coordinate
- * @returns {number} Screen X coordinate
+ * @see Utils.screenX for centralized implementation
  */
 function screenX(worldX) {
-  return worldX * zoom + camX;
+  return typeof Utils !== 'undefined' ? Utils.screenX(worldX) : worldX * zoom + camX;
 }
 
 /**
  * Converts world Y coordinate to screen space
- * @param {number} worldY - World Y coordinate
- * @returns {number} Screen Y coordinate
+ * @see Utils.screenY for centralized implementation
  */
 function screenY(worldY) {
-  return worldY * zoom + camY;
+  return typeof Utils !== 'undefined' ? Utils.screenY(worldY) : worldY * zoom + camY;
 }
 
 // ============================================================================
@@ -1767,103 +1765,30 @@ function handleNativeCopy(e) {
   } catch (_) { }
 }
 
+// ============================================================================
+// IMAGE UTILITIES (delegated to ImageUtils.js module)
+// ============================================================================
+
 /**
  * Compress and downscale an image File to a DataURL.
- * Returns a Promise<string> that resolves to a data URL (e.g. "data:image/webp;base64,...").
- * Uses createImageBitmap + canvas drawing to avoid creating a DOM Image element.
+ * @see ImageUtils.compressImageFile for full documentation
  */
-async function compressImageFile(file, {
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.75,
-  mimeType = 'image/webp'
-} = {}) {
-  if (!file) throw new Error('No file');
-
-  // Determine supported output type
-  try {
-    const testCanvas = document.createElement('canvas');
-    const webpSupported = testCanvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
-    if (!webpSupported && mimeType === 'image/webp') mimeType = 'image/jpeg';
-  } catch (_) { if (mimeType === 'image/webp') mimeType = 'image/jpeg'; }
-
-  // Use createImageBitmap where available (more efficient and avoids layout)
-  const bitmap = await createImageBitmap(file);
-  try {
-    let w = bitmap.width;
-    let h = bitmap.height;
-    const ratio = Math.min(1, maxWidth / w, maxHeight / h);
-    const targetW = Math.max(1, Math.round(w * ratio));
-    const targetH = Math.max(1, Math.round(h * ratio));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-
-    // Return data URL (base64).
-    return canvas.toDataURL(mimeType, quality);
-  } finally {
-    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+async function compressImageFile(file, options = {}) {
+  if (typeof ImageUtils !== 'undefined' && ImageUtils.compressImageFile) {
+    return ImageUtils.compressImageFile(file, options);
   }
+  throw new Error('ImageUtils module not loaded');
 }
 
 /**
- * Convert a data: URL (PNG/JPEG/etc) to a downscaled WebP data URL.
- * Returns Promise<string> data URL.
+ * Convert a data: URL to a downscaled WebP data URL.
+ * @see ImageUtils.convertDataUrlToWebP for full documentation
  */
-async function convertDataUrlToWebP(dataUrl, {
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.75,
-  mimeType = 'image/webp'
-} = {}) {
-  if (!dataUrl || typeof dataUrl !== 'string') throw new Error('Invalid dataUrl');
-
-  // If already webp, optionally still downscale; but skip quick-convert if already webp
-  if (dataUrl.startsWith('data:image/webp')) {
-    // Still attempt to downscale if huge by decoding the blob
-    try {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      return await _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType);
-    } catch (e) {
-      return dataUrl;
-    }
+async function convertDataUrlToWebP(dataUrl, options = {}) {
+  if (typeof ImageUtils !== 'undefined' && ImageUtils.convertDataUrlToWebP) {
+    return ImageUtils.convertDataUrlToWebP(dataUrl, options);
   }
-
-  // Convert data URL to blob via fetch (works for data: URLs)
-  const resp = await fetch(dataUrl);
-  const blob = await resp.blob();
-  return await _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType);
-}
-
-async function _bitmapToDataUrl(blob, maxWidth, maxHeight, quality, mimeType) {
-  const bitmap = await createImageBitmap(blob);
-  try {
-    let w = bitmap.width;
-    let h = bitmap.height;
-    const ratio = Math.min(1, maxWidth / w, maxHeight / h);
-    const targetW = Math.max(1, Math.round(w * ratio));
-    const targetH = Math.max(1, Math.round(h * ratio));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-
-    // Ensure webp support, otherwise fall back to jpeg
-    try {
-      const test = canvas.toDataURL('image/webp');
-      if (test.indexOf('data:image/webp') !== 0) mimeType = 'image/jpeg';
-    } catch (_) { mimeType = 'image/jpeg'; }
-
-    return canvas.toDataURL(mimeType, quality);
-  } finally {
-    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
-  }
+  throw new Error('ImageUtils module not loaded');
 }
 
 function handleNativeCut(e) {
@@ -2306,242 +2231,16 @@ function toggleKeyboardControlsOverlay() {
 }
 
 // ============================================================================
-// MOBILE NAVIGATION OVERLAY
+// MOBILE NAVIGATION (delegated to MobileNavigation.js module)
 // ============================================================================
 
-/**
- * Detects if the current device supports touch events or has a mobile-sized screen
- * @returns {boolean} true if touch is supported or mobile-sized
- */
-function detectTouchDevice() {
-  const hasTouchEvents = (
-    'ontouchstart' in window ||
-    navigator.maxTouchPoints > 0 ||
-    navigator.msMaxTouchPoints > 0
-  );
-  const hasCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  const isMobileSize = window.innerWidth <= 768 || window.innerHeight <= 500;
+// Note: Mobile navigation functions are now in MobileNavigation.js
+// These wrapper functions ensure backwards compatibility with existing code
 
-  return hasTouchEvents || hasCoarsePointer || isMobileSize;
-}
-
-/**
- * Sets up the mobile navigation overlay with up/down buttons
- */
-function setupMobileNavigation() {
-  try {
-    isTouchDevice = detectTouchDevice();
-
-    // Create overlay container for mobile navigation buttons
-    mobileNavOverlay = createDiv();
-    mobileNavOverlay.id('mobile-nav-overlay');
-    mobileNavOverlay.style('position', 'fixed');
-    mobileNavOverlay.style('bottom', '20px');
-    mobileNavOverlay.style('left', '20px');
-    mobileNavOverlay.style('display', 'flex');
-    mobileNavOverlay.style('flex-direction', 'column');
-    mobileNavOverlay.style('gap', '10px');
-    mobileNavOverlay.style('z-index', '999');
-    mobileNavOverlay.style('pointer-events', 'auto');
-    // Initially show only on touch devices
-    mobileNavOverlay.style('opacity', isTouchDevice ? '1' : '0');
-    mobileNavOverlay.style('visibility', isTouchDevice ? 'visible' : 'hidden');
-    mobileNavOverlay.style('transition', 'opacity 0.3s ease');
-
-    // Common button styles
-    const buttonSize = 56;
-    const buttonStyle = {
-      width: buttonSize + 'px',
-      height: buttonSize + 'px',
-      borderRadius: '50%',
-      border: '2px solid rgba(100, 100, 100, 0.5)',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      color: '#333',
-      fontSize: '24px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-      userSelect: 'none',
-      WebkitUserSelect: 'none',
-      touchAction: 'manipulation'
-    };
-
-    // Create Up button (navigate to previous box)
-    mobileNavUpButton = createButton('▲');
-    mobileNavUpButton.parent(mobileNavOverlay);
-    mobileNavUpButton.id('mobile-nav-up');
-    applyButtonStyles(mobileNavUpButton, buttonStyle);
-    mobileNavUpButton.attribute('aria-label', 'Navigate to previous box');
-
-    // Create Down button (navigate to next box)
-    mobileNavDownButton = createButton('▼');
-    mobileNavDownButton.parent(mobileNavOverlay);
-    mobileNavDownButton.id('mobile-nav-down');
-    applyButtonStyles(mobileNavDownButton, buttonStyle);
-    mobileNavDownButton.attribute('aria-label', 'Navigate to next box');
-
-    // Add touch event handlers for smooth navigation
-    setupMobileNavButtonEvents(mobileNavUpButton, 'up');
-    setupMobileNavButtonEvents(mobileNavDownButton, 'down');
-
-    // Handle orientation changes
-    addTrackedEventListener(window, 'resize', updateMobileNavPosition);
-    addTrackedEventListener(window, 'orientationchange', updateMobileNavPosition);
-
-    // Initial position update
-    updateMobileNavPosition();
-
-  } catch (e) {
-    console.warn('Failed to setup mobile navigation:', e);
-  }
-}
-
-/**
- * Applies styles to a p5.js button element
- * @param {Object} button - p5.js button element
- * @param {Object} styles - Style object
- */
-function applyButtonStyles(button, styles) {
-  if (!button || !button.style) return;
-  for (const [key, value] of Object.entries(styles)) {
-    button.style(key, value);
-  }
-}
-
-/**
- * Sets up touch and mouse event handlers for mobile navigation buttons
- * @param {Object} button - p5.js button element
- * @param {string} direction - 'up' or 'down'
- */
-function setupMobileNavButtonEvents(button, direction) {
-  if (!button || !button.elt) return;
-
-  const navigateAction = () => {
-    if (!mindMap) return;
-
-    // Use the existing navigateBoxes method which handles smooth animation
-    if (direction === 'up') {
-      mindMap.navigateBoxes(UP_ARROW);
-    } else if (direction === 'down') {
-      mindMap.navigateBoxes(DOWN_ARROW);
-    }
-  };
-
-  // Touch start handler with visual feedback
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
-    button.style('transform', 'scale(0.95)');
-  };
-
-  // Touch end handler
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    button.style('backgroundColor', 'rgba(255, 255, 255, 0.9)');
-    button.style('transform', 'scale(1)');
-    navigateAction();
-  };
-
-  // Mouse handlers for desktop testing
-  const handleMouseDown = (e) => {
-    button.style('backgroundColor', 'rgba(100, 150, 255, 0.9)');
-    button.style('transform', 'scale(0.95)');
-  };
-
-  const handleMouseUp = (e) => {
-    button.style('backgroundColor', 'rgba(255, 255, 255, 0.9)');
-    button.style('transform', 'scale(1)');
-  };
-
-  // Mouse click for non-touch interaction
-  button.mousePressed(() => {
-    navigateAction();
-  });
-
-  // Touch events for mobile
-  addTrackedEventListener(button.elt, 'touchstart', handleTouchStart, { passive: false });
-  addTrackedEventListener(button.elt, 'touchend', handleTouchEnd, { passive: false });
-  addTrackedEventListener(button.elt, 'touchcancel', handleTouchEnd, { passive: false });
-
-  // Mouse events for visual feedback
-  addTrackedEventListener(button.elt, 'mousedown', handleMouseDown);
-  addTrackedEventListener(button.elt, 'mouseup', handleMouseUp);
-  addTrackedEventListener(button.elt, 'mouseleave', handleMouseUp);
-
-  // Add transition for smooth button feedback
-  button.style('transition', 'background-color 0.15s ease, transform 0.15s ease');
-}
-
-/**
- * Updates mobile navigation position based on screen orientation and size
- */
-function updateMobileNavPosition() {
-  if (!mobileNavOverlay) return;
-
-  try {
-    // Re-check if we should show/hide based on screen size
-    const shouldShow = detectTouchDevice();
-
-    if (shouldShow) {
-      mobileNavOverlay.style('opacity', '1');
-      mobileNavOverlay.style('visibility', 'visible');
-    } else {
-      mobileNavOverlay.style('opacity', '0');
-      mobileNavOverlay.style('visibility', 'hidden');
-    }
-
-    // Check current orientation
-    const isPortrait = window.innerHeight > window.innerWidth;
-
-    // Adjust position based on orientation and safe areas
-    const safeBottom = 20;
-    const safeLeft = 20;
-
-    // Position remains in bottom-left for both orientations
-    mobileNavOverlay.style('bottom', safeBottom + 'px');
-    mobileNavOverlay.style('left', safeLeft + 'px');
-
-    // Optionally adjust button size for smaller screens
-    const screenMin = Math.min(window.innerWidth, window.innerHeight);
-    let buttonSize = 56;
-    if (screenMin < 400) {
-      buttonSize = 48;
-    }
-
-    if (mobileNavUpButton) {
-      mobileNavUpButton.style('width', buttonSize + 'px');
-      mobileNavUpButton.style('height', buttonSize + 'px');
-    }
-    if (mobileNavDownButton) {
-      mobileNavDownButton.style('width', buttonSize + 'px');
-      mobileNavDownButton.style('height', buttonSize + 'px');
-    }
-  } catch (e) {
-    console.warn('Failed to update mobile nav position:', e);
-  }
-}
-
-/**
- * Shows the mobile navigation overlay
- */
-function showMobileNavOverlay() {
-  if (!mobileNavOverlay) return;
-  mobileNavOverlay.style('opacity', '1');
-  mobileNavOverlay.style('visibility', 'visible');
-}
-
-/**
- * Hides the mobile navigation overlay
- */
-function hideMobileNavOverlay() {
-  if (!mobileNavOverlay) return;
-  mobileNavOverlay.style('opacity', '0');
-  mobileNavOverlay.style('visibility', 'hidden');
-}
+// detectTouchDevice, setupMobileNavigation, applyButtonStyles,
+// setupMobileNavButtonEvents, updateMobileNavPosition, 
+// showMobileNavOverlay, hideMobileNavOverlay
+// are all defined in MobileNavigation.js and available globally
 
 // ============================================================================
 // MOUSE AND KEYBOARD INPUT HANDLERS
