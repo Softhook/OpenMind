@@ -2179,8 +2179,8 @@ function mouseDragged() {
  */
 function keyPressed() {
   // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
-  const isShiftHeld = keyIsDown(16);
-  if (isShiftHeld && (key === 't' || key === 'T')) {
+  // Check for uppercase T (which means Shift+T was pressed)
+  if (key === 'T') {
     if (!thrustGame) {
       // Initialize thrust game on first activation
       thrustGame = new ThrustGame(collaborationManager);

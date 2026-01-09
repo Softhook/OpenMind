@@ -396,14 +396,21 @@ class ThrustGame {
     if (!this.player.alive) return;
     
     const now = Date.now();
-    if (now - this.lastFireTime < ThrustGame.BULLET.COOLDOWN * ThrustGame.TIMING.FRAME_TIME_MS) return;
+    const cooldownMs = ThrustGame.BULLET.COOLDOWN * ThrustGame.TIMING.FRAME_TIME_MS;
+    if (now - this.lastFireTime < cooldownMs) return;
     
     this.lastFireTime = now;
     
     // Create bullet at ship tip
     const tipDist = ThrustGame.PLAYER.SIZE;
+    
+    // Generate UUID with fallback
+    const bulletId = (typeof Utils !== 'undefined' && Utils.generateUUID) 
+      ? Utils.generateUUID() 
+      : `bullet_${Date.now()}_${Math.random()}`;
+    
     const bullet = {
-      id: Utils.generateUUID(),
+      id: bulletId,
       x: this.player.x + Math.cos(this.player.angle) * tipDist,
       y: this.player.y + Math.sin(this.player.angle) * tipDist,
       vx: Math.cos(this.player.angle) * ThrustGame.BULLET.SPEED + this.player.vx,
@@ -472,9 +479,12 @@ class ThrustGame {
     rotate(player.angle);
     
     // Flash effect for invulnerability
-    if (invulnerable && Math.floor(millis() / 100) % 2 === 0) {
-      pop();
-      return;
+    if (invulnerable) {
+      const time = typeof millis !== 'undefined' ? millis() : Date.now();
+      if (Math.floor(time / 100) % 2 === 0) {
+        pop();
+        return;
+      }
     }
     
     // Draw ship as triangle
