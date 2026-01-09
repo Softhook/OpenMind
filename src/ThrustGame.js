@@ -73,12 +73,15 @@ class ThrustGame {
   static COLORS = {
     BACKGROUND: { r: 10, g: 10, b: 30 },       // Dark space background
     PLAYER_LOCAL: { r: 100, g: 200, b: 255 },  // Cyan for local player
-    PLAYER_REMOTE: { r: 255, g: 100, b: 100 }, // Red for remote players
-    BULLET_LOCAL: { r: 255, g: 255, b: 100 },  // Yellow bullets
-    BULLET_REMOTE: { r: 255, g: 100, b: 100 }, // Red bullets
+    PLAYER_REMOTE: { r: 255, g: 100, b: 100 }, // Red for remote players (fallback)
+    BULLET_LOCAL: { r: 0, g: 0, b: 0 },        // Black bullets for own player
+    BULLET_REMOTE: { r: 255, g: 0, b: 0 },     // Red bullets for enemies
     THRUST_FLAME: { r: 255, g: 150, b: 50 },   // Orange thrust flame
     UI_TEXT: 255                                // White text
   };
+  
+  static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
+  static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
   
   // ============================================================================
   // CONSTRUCTOR
@@ -117,6 +120,9 @@ class ThrustGame {
     // Score tracking
     this.score = 0;
     this.deaths = 0;
+    
+    // Multiplayer state
+    this.multiplayerInitialized = false;
     
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -205,8 +211,9 @@ class ThrustGame {
       space: false
     };
     
-    // Announce to multiplayer if connected
+    // Setup multiplayer if connected (may not have been connected at construction time)
     if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.setupMultiplayer();
       this.broadcastPlayerState();
     }
   }
@@ -217,6 +224,11 @@ class ThrustGame {
   stop() {
     // Set inactive first
     this.active = false;
+    
+    // Clear multiplayer state from awareness
+    if (this.collaborationManager && this.collaborationManager.awareness) {
+      this.collaborationManager.awareness.setLocalStateField('thrustGame', null);
+    }
     
     // Clear all game state
     this.bullets = [];
@@ -543,10 +555,10 @@ class ThrustGame {
     // Everything drawn here is in world space
     // No need to resetMatrix - we're already in the world transform
     
-    // Draw remote players
+    // Draw remote players with their custom colors and names
     for (const [clientId, remotePlayer] of this.remotePlayers) {
       if (remotePlayer.alive) {
-        this.drawPlayer(remotePlayer, ThrustGame.COLORS.PLAYER_REMOTE, false);
+        this.drawPlayer(remotePlayer, remotePlayer.color, false, false, remotePlayer.name);
       }
     }
     
@@ -618,11 +630,12 @@ class ThrustGame {
   /**
    * Draws a player ship
    * @param {Object} player - Player object
-   * @param {Object} color - Color object {r, g, b}
+   * @param {Object} color - Color object {r, g, b} or hex string
    * @param {boolean} showThrust - Whether to show thrust flame
    * @param {boolean} invulnerable - Whether player is invulnerable (flashing effect)
+   * @param {string} name - Optional player name to display above ship
    */
-  drawPlayer(player, color, showThrust = false, invulnerable = false) {
+  drawPlayer(player, color, showThrust = false, invulnerable = false, name = null) {
     push();
     translate(player.x, player.y);
     rotate(player.angle);
@@ -636,10 +649,33 @@ class ThrustGame {
       }
     }
     
+    // Convert color to RGB if it's a hex string
+    let r, g, b;
+    if (typeof color === 'string') {
+      // Parse hex color (e.g., "#ff6464")
+      const hex = color.replace('#', '');
+      // Validate hex format (should be 6 characters)
+      if (hex.length === 6 && /^[0-9A-Fa-f]{6}$/.test(hex)) {
+        r = parseInt(hex.slice(0, 2), 16);
+        g = parseInt(hex.slice(2, 4), 16);
+        b = parseInt(hex.slice(4, 6), 16);
+      } else {
+        // Fallback to default remote player color if invalid
+        const fallback = ThrustGame.COLORS.PLAYER_REMOTE;
+        r = fallback.r;
+        g = fallback.g;
+        b = fallback.b;
+      }
+    } else {
+      r = color.r;
+      g = color.g;
+      b = color.b;
+    }
+    
     // Draw ship as triangle
     const halfSize = ThrustGame.PLAYER.SIZE / 2;
     noStroke();
-    fill(color.r, color.g, color.b);
+    fill(r, g, b);
     triangle(
       ThrustGame.PLAYER.SIZE, 0,
       -halfSize, -halfSize,
@@ -659,6 +695,17 @@ class ThrustGame {
     }
     
     pop();
+    
+    // Draw player name above ship (in world space, not rotated)
+    if (name) {
+      push();
+      fill(255);
+      noStroke();
+      textAlign(CENTER, BOTTOM);
+      textSize(12);
+      text(name, player.x, player.y - ThrustGame.PLAYER.SIZE - 5);
+      pop();
+    }
   }
   
   /**
@@ -689,22 +736,148 @@ class ThrustGame {
    * Sets up multiplayer synchronization
    */
   setupMultiplayer() {
-    // This would integrate with CollaborationManager's awareness or custom protocol
-    // For now, we'll use a simple approach with awareness updates
-    // In a real implementation, you'd want a dedicated game state sync
+    if (!this.collaborationManager || !this.collaborationManager.awareness) {
+      return;
+    }
     
-    // Listen for remote player updates (would need custom implementation in CollaborationManager)
-    // For this Easter egg, we'll keep it simple and not implement full multiplayer
-    // But the structure is here for future expansion
+    // Only set up once to avoid duplicate event listeners
+    if (this.multiplayerInitialized) {
+      return;
+    }
+    this.multiplayerInitialized = true;
+    
+    // Listen for awareness changes to get remote player updates
+    this.collaborationManager.awareness.on('change', () => {
+      if (this.active) {
+        this.updateRemotePlayers();
+      }
+    });
+    
+    // Initial update to populate remote players
+    this.updateRemotePlayers();
+  }
+  
+  /**
+   * Updates remote players based on awareness state
+   */
+  updateRemotePlayers() {
+    // Only update if game is active to ensure zero overhead when inactive
+    if (!this.active) return;
+    
+    if (!this.collaborationManager || !this.collaborationManager.awareness) {
+      return;
+    }
+    
+    const states = this.collaborationManager.awareness.getStates();
+    const myClientId = this.collaborationManager.awareness.clientID;
+    
+    // Track which clients are still active
+    const activeClients = new Set();
+    
+    states.forEach((state, clientId) => {
+      // Skip self
+      if (clientId === myClientId) return;
+      
+      // Check if remote player has thrust game state
+      if (state.thrustGame) {
+        activeClients.add(clientId);
+        
+        // Update or create remote player
+        if (!this.remotePlayers.has(clientId)) {
+          this.remotePlayers.set(clientId, {
+            x: state.thrustGame.x,
+            y: state.thrustGame.y,
+            vx: state.thrustGame.vx || 0,
+            vy: state.thrustGame.vy || 0,
+            angle: state.thrustGame.angle,
+            alive: state.thrustGame.alive,
+            name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
+            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR
+          });
+        } else {
+          const player = this.remotePlayers.get(clientId);
+          player.x = state.thrustGame.x;
+          player.y = state.thrustGame.y;
+          player.vx = state.thrustGame.vx || 0;
+          player.vy = state.thrustGame.vy || 0;
+          player.angle = state.thrustGame.angle;
+          player.alive = state.thrustGame.alive;
+          player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
+          player.color = state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR;
+        }
+        
+        // Update remote bullets from this player
+        if (state.thrustGame.bullets && Array.isArray(state.thrustGame.bullets)) {
+          // Track current bullet IDs for this client
+          const currentBulletIds = new Set(state.thrustGame.bullets.map(b => b.id).filter(id => id !== null && id !== undefined));
+          
+          // Remove bullets that are no longer in the update
+          for (const [bulletId, bullet] of this.remoteBullets) {
+            if (bullet.clientId === clientId && !currentBulletIds.has(bulletId)) {
+              this.remoteBullets.delete(bulletId);
+            }
+          }
+          
+          // Add or update current bullets
+          for (const bullet of state.thrustGame.bullets) {
+            if (bullet.id !== null && bullet.id !== undefined) {
+              this.remoteBullets.set(bullet.id, {
+                x: bullet.x,
+                y: bullet.y,
+                vx: bullet.vx,
+                vy: bullet.vy,
+                lifetime: bullet.lifetime,
+                clientId: clientId
+              });
+            }
+          }
+        }
+      }
+    });
+    
+    // Remove players that are no longer present
+    for (const clientId of this.remotePlayers.keys()) {
+      if (!activeClients.has(clientId)) {
+        this.remotePlayers.delete(clientId);
+        
+        // Also remove their bullets
+        for (const [bulletId, bullet] of this.remoteBullets) {
+          if (bullet.clientId === clientId) {
+            this.remoteBullets.delete(bulletId);
+          }
+        }
+      }
+    }
   }
   
   /**
    * Broadcasts local player state to other players
    */
   broadcastPlayerState() {
-    // In a full implementation, this would send player position/velocity/angle
-    // through the collaboration manager's awareness or a custom channel
-    // For now, this is a placeholder
+    if (!this.collaborationManager || !this.collaborationManager.awareness) {
+      return;
+    }
+    
+    // Build the state to broadcast
+    const gameState = {
+      x: this.player.x,
+      y: this.player.y,
+      vx: this.player.vx,
+      vy: this.player.vy,
+      angle: this.player.angle,
+      alive: this.player.alive,
+      bullets: this.bullets.map(b => ({
+        id: b.id,
+        x: b.x,
+        y: b.y,
+        vx: b.vx,
+        vy: b.vy,
+        lifetime: b.lifetime
+      }))
+    };
+    
+    // Update awareness with thrust game state
+    this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
   }
   
   /**
@@ -712,8 +885,9 @@ class ThrustGame {
    * @param {Object} bullet - Bullet object
    */
   broadcastBullet(bullet) {
-    // In a full implementation, this would send bullet data to other players
-    // For now, this is a placeholder
+    // Bullets are broadcasted as part of player state in broadcastPlayerState
+    // The update() method already throttles broadcasts to ~100ms intervals
+    // No need to broadcast immediately here - will be sent in next update cycle
   }
 }
 
