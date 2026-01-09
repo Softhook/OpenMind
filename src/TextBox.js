@@ -16,7 +16,10 @@ class TextBox {
   static DRAG_EDGE_THICKNESS = 18;
   static HORIZONTAL_EDGE_WIDTH = 12; // fixed thinner vertical grab area for all boxes
   static LINE_HEIGHT_MULTIPLIER = 1.5;
-  
+  static CONNECTOR_RADIUS = 7;
+  static CONNECTOR_RADIUS_ACTIVE = 7;
+  static MIN_CENTER_EDIT_ZONE = 20; // Minimum size of the central area reserved for text editing (not dragging)
+
   // Change detection threshold for drag/resize operations (in pixels)
   // Operations with changes smaller than this are considered "no change" for undo purposes
   static CHANGE_THRESHOLD = 0.001;
@@ -971,7 +974,7 @@ class TextBox {
     const pts = this.getConnectorPoints();
     push();
     noStroke();
-    const r = (active ? 6 : 5) / Math.sqrt(zoomFactor);
+    const r = (active ? TextBox.CONNECTOR_RADIUS_ACTIVE : TextBox.CONNECTOR_RADIUS) / Math.sqrt(zoomFactor);
     const c = active ? color(100, 150, 255) : color(120);
     fill(c);
     circle(pts.left.x, pts.left.y, r * 2);
@@ -1015,8 +1018,8 @@ class TextBox {
     }
 
     // Make the draggable edge zone a bit larger, while keeping a minimum editable center
-    const minCenterWidth = 20;  // ensure at least 20px center horizontal edit zone
-    const minCenterHeight = 20; // ensure at least 20px center vertical edit zone
+    const minCenterWidth = TextBox.MIN_CENTER_EDIT_ZONE;  // ensure at least 20px center horizontal edit zone
+    const minCenterHeight = TextBox.MIN_CENTER_EDIT_ZONE; // ensure at least 20px center vertical edit zone
     const maxEdgeX = max(4, this.width / 2 - minCenterWidth / 2);
     const maxEdgeY = max(4, this.height / 2 - minCenterHeight / 2);
     const edgeThresholdX = min(this.dragEdgeThickness, maxEdgeX);
@@ -1816,15 +1819,15 @@ class TextBox {
   stopDrag(skipSync = false) {
     const wasDragging = this.isDragging;
     this.isDragging = false;
-    
+
     let positionChanged = false;
     if (wasDragging) {
       // Check if position actually changed during drag
-      positionChanged = 
+      positionChanged =
         (this._dragStartX !== undefined && this._dragStartY !== undefined) &&
-        (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD || 
-         Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
-      
+        (Math.abs(this.x - this._dragStartX) > TextBox.CHANGE_THRESHOLD ||
+          Math.abs(this.y - this._dragStartY) > TextBox.CHANGE_THRESHOLD);
+
       if (!skipSync) {
         if (positionChanged) {
           // Sync final position WITH transaction wrapper for clean undo
@@ -1836,11 +1839,11 @@ class TextBox {
         }
       }
     }
-    
+
     // Clean up tracking variables
     this._dragStartX = undefined;
     this._dragStartY = undefined;
-    
+
     return positionChanged;
   }
 
@@ -2003,20 +2006,20 @@ class TextBox {
   stopResize(skipSync = false) {
     const wasResizing = this.isResizing;
     this.isResizing = false;
-    
+
     let sizeChanged = false;
     if (wasResizing) {
       // Check if size actually changed during resize
-      sizeChanged = 
+      sizeChanged =
         (this.resizeStartWidth !== undefined && this.resizeStartHeight !== undefined) &&
-        (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD || 
-         Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
-      
+        (Math.abs(this.width - this.resizeStartWidth) > TextBox.CHANGE_THRESHOLD ||
+          Math.abs(this.height - this.resizeStartHeight) > TextBox.CHANGE_THRESHOLD);
+
       // Always reflow and update position
       const prevTop = this.y - this.height / 2;
       this.updateDimensions();
       this.y = prevTop + this.height / 2;
-      
+
       if (!skipSync) {
         if (sizeChanged) {
           // Sync final size WITH transaction wrapper for clean undo
@@ -2028,7 +2031,7 @@ class TextBox {
         }
       }
     }
-    
+
     return sizeChanged;
   }
 
