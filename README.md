@@ -1,6 +1,6 @@
 # OpenMind - Mind Mapping Software
 
-Author: Christian Nold (2025) • Live App: https://softhook.github.io/OpenMind
+Author: Christian Nold (2025) • Live App: https://softhook.github.io/OpenMind/
 
 ![OpenMind mind map screenshot](./screenshot.png)
 
@@ -8,10 +8,28 @@ OpenMind is a fast, keyboard-driven mind mapping presentation app built with p5.
 Create, connect, export and present ideas with minimal hassle.
 
 ## Quick Start
-- Use in the browser: https://softhook.github.io/OpenMind
-
 - Here is an example map
-https://softhook.github.io/OpenMind/#maps/ANTtalk
+https://softhook.github.io/OpenMind/#room=test
+
+## Online Collaboration
+
+OpenMind supports real-time collaborative editing using WebSocket synchronization. Multiple users can work on the same mind map simultaneously, seeing each other's changes instantly.
+
+### Starting a Collaboration Session
+
+- **Share a room**: Add `#room=yourRoomName` to the URL (e.g., `https://softhook.github.io/OpenMind/#room=myproject`)
+- Share this URL with collaborators to work together in real-time
+- Room names are case-sensitive and can contain letters, numbers, and common symbols
+
+### Collaborative Features
+
+- **Real-time sync**: All changes (boxes, connections, text edits) sync instantly across all connected users
+- **Conflict-free editing**: Built on Yjs CRDTs to handle simultaneous edits without conflicts
+- **Persistent rooms**: Rooms persist on the server - join anytime to see the latest state
+
+### Privacy & Data
+
+- No authentication required - anyone with the room URL can join
 
 ## Loading and Saving Maps
 - Maps autosave in the browser 
@@ -53,14 +71,8 @@ While editing a text box:
   - Cmd/Ctrl+V: paste
   - Cmd/Ctrl+B: toggle highlight on the selected text (adds/removes persistent highlight)
 
-Presentation Mode
+### Presentation Mode
 - Arrow keys move the caret; Up/Down move between wrapped lines
-
-- Native OS paste and voice dictation: You can paste via the Edit menu, right-click menu, or dictation tools. The app listens for the browser's native paste/copy/cut events and inserts text into the focused box while editing.
-
-- Permissions: Browser clipboard APIs (navigator.clipboard) work best on HTTPS or localhost. If you open this app from a `file://` URL, native paste events still work, but programmatic clipboard reads may be blocked by the browser.
-
-
 
 ### Mouse/Trackpad Controls
 - Scroll over the canvas to zoom in/out around the cursor

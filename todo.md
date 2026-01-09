@@ -1,13 +1,5 @@
 
-reflow text boxes based on connections Use an algorithm to make a logical structured layout based on the connections 
-
-Selecting a few boxes and then using 'a' line should try and horizontally or vertically align the edges of all the boxes 
-
-pressing s key make all the selected boxes an average same width
-
-
-detect hyperlinks or local file links - colour them blue and clicking on them opens the link in another window
-
+reflow text boxes based on connections Use an algorithm to 
 Text Import
 
 Split input into paragraphs (define what counts as a paragraph: blank-line separated, or single-line breaks).
