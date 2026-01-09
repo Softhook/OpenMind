@@ -35,6 +35,10 @@ class MindMap {
   /** @type {function():void|null} Called when connections change */
   static onConnectionsChange = null;
 
+  // ============================================================================
+  // CONSTRUCTOR & INITIALIZATION
+  // ============================================================================
+
   /**
    * Initializes a new MindMap with default state
    */
@@ -79,6 +83,10 @@ class MindMap {
     this.isZoomAnimating = false;
     this.zoomAnimationSpeed = 0.12; // separate speed for zoom interpolation
   }
+
+  // ============================================================================
+  // BASIC BOX & CONNECTION MANAGEMENT
+  // ============================================================================
 
   /**
    * Adds a new box to the mind map
@@ -179,6 +187,10 @@ class MindMap {
     // White or other: lowest priority
     return 999;
   }
+
+  // ============================================================================
+  // ANIMATION & RENDERING
+  // ============================================================================
 
   /**
    * Updates animation states (call this every frame)
@@ -326,6 +338,10 @@ class MindMap {
       }
     }
   }
+
+  // ============================================================================
+  // ALIGNMENT ALGORITHMS
+  // ============================================================================
 
   /**
    * Aligns boxes' x and y positions when they are within a tolerance.
@@ -1100,6 +1116,10 @@ class MindMap {
     }
   }
 
+  // ============================================================================
+  // NAVIGATION & FOCUS MANAGEMENT
+  // ============================================================================
+
   /**
    * Navigates between boxes using arrow keys
    * UP/DOWN: Traverse depth-first through connections (priority: red → orange → white)
@@ -1438,6 +1458,10 @@ class MindMap {
     this.isArrowKeyNavigating = false;
     return connected;
   }
+
+  // ============================================================================
+  // MOUSE & KEYBOARD INPUT HANDLERS
+  // ============================================================================
 
   /**
    * Handles mouse press events
@@ -2118,6 +2142,10 @@ class MindMap {
       }
     }
   }
+
+  // ============================================================================
+  // STATE MANAGEMENT (SAVE/LOAD)
+  // ============================================================================
 
   /**
    * Serializes the mind map to JSON
