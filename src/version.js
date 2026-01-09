@@ -6,8 +6,8 @@
 
 const APP_VERSION = {
     MAJOR: 1,
-    MINOR: 0,
-    PATCH: 3,
+    MINOR: 1,
+    PATCH: 0,
     
     toString() {
         return `${this.MAJOR}.${this.MINOR}.${this.PATCH}`;
