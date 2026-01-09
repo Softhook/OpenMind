@@ -741,8 +741,13 @@ function shareSession() {
 /**
  * Updates local user presence (cursor, selection) broadcast
  */
+/**
+ * Updates presence information (cursor, selection) for collaboration.
+ * Called from draw loop only when connected to a room.
+ */
 function updateCollaborationPresence() {
-  if (!collaborationManager || !collaborationManager.isConnected) return;
+  // Early exit if somehow called without valid manager (defensive check)
+  if (!collaborationManager) return;
 
   // Throttle updates (every ~100ms)
   if (frameCount % 6 !== 0) return;
@@ -776,10 +781,12 @@ function updateCollaborationPresence() {
 }
 
 /**
- * Draws cursors of remote users
+ * Draws cursors of remote users.
+ * Called from draw loop only when connected to a room.
  */
 function drawRemoteCursors() {
-  if (!collaborationManager || !collaborationManager.isConnected) return;
+  // Early exit if somehow called without valid manager (defensive check)
+  if (!collaborationManager) return;
 
   const users = collaborationManager.getRemoteUsers();
   if (!users || users.length === 0) return;
@@ -1222,18 +1229,21 @@ function draw() {
         drawSelectionRectangle();
       }
 
-      // Draw remote users' cursors (in world space)
-      if (typeof collaborationManager !== 'undefined' && collaborationManager && typeof collaborationManager.updateCursors === 'function') {
-        collaborationManager.updateCursors();
-      }
-
-      if (typeof drawRemoteCursors === 'function') {
+      // Draw remote collaboration elements (cursors, selections) if connected
+      // Consolidated check to avoid redundant conditionals in draw loop
+      const hasActiveCollaboration = collaborationManager && collaborationManager.isConnected;
+      if (hasActiveCollaboration) {
+        // Update cursor interpolation
+        if (collaborationManager.updateCursors) {
+          collaborationManager.updateCursors();
+        }
+        // Draw remote users' cursors (in world space)
         drawRemoteCursors();
       }
       pop();
 
-      // Update our presence (cursor position, selection) throttled
-      if (typeof updateCollaborationPresence === 'function') {
+      // Update our presence (cursor position, selection) if connected - throttled internally
+      if (hasActiveCollaboration) {
         updateCollaborationPresence();
       }
     } catch (e) {

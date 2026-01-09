@@ -46,6 +46,17 @@ class Connection {
     this.toBox = toBox;
     this.arrowSize = Connection.ARROW_SIZE;
     this.selected = false;
+    
+    // Cache for connection endpoints
+    this._cachedEndpoints = null;
+    this._lastFromBoxX = null;
+    this._lastFromBoxY = null;
+    this._lastFromBoxWidth = null;
+    this._lastFromBoxHeight = null;
+    this._lastToBoxX = null;
+    this._lastToBoxY = null;
+    this._lastToBoxWidth = null;
+    this._lastToBoxHeight = null;
   }
 
   // ============================================================================
@@ -56,12 +67,45 @@ class Connection {
    * Gets the connection endpoints on the edges of the boxes.
    * Calculates where the connection line should start and end based on
    * the positions of the two boxes.
+   * Uses caching to avoid recalculating when boxes haven't moved.
    * @returns {Object|null} Object with {start, end} points, or null if invalid
    * @private
    */
   _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
 
+    // Check if cache is valid (boxes haven't moved or resized)
+    // Cache is valid only if:
+    // 1. Cached endpoints exist
+    // 2. All tracking has been initialized (not first call)
+    // 3. Boxes haven't moved or changed size since last cache
+    const hasValidCache = this._cachedEndpoints !== null && 
+                          this._lastFromBoxX !== null &&
+                          this._lastFromBoxY !== null &&
+                          this._lastFromBoxWidth !== null &&
+                          this._lastFromBoxHeight !== null &&
+                          this._lastToBoxX !== null &&
+                          this._lastToBoxY !== null &&
+                          this._lastToBoxWidth !== null &&
+                          this._lastToBoxHeight !== null;
+    
+    if (hasValidCache) {
+      const fromChanged = this._lastFromBoxX !== this.fromBox.x || 
+                          this._lastFromBoxY !== this.fromBox.y ||
+                          this._lastFromBoxWidth !== this.fromBox.width ||
+                          this._lastFromBoxHeight !== this.fromBox.height;
+      const toChanged = this._lastToBoxX !== this.toBox.x || 
+                        this._lastToBoxY !== this.toBox.y ||
+                        this._lastToBoxWidth !== this.toBox.width ||
+                        this._lastToBoxHeight !== this.toBox.height;
+      
+      // Return cached result if boxes haven't changed
+      if (!fromChanged && !toChanged) {
+        return this._cachedEndpoints;
+      }
+    }
+
+    // Recalculate endpoints
     const start = this.fromBox.getConnectionPoint(this.toBox);
     const end = this.toBox.getConnectionPoint(this.fromBox);
 
@@ -72,7 +116,18 @@ class Connection {
       return null;
     }
 
-    return { start, end };
+    // Update cache with position and size
+    this._cachedEndpoints = { start, end };
+    this._lastFromBoxX = this.fromBox.x;
+    this._lastFromBoxY = this.fromBox.y;
+    this._lastFromBoxWidth = this.fromBox.width;
+    this._lastFromBoxHeight = this.fromBox.height;
+    this._lastToBoxX = this.toBox.x;
+    this._lastToBoxY = this.toBox.y;
+    this._lastToBoxWidth = this.toBox.width;
+    this._lastToBoxHeight = this.toBox.height;
+
+    return this._cachedEndpoints;
   }
 
   /**
