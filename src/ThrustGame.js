@@ -54,6 +54,14 @@ class ThrustGame {
     FRAME_TIME_MS: 1000 / 60  // Milliseconds per frame at 60fps
   };
   
+  static KEY_CODES = {
+    LEFT: 37,
+    RIGHT: 39,
+    UP: 38,
+    DOWN: 40,
+    SPACE: 32
+  };
+  
   static COLORS = {
     BACKGROUND: { r: 10, g: 10, b: 30 },       // Dark space background
     PLAYER_LOCAL: { r: 100, g: 200, b: 255 },  // Cyan for local player
@@ -422,19 +430,21 @@ class ThrustGame {
   handleKeyPressed(key, keyCode) {
     if (!this.active) return;
     
-    // Arrow keys (use numeric codes for reliability)
-    if (keyCode === 37) {  // Left
+    const K = ThrustGame.KEY_CODES;
+    
+    // Arrow keys
+    if (keyCode === K.LEFT) {
       this.keys.left = true;
-    } else if (keyCode === 39) {  // Right
+    } else if (keyCode === K.RIGHT) {
       this.keys.right = true;
-    } else if (keyCode === 38) {  // Up
+    } else if (keyCode === K.UP) {
       this.keys.up = true;
-    } else if (keyCode === 40) {  // Down
+    } else if (keyCode === K.DOWN) {
       this.keys.down = true;
     }
     
     // Spacebar for shooting
-    if (keyCode === 32 || key === ' ') {
+    if (keyCode === K.SPACE || key === ' ') {
       this.fireBullet();
     }
   }
@@ -445,13 +455,15 @@ class ThrustGame {
    */
   handleKeyReleased(keyCode) {
     // Always handle key releases to prevent stuck keys, even when inactive
-    if (keyCode === 37) {  // Left
+    const K = ThrustGame.KEY_CODES;
+    
+    if (keyCode === K.LEFT) {
       this.keys.left = false;
-    } else if (keyCode === 39) {  // Right
+    } else if (keyCode === K.RIGHT) {
       this.keys.right = false;
-    } else if (keyCode === 38) {  // Up
+    } else if (keyCode === K.UP) {
       this.keys.up = false;
-    } else if (keyCode === 40) {  // Down
+    } else if (keyCode === K.DOWN) {
       this.keys.down = false;
     }
   }
@@ -462,27 +474,22 @@ class ThrustGame {
    */
   syncKeyboardState() {
     if (!this.active) return;
+    if (typeof keyIsDown !== 'function') return;
     
-    // Check actual key state and sync with our tracked state
-    // This catches any missed keyup events
-    if (typeof keyIsDown === 'function') {
-      const actualLeft = keyIsDown(37);
-      const actualRight = keyIsDown(39);
-      const actualUp = keyIsDown(38);
-      const actualDown = keyIsDown(40);
-      
-      // If our state says key is pressed but p5 says it's not, clear it
-      if (this.keys.left && !actualLeft) {
-        this.keys.left = false;
-      }
-      if (this.keys.right && !actualRight) {
-        this.keys.right = false;
-      }
-      if (this.keys.up && !actualUp) {
-        this.keys.up = false;
-      }
-      if (this.keys.down && !actualDown) {
-        this.keys.down = false;
+    const K = ThrustGame.KEY_CODES;
+    
+    // Map of key names to their codes
+    const keyMap = [
+      { name: 'left', code: K.LEFT },
+      { name: 'right', code: K.RIGHT },
+      { name: 'up', code: K.UP },
+      { name: 'down', code: K.DOWN }
+    ];
+    
+    // Check each key and clear if stuck
+    for (const { name, code } of keyMap) {
+      if (this.keys[name] && !keyIsDown(code)) {
+        this.keys[name] = false;
       }
     }
   }
