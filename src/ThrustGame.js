@@ -375,7 +375,7 @@ class ThrustGame {
    * Updates all bullets (movement and lifetime)
    */
   updateBullets() {
-    // Update bullets in place and remove expired ones
+    // Update local bullets in place and remove expired ones
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
       
@@ -393,6 +393,14 @@ class ThrustGame {
       // Remove expired bullets
       if (bullet.lifetime <= 0) {
         this.bullets.splice(i, 1);
+      }
+    }
+    
+    // Update remote bullets - check for box collisions
+    // Remote bullets are synced from other players, but we still need to check local collisions
+    for (const [bulletId, bullet] of this.remoteBullets) {
+      if (this.checkBulletBoxCollision(bullet)) {
+        this.remoteBullets.delete(bulletId);
       }
     }
   }
@@ -442,12 +450,6 @@ class ThrustGame {
       const bullet = this.bullets[i];
       let bulletHit = false;
       
-      // Check collision with boxes first
-      if (this.checkBulletBoxCollision(bullet)) {
-        this.bullets.splice(i, 1);
-        continue;
-      }
-      
       for (const [clientId, remotePlayer] of this.remotePlayers) {
         if (!remotePlayer.alive) continue;
         
@@ -469,12 +471,6 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
-        // Check bullet collision with boxes
-        if (this.checkBulletBoxCollision(bullet)) {
-          this.remoteBullets.delete(bulletId);
-          continue;
-        }
-        
         const dx = bullet.x - this.player.x;
         const dy = bullet.y - this.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
