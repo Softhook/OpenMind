@@ -90,6 +90,8 @@ let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
 
+// Easter egg: Thrust game
+let thrustGame = null; // ThrustGame instance
 
 // Autosave state
 let autosaveTimer = null;
@@ -1212,6 +1214,13 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
+  // Check if thrust game is active - if so, let it handle everything
+  if (thrustGame && thrustGame.active) {
+    thrustGame.update();
+    thrustGame.draw();
+    return; // Skip normal mind map rendering
+  }
+  
   background(UI_COLORS.BACKGROUND);
   updateMenuVisibility();
 
@@ -2169,6 +2178,30 @@ function mouseDragged() {
  * Handles key press events
  */
 function keyPressed() {
+  // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
+  const isShiftHeld = keyIsDown(16);
+  if (isShiftHeld && (key === 't' || key === 'T')) {
+    if (!thrustGame) {
+      // Initialize thrust game on first activation
+      thrustGame = new ThrustGame(collaborationManager);
+    }
+    
+    if (thrustGame.active) {
+      // Stop the game
+      thrustGame.stop();
+    } else {
+      // Start the game
+      thrustGame.start();
+    }
+    return false;
+  }
+  
+  // If thrust game is active, route keyboard events to it
+  if (thrustGame && thrustGame.active) {
+    thrustGame.handleKeyPressed(key, keyCode);
+    return false; // Prevent default and stop propagation
+  }
+  
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     // Enter/Return = Confirm and join room
@@ -2423,6 +2456,12 @@ function keyPressed() {
  * Handles key release events
  */
 function keyReleased() {
+  // Route to thrust game if active
+  if (thrustGame && thrustGame.active) {
+    thrustGame.handleKeyReleased(keyCode);
+    return false;
+  }
+  
   // Stop fallback repeat on key release
   KeyRepeat.stop(keyCode);
 }
