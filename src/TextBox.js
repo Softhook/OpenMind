@@ -825,18 +825,18 @@ class TextBox {
       }
       // Continue so dimming overlay and handles are applied to image boxes as well
     } else {
-      // Draw text with wrapping
-      fill(0);
-      noStroke();
-      textAlign(LEFT, CENTER);
-      textSize(this.fontSize);
-
+      // Performance optimization: at very low zoom (highly zoomed out),
+      // text is unreadable anyway, so render simplified placeholder lines
+      // This dramatically improves performance when viewing large maps
+      const currentZoom = Utils.getCurrentZoom ? Utils.getCurrentZoom() : 1;
+      const shouldSimplifyText = currentZoom < 0.35 && !this.isEditing;
+      
+      // Pre-calculate these values for both rendering paths
       let wrappedLines = this.wrapText(this.text);
       let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
-      // Top-anchored text: start at top padding of the box
       let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
       let textX = this.x - this.width / 2 + this.padding;
-
+      
       // If connector dots are visible (hover OR active connection from this box),
       // slightly dim the draggable frame area so the grab-edge is visually prominent.
       const connectorsVisible = ((!(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
@@ -877,57 +877,79 @@ class TextBox {
         pop();
       }
 
-      // Draw selection highlight if there's a selection
-      if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
-        this.drawSelection(wrappedLines, textX, startY, lineHeight);
-      }
+      if (shouldSimplifyText) {
+        // Draw simplified representation: horizontal lines like redacted text
+        fill(0);
+        strokeWeight(1.5);
+        stroke(0);
+        for (let i = 0; i < wrappedLines.length; i++) {
+          let lineText = wrappedLines[i];
+          if (lineText.length > 0) {
+            // Approximate line width based on character count
+            let approxWidth = Math.min(this.width - this.padding * 2, lineText.length * this.fontSize * 0.6);
+            let y = startY + i * lineHeight;
+            line(textX, y, textX + approxWidth, y);
+          }
+        }
+      } else {
+        // Normal text rendering at readable zoom levels
+        fill(0);
+        noStroke();
+        textAlign(LEFT, CENTER);
+        textSize(this.fontSize);
 
-      // Draw persistent highlights (behind text)
-      if (this.highlights && this.highlights.length > 0) {
-        this.drawHighlights(wrappedLines, textX, startY, lineHeight);
-      }
+        // Draw selection highlight if there's a selection
+        if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
+          this.drawSelection(wrappedLines, textX, startY, lineHeight);
+        }
 
-      for (let i = 0; i < wrappedLines.length; i++) {
-        let lineText = wrappedLines[i];
+        // Draw persistent highlights (behind text)
+        if (this.highlights && this.highlights.length > 0) {
+          this.drawHighlights(wrappedLines, textX, startY, lineHeight);
+        }
 
-        // Get absolute character position for this line
-        let lineStartPos = (this.cachedLineCharMap && this.cachedLineCharMap[i] !== undefined)
-          ? this.cachedLineCharMap[i] : 0;
+        for (let i = 0; i < wrappedLines.length; i++) {
+          let lineText = wrappedLines[i];
 
-        // Detect links for coloring
-        const links = this.detectLinks();
+          // Get absolute character position for this line
+          let lineStartPos = (this.cachedLineCharMap && this.cachedLineCharMap[i] !== undefined)
+            ? this.cachedLineCharMap[i] : 0;
 
-        // Always render character by character for precise spacing control
-        // This ensures multiple spaces are visible
-        let xPos = textX;
-        for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
-          let char = lineText[charIdx];
-          let absCharPos = lineStartPos + charIdx;
+          // Detect links for coloring
+          const links = this.detectLinks();
 
-          // Check if this character is part of a link
-          let isInLink = false;
-          for (const link of links) {
-            if (absCharPos >= link.start && absCharPos < link.end) {
-              isInLink = true;
-              break;
+          // Always render character by character for precise spacing control
+          // This ensures multiple spaces are visible
+          let xPos = textX;
+          for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
+            let char = lineText[charIdx];
+            let absCharPos = lineStartPos + charIdx;
+
+            // Check if this character is part of a link
+            let isInLink = false;
+            for (const link of links) {
+              if (absCharPos >= link.start && absCharPos < link.end) {
+                isInLink = true;
+                break;
+              }
             }
-          }
 
-          // Set color based on whether character is in a link
-          if (isInLink) {
-            const linkColor = TextBox.COLORS.LINK_TEXT;
-            fill(linkColor.r, linkColor.g, linkColor.b); // Blue for links
-          } else {
-            fill(0); // Black for regular text
-          }
+            // Set color based on whether character is in a link
+            if (isInLink) {
+              const linkColor = TextBox.COLORS.LINK_TEXT;
+              fill(linkColor.r, linkColor.g, linkColor.b); // Blue for links
+            } else {
+              fill(0); // Black for regular text
+            }
 
-          // For spaces, use measured width to ensure they take up space
-          if (char === ' ') {
-            // Draw a space by moving position (p5 text(' ') might collapse)
-            xPos += textWidth(' ');
-          } else {
-            text(char, xPos, startY + i * lineHeight);
-            xPos += textWidth(char);
+            // For spaces, use measured width to ensure they take up space
+            if (char === ' ') {
+              // Draw a space by moving position (p5 text(' ') might collapse)
+              xPos += textWidth(' ');
+            } else {
+              text(char, xPos, startY + i * lineHeight);
+              xPos += textWidth(char);
+            }
           }
         }
       }
