@@ -52,6 +52,7 @@ OpenMind supports real-time collaborative editing using WebSocket synchronizatio
 - Cmd/Ctrl+C: copy selected box(es)
 - Cmd/Ctrl+V: paste copied box(es) at the cursor location
 - Cmd/Ctrl+Z: undo last action
+- **Shift+T: toggle Easter egg thrust game** 🎮
 
 While editing a text box:
 
@@ -81,3 +82,7 @@ While editing a text box:
 - Reattach a connection: drag its arrowhead to a different target box
 - Click a connection to select it
 - With a connection selected, press Space to reverse its direction
+
+## Easter Egg: Thrust Game 🎮
+
+OpenMind includes a hidden mini-game! Press **Shift+T** to launch a classic thrust-based space shooter. Use arrow keys to fly your ship, spacebar to fire bullets, and try to survive against gravity and other players in multiplayer mode. Press **Shift+T** again to return to your mind map. [Read more about the game →](docs/ThrustGame.md)
