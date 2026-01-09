@@ -1921,197 +1921,74 @@ function layoutMenuButtons() {
   menuRightEdge = x + 10;
 }
 
+// ============================================================================
+// KEYBOARD CONTROLS OVERLAY (delegated to KeyboardOverlay.js module)
+// ============================================================================
+
+/**
+ * Sets up the keyboard controls overlay.
+ * @see KeyboardOverlay.setup for implementation
+ */
 function setupKeyboardControlsOverlay() {
-  if (keyboardOverlay) return;
-
-  keyboardOverlay = createDiv();
-  keyboardOverlay.id('keyboard-controls-overlay');
-  keyboardOverlay.style('position', 'fixed');
-  keyboardOverlay.style('top', '0');
-  keyboardOverlay.style('left', '0');
-  keyboardOverlay.style('width', '100%');
-  keyboardOverlay.style('height', '100%');
-  keyboardOverlay.style('padding', '24px');
-  keyboardOverlay.style('background', 'rgba(0, 0, 0, 0.55)');
-  keyboardOverlay.style('display', 'none');
-  keyboardOverlay.style('align-items', 'center');
-  keyboardOverlay.style('justify-content', 'center');
-  keyboardOverlay.style('z-index', '1000');
-  keyboardOverlay.style('box-sizing', 'border-box');
-
-  if (keyboardOverlay.elt) {
-    overlayClickHandler = (event) => {
-      if (event.target === keyboardOverlay.elt) {
-        hideKeyboardControlsOverlay();
-      }
-    };
-    keyboardOverlay.elt.addEventListener('click', overlayClickHandler);
+  if (typeof KeyboardOverlay !== 'undefined') {
+    const refs = KeyboardOverlay.setup({ keyboardControlsButton });
+    if (refs) {
+      keyboardOverlay = refs.overlay;
+      keyboardOverlayContent = refs.overlayContent;
+    }
   }
-
-  keyboardOverlayContent = createDiv();
-  keyboardOverlayContent.parent(keyboardOverlay);
-  keyboardOverlayContent.id('keyboard-controls-overlay-content');
-  keyboardOverlayContent.style('background', '#ffffff');
-  keyboardOverlayContent.style('padding', '24px 32px');
-  keyboardOverlayContent.style('border-radius', '8px');
-  keyboardOverlayContent.style('max-width', '520px');
-  keyboardOverlayContent.style('width', '100%');
-  // Make the overlay responsive to viewport size and allow scrolling when needed
-  // Keep the overlay intentionally narrower so lines wrap earlier
-  // Let the content determine its width (shrink-to-fit) but cap at viewport width
-  keyboardOverlayContent.style('max-width', Math.min(560, window.innerWidth - 48) + 'px');
-  keyboardOverlayContent.style('width', 'auto');
-  keyboardOverlayContent.style('display', 'inline-block');
-  keyboardOverlayContent.style('max-height', 'calc(100vh - 48px)');
-  keyboardOverlayContent.style('overflow-y', 'auto');
-  keyboardOverlayContent.style('color', '#222222');
-  keyboardOverlayContent.style('box-shadow', '0 16px 40px rgba(0, 0, 0, 0.35)');
-  keyboardOverlayContent.style('box-sizing', 'border-box');
-  keyboardOverlayContent.style('font-family', 'sans-serif');
-  // Slightly reduce the overall font size so more shortcuts fit without changing layout
-  keyboardOverlayContent.style('font-size', '13px');
-
-  if (keyboardOverlayContent.elt) {
-    overlayContentClickHandler = (event) => {
-      event.stopPropagation();
-    };
-    keyboardOverlayContent.elt.addEventListener('click', overlayContentClickHandler);
-  }
-
-  populateKeyboardControlsOverlay();
 }
 
+/**
+ * Populates the keyboard controls overlay with shortcuts.
+ * @see KeyboardOverlay.populate for implementation
+ */
 function populateKeyboardControlsOverlay() {
-  if (!keyboardOverlayContent) return;
-
-  keyboardOverlayContent.html('');
-
-  const title = createElement('h2', 'Open Mind    <span style="font-size: 0.6em; color: grey;">Christian Nold, 2025</span>');
-  title.parent(keyboardOverlayContent);
-  title.style('margin', '0 0 12px 0');
-  title.style('font-size', '20px');
-  title.style('font-weight', '600');
-
-  const hint = createElement('p');
-  hint.html('Timed autosaves to browser. Box hierarchy: <span style="color: red;">Red</span> > <span style="color: orange;">Orange</span> > White');
-  hint.parent(keyboardOverlayContent);
-  hint.style('margin', '0 0 18px 0');
-  hint.style('font-size', '13px');
-  hint.style('color', '#555555');
-
-  const shortcuts = [
-    { keys: 'N', description: 'Create new box' },
-    { keys: 'C', description: 'Create connection from selected box' },
-    { keys: '1 / 2 / 3', description: 'Set box color (Red / Orange / White)' },
-    { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
-    { keys: 'Space', description: 'Reverse the selected connection' },
-    { keys: 'Shift + Click', description: 'Add and remove from selection' },
-    { keys: 'A', description: 'Align selected boxes to the left (Shift+A distributes vertically)' },
-    { keys: 'S', description: 'Align selected boxes to the bottom (Shift+S distributes horizontally)' },
-    { keys: 'D', description: 'Align selected boxes to the right (Shift+D distributes vertically)' },
-    { keys: 'W', description: 'Align selected boxes to the top (Shift+W distributes horizontally)' },
-    { keys: 'Q', description: 'Align selected boxes to the horizontal centre (Shift+Q distributes horizontally)' },
-    { keys: 'E', description: 'Align selected boxes to the vertical centre (Shift+E distributes vertically)' },
-    { keys: 'R', description: 'Apply hierarchical layout in place (keep current position)' },
-    { keys: 'Arrow Keys', description: 'Navigate between boxes' },
-    { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
-    { keys: 'Scroll Wheel', description: 'Zoom in and out' },
-    { keys: 'F', description: 'Toggle fullscreen view' },
-    { keys: '-', description: 'Fit and center the entire map' },
-    { keys: '+', description: 'Zoom to selected elements' },
-    { keys: 'Cmd/Ctrl + Click', description: 'Open hyperlink in new tab' },
-    { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
-    { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
-    { keys: 'Cmd/Ctrl + B', description: 'Highlight selected text' },
-    { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
-    { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
-    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
-  ];
-
-  for (const item of shortcuts) {
-    const row = createDiv();
-    row.parent(keyboardOverlayContent);
-    row.style('display', 'flex');
-    row.style('align-items', 'flex-start');
-    // Increase gap between key column and description column
-    row.style('gap', '24px');
-    row.style('margin-bottom', '8px');
-    row.style('font-size', '13px');
-
-    const keyLabel = createSpan(item.keys);
-    keyLabel.parent(row);
-    keyLabel.style('font-family', 'monospace');
-    keyLabel.style('font-weight', '600');
-    // Use a fixed column width so the left column doesn't push the right column
-    // Slightly reduce label column width to better fit a narrower overlay
-    keyLabel.style('flex', '0 0 120px');
-    keyLabel.style('min-width', '100px');
-    keyLabel.style('white-space', 'nowrap');
-    keyLabel.style('font-size', '13px');
-    keyLabel.style('text-align', 'right');
-
-    const description = createSpan(item.description);
-    description.parent(row);
-    // Allow the description column to flex and wrap without being pushed by the label
-    description.style('flex', '1');
-    description.style('min-width', '0');
-    description.style('font-size', '13px');
+  if (typeof KeyboardOverlay !== 'undefined') {
+    KeyboardOverlay.populate();
   }
-
-  const closeButton = createButton('Close');
-  closeButton.parent(keyboardOverlayContent);
-  closeButton.style('margin-top', '20px');
-  closeButton.style('align-self', 'flex-end');
-  closeButton.style('padding', '6px 14px');
-  closeButton.style('font-size', '14px');
-  closeButton.style('cursor', 'pointer');
-  closeButton.mousePressed(hideKeyboardControlsOverlay);
 }
 
+/**
+ * Shows the keyboard controls overlay.
+ * @see KeyboardOverlay.show for implementation
+ */
 function showKeyboardControlsOverlay() {
-  if (!keyboardOverlay) return;
-  keyboardOverlay.style('display', 'flex');
-  // Recompute sizing for current viewport so content fits
-  try { updateKeyboardOverlaySize(); } catch (_) { }
-  keyboardOverlayVisible = true;
-  if (keyboardControlsButton && keyboardControlsButton.attribute) {
-    keyboardControlsButton.attribute('aria-expanded', 'true');
+  if (typeof KeyboardOverlay !== 'undefined') {
+    KeyboardOverlay.show(keyboardControlsButton);
+    keyboardOverlayVisible = KeyboardOverlay.isVisible();
   }
 }
 
+/**
+ * Hides the keyboard controls overlay.
+ * @see KeyboardOverlay.hide for implementation
+ */
 function hideKeyboardControlsOverlay() {
-  if (!keyboardOverlay) return;
-  keyboardOverlay.style('display', 'none');
-  keyboardOverlayVisible = false;
-  if (keyboardControlsButton && keyboardControlsButton.attribute) {
-    keyboardControlsButton.attribute('aria-expanded', 'false');
+  if (typeof KeyboardOverlay !== 'undefined') {
+    KeyboardOverlay.hide(keyboardControlsButton);
+    keyboardOverlayVisible = KeyboardOverlay.isVisible();
   }
 }
 
-// Update overlay content size to fit viewport. Public so we can call on resize.
+/**
+ * Updates overlay content size to fit viewport.
+ * @see KeyboardOverlay.updateSize for implementation
+ */
 function updateKeyboardOverlaySize() {
-  if (!keyboardOverlayContent) return;
-  try {
-    const minWidth = 360;
-    // Only cap width; allow actual width to be content-driven (auto)
-    const maxWidth = Math.min(900, Math.max(220, window.innerWidth - 48));
-    keyboardOverlayContent.style('max-width', maxWidth + 'px');
-    keyboardOverlayContent.style('width', 'auto');
-    keyboardOverlayContent.style('min-width', '0');
-
-    const minHeight = 120;
-    const maxHeight = Math.max(minHeight, window.innerHeight - 48);
-    keyboardOverlayContent.style('max-height', maxHeight + 'px');
-  } catch (e) {
-    // ignore
+  if (typeof KeyboardOverlay !== 'undefined') {
+    KeyboardOverlay.updateSize();
   }
 }
 
+/**
+ * Toggles the keyboard controls overlay visibility.
+ * @see KeyboardOverlay.toggle for implementation
+ */
 function toggleKeyboardControlsOverlay() {
-  if (keyboardOverlayVisible) {
-    hideKeyboardControlsOverlay();
-  } else {
-    showKeyboardControlsOverlay();
+  if (typeof KeyboardOverlay !== 'undefined') {
+    KeyboardOverlay.toggle(keyboardControlsButton);
+    keyboardOverlayVisible = KeyboardOverlay.isVisible();
   }
 }
 
