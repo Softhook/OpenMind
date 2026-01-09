@@ -397,7 +397,10 @@ class ThrustGame {
     }
     
     // Update remote bullets - check for box collisions
-    // Remote bullets are synced from other players, but we still need to check local collisions
+    // Note: Each client independently checks remote bullets against their local boxes.
+    // This is intentional to prevent bullets from appearing to pass through boxes on
+    // different clients. Remote bullets are continuously re-synced from their owners,
+    // so temporary desync is acceptable and self-correcting.
     for (const [bulletId, bullet] of this.remoteBullets) {
       if (this.checkBulletBoxCollision(bullet)) {
         this.remoteBullets.delete(bulletId);
@@ -476,7 +479,7 @@ class ThrustGame {
         const dist = Math.sqrt(dx * dx + dy * dy);
         
         if (dist < ThrustGame.COLLISION.RADIUS) {
-          // Hit! Player dies and respawns - enemy bullets kill player
+          // Hit! Player dies and respawns
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
           this.deaths++;
