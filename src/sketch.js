@@ -1214,13 +1214,6 @@ function setupUIButtons() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
-  // Check if thrust game is active - if so, let it handle everything
-  if (thrustGame && thrustGame.active) {
-    thrustGame.update();
-    thrustGame.draw();
-    return; // Skip normal mind map rendering
-  }
-  
   background(UI_COLORS.BACKGROUND);
   updateMenuVisibility();
 
@@ -1249,6 +1242,13 @@ function draw() {
         // Draw remote users' cursors (in world space)
         drawRemoteCursors();
       }
+      
+      // Draw thrust game in world space (if active)
+      if (thrustGame && thrustGame.active) {
+        thrustGame.update();
+        thrustGame.draw();
+      }
+      
       pop();
 
       // Update our presence (cursor position, selection) if connected - throttled internally
@@ -1257,6 +1257,15 @@ function draw() {
       }
     } catch (e) {
       console.error('Error drawing mindmap:', e);
+    }
+    
+    // Draw thrust game UI overlay (in screen space)
+    if (thrustGame && thrustGame.active) {
+      try {
+        thrustGame.drawUI();
+      } catch (e) {
+        console.error('Error drawing thrust game UI:', e);
+      }
     }
 
     // Draw save indicator (in screen space, not world space)
@@ -2182,8 +2191,8 @@ function keyPressed() {
   // Check for uppercase T (which means Shift+T was pressed)
   if (key === 'T') {
     if (!thrustGame) {
-      // Initialize thrust game on first activation
-      thrustGame = new ThrustGame(collaborationManager);
+      // Initialize thrust game on first activation with mindMap reference
+      thrustGame = new ThrustGame(collaborationManager, mindMap);
     }
     
     if (thrustGame.active) {

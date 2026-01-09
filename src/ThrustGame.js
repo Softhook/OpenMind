@@ -32,7 +32,7 @@ class ThrustGame {
   };
   
   static PLAYER = {
-    SIZE: 20,                // Player ship triangle size
+    SIZE: 15,                // Player ship triangle size (in world space)
     RESPAWN_TIME: 3000,      // Milliseconds before respawn after death
     INVULNERABLE_TIME: 2000  // Invulnerability after spawn (ms)
   };
@@ -45,7 +45,7 @@ class ThrustGame {
   };
   
   static COLLISION = {
-    RADIUS: 20 + 4           // Player size + bullet size for collision detection
+    RADIUS: 15 + 4           // Player size + bullet size for collision detection
   };
   
   static TIMING = {
@@ -69,9 +69,11 @@ class ThrustGame {
   /**
    * Creates a new ThrustGame instance
    * @param {CollaborationManager} collaborationManager - Optional collaboration manager for multiplayer
+   * @param {MindMap} mindMap - Reference to mind map for box collision detection
    */
-  constructor(collaborationManager = null) {
+  constructor(collaborationManager = null, mindMap = null) {
     this.collaborationManager = collaborationManager;
+    this.mindMap = mindMap;
     this.active = false;
     
     // Local player state
@@ -82,7 +84,7 @@ class ThrustGame {
     this.remotePlayers = new Map();  // Remote players by clientId
     this.remoteBullets = new Map();  // Remote bullets by bulletId
     
-    // Input state
+    // Input state - track current frame state
     this.keys = {
       left: false,
       right: false,
@@ -113,13 +115,30 @@ class ThrustGame {
    * @returns {Object} Player object with position, velocity, and state
    */
   createPlayer() {
-    // Use canvas dimensions if available, otherwise default
-    const canvasWidth = typeof width !== 'undefined' ? width : 800;
-    const canvasHeight = typeof height !== 'undefined' ? height : 600;
+    // Spawn player in world space - try to find a good location near boxes
+    let spawnX = 300;
+    let spawnY = 200;
+    
+    if (this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
+      // Find the center of all boxes
+      let sumX = 0, sumY = 0, count = 0;
+      for (const box of this.mindMap.boxes) {
+        if (box && box.x != null && box.y != null) {
+          sumX += box.x;
+          sumY += box.y;
+          count++;
+        }
+      }
+      if (count > 0) {
+        // Spawn near the center of boxes, but offset to avoid being inside one
+        spawnX = sumX / count - 100;
+        spawnY = sumY / count - 100;
+      }
+    }
     
     return {
-      x: canvasWidth / 2,
-      y: canvasHeight / 2,
+      x: spawnX,
+      y: spawnY,
       vx: 0,
       vy: 0,
       angle: 0,  // 0 points right, increases clockwise
@@ -133,19 +152,16 @@ class ThrustGame {
    * Respawns the player after death
    */
   respawnPlayer() {
-    const canvasWidth = typeof width !== 'undefined' ? width : 800;
-    const canvasHeight = typeof height !== 'undefined' ? height : 600;
-    
-    this.player = {
-      x: canvasWidth / 2,
-      y: canvasHeight / 2,
-      vx: 0,
-      vy: 0,
-      angle: 0,
-      alive: true,
-      respawnTime: 0,
-      invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME
-    };
+    // Use the same spawn logic
+    const newPlayer = this.createPlayer();
+    this.player.x = newPlayer.x;
+    this.player.y = newPlayer.y;
+    this.player.vx = 0;
+    this.player.vy = 0;
+    this.player.angle = 0;
+    this.player.alive = true;
+    this.player.respawnTime = 0;
+    this.player.invulnerableUntil = Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME;
   }
   
   // ============================================================================
@@ -263,27 +279,57 @@ class ThrustGame {
       p.vy *= scale;
     }
     
+    // Store previous position for collision resolution
+    const prevX = p.x;
+    const prevY = p.y;
+    
     // Update position
     p.x += p.vx;
     p.y += p.vy;
     
-    // Wrap around screen edges
-    const canvasWidth = typeof width !== 'undefined' ? width : 800;
-    const canvasHeight = typeof height !== 'undefined' ? height : 600;
+    // Check collision with boxes
+    if (this.mindMap && this.mindMap.boxes) {
+      const playerRadius = ThrustGame.PLAYER.SIZE;
+      
+      for (const box of this.mindMap.boxes) {
+        if (!box) continue;
+        
+        // Get box bounds
+        const boxLeft = box.x - box.width / 2;
+        const boxRight = box.x + box.width / 2;
+        const boxTop = box.y - box.height / 2;
+        const boxBottom = box.y + box.height / 2;
+        
+        // Check if player circle collides with box rectangle
+        const closestX = Math.max(boxLeft, Math.min(p.x, boxRight));
+        const closestY = Math.max(boxTop, Math.min(p.y, boxBottom));
+        
+        const distX = p.x - closestX;
+        const distY = p.y - closestY;
+        const distSq = distX * distX + distY * distY;
+        
+        if (distSq < playerRadius * playerRadius) {
+          // Collision! Revert to previous position and bounce
+          p.x = prevX;
+          p.y = prevY;
+          
+          // Bounce effect - reverse velocity with damping
+          const bounceAmount = 0.5;
+          p.vx *= -bounceAmount;
+          p.vy *= -bounceAmount;
+          
+          break; // Only handle one collision per frame
+        }
+      }
+    }
     
-    if (p.x < 0) p.x = canvasWidth;
-    if (p.x > canvasWidth) p.x = 0;
-    if (p.y < 0) p.y = canvasHeight;
-    if (p.y > canvasHeight) p.y = 0;
+    // No screen wrapping - player stays in world space
   }
   
   /**
    * Updates all bullets (movement and lifetime)
    */
   updateBullets() {
-    const canvasWidth = typeof width !== 'undefined' ? width : 800;
-    const canvasHeight = typeof height !== 'undefined' ? height : 600;
-    
     // Update bullets in place and remove expired ones
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
@@ -292,11 +338,7 @@ class ThrustGame {
       bullet.y += bullet.vy;
       bullet.lifetime--;
       
-      // Wrap around screen
-      if (bullet.x < 0) bullet.x = canvasWidth;
-      if (bullet.x > canvasWidth) bullet.x = 0;
-      if (bullet.y < 0) bullet.y = canvasHeight;
-      if (bullet.y > canvasHeight) bullet.y = 0;
+      // No screen wrapping - bullets just expire
       
       // Remove expired bullets
       if (bullet.lifetime <= 0) {
@@ -440,18 +482,14 @@ class ThrustGame {
   // ============================================================================
   
   /**
-   * Draws the game (called from main draw loop)
+   * Draws the game in world space (called from main draw loop)
+   * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
     if (!this.active) return;
     
-    // Draw in screen space (not world space)
-    push();
-    resetMatrix();
-    
-    // Dark space background
-    const bg = ThrustGame.COLORS.BACKGROUND;
-    background(bg.r, bg.g, bg.b);
+    // Everything drawn here is in world space
+    // No need to resetMatrix - we're already in the world transform
     
     // Draw remote players
     for (const [clientId, remotePlayer] of this.remotePlayers) {
@@ -468,9 +506,59 @@ class ThrustGame {
     
     // Draw bullets
     this.drawBullets();
+  }
+  
+  /**
+   * Draws UI overlay in screen space
+   * This should be called OUTSIDE the world transform
+   */
+  drawUI() {
+    if (!this.active) return;
     
-    // Draw UI
-    this.drawUI();
+    push();
+    resetMatrix && resetMatrix();
+    
+    fill(ThrustGame.COLORS.UI_TEXT);
+    textAlign(LEFT, TOP);
+    textSize(14);
+    
+    // Score and stats with semi-transparent background
+    fill(0, 0, 0, 150);
+    noStroke();
+    rect(5, 5, 120, 60, 5);
+    
+    fill(ThrustGame.COLORS.UI_TEXT);
+    text(`Score: ${this.score}`, 10, 10);
+    text(`Deaths: ${this.deaths}`, 10, 28);
+    text('Shift+T: Exit', 10, 46);
+    
+    // Respawn countdown
+    if (!this.player.alive) {
+      textSize(24);
+      textAlign(CENTER, CENTER);
+      const canvasWidth = typeof width !== 'undefined' ? width : 800;
+      const canvasHeight = typeof height !== 'undefined' ? height : 600;
+      const timeLeft = Math.ceil((this.player.respawnTime - Date.now()) / 1000);
+      if (timeLeft > 0) {
+        fill(0, 0, 0, 180);
+        rect(canvasWidth / 2 - 150, canvasHeight / 2 - 40, 300, 80, 10);
+        fill(ThrustGame.COLORS.UI_TEXT);
+        text(`Respawning in ${timeLeft}...`, canvasWidth / 2, canvasHeight / 2);
+      }
+    }
+    
+    // Multiplayer info
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      textSize(12);
+      textAlign(RIGHT, TOP);
+      const canvasWidth = typeof width !== 'undefined' ? width : 800;
+      const playerCount = this.remotePlayers.size + 1;
+      fill(0, 0, 0, 150);
+      noStroke();
+      rect(canvasWidth - 115, 5, 110, 24, 5);
+      fill(ThrustGame.COLORS.UI_TEXT);
+      text(`Players: ${playerCount}`, canvasWidth - 10, 10);
+    }
     
     pop();
   }
@@ -537,44 +625,6 @@ class ThrustGame {
     fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
-    }
-  }
-  
-  /**
-   * Draws UI elements (score, status, instructions)
-   */
-  drawUI() {
-    fill(ThrustGame.COLORS.UI_TEXT);
-    textAlign(LEFT, TOP);
-    textSize(16);
-    
-    // Score and stats
-    text(`Score: ${this.score}`, 10, 10);
-    text(`Deaths: ${this.deaths}`, 10, 30);
-    
-    // Instructions
-    textSize(12);
-    textAlign(CENTER, TOP);
-    const canvasWidth = typeof width !== 'undefined' ? width : 800;
-    text('Arrow Keys: Move | Space: Fire | Shift+T: Exit', canvasWidth / 2, 10);
-    
-    // Respawn countdown
-    if (!this.player.alive) {
-      textSize(24);
-      textAlign(CENTER, CENTER);
-      const canvasHeight = typeof height !== 'undefined' ? height : 600;
-      const timeLeft = Math.ceil((this.player.respawnTime - Date.now()) / 1000);
-      if (timeLeft > 0) {
-        text(`Respawning in ${timeLeft}...`, canvasWidth / 2, canvasHeight / 2);
-      }
-    }
-    
-    // Multiplayer info
-    if (this.collaborationManager && this.collaborationManager.isConnected) {
-      textSize(12);
-      textAlign(RIGHT, TOP);
-      const playerCount = this.remotePlayers.size + 1;
-      text(`Players: ${playerCount}`, canvasWidth - 10, 10);
     }
   }
   
