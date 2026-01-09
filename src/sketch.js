@@ -2888,11 +2888,12 @@ function parseTextIntoSections(lines) {
   const isHeading = (line) => {
     if (!line || line.length === 0) return false;
     
-    // Check for numbered list format (e.g., "1.", "2.", "3. My method")
-    const hasNumberPrefix = /^\d+\.\s+/.test(line);
+    // Check for numbered list format including decimal numbering
+    // Matches: "1.", "2.", "3.1", "4.1.2", "1.2.3.4" etc.
+    const hasNumberPrefix = /^\d+(\.\d+)*\.?\s+/.test(line);
     
     // Remove number prefix for further analysis if present
-    const lineWithoutNumber = hasNumberPrefix ? line.replace(/^\d+\.\s+/, '') : line;
+    const lineWithoutNumber = hasNumberPrefix ? line.replace(/^\d+(\.\d+)*\.?\s+/, '') : line;
     
     // Must end with sentence-ending punctuation OR have a number prefix (numbered lists)
     const endsWithPunctuation = /[.!?]$/.test(line);
@@ -2932,7 +2933,7 @@ function parseTextIntoSections(lines) {
     // 1. It passes basic checks (punctuation OR number prefix, length, no internal punctuation)
     // 2. Word count is reasonable (2-10 words)
     // 3. AND one of:
-    //    a) It has a number prefix (numbered list item)
+    //    a) It has a number prefix (numbered list item, including decimal like "4.1")
     //    b) It's very short (< 50 chars)
     //    c) It has no complex punctuation (commas, semicolons, colons) AND ≤7 words
     //    d) It's in title case or all caps
@@ -2987,7 +2988,7 @@ function parseTextIntoSections(lines) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Empty line - could be paragraph break or section break
+    // Empty line - creates a paragraph break
     if (line === '') {
       // Check for page break (multiple consecutive empty lines)
       let emptyLineCount = 1;
@@ -2996,7 +2997,7 @@ function parseTextIntoSections(lines) {
         i++;
       }
 
-      // Finish current paragraph
+      // Always finish current paragraph on empty line
       finishParagraph();
 
       // If multiple empty lines (page break), finish section
@@ -3025,6 +3026,10 @@ function parseTextIntoSections(lines) {
 
     // Add line to current paragraph
     currentParagraphLines.push(line);
+    
+    // NEW: Finish paragraph after each non-empty line (single newline creates new paragraph)
+    // This allows consecutive lines to become separate paragraph boxes
+    finishParagraph();
   }
 
   // Finish any remaining content
