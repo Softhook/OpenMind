@@ -5,7 +5,11 @@ Author: Christian Nold (2025) • Live App: https://softhook.github.io/OpenMind/
 ![OpenMind mind map screenshot](./screenshot.png)
 
 OpenMind is a fast, keyboard-driven mind mapping presentation app built with p5.js. 
-Create, connect, export and present ideas with minimal hassle.
+Create, collaborate and present ideas with minimal hassle.
+
+## Features
+- Fullscreen distraction free mode
+- Move between Editing and Presentation seamlessly. 
 
 ## Quick Start
 - Here is an example map
@@ -33,19 +37,11 @@ OpenMind supports real-time collaborative editing using WebSocket synchronizatio
 
 ## Loading and Saving Maps
 - Maps autosave in the browser 
-- Click **Save** to download a JSON map. On Chrome/Edge you can pick a folder; other browsers download to `Downloads`.
+- Click **Save** to download a JSON map.
 - Click **Load** to import a saved JSON.
 - Export your canvas via **Export PNG**, **Export PDF**, or **Export Text** from the menu.
 
-## Features
-- Menu at the top of the screen
-- Add images, pdfs and JSON maps by dragging onto the canvas
-- Export as PNG, PDF, and Text
-- Present the mind map using the arrow keys 
-- Save/Load maps as JSON files
-
 ### Keyboard Controls
-Global (when NOT editing text):
 
 - N: create a new box at the cursor
 - Space: reverse the selected connection
