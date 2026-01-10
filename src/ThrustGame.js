@@ -28,7 +28,10 @@ class ThrustGame {
     THRUST: 0.2,             // Thrust acceleration magnitude
     ROTATION_SPEED: 0.08,    // Angular velocity for rotation
     MAX_SPEED: 8,            // Maximum velocity magnitude
-    DRAG: 0.98               // Velocity dampening per frame
+    DRAG: 0.98,              // Velocity dampening per frame
+    GROUNDING_VELOCITY: 0.2, // Max velocity to be considered for grounding
+    GROUNDING_FRAMES: 3,     // Consecutive frames needed to confirm grounded state
+    COLLISION_DAMPING: 0.4   // Velocity damping for low-speed collisions
   };
 
   static PLAYER = {
@@ -656,7 +659,7 @@ class ThrustGame {
               p.vy *= -bounceAmount;
               p.grounded = false;
               p.groundedFrames = 0;
-            } else if (velocityMagnitude < 0.2 && isBeingPushedUp) {
+            } else if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp) {
               // Very low velocity and being pushed up - ship is grounding
               // Zero out velocity and mark as grounded
               p.vx = 0;
@@ -665,13 +668,13 @@ class ThrustGame {
               
               // Require multiple frames of grounded contact to set grounded state
               // This prevents false positives from glancing collisions
-              if (p.groundedFrames >= 3) {
+              if (p.groundedFrames >= phys.GROUNDING_FRAMES) {
                 p.grounded = true;
               }
             } else {
               // Low to medium velocity - dampen
-              p.vx *= 0.4;
-              p.vy *= 0.4;
+              p.vx *= phys.COLLISION_DAMPING;
+              p.vy *= phys.COLLISION_DAMPING;
               p.grounded = false;
               p.groundedFrames = 0;
             }
