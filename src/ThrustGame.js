@@ -55,7 +55,8 @@ class ThrustGame {
 
   static COLLISION = {
     RADIUS: 15 + 4,          // Player size + bullet size for collision detection
-    EPSILON: 0.0001          // Small value for floating-point comparisons
+    EPSILON: 0.0001,         // Small value for floating-point comparisons in geometry
+    VELOCITY_EPSILON: 0.001  // Minimum velocity magnitude to avoid division by zero
   };
 
   static TIMING = {
@@ -773,7 +774,7 @@ class ThrustGame {
     
     // Calculate normalized impact direction from bullet velocity
     const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
-    if (speed < 0.001) return; // Avoid division by zero
+    if (speed < ThrustGame.COLLISION.VELOCITY_EPSILON) return; // Avoid division by zero
     
     const dirX = bullet.vx / speed;
     const dirY = bullet.vy / speed;
