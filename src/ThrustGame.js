@@ -1024,7 +1024,8 @@ class ThrustGame {
     };
     
     // Detect movement by comparing with last broadcast state
-    let hasMovement = false;
+    // On first broadcast, treat as movement to ensure initial state is sent
+    let hasMovement = !this.lastBroadcastState; // True on first broadcast
     if (this.lastBroadcastState) {
       hasMovement = (
         Math.abs(currentState.x - this.lastBroadcastState.x) > 0.1 ||

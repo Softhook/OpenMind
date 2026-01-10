@@ -92,6 +92,7 @@ let menuRightEdge = 600;
 
 // Easter egg: Thrust game
 let thrustGame = null; // ThrustGame instance
+let hasRemoteThrustPlayers = false; // Track if any remote player is in thrust mode
 
 // Autosave state
 let autosaveTimer = null;
@@ -677,6 +678,29 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
           doSync();
         });
       }
+    }
+
+    // Setup awareness listener for thrust game optimization
+    // This checks if any remote player is in thrust mode to enable lazy initialization
+    if (collaborationManager && collaborationManager.awareness) {
+      const updateRemoteThrustStatus = () => {
+        const states = collaborationManager.awareness.getStates();
+        const myClientId = collaborationManager.awareness.clientID;
+        hasRemoteThrustPlayers = false;
+        
+        for (const [clientId, state] of states) {
+          if (clientId !== myClientId && state.thrustGame) {
+            hasRemoteThrustPlayers = true;
+            break;
+          }
+        }
+      };
+      
+      // Set up listener for awareness changes
+      collaborationManager.awareness.on('change', updateRemoteThrustStatus);
+      
+      // Do initial check
+      updateRemoteThrustStatus();
     }
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
@@ -1270,25 +1294,13 @@ function draw() {
       }
       
       // Only initialize and draw thrust game if someone is actually using it
-      // Check if any remote players have thrustGame state before initializing
+      // Use cached flag updated by awareness listener to avoid checking every frame
       if (thrustGame) {
         thrustGame.draw();
-      } else if (collaborationManager && collaborationManager.awareness) {
-        // Check if any remote player is in thrust mode
-        const states = collaborationManager.awareness.getStates();
-        let hasRemoteThrustPlayer = false;
-        for (const [clientId, state] of states) {
-          if (clientId !== collaborationManager.awareness.clientID && state.thrustGame) {
-            hasRemoteThrustPlayer = true;
-            break;
-          }
-        }
-        
+      } else if (hasRemoteThrustPlayers) {
         // Only create instance if someone is using thrust mode
-        if (hasRemoteThrustPlayer) {
-          thrustGame = new ThrustGame(collaborationManager, mindMap);
-          thrustGame.draw();
-        }
+        thrustGame = new ThrustGame(collaborationManager, mindMap);
+        thrustGame.draw();
       }
       
       pop();
