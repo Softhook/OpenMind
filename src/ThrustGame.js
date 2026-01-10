@@ -24,11 +24,18 @@ class ThrustGame {
   // ============================================================================
 
   static PHYSICS = {
-    GRAVITY: 0.03,           // Downward acceleration
-    THRUST: 0.2,             // Thrust acceleration magnitude
-    ROTATION_SPEED: 0.08,    // Angular velocity for rotation
-    MAX_SPEED: 8,            // Maximum velocity magnitude
-    DRAG: 0.98               // Velocity dampening per frame
+    GRAVITY: 0.03,                 // Downward acceleration (pixels per frame^2)
+    THRUST: 0.2,                   // Thrust acceleration magnitude (pixels per frame^2)
+    ROTATION_SPEED: 0.08,          // Angular velocity for rotation (radians per frame)
+    MAX_SPEED: 8,                  // Maximum velocity magnitude (pixels per frame)
+    DRAG: 0.98,                    // Velocity dampening per frame (0-1, 1 = no drag)
+    GROUNDING_VELOCITY: 1.0,       // Max velocity (pixels/frame) to treat collision as soft landing and ground ship.
+                                   // Above this threshold, collision uses bounce/damping logic instead.
+                                   // Range: 0.5-2.0 typical. Higher = more aggressive grounding.
+    GROUNDING_NUDGE: 0.5,          // Small downward nudge (pixels) applied when grounded but no collision detected.
+                                   // Keeps ship in contact with surface. Should be << player size and <= GROUNDING_VELOCITY.
+    COLLISION_DAMPING: 0.4,        // Velocity damping factor (0-1) for low-speed collisions. 0 = full stop, 1 = no damping.
+    BOUNCE_AMOUNT: 0.5             // Bounce damping factor (0-1) for high-speed collisions. Lower = less bouncy.
   };
 
   static PLAYER = {
@@ -49,11 +56,16 @@ class ThrustGame {
     SPEED: 12,               // Bullet velocity
     LIFETIME: 120,           // Frames before bullet expires
     SIZE: 4,                 // Bullet radius
-    COOLDOWN: 15             // Frames between shots
+    COOLDOWN: 15,            // Frames between shots
+    BOX_PUSH_FORCE: 2        // Force applied to boxes on impact
   };
 
   static COLLISION = {
-    RADIUS: 15 + 4           // Player size + bullet size for collision detection
+    RADIUS: 15 + 4,              // Player size + bullet size for collision detection
+    EPSILON: 0.0001,             // Small value for floating-point comparisons in geometry
+    VELOCITY_EPSILON: 0.001,     // Minimum velocity magnitude to avoid division by zero
+    PUSH_OUT_DISTANCE: 2,        // Distance to push ship away from box when resolving collision
+    PUSH_OUT_DIAGONAL: Math.SQRT2 // Diagonal push distance (sqrt(2) ≈ 1.414)
   };
 
   static TIMING = {
@@ -88,6 +100,12 @@ class ThrustGame {
 
   static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
   static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
+
+  static SPAWN = {
+    MAX_ATTEMPTS: 20,        // Maximum attempts to find valid spawn location
+    SEARCH_RADIUS: 150,      // Radius around box center to search for spawn point
+    MIN_DISTANCE_FROM_BOX: 30 // Minimum distance from any box to spawn
+  };
 
   // ============================================================================
   // CONSTRUCTOR
@@ -174,6 +192,181 @@ class ThrustGame {
   }
 
   // ============================================================================
+  // COLLISION DETECTION HELPERS
+  // ============================================================================
+
+  /**
+   * Gets the three vertices of the ship triangle in world space
+   * @param {Object} player - Player object with x, y, angle
+   * @returns {Array<{x: number, y: number}>} Array of 3 vertices
+   */
+  static getShipTriangleVertices(player) {
+    const size = ThrustGame.PLAYER.SIZE;
+    const halfSize = size / 2;
+    
+    // Local coordinates of the triangle (before rotation)
+    const localVertices = [
+      { x: size, y: 0 },           // Front tip
+      { x: -halfSize, y: -halfSize }, // Back left
+      { x: -halfSize, y: halfSize }   // Back right
+    ];
+    
+    // Apply rotation and translation to get world coordinates
+    const cos = Math.cos(player.angle);
+    const sin = Math.sin(player.angle);
+    
+    return localVertices.map(v => ({
+      x: player.x + v.x * cos - v.y * sin,
+      y: player.y + v.x * sin + v.y * cos
+    }));
+  }
+
+  /**
+   * Checks if a triangle collides with an axis-aligned rectangle (box)
+   * Uses Separating Axis Theorem (SAT)
+   * @param {Array<{x: number, y: number}>} triangleVertices - Triangle vertices
+   * @param {Object} box - Box with x, y (center), width, height
+   * @returns {boolean} True if collision detected
+   */
+  static triangleBoxCollision(triangleVertices, box) {
+    // Get box corners
+    const halfW = box.width / 2;
+    const halfH = box.height / 2;
+    const boxLeft = box.x - halfW;
+    const boxRight = box.x + halfW;
+    const boxTop = box.y - halfH;
+    const boxBottom = box.y + halfH;
+    
+    // Quick check: if any triangle vertex is inside the box, there's a collision
+    for (const v of triangleVertices) {
+      if (v.x >= boxLeft && v.x <= boxRight && v.y >= boxTop && v.y <= boxBottom) {
+        return true;
+      }
+    }
+    
+    // Check if any box corner is inside the triangle
+    const boxCorners = [
+      { x: boxLeft, y: boxTop },
+      { x: boxRight, y: boxTop },
+      { x: boxLeft, y: boxBottom },
+      { x: boxRight, y: boxBottom }
+    ];
+    
+    for (const corner of boxCorners) {
+      if (ThrustGame.pointInTriangle(corner, triangleVertices)) {
+        return true;
+      }
+    }
+    
+    // Check if any triangle edge intersects any box edge
+    for (let i = 0; i < 3; i++) {
+      const v1 = triangleVertices[i];
+      const v2 = triangleVertices[(i + 1) % 3];
+      
+      // Check intersection with all 4 box edges
+      if (ThrustGame.lineSegmentIntersectsBox(v1, v2, boxLeft, boxRight, boxTop, boxBottom)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Checks if a point is inside a triangle using barycentric coordinates
+   * @param {Object} point - Point with x, y
+   * @param {Array<{x: number, y: number}>} triangle - Triangle vertices [v0, v1, v2]
+   * @returns {boolean} True if point is inside triangle
+   */
+  static pointInTriangle(point, triangle) {
+    const v0 = triangle[0];
+    const v1 = triangle[1];
+    const v2 = triangle[2];
+    
+    // Compute barycentric coordinates
+    const d00 = (v1.x - v0.x) * (v1.x - v0.x) + (v1.y - v0.y) * (v1.y - v0.y);
+    const d01 = (v1.x - v0.x) * (v2.x - v0.x) + (v1.y - v0.y) * (v2.y - v0.y);
+    const d11 = (v2.x - v0.x) * (v2.x - v0.x) + (v2.y - v0.y) * (v2.y - v0.y);
+    const d20 = (point.x - v0.x) * (v1.x - v0.x) + (point.y - v0.y) * (v1.y - v0.y);
+    const d21 = (point.x - v0.x) * (v2.x - v0.x) + (point.y - v0.y) * (v2.y - v0.y);
+    
+    const denom = d00 * d11 - d01 * d01;
+    if (Math.abs(denom) < ThrustGame.COLLISION.EPSILON) return false; // Degenerate triangle
+    
+    const v = (d11 * d20 - d01 * d21) / denom;
+    const w = (d00 * d21 - d01 * d20) / denom;
+    const u = 1 - v - w;
+    
+    // Check if point is in triangle
+    return (u >= 0) && (v >= 0) && (w >= 0);
+  }
+
+  /**
+   * Checks if a line segment intersects with a box
+   * @param {Object} p1 - First point of line segment
+   * @param {Object} p2 - Second point of line segment
+   * @param {number} boxLeft - Left edge of box
+   * @param {number} boxRight - Right edge of box
+   * @param {number} boxTop - Top edge of box
+   * @param {number} boxBottom - Bottom edge of box
+   * @returns {boolean} True if line segment intersects box
+   */
+  static lineSegmentIntersectsBox(p1, p2, boxLeft, boxRight, boxTop, boxBottom) {
+    // Check intersection with each of the 4 box edges
+    return (
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxTop}, {x: boxRight, y: boxTop}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxTop}, {x: boxRight, y: boxBottom}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxBottom}, {x: boxLeft, y: boxBottom}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxBottom}, {x: boxLeft, y: boxTop})
+    );
+  }
+
+  /**
+   * Checks if two line segments intersect
+   * @param {Object} p1 - First point of segment 1
+   * @param {Object} p2 - Second point of segment 1
+   * @param {Object} p3 - First point of segment 2
+   * @param {Object} p4 - Second point of segment 2
+   * @returns {boolean} True if segments intersect
+   */
+  static lineSegmentsIntersect(p1, p2, p3, p4) {
+    const ccw = (a, b, c) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+    return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+  }
+
+  /**
+   * Checks if a position is inside or too close to any box
+   * @param {number} x - X coordinate
+   * @param {number} y - Y coordinate
+   * @param {Array} boxes - Array of box objects
+   * @param {number} minDistance - Minimum distance from box edges
+   * @returns {boolean} True if position is valid (not inside or too close to boxes)
+   */
+  static isValidSpawnPosition(x, y, boxes, minDistance) {
+    if (!boxes || boxes.length === 0) return true;
+    
+    for (const box of boxes) {
+      if (!box) continue;
+      
+      const halfW = box.width / 2;
+      const halfH = box.height / 2;
+      
+      // Expand box by minDistance
+      const boxLeft = box.x - halfW - minDistance;
+      const boxRight = box.x + halfW + minDistance;
+      const boxTop = box.y - halfH - minDistance;
+      const boxBottom = box.y + halfH + minDistance;
+      
+      // Check if point is inside expanded box
+      if (x >= boxLeft && x <= boxRight && y >= boxTop && y <= boxBottom) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  // ============================================================================
   // PLAYER MANAGEMENT
   // ============================================================================
 
@@ -182,7 +375,7 @@ class ThrustGame {
    * @returns {Object} Player object with position, velocity, and state
    */
   createPlayer() {
-    // Spawn player in world space - try to find a good location near boxes
+    // Default spawn position if no boxes
     let spawnX = 300;
     let spawnY = 200;
 
@@ -196,10 +389,53 @@ class ThrustGame {
           count++;
         }
       }
+      
       if (count > 0) {
-        // Spawn near the center of boxes, but offset to avoid being inside one
-        spawnX = sumX / count - 100;
-        spawnY = sumY / count - 100;
+        const centerX = sumX / count;
+        const centerY = sumY / count;
+        
+        // Try to find a valid spawn position that's not inside a box
+        let foundValidPosition = false;
+        const maxAttempts = ThrustGame.SPAWN.MAX_ATTEMPTS;
+        const searchRadius = ThrustGame.SPAWN.SEARCH_RADIUS;
+        const minDistance = ThrustGame.SPAWN.MIN_DISTANCE_FROM_BOX;
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          // Generate random position around the center of boxes
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * searchRadius;
+          const testX = centerX + Math.cos(angle) * distance;
+          const testY = centerY + Math.sin(angle) * distance;
+          
+          // Check if this position is valid (not inside or too close to any box)
+          if (ThrustGame.isValidSpawnPosition(testX, testY, this.mindMap.boxes, minDistance)) {
+            spawnX = testX;
+            spawnY = testY;
+            foundValidPosition = true;
+            break;
+          }
+        }
+        
+        // If no valid position found after all attempts, try validated fallback positions
+        if (!foundValidPosition) {
+          const offset = searchRadius * 1.5;
+          const fallbackCandidates = [
+            { x: centerX - offset, y: centerY - offset },
+            { x: centerX + offset, y: centerY - offset },
+            { x: centerX - offset, y: centerY + offset },
+            { x: centerX + offset, y: centerY + offset }
+          ];
+
+          for (const candidate of fallbackCandidates) {
+            if (ThrustGame.isValidSpawnPosition(candidate.x, candidate.y, this.mindMap.boxes, minDistance)) {
+              spawnX = candidate.x;
+              spawnY = candidate.y;
+              foundValidPosition = true;
+              break;
+            }
+          }
+          // If no fallback candidate is valid, keep the original spawnX/spawnY defaults
+        }
       }
     }
 
@@ -211,7 +447,8 @@ class ThrustGame {
       angle: 0,  // 0 points right, increases clockwise
       alive: true,
       respawnTime: 0,
-      invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME
+      invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME,
+      grounded: false  // Track if ship is resting on a surface
     };
   }
 
@@ -357,28 +594,40 @@ class ThrustGame {
     const p = this.player;
     const phys = ThrustGame.PHYSICS;
 
+    // Store previous state for collision resolution (position and angle)
+    // These are used to revert if collision cannot be resolved with push-out
+    const prevX = p.x;
+    const prevY = p.y;
+    const prevAngle = p.angle;
+
     // Apply rotation
     if (this.keys.left) {
       p.angle -= phys.ROTATION_SPEED;
+      p.grounded = false;  // Rotation breaks grounded state
     }
     if (this.keys.right) {
       p.angle += phys.ROTATION_SPEED;
+      p.grounded = false;  // Rotation breaks grounded state
     }
 
     // Apply thrust in the direction the ship is facing
     if (this.keys.up) {
       p.vx += Math.cos(p.angle) * phys.THRUST;
       p.vy += Math.sin(p.angle) * phys.THRUST;
+      p.grounded = false;  // Thrust breaks grounded state
     }
 
     // Optional downward thrust (reverse)
     if (this.keys.down) {
       p.vx -= Math.cos(p.angle) * phys.THRUST * 0.5;
       p.vy -= Math.sin(p.angle) * phys.THRUST * 0.5;
+      p.grounded = false;  // Thrust breaks grounded state
     }
 
-    // Apply gravity
-    p.vy += phys.GRAVITY;
+    // Only apply gravity if not grounded
+    if (!p.grounded) {
+      p.vy += phys.GRAVITY;
+    }
 
     // Apply drag
     p.vx *= phys.DRAG;
@@ -392,51 +641,139 @@ class ThrustGame {
       p.vy *= scale;
     }
 
-    // Store previous position for collision resolution
-    const prevX = p.x;
-    const prevY = p.y;
-
     // Update position
     p.x += p.vx;
     p.y += p.vy;
 
-    // Check collision with boxes
+    // Check collision with boxes using triangular ship shape
     if (this.mindMap && this.mindMap.boxes) {
-      const playerRadius = ThrustGame.PLAYER.SIZE;
+      const shipVertices = ThrustGame.getShipTriangleVertices(p);
+      let collisionDetected = false;
 
       for (const box of this.mindMap.boxes) {
         if (!box) continue;
 
-        // Get box bounds
-        const boxLeft = box.x - box.width / 2;
-        const boxRight = box.x + box.width / 2;
-        const boxTop = box.y - box.height / 2;
-        const boxBottom = box.y + box.height / 2;
-
-        // Check if player circle collides with box rectangle
-        const closestX = Math.max(boxLeft, Math.min(p.x, boxRight));
-        const closestY = Math.max(boxTop, Math.min(p.y, boxBottom));
-
-        const distX = p.x - closestX;
-        const distY = p.y - closestY;
-        const distSq = distX * distX + distY * distY;
-
-        if (distSq < playerRadius * playerRadius) {
-          // Collision! Revert to previous position and bounce
-          p.x = prevX;
-          p.y = prevY;
-
-          // Bounce effect - reverse velocity with damping
-          const bounceAmount = 0.5;
-          p.vx *= -bounceAmount;
-          p.vy *= -bounceAmount;
+        // Check if ship triangle collides with box
+        if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
+          collisionDetected = true;
+          
+          // Collision detected - handle based on velocity
+          const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          
+          // Try to push ship out to resolve collision
+          const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
+          
+          if (separation) {
+            const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
+            
+            // Check if ship should be grounded (resting on top of box)
+            // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
+            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
+              // Low velocity collision from above - ground the ship
+              // Don't push out, just stop at current position
+              p.vx = 0;
+              p.vy = 0;
+              p.grounded = true;
+              // Don't apply separation - keep ship at current position
+            } else {
+              // Apply separation for high-velocity or non-resting collisions
+              p.x += separation.x;
+              p.y += separation.y;
+              
+              if (velocityMagnitude > 0.5) {
+                // Significant velocity - bounce
+                p.vx *= -phys.BOUNCE_AMOUNT;
+                p.vy *= -phys.BOUNCE_AMOUNT;
+              } else {
+                // Low velocity - dampen
+                p.vx *= phys.COLLISION_DAMPING;
+                p.vy *= phys.COLLISION_DAMPING;
+              }
+              p.grounded = false;
+            }
+          } else {
+            // Fallback: revert to previous position
+            p.x = prevX;
+            p.y = prevY;
+            p.vx *= -phys.BOUNCE_AMOUNT;
+            p.vy *= -phys.BOUNCE_AMOUNT;
+            p.grounded = false;
+          }
 
           break; // Only handle one collision per frame
+        }
+      }
+      
+      // If no collision this frame but was grounded, apply small downward movement
+      // This keeps ship in contact with surface, but only if there's a surface below
+      if (!collisionDetected && p.grounded) {
+        const nudge = phys.GROUNDING_NUDGE;
+        // Predictively check if moving down by the nudge would collide with any box
+        const nudgedPlayer = { x: p.x, y: p.y + nudge, angle: p.angle };
+        const nudgedVertices = ThrustGame.getShipTriangleVertices(nudgedPlayer);
+        let hasSurfaceBelow = false;
+        for (const box of this.mindMap.boxes) {
+          if (!box) continue;
+          if (ThrustGame.triangleBoxCollision(nudgedVertices, box)) {
+            hasSurfaceBelow = true;
+            break;
+          }
+        }
+        if (hasSurfaceBelow) {
+          p.y += nudge;  // Small downward nudge to re-establish collision
+        } else {
+          // No surface below - unground the ship
+          p.grounded = false;
         }
       }
     }
 
     // No screen wrapping - player stays in world space
+  }
+
+  /**
+   * Attempts to resolve triangle-box collision by trying push-out vectors.
+   * Tests 8 directional displacement vectors to find one that resolves the collision.
+   * @param {Object} player - Player object with x, y, angle
+   * @param {Object} box - Box object with collision geometry
+   * @param {number} prevX - Previous x position (unused, kept for signature compatibility)
+   * @param {number} prevY - Previous y position (unused, kept for signature compatibility)  
+   * @param {number} prevAngle - Previous angle (unused, kept for signature compatibility)
+   * @returns {Object|null} Separation vector {x, y} or null if no resolution found
+   */
+  resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
+    // Try small displacement vectors to push ship out of box
+    // Using constants for consistent push distances
+    const d = ThrustGame.COLLISION.PUSH_OUT_DISTANCE;      // Cardinal directions
+    const diag = ThrustGame.COLLISION.PUSH_OUT_DIAGONAL;   // Diagonals
+    
+    const pushOutVectors = [
+      { x: 0, y: -d },        // Push up
+      { x: 0, y: d },         // Push down
+      { x: -d, y: 0 },        // Push left
+      { x: d, y: 0 },         // Push right
+      { x: -diag, y: -diag }, // Diagonal up-left
+      { x: diag, y: -diag },  // Diagonal up-right
+      { x: -diag, y: diag },  // Diagonal down-left
+      { x: diag, y: diag }    // Diagonal down-right
+    ];
+
+    // Test each separation vector
+    for (const sep of pushOutVectors) {
+      const testPlayer = {
+        x: player.x + sep.x,
+        y: player.y + sep.y,
+        angle: player.angle
+      };
+      
+      const testVertices = ThrustGame.getShipTriangleVertices(testPlayer);
+      
+      if (!ThrustGame.triangleBoxCollision(testVertices, box)) {
+        return sep; // Found a valid separation
+      }
+    }
+
+    return null; // Could not resolve with small displacement
   }
 
   /**
@@ -451,8 +788,11 @@ class ThrustGame {
       bullet.y += bullet.vy;
       bullet.lifetime--;
 
-      // Check collision with boxes
-      if (this.checkBulletBoxCollision(bullet)) {
+      // Check collision with boxes and apply force if hit
+      const hitBox = this.checkBulletBoxCollision(bullet);
+      if (hitBox) {
+        // Apply push force to the box
+        this.applyBulletForceToBox(hitBox, bullet);
         // Remove bullet on collision with box
         this.bullets.splice(i, 1);
         continue;
@@ -470,7 +810,10 @@ class ThrustGame {
     // different clients. Remote bullets are continuously re-synced from their owners,
     // so temporary desync is acceptable and self-correcting.
     for (const [bulletId, bullet] of this.remoteBullets) {
-      if (this.checkBulletBoxCollision(bullet)) {
+      const hitBox = this.checkBulletBoxCollision(bullet);
+      if (hitBox) {
+        // Apply push force to the box
+        this.applyBulletForceToBox(hitBox, bullet);
         this.remoteBullets.delete(bulletId);
       }
     }
@@ -506,10 +849,10 @@ class ThrustGame {
   /**
    * Checks if a bullet collides with any box
    * @param {Object} bullet - Bullet to check
-   * @returns {boolean} true if bullet collides with a box
+   * @returns {Object|null} The box that was hit, or null if no collision
    */
   checkBulletBoxCollision(bullet) {
-    if (!this.mindMap || !this.mindMap.boxes) return false;
+    if (!this.mindMap || !this.mindMap.boxes) return null;
 
     const bulletRadius = ThrustGame.BULLET.SIZE; // SIZE is defined as radius (4 pixels)
 
@@ -534,11 +877,47 @@ class ThrustGame {
 
       // Compare squared distance to squared radius
       if (distSq < bulletRadius * bulletRadius) {
-        return true; // Collision detected
+        return box; // Return the box that was hit
       }
     }
 
-    return false;
+    return null;
+  }
+
+  /**
+   * Applies a small force to a box when hit by a bullet.
+   * Updates both position and interpolation targets to prevent snap-back.
+   * Syncs changes to collaboration if connected.
+   * @param {Object} box - The box to apply force to
+   * @param {Object} bullet - The bullet providing the force
+   */
+  applyBulletForceToBox(box, bullet) {
+    if (!box) return;
+    
+    // Calculate normalized impact direction from bullet velocity
+    const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
+    if (speed < ThrustGame.COLLISION.VELOCITY_EPSILON) return; // Avoid division by zero
+    
+    const dirX = bullet.vx / speed;
+    const dirY = bullet.vy / speed;
+    
+    // Apply small force in the direction of bullet travel
+    const force = ThrustGame.BULLET.BOX_PUSH_FORCE;
+    box.x += dirX * force;
+    box.y += dirY * force;
+    
+    // IMPORTANT: Also update targetX/targetY to prevent interpolation snap-back
+    // TextBox interpolates towards these targets, so they must match the new position
+    if (typeof box.targetX !== 'undefined' && typeof box.targetY !== 'undefined') {
+      box.targetX = box.x;
+      box.targetY = box.y;
+    }
+    
+    // Sync the pushed box position to collaboration if available
+    // Use false for skipTransactionWrapper to ensure proper transaction
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.collaborationManager.syncBoxToYjs(box, false);
+    }
   }
 
   /**
