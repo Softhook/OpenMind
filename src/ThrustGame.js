@@ -30,7 +30,6 @@ class ThrustGame {
     MAX_SPEED: 8,            // Maximum velocity magnitude
     DRAG: 0.98,              // Velocity dampening per frame
     GROUNDING_VELOCITY: 0.2, // Max velocity to be considered for grounding
-    GROUNDING_FRAMES: 3,     // Consecutive frames needed to confirm grounded state
     COLLISION_DAMPING: 0.4   // Velocity damping for low-speed collisions
   };
 
@@ -429,8 +428,7 @@ class ThrustGame {
       alive: true,
       respawnTime: 0,
       invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME,
-      grounded: false,  // Track if ship is resting on a surface
-      groundedFrames: 0  // Count frames ship has been grounded
+      grounded: false  // Track if ship is resting on a surface
     };
   }
 
@@ -658,25 +656,17 @@ class ThrustGame {
               p.vx *= -bounceAmount;
               p.vy *= -bounceAmount;
               p.grounded = false;
-              p.groundedFrames = 0;
             } else if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp) {
-              // Very low velocity and being pushed up - ship is grounding
-              // Zero out velocity and mark as grounded
+              // Very low velocity and being pushed up - ship is resting
+              // Zero out velocity completely and mark as grounded immediately
               p.vx = 0;
               p.vy = 0;
-              p.groundedFrames++;
-              
-              // Require multiple frames of grounded contact to set grounded state
-              // This prevents false positives from glancing collisions
-              if (p.groundedFrames >= phys.GROUNDING_FRAMES) {
-                p.grounded = true;
-              }
+              p.grounded = true;  // Set grounded immediately - simple and effective
             } else {
               // Low to medium velocity - dampen
               p.vx *= phys.COLLISION_DAMPING;
               p.vy *= phys.COLLISION_DAMPING;
               p.grounded = false;
-              p.groundedFrames = 0;
             }
           } else {
             // Fallback: revert to previous position
@@ -685,7 +675,6 @@ class ThrustGame {
             p.vx *= -0.5;
             p.vy *= -0.5;
             p.grounded = false;
-            p.groundedFrames = 0;
           }
 
           break; // Only handle one collision per frame
@@ -693,9 +682,8 @@ class ThrustGame {
       }
       
       // If no collision this frame, reset grounded state
-      if (!collisionDetected && p.grounded) {
+      if (!collisionDetected) {
         p.grounded = false;
-        p.groundedFrames = 0;
       }
     }
 
