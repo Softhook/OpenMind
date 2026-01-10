@@ -39,6 +39,12 @@ class ThrustGame {
     FLAME_VARIATION: 5       // Random variation in flame length
   };
 
+  static EXPLOSION = {
+    DURATION: 800,           // Explosion animation duration in ms
+    MAX_RADIUS: 40,          // Maximum radius of explosion circle
+    FADE_START: 0.4          // Start fading at 40% of animation
+  };
+
   static BULLET = {
     SPEED: 12,               // Bullet velocity
     LIFETIME: 120,           // Frames before bullet expires
@@ -104,6 +110,7 @@ class ThrustGame {
     this.bullets = [];  // Local bullets
     this.remotePlayers = new Map();  // Remote players by clientId
     this.remoteBullets = new Map();  // Remote bullets by bulletId
+    this.explosions = [];  // Active explosion animations
 
     // Input state - track current frame state
     this.keys = {
@@ -285,6 +292,9 @@ class ThrustGame {
       space: false
     };
     
+    // Clear explosion animations
+    this.explosions = [];
+    
     // Reset idle detection state to prevent stale data on restart
     this.lastBroadcastState = null;
     this.lastMovementTime = Date.now();
@@ -318,6 +328,9 @@ class ThrustGame {
 
     // Update bullets
     this.updateBullets();
+    
+    // Update explosion animations
+    this.updateExplosions();
 
     // Check collisions
     this.checkCollisions();
@@ -464,6 +477,33 @@ class ThrustGame {
   }
 
   /**
+   * Creates an explosion at the specified location
+   * @param {number} x - World X coordinate
+   * @param {number} y - World Y coordinate
+   */
+  createExplosion(x, y) {
+    this.explosions.push({
+      x: x,
+      y: y,
+      startTime: Date.now(),
+      duration: ThrustGame.EXPLOSION.DURATION
+    });
+  }
+
+  /**
+   * Updates explosion animations and removes expired ones
+   */
+  updateExplosions() {
+    const now = Date.now();
+    
+    // Remove expired explosions
+    this.explosions = this.explosions.filter(explosion => {
+      const elapsed = now - explosion.startTime;
+      return elapsed < explosion.duration;
+    });
+  }
+
+  /**
    * Checks if a bullet collides with any box
    * @param {Object} bullet - Bullet to check
    * @returns {boolean} true if bullet collides with a box
@@ -541,6 +581,10 @@ class ThrustGame {
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
           this.deaths++;
+          
+          // Create explosion at death location
+          this.createExplosion(this.player.x, this.player.y);
+          
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
@@ -749,6 +793,10 @@ class ThrustGame {
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
+    
+    // Draw explosions for all players (before local player check)
+    // This ensures explosions are visible even when not actively playing
+    this.drawExplosions(viewportBounds, isInViewport);
 
     // Only draw local player, bullets, and UI if we're actually in thrust mode
     if (!this.active) return;
@@ -927,6 +975,49 @@ class ThrustGame {
     }
   }
 
+  /**
+   * Draws explosion animations
+   * @param {Object} viewportBounds - Viewport bounds for culling (optional)
+   * @param {Function} isInViewport - Function to check if position is in viewport (optional)
+   */
+  drawExplosions(viewportBounds = null, isInViewport = null) {
+    const now = Date.now();
+    
+    for (const explosion of this.explosions) {
+      // Skip explosions outside viewport for performance
+      if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
+      
+      const elapsed = now - explosion.startTime;
+      const progress = elapsed / explosion.duration; // 0 to 1
+      
+      // Calculate expanding radius
+      const radius = ThrustGame.EXPLOSION.MAX_RADIUS * progress;
+      
+      // Calculate fade effect (starts fading at FADE_START progress)
+      let alpha = 255;
+      if (progress > ThrustGame.EXPLOSION.FADE_START) {
+        const fadeProgress = (progress - ThrustGame.EXPLOSION.FADE_START) / 
+                            (1 - ThrustGame.EXPLOSION.FADE_START);
+        alpha = 255 * (1 - fadeProgress);
+      }
+      
+      // Draw expanding red circle
+      push();
+      noFill();
+      stroke(255, 0, 0, alpha); // Red with alpha
+      strokeWeight(3);
+      circle(explosion.x, explosion.y, radius * 2);
+      
+      // Inner circle for more impact
+      if (progress < 0.5) {
+        strokeWeight(2);
+        stroke(255, 100, 0, alpha * 0.7); // Orange
+        circle(explosion.x, explosion.y, radius * 1.5);
+      }
+      pop();
+    }
+  }
+
   // ============================================================================
   // MULTIPLAYER
   // ============================================================================
@@ -999,6 +1090,15 @@ class ThrustGame {
           });
         } else {
           const player = this.remotePlayers.get(clientId);
+          
+          // Check if player just died (create explosion)
+          const wasPreviouslyAlive = player.alive;
+          const isNowDead = !state.thrustGame.alive;
+          if (wasPreviouslyAlive && isNowDead) {
+            // Create explosion at player's current position
+            this.createExplosion(player.x, player.y);
+          }
+          
           // Store target positions for interpolation
           player.targetX = state.thrustGame.x;
           player.targetY = state.thrustGame.y;
