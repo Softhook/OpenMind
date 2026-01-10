@@ -425,7 +425,9 @@ class ThrustGame {
       angle: 0,  // 0 points right, increases clockwise
       alive: true,
       respawnTime: 0,
-      invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME
+      invulnerableUntil: Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME,
+      grounded: false,  // Track if ship is resting on a surface
+      groundedFrames: 0  // Count frames ship has been grounded
     };
   }
 
@@ -580,25 +582,31 @@ class ThrustGame {
     // Apply rotation
     if (this.keys.left) {
       p.angle -= phys.ROTATION_SPEED;
+      p.grounded = false;  // Rotation breaks grounded state
     }
     if (this.keys.right) {
       p.angle += phys.ROTATION_SPEED;
+      p.grounded = false;  // Rotation breaks grounded state
     }
 
     // Apply thrust in the direction the ship is facing
     if (this.keys.up) {
       p.vx += Math.cos(p.angle) * phys.THRUST;
       p.vy += Math.sin(p.angle) * phys.THRUST;
+      p.grounded = false;  // Thrust breaks grounded state
     }
 
     // Optional downward thrust (reverse)
     if (this.keys.down) {
       p.vx -= Math.cos(p.angle) * phys.THRUST * 0.5;
       p.vy -= Math.sin(p.angle) * phys.THRUST * 0.5;
+      p.grounded = false;  // Thrust breaks grounded state
     }
 
-    // Apply gravity
-    p.vy += phys.GRAVITY;
+    // Only apply gravity if not grounded
+    if (!p.grounded) {
+      p.vy += phys.GRAVITY;
+    }
 
     // Apply drag
     p.vx *= phys.DRAG;
@@ -619,12 +627,15 @@ class ThrustGame {
     // Check collision with boxes using triangular ship shape
     if (this.mindMap && this.mindMap.boxes) {
       const shipVertices = ThrustGame.getShipTriangleVertices(p);
+      let collisionDetected = false;
 
       for (const box of this.mindMap.boxes) {
         if (!box) continue;
 
         // Check if ship triangle collides with box
         if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
+          collisionDetected = true;
+          
           // Collision detected - try to push ship out instead of just reverting
           // This allows rotation on boxes by gently pushing ship away
           const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
@@ -643,15 +654,26 @@ class ThrustGame {
               const bounceAmount = 0.5;
               p.vx *= -bounceAmount;
               p.vy *= -bounceAmount;
-            } else if (velocityMagnitude < 0.1 && isBeingPushedUp) {
-              // Very low velocity and being pushed up - ship is resting
-              // Zero out velocity completely to prevent bouncing
+              p.grounded = false;
+              p.groundedFrames = 0;
+            } else if (velocityMagnitude < 0.2 && isBeingPushedUp) {
+              // Very low velocity and being pushed up - ship is grounding
+              // Zero out velocity and mark as grounded
               p.vx = 0;
               p.vy = 0;
+              p.groundedFrames++;
+              
+              // Require multiple frames of grounded contact to set grounded state
+              // This prevents false positives from glancing collisions
+              if (p.groundedFrames >= 3) {
+                p.grounded = true;
+              }
             } else {
-              // Low velocity but not quite resting - minimal bounce
-              p.vx *= 0.3;
-              p.vy *= 0.3;
+              // Low to medium velocity - dampen
+              p.vx *= 0.4;
+              p.vy *= 0.4;
+              p.grounded = false;
+              p.groundedFrames = 0;
             }
           } else {
             // Fallback: revert to previous position
@@ -659,10 +681,18 @@ class ThrustGame {
             p.y = prevY;
             p.vx *= -0.5;
             p.vy *= -0.5;
+            p.grounded = false;
+            p.groundedFrames = 0;
           }
 
           break; // Only handle one collision per frame
         }
+      }
+      
+      // If no collision this frame, reset grounded state
+      if (!collisionDetected && p.grounded) {
+        p.grounded = false;
+        p.groundedFrames = 0;
       }
     }
 
@@ -841,6 +871,11 @@ class ThrustGame {
     const force = ThrustGame.BULLET.BOX_PUSH_FORCE;
     box.x += dirX * force;
     box.y += dirY * force;
+    
+    // IMPORTANT: Also update targetX/targetY to prevent interpolation snap-back
+    // TextBox interpolates towards these targets, so they must match the new position
+    if (typeof box.targetX !== 'undefined') box.targetX = box.x;
+    if (typeof box.targetY !== 'undefined') box.targetY = box.y;
     
     // Sync the pushed box position to collaboration if available
     // Use false for skipTransactionWrapper to ensure proper transaction
