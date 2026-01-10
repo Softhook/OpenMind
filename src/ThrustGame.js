@@ -24,15 +24,18 @@ class ThrustGame {
   // ============================================================================
 
   static PHYSICS = {
-    GRAVITY: 0.03,                 // Downward acceleration
-    THRUST: 0.2,                   // Thrust acceleration magnitude
-    ROTATION_SPEED: 0.08,          // Angular velocity for rotation
-    MAX_SPEED: 8,                  // Maximum velocity magnitude
-    DRAG: 0.98,                    // Velocity dampening per frame
-    GROUNDING_VELOCITY: 1.0,       // Max velocity to ground ship (aggressive to stop bouncing)
-    GROUNDING_NUDGE: 0.5,          // Downward nudge to maintain ground contact (pixels)
-    COLLISION_DAMPING: 0.4,        // Velocity damping for low-speed collisions
-    BOUNCE_AMOUNT: 0.5             // Bounce damping factor for high-speed collisions
+    GRAVITY: 0.03,                 // Downward acceleration (pixels per frame^2)
+    THRUST: 0.2,                   // Thrust acceleration magnitude (pixels per frame^2)
+    ROTATION_SPEED: 0.08,          // Angular velocity for rotation (radians per frame)
+    MAX_SPEED: 8,                  // Maximum velocity magnitude (pixels per frame)
+    DRAG: 0.98,                    // Velocity dampening per frame (0-1, 1 = no drag)
+    GROUNDING_VELOCITY: 1.0,       // Max velocity (pixels/frame) to treat collision as soft landing and ground ship.
+                                   // Above this threshold, collision uses bounce/damping logic instead.
+                                   // Range: 0.5-2.0 typical. Higher = more aggressive grounding.
+    GROUNDING_NUDGE: 0.5,          // Small downward nudge (pixels) applied when grounded but no collision detected.
+                                   // Keeps ship in contact with surface. Should be << player size and <= GROUNDING_VELOCITY.
+    COLLISION_DAMPING: 0.4,        // Velocity damping factor (0-1) for low-speed collisions. 0 = full stop, 1 = no damping.
+    BOUNCE_AMOUNT: 0.5             // Bounce damping factor (0-1) for high-speed collisions. Lower = less bouncy.
   };
 
   static PLAYER = {
@@ -62,7 +65,7 @@ class ThrustGame {
     EPSILON: 0.0001,             // Small value for floating-point comparisons in geometry
     VELOCITY_EPSILON: 0.001,     // Minimum velocity magnitude to avoid division by zero
     PUSH_OUT_DISTANCE: 2,        // Distance to push ship away from box when resolving collision
-    PUSH_OUT_DIAGONAL: 1.5       // Diagonal push distance (sqrt(2) ≈ 1.414, rounded to 1.5)
+    PUSH_OUT_DIAGONAL: Math.SQRT2 // Diagonal push distance (sqrt(2) ≈ 1.414)
   };
 
   static TIMING = {
@@ -413,10 +416,25 @@ class ThrustGame {
           }
         }
         
-        // If no valid position found after all attempts, spawn farther away
+        // If no valid position found after all attempts, try validated fallback positions
         if (!foundValidPosition) {
-          spawnX = centerX - searchRadius * 1.5;
-          spawnY = centerY - searchRadius * 1.5;
+          const offset = searchRadius * 1.5;
+          const fallbackCandidates = [
+            { x: centerX - offset, y: centerY - offset },
+            { x: centerX + offset, y: centerY - offset },
+            { x: centerX - offset, y: centerY + offset },
+            { x: centerX + offset, y: centerY + offset }
+          ];
+
+          for (const candidate of fallbackCandidates) {
+            if (ThrustGame.isValidSpawnPosition(candidate.x, candidate.y, this.mindMap.boxes, minDistance)) {
+              spawnX = candidate.x;
+              spawnY = candidate.y;
+              foundValidPosition = true;
+              break;
+            }
+          }
+          // If no fallback candidate is valid, keep the original spawnX/spawnY defaults
         }
       }
     }
@@ -649,8 +667,9 @@ class ThrustGame {
             const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
             
             // Check if ship should be grounded (resting on top of box)
-            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp) {
-              // Low velocity collision from above - ground the ship
+            // Verify collision is from above by checking vertical velocity (downward movement)
+            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy > 0) {
+              // Low velocity downward collision from above - ground the ship
               // Don't push out, just stop at current position
               p.vx = 0;
               p.vy = 0;
@@ -686,9 +705,26 @@ class ThrustGame {
       }
       
       // If no collision this frame but was grounded, apply small downward movement
-      // This keeps ship in contact with surface
+      // This keeps ship in contact with surface, but only if there's a surface below
       if (!collisionDetected && p.grounded) {
-        p.y += phys.GROUNDING_NUDGE;  // Small downward nudge to re-establish collision
+        const nudge = phys.GROUNDING_NUDGE;
+        // Predictively check if moving down by the nudge would collide with any box
+        const nudgedPlayer = { x: p.x, y: p.y + nudge, angle: p.angle };
+        const nudgedVertices = ThrustGame.getShipTriangleVertices(nudgedPlayer);
+        let hasSurfaceBelow = false;
+        for (const box of this.mindMap.boxes) {
+          if (!box) continue;
+          if (ThrustGame.triangleBoxCollision(nudgedVertices, box)) {
+            hasSurfaceBelow = true;
+            break;
+          }
+        }
+        if (hasSurfaceBelow) {
+          p.y += nudge;  // Small downward nudge to re-establish collision
+        } else {
+          // No surface below - unground the ship
+          p.grounded = false;
+        }
       }
     }
 
@@ -705,13 +741,23 @@ class ThrustGame {
    * @param {number} prevAngle - Previous angle
    * @returns {Object|null} Separation vector {x, y} or null if can't resolve
    */
+  /**
+   * Attempts to resolve triangle-box collision by trying push-out vectors.
+   * Tests 8 directional displacement vectors to find one that resolves the collision.
+   * @param {Object} player - Player object with x, y, angle
+   * @param {Object} box - Box object with collision geometry
+   * @param {number} prevX - Previous x position (unused, kept for signature compatibility)
+   * @param {number} prevY - Previous y position (unused, kept for signature compatibility)  
+   * @param {number} prevAngle - Previous angle (unused, kept for signature compatibility)
+   * @returns {Object|null} Separation vector {x, y} or null if no resolution found
+   */
   resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
     // Try small displacement vectors to push ship out of box
     // Using constants for consistent push distances
     const d = ThrustGame.COLLISION.PUSH_OUT_DISTANCE;      // Cardinal directions
     const diag = ThrustGame.COLLISION.PUSH_OUT_DIAGONAL;   // Diagonals
     
-    const separationAttempts = [
+    const pushOutVectors = [
       { x: 0, y: -d },        // Push up
       { x: 0, y: d },         // Push down
       { x: -d, y: 0 },        // Push left
@@ -723,7 +769,7 @@ class ThrustGame {
     ];
 
     // Test each separation vector
-    for (const sep of separationAttempts) {
+    for (const sep of pushOutVectors) {
       const testPlayer = {
         x: player.x + sep.x,
         y: player.y + sep.y,
@@ -853,6 +899,13 @@ class ThrustGame {
    * @param {Object} box - The box to push
    * @param {Object} bullet - The bullet that hit the box
    */
+  /**
+   * Applies a small force to a box when hit by a bullet.
+   * Updates both position and interpolation targets to prevent snap-back.
+   * Syncs changes to collaboration if connected.
+   * @param {Object} box - The box to apply force to
+   * @param {Object} bullet - The bullet providing the force
+   */
   applyBulletForceToBox(box, bullet) {
     if (!box) return;
     
@@ -870,8 +923,10 @@ class ThrustGame {
     
     // IMPORTANT: Also update targetX/targetY to prevent interpolation snap-back
     // TextBox interpolates towards these targets, so they must match the new position
-    if (typeof box.targetX !== 'undefined') box.targetX = box.x;
-    if (typeof box.targetY !== 'undefined') box.targetY = box.y;
+    if (typeof box.targetX !== 'undefined' && typeof box.targetY !== 'undefined') {
+      box.targetX = box.x;
+      box.targetY = box.y;
+    }
     
     // Sync the pushed box position to collaboration if available
     // Use false for skipTransactionWrapper to ensure proper transaction
