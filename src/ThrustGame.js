@@ -54,9 +54,11 @@ class ThrustGame {
   };
 
   static COLLISION = {
-    RADIUS: 15 + 4,          // Player size + bullet size for collision detection
-    EPSILON: 0.0001,         // Small value for floating-point comparisons in geometry
-    VELOCITY_EPSILON: 0.001  // Minimum velocity magnitude to avoid division by zero
+    RADIUS: 15 + 4,              // Player size + bullet size for collision detection
+    EPSILON: 0.0001,             // Small value for floating-point comparisons in geometry
+    VELOCITY_EPSILON: 0.001,     // Minimum velocity magnitude to avoid division by zero
+    PUSH_OUT_DISTANCE: 2,        // Distance to push ship away from box when resolving collision
+    PUSH_OUT_DIAGONAL: 1.5       // Diagonal push distance (sqrt(2) ≈ 1.414, rounded to 1.5)
   };
 
   static TIMING = {
@@ -569,7 +571,8 @@ class ThrustGame {
     const p = this.player;
     const phys = ThrustGame.PHYSICS;
 
-    // Store previous state for collision resolution
+    // Store previous state for collision resolution (position and angle)
+    // These are used to revert if collision cannot be resolved with push-out
     const prevX = p.x;
     const prevY = p.y;
     const prevAngle = p.angle;
@@ -614,7 +617,6 @@ class ThrustGame {
     p.y += p.vy;
 
     // Check collision with boxes using triangular ship shape
-    // If collision detected, push ship out of box instead of just reverting
     if (this.mindMap && this.mindMap.boxes) {
       const shipVertices = ThrustGame.getShipTriangleVertices(p);
 
@@ -623,7 +625,8 @@ class ThrustGame {
 
         // Check if ship triangle collides with box
         if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
-          // Find the minimum displacement to separate ship from box
+          // Collision detected - try to push ship out instead of just reverting
+          // This allows rotation on boxes by gently pushing ship away
           const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
           
           if (separation) {
@@ -662,15 +665,19 @@ class ThrustGame {
    */
   resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
     // Try small displacement vectors to push ship out of box
+    // Using constants for consistent push distances
+    const d = ThrustGame.COLLISION.PUSH_OUT_DISTANCE;      // Cardinal directions
+    const diag = ThrustGame.COLLISION.PUSH_OUT_DIAGONAL;   // Diagonals
+    
     const separationAttempts = [
-      { x: 0, y: -2 },  // Push up
-      { x: 0, y: 2 },   // Push down
-      { x: -2, y: 0 },  // Push left
-      { x: 2, y: 0 },   // Push right
-      { x: -1.5, y: -1.5 }, // Diagonal up-left
-      { x: 1.5, y: -1.5 },  // Diagonal up-right
-      { x: -1.5, y: 1.5 },  // Diagonal down-left
-      { x: 1.5, y: 1.5 }    // Diagonal down-right
+      { x: 0, y: -d },        // Push up
+      { x: 0, y: d },         // Push down
+      { x: -d, y: 0 },        // Push left
+      { x: d, y: 0 },         // Push right
+      { x: -diag, y: -diag }, // Diagonal up-left
+      { x: diag, y: -diag },  // Diagonal up-right
+      { x: -diag, y: diag },  // Diagonal down-left
+      { x: diag, y: diag }    // Diagonal down-right
     ];
 
     // Test each separation vector
