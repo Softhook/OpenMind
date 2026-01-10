@@ -1061,6 +1061,13 @@ class ThrustGame {
 
     // Build the state to broadcast - optimized for bandwidth
     // Round position/angle values to reduce precision (saves bytes in JSON)
+    // Validate all values are finite before broadcasting
+    if (!Number.isFinite(currentState.x) || !Number.isFinite(currentState.y) || 
+        !Number.isFinite(currentState.angle)) {
+      // Invalid state - skip broadcasting to prevent NaN/Infinity issues
+      return;
+    }
+    
     const gameState = {
       x: currentState.x,
       y: currentState.y,
@@ -1075,7 +1082,7 @@ class ThrustGame {
         vx: Math.round(b.vx * 10) / 10,
         vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
-      }))
+      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)) // Filter invalid bullets
     };
 
     // Update awareness with thrust game state

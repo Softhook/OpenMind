@@ -610,6 +610,17 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
         if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         syncStatus = null;
+        
+        // Clean up presence state on disconnect to prevent stale data
+        lastPresenceBroadcast = {
+          cursorX: null,
+          cursorY: null,
+          selectedIds: [],
+          editingBoxId: null,
+          time: Date.now(),
+          isIdle: false
+        };
+        hasRemoteThrustPlayers = false;
       }
       if (prevStatus !== syncStatus) {
         Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
@@ -848,9 +859,13 @@ function updateCollaborationPresence() {
     if (wx !== null && wy !== null) {
       const roundedX = Math.round(wx * 10) / 10;
       const roundedY = Math.round(wy * 10) / 10;
-      collaborationManager.updateCursor(roundedX, roundedY);
-      lastPresenceBroadcast.cursorX = roundedX;
-      lastPresenceBroadcast.cursorY = roundedY;
+      
+      // Validate rounded values are finite before broadcasting
+      if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
+        collaborationManager.updateCursor(roundedX, roundedY);
+        lastPresenceBroadcast.cursorX = roundedX;
+        lastPresenceBroadcast.cursorY = roundedY;
+      }
     } else if (cursorBecameInvalid) {
       // Cursor went off-canvas - update to null to clear remote cursor
       lastPresenceBroadcast.cursorX = null;
@@ -871,9 +886,13 @@ function updateCollaborationPresence() {
       if (wx !== null && wy !== null) {
         const roundedX = Math.round(wx * 10) / 10;
         const roundedY = Math.round(wy * 10) / 10;
-        collaborationManager.updateCursor(roundedX, roundedY);
-        lastPresenceBroadcast.cursorX = roundedX;
-        lastPresenceBroadcast.cursorY = roundedY;
+        
+        // Validate rounded values before final idle broadcast
+        if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
+          collaborationManager.updateCursor(roundedX, roundedY);
+          lastPresenceBroadcast.cursorX = roundedX;
+          lastPresenceBroadcast.cursorY = roundedY;
+        }
       }
     }
     // Idle - skip broadcasting to save bandwidth
