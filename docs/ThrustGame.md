@@ -63,7 +63,7 @@ The thrust game uses Yjs awareness protocol (the same system used for cursor pre
 - Each player's position, velocity, angle, and alive status
 - All active bullets with their positions and velocities
 - Thrusting state for animated fire jet display
-- Updates are throttled to ~100ms intervals to balance responsiveness and bandwidth
+- Updates are throttled to ~50ms intervals (20 Hz) for smooth gameplay while balancing bandwidth
 
 When you fire a bullet, it appears immediately for you and is synced to other players. Remote players see your ship in your assigned collaboration color, making it easy to identify who's who in the game.
 
@@ -92,7 +92,7 @@ The game is implemented as a separate class (`ThrustGame.js`) that:
 
 - Game runs at 60 FPS (browser's requestAnimationFrame)
 - Physics updates every frame
-- Multiplayer broadcasts throttled to ~100ms intervals
+- Multiplayer broadcasts throttled to ~50ms intervals (20 Hz)
 - No performance impact when game is inactive
 
 ## Known Limitations

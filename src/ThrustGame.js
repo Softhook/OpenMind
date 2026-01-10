@@ -309,9 +309,10 @@ class ThrustGame {
 
     // Broadcast state to multiplayer
     if (this.collaborationManager && this.collaborationManager.isConnected) {
-      // Throttle broadcasts (every ~100ms)
+      // Throttle broadcasts (every ~50ms for smoother gameplay)
+      // 50ms = 20 updates per second, providing better responsiveness
       const now = Date.now();
-      if (!this.lastBroadcast || now - this.lastBroadcast > 100) {
+      if (!this.lastBroadcast || now - this.lastBroadcast > 50) {
         this.broadcastPlayerState();
         this.lastBroadcast = now;
       }
@@ -887,9 +888,8 @@ class ThrustGame {
    * Updates remote players based on awareness state
    */
   updateRemotePlayers() {
-    // Only update if game is active to ensure zero overhead when inactive
-    if (!this.active) return;
-
+    // Always update remote players to ensure they're visible even when local player
+    // is not in thrust mode. This allows players to see others' spaceships.
     if (!this.collaborationManager || !this.collaborationManager.awareness) {
       return;
     }
