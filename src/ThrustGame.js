@@ -123,6 +123,11 @@ class ThrustGame {
 
     // Multiplayer state
     this.multiplayerInitialized = false;
+    
+    // Idle detection for bandwidth optimization
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
+    this.lastBroadcastState = null; // Track last broadcast to detect changes
 
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -241,6 +246,11 @@ class ThrustGame {
       down: false,
       space: false
     };
+    
+    // Reset idle detection state
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
+    this.lastBroadcastState = null;
 
     // Setup multiplayer if connected (may not have been connected at construction time)
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -309,10 +319,10 @@ class ThrustGame {
 
     // Broadcast state to multiplayer
     if (this.collaborationManager && this.collaborationManager.isConnected) {
-      // Throttle broadcasts (every ~50ms for smoother gameplay)
-      // 50ms = 20 updates per second, providing better responsiveness
+      // Throttle broadcasts (every ~100ms for balanced gameplay and bandwidth)
+      // 100ms = 10 updates per second, sufficient for multiplayer game
       const now = Date.now();
-      if (!this.lastBroadcast || now - this.lastBroadcast > 50) {
+      if (!this.lastBroadcast || now - this.lastBroadcast > 100) {
         this.broadcastPlayerState();
         this.lastBroadcast = now;
       }
@@ -643,10 +653,19 @@ class ThrustGame {
    * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
-    // Always update and draw remote players in thrust mode, even if local player isn't active
-    // This ensures remote players' spaceships are visible
-    if (this.collaborationManager && this.collaborationManager.isConnected) {
+    // Early exit if no collaboration or no remote players
+    if (!this.collaborationManager || !this.collaborationManager.isConnected) {
+      // Only draw local game elements if active
+      if (!this.active) return;
+      // Continue to draw local player below
+    } else {
+      // Update remote players only if we have collaboration
       this.updateRemotePlayers();
+      
+      // Early exit if no remote players and not active locally
+      if (this.remotePlayers.size === 0 && !this.active) {
+        return;
+      }
     }
 
     // Get viewport bounds for culling (optimization for 10+ players)
@@ -989,27 +1008,75 @@ class ThrustGame {
       return;
     }
 
-    // Build the state to broadcast
+    // Detect if player is moving or has any input
+    const hasInput = this.keys.left || this.keys.right || this.keys.up || this.keys.down;
+    const hasBullets = this.bullets.length > 0;
+    
+    // Check if player state has changed significantly
+    const p = this.player;
+    const currentState = {
+      x: Math.round(p.x * 10) / 10,
+      y: Math.round(p.y * 10) / 10,
+      angle: Math.round(p.angle * 100) / 100,
+      alive: p.alive,
+      thrusting: this.keys.up,
+      bulletCount: this.bullets.length
+    };
+    
+    // Detect movement by comparing with last broadcast state
+    let hasMovement = false;
+    if (this.lastBroadcastState) {
+      hasMovement = (
+        Math.abs(currentState.x - this.lastBroadcastState.x) > 0.1 ||
+        Math.abs(currentState.y - this.lastBroadcastState.y) > 0.1 ||
+        Math.abs(currentState.angle - this.lastBroadcastState.angle) > 0.01 ||
+        currentState.alive !== this.lastBroadcastState.alive ||
+        currentState.thrusting !== this.lastBroadcastState.thrusting ||
+        currentState.bulletCount !== this.lastBroadcastState.bulletCount
+      );
+    }
+    
+    const now = Date.now();
+    
+    // Update idle state
+    if (hasInput || hasBullets || hasMovement) {
+      this.lastMovementTime = now;
+      this.isIdle = false;
+    } else if (now - this.lastMovementTime > 2000) {
+      // No movement for 2 seconds = idle
+      if (!this.isIdle) {
+        // Transition to idle - send one final update
+        this.isIdle = true;
+      } else {
+        // Already idle and sent final update - skip broadcasting
+        return;
+      }
+    }
+
+    // Build the state to broadcast - optimized for bandwidth
+    // Round position/angle values to reduce precision (saves bytes in JSON)
     const gameState = {
-      x: this.player.x,
-      y: this.player.y,
-      vx: this.player.vx,
-      vy: this.player.vy,
-      angle: this.player.angle,
-      alive: this.player.alive,
-      thrusting: this.keys.up, // Add thrust state for visual display
+      x: currentState.x,
+      y: currentState.y,
+      angle: currentState.angle,
+      alive: currentState.alive,
+      thrusting: currentState.thrusting,
+      // Note: vx/vy removed - only needed locally, remote clients can interpolate
       bullets: this.bullets.map(b => ({
         id: b.id,
-        x: b.x,
-        y: b.y,
-        vx: b.vx,
-        vy: b.vy,
+        x: Math.round(b.x * 10) / 10,
+        y: Math.round(b.y * 10) / 10,
+        vx: Math.round(b.vx * 10) / 10,
+        vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
       }))
     };
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
+    
+    // Save current state for next comparison
+    this.lastBroadcastState = currentState;
   }
 
   /**
