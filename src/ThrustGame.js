@@ -89,6 +89,12 @@ class ThrustGame {
   static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
   static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
 
+  static SPAWN = {
+    MAX_ATTEMPTS: 20,        // Maximum attempts to find valid spawn location
+    SEARCH_RADIUS: 150,      // Radius around box center to search for spawn point
+    MIN_DISTANCE_FROM_BOX: 30 // Minimum distance from any box to spawn
+  };
+
   // ============================================================================
   // CONSTRUCTOR
   // ============================================================================
@@ -174,6 +180,181 @@ class ThrustGame {
   }
 
   // ============================================================================
+  // COLLISION DETECTION HELPERS
+  // ============================================================================
+
+  /**
+   * Gets the three vertices of the ship triangle in world space
+   * @param {Object} player - Player object with x, y, angle
+   * @returns {Array<{x: number, y: number}>} Array of 3 vertices
+   */
+  static getShipTriangleVertices(player) {
+    const size = ThrustGame.PLAYER.SIZE;
+    const halfSize = size / 2;
+    
+    // Local coordinates of the triangle (before rotation)
+    const localVertices = [
+      { x: size, y: 0 },           // Front tip
+      { x: -halfSize, y: -halfSize }, // Back left
+      { x: -halfSize, y: halfSize }   // Back right
+    ];
+    
+    // Apply rotation and translation to get world coordinates
+    const cos = Math.cos(player.angle);
+    const sin = Math.sin(player.angle);
+    
+    return localVertices.map(v => ({
+      x: player.x + v.x * cos - v.y * sin,
+      y: player.y + v.x * sin + v.y * cos
+    }));
+  }
+
+  /**
+   * Checks if a triangle collides with an axis-aligned rectangle (box)
+   * Uses Separating Axis Theorem (SAT)
+   * @param {Array<{x: number, y: number}>} triangleVertices - Triangle vertices
+   * @param {Object} box - Box with x, y (center), width, height
+   * @returns {boolean} True if collision detected
+   */
+  static triangleBoxCollision(triangleVertices, box) {
+    // Get box corners
+    const halfW = box.width / 2;
+    const halfH = box.height / 2;
+    const boxLeft = box.x - halfW;
+    const boxRight = box.x + halfW;
+    const boxTop = box.y - halfH;
+    const boxBottom = box.y + halfH;
+    
+    // Quick check: if any triangle vertex is inside the box, there's a collision
+    for (const v of triangleVertices) {
+      if (v.x >= boxLeft && v.x <= boxRight && v.y >= boxTop && v.y <= boxBottom) {
+        return true;
+      }
+    }
+    
+    // Check if any box corner is inside the triangle
+    const boxCorners = [
+      { x: boxLeft, y: boxTop },
+      { x: boxRight, y: boxTop },
+      { x: boxLeft, y: boxBottom },
+      { x: boxRight, y: boxBottom }
+    ];
+    
+    for (const corner of boxCorners) {
+      if (ThrustGame.pointInTriangle(corner, triangleVertices)) {
+        return true;
+      }
+    }
+    
+    // Check if any triangle edge intersects any box edge
+    for (let i = 0; i < 3; i++) {
+      const v1 = triangleVertices[i];
+      const v2 = triangleVertices[(i + 1) % 3];
+      
+      // Check intersection with all 4 box edges
+      if (ThrustGame.lineSegmentIntersectsBox(v1, v2, boxLeft, boxRight, boxTop, boxBottom)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Checks if a point is inside a triangle using barycentric coordinates
+   * @param {Object} point - Point with x, y
+   * @param {Array<{x: number, y: number}>} triangle - Triangle vertices [v0, v1, v2]
+   * @returns {boolean} True if point is inside triangle
+   */
+  static pointInTriangle(point, triangle) {
+    const v0 = triangle[0];
+    const v1 = triangle[1];
+    const v2 = triangle[2];
+    
+    // Compute barycentric coordinates
+    const d00 = (v1.x - v0.x) * (v1.x - v0.x) + (v1.y - v0.y) * (v1.y - v0.y);
+    const d01 = (v1.x - v0.x) * (v2.x - v0.x) + (v1.y - v0.y) * (v2.y - v0.y);
+    const d11 = (v2.x - v0.x) * (v2.x - v0.x) + (v2.y - v0.y) * (v2.y - v0.y);
+    const d20 = (point.x - v0.x) * (v1.x - v0.x) + (point.y - v0.y) * (v1.y - v0.y);
+    const d21 = (point.x - v0.x) * (v2.x - v0.x) + (point.y - v0.y) * (v2.y - v0.y);
+    
+    const denom = d00 * d11 - d01 * d01;
+    if (Math.abs(denom) < 0.0001) return false; // Degenerate triangle
+    
+    const v = (d11 * d20 - d01 * d21) / denom;
+    const w = (d00 * d21 - d01 * d20) / denom;
+    const u = 1 - v - w;
+    
+    // Check if point is in triangle
+    return (u >= 0) && (v >= 0) && (w >= 0);
+  }
+
+  /**
+   * Checks if a line segment intersects with a box
+   * @param {Object} p1 - First point of line segment
+   * @param {Object} p2 - Second point of line segment
+   * @param {number} boxLeft - Left edge of box
+   * @param {number} boxRight - Right edge of box
+   * @param {number} boxTop - Top edge of box
+   * @param {number} boxBottom - Bottom edge of box
+   * @returns {boolean} True if line segment intersects box
+   */
+  static lineSegmentIntersectsBox(p1, p2, boxLeft, boxRight, boxTop, boxBottom) {
+    // Check intersection with each of the 4 box edges
+    return (
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxTop}, {x: boxRight, y: boxTop}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxTop}, {x: boxRight, y: boxBottom}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxBottom}, {x: boxLeft, y: boxBottom}) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxBottom}, {x: boxLeft, y: boxTop})
+    );
+  }
+
+  /**
+   * Checks if two line segments intersect
+   * @param {Object} p1 - First point of segment 1
+   * @param {Object} p2 - Second point of segment 1
+   * @param {Object} p3 - First point of segment 2
+   * @param {Object} p4 - Second point of segment 2
+   * @returns {boolean} True if segments intersect
+   */
+  static lineSegmentsIntersect(p1, p2, p3, p4) {
+    const ccw = (a, b, c) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+    return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+  }
+
+  /**
+   * Checks if a position is inside or too close to any box
+   * @param {number} x - X coordinate
+   * @param {number} y - Y coordinate
+   * @param {Array} boxes - Array of box objects
+   * @param {number} minDistance - Minimum distance from box edges
+   * @returns {boolean} True if position is valid (not inside or too close to boxes)
+   */
+  static isValidSpawnPosition(x, y, boxes, minDistance) {
+    if (!boxes || boxes.length === 0) return true;
+    
+    for (const box of boxes) {
+      if (!box) continue;
+      
+      const halfW = box.width / 2;
+      const halfH = box.height / 2;
+      
+      // Expand box by minDistance
+      const boxLeft = box.x - halfW - minDistance;
+      const boxRight = box.x + halfW + minDistance;
+      const boxTop = box.y - halfH - minDistance;
+      const boxBottom = box.y + halfH + minDistance;
+      
+      // Check if point is inside expanded box
+      if (x >= boxLeft && x <= boxRight && y >= boxTop && y <= boxBottom) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  // ============================================================================
   // PLAYER MANAGEMENT
   // ============================================================================
 
@@ -182,7 +363,7 @@ class ThrustGame {
    * @returns {Object} Player object with position, velocity, and state
    */
   createPlayer() {
-    // Spawn player in world space - try to find a good location near boxes
+    // Default spawn position if no boxes
     let spawnX = 300;
     let spawnY = 200;
 
@@ -196,10 +377,38 @@ class ThrustGame {
           count++;
         }
       }
+      
       if (count > 0) {
-        // Spawn near the center of boxes, but offset to avoid being inside one
-        spawnX = sumX / count - 100;
-        spawnY = sumY / count - 100;
+        const centerX = sumX / count;
+        const centerY = sumY / count;
+        
+        // Try to find a valid spawn position that's not inside a box
+        let foundValidPosition = false;
+        const maxAttempts = ThrustGame.SPAWN.MAX_ATTEMPTS;
+        const searchRadius = ThrustGame.SPAWN.SEARCH_RADIUS;
+        const minDistance = ThrustGame.SPAWN.MIN_DISTANCE_FROM_BOX;
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          // Generate random position around the center of boxes
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * searchRadius;
+          const testX = centerX + Math.cos(angle) * distance;
+          const testY = centerY + Math.sin(angle) * distance;
+          
+          // Check if this position is valid (not inside or too close to any box)
+          if (ThrustGame.isValidSpawnPosition(testX, testY, this.mindMap.boxes, minDistance)) {
+            spawnX = testX;
+            spawnY = testY;
+            foundValidPosition = true;
+            break;
+          }
+        }
+        
+        // If no valid position found after all attempts, spawn farther away
+        if (!foundValidPosition) {
+          spawnX = centerX - searchRadius * 1.5;
+          spawnY = centerY - searchRadius * 1.5;
+        }
       }
     }
 
@@ -400,28 +609,16 @@ class ThrustGame {
     p.x += p.vx;
     p.y += p.vy;
 
-    // Check collision with boxes
+    // Check collision with boxes using triangular ship shape
     if (this.mindMap && this.mindMap.boxes) {
-      const playerRadius = ThrustGame.PLAYER.SIZE;
+      // Get the triangle vertices of the ship at current position
+      const shipVertices = ThrustGame.getShipTriangleVertices(p);
 
       for (const box of this.mindMap.boxes) {
         if (!box) continue;
 
-        // Get box bounds
-        const boxLeft = box.x - box.width / 2;
-        const boxRight = box.x + box.width / 2;
-        const boxTop = box.y - box.height / 2;
-        const boxBottom = box.y + box.height / 2;
-
-        // Check if player circle collides with box rectangle
-        const closestX = Math.max(boxLeft, Math.min(p.x, boxRight));
-        const closestY = Math.max(boxTop, Math.min(p.y, boxBottom));
-
-        const distX = p.x - closestX;
-        const distY = p.y - closestY;
-        const distSq = distX * distX + distY * distY;
-
-        if (distSq < playerRadius * playerRadius) {
+        // Check if ship triangle collides with box
+        if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
           // Collision! Revert to previous position and bounce
           p.x = prevX;
           p.y = prevY;
