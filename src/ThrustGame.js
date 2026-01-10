@@ -634,8 +634,9 @@ class ThrustGame {
             p.y += separation.y;
             
             // Check if ship is resting: low velocity and being pushed upward
+            // In p5.js coordinate system: y increases downward, so negative y = upward
             const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-            const isBeingPushedUp = separation.y < 0;  // Negative y = upward push
+            const isBeingPushedUp = separation.y < 0;  // Negative y separation = pushed upward
             
             if (velocityMagnitude > 0.5) {
               // Significant velocity - apply bounce
