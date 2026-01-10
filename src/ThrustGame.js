@@ -732,16 +732,6 @@ class ThrustGame {
   }
 
   /**
-   * Resolves collision by finding minimum displacement to separate ship from box
-   * This allows rotation and movement while preventing clipping
-   * @param {Object} player - Player state
-   * @param {Object} box - Box to separate from
-   * @param {number} prevX - Previous X position
-   * @param {number} prevY - Previous Y position
-   * @param {number} prevAngle - Previous angle
-   * @returns {Object|null} Separation vector {x, y} or null if can't resolve
-   */
-  /**
    * Attempts to resolve triangle-box collision by trying push-out vectors.
    * Tests 8 directional displacement vectors to find one that resolves the collision.
    * @param {Object} player - Player object with x, y, angle
@@ -894,11 +884,6 @@ class ThrustGame {
     return null;
   }
 
-  /**
-   * Applies a small push force to a box based on bullet impact
-   * @param {Object} box - The box to push
-   * @param {Object} bullet - The bullet that hit the box
-   */
   /**
    * Applies a small force to a box when hit by a bullet.
    * Updates both position and interpolation targets to prevent snap-back.
