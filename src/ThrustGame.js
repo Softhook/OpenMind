@@ -30,10 +30,10 @@ class ThrustGame {
     MAX_SPEED: 8,                  // Maximum velocity magnitude (pixels per frame)
     DRAG: 0.98,                    // Velocity dampening per frame (0-1, 1 = no drag)
     GROUNDING_VELOCITY: 1.0,       // Max velocity (pixels/frame) to treat collision as soft landing and ground ship.
-                                   // Above this threshold, collision uses bounce/damping logic instead.
-                                   // Range: 0.5-2.0 typical. Higher = more aggressive grounding.
+    // Above this threshold, collision uses bounce/damping logic instead.
+    // Range: 0.5-2.0 typical. Higher = more aggressive grounding.
     GROUNDING_NUDGE: 0.5,          // Small downward nudge (pixels) applied when grounded but no collision detected.
-                                   // Keeps ship in contact with surface. Should be << player size and <= GROUNDING_VELOCITY.
+    // Keeps ship in contact with surface. Should be << player size and <= GROUNDING_VELOCITY.
     COLLISION_DAMPING: 0.4,        // Velocity damping factor (0-1) for low-speed collisions. 0 = full stop, 1 = no damping.
     BOUNCE_AMOUNT: 0.5             // Bounce damping factor (0-1) for high-speed collisions. Lower = less bouncy.
   };
@@ -43,7 +43,7 @@ class ThrustGame {
     RESPAWN_TIME: 3000,      // Milliseconds before respawn after death
     INVULNERABLE_TIME: 2000, // Invulnerability after spawn (ms)
     FLAME_BASE_LENGTH: 15,   // Base thrust flame length
-    FLAME_VARIATION: 5       // Random variation in flame length
+    FLAME_VARIATION: 12       // Random variation in flame length
   };
 
   static EXPLOSION = {
@@ -148,7 +148,7 @@ class ThrustGame {
 
     // Multiplayer state
     this.multiplayerInitialized = false;
-    
+
     // Idle detection for bandwidth optimization
     this.lastMovementTime = Date.now();
     this.isIdle = false;
@@ -174,12 +174,12 @@ class ThrustGame {
    */
   static toggle(existingInstance, collaborationManager, mindMap) {
     let instance = existingInstance;
-    
+
     if (!instance) {
       // Initialize thrust game on first activation
       instance = new ThrustGame(collaborationManager, mindMap);
     }
-    
+
     if (instance.active) {
       // Stop the game
       instance.stop();
@@ -187,7 +187,7 @@ class ThrustGame {
       // Start the game
       instance.start();
     }
-    
+
     return instance;
   }
 
@@ -203,18 +203,18 @@ class ThrustGame {
   static getShipTriangleVertices(player) {
     const size = ThrustGame.PLAYER.SIZE;
     const halfSize = size / 2;
-    
+
     // Local coordinates of the triangle (before rotation)
     const localVertices = [
       { x: size, y: 0 },           // Front tip
       { x: -halfSize, y: -halfSize }, // Back left
       { x: -halfSize, y: halfSize }   // Back right
     ];
-    
+
     // Apply rotation and translation to get world coordinates
     const cos = Math.cos(player.angle);
     const sin = Math.sin(player.angle);
-    
+
     return localVertices.map(v => ({
       x: player.x + v.x * cos - v.y * sin,
       y: player.y + v.x * sin + v.y * cos
@@ -236,14 +236,14 @@ class ThrustGame {
     const boxRight = box.x + halfW;
     const boxTop = box.y - halfH;
     const boxBottom = box.y + halfH;
-    
+
     // Quick check: if any triangle vertex is inside the box, there's a collision
     for (const v of triangleVertices) {
       if (v.x >= boxLeft && v.x <= boxRight && v.y >= boxTop && v.y <= boxBottom) {
         return true;
       }
     }
-    
+
     // Check if any box corner is inside the triangle
     const boxCorners = [
       { x: boxLeft, y: boxTop },
@@ -251,24 +251,24 @@ class ThrustGame {
       { x: boxLeft, y: boxBottom },
       { x: boxRight, y: boxBottom }
     ];
-    
+
     for (const corner of boxCorners) {
       if (ThrustGame.pointInTriangle(corner, triangleVertices)) {
         return true;
       }
     }
-    
+
     // Check if any triangle edge intersects any box edge
     for (let i = 0; i < 3; i++) {
       const v1 = triangleVertices[i];
       const v2 = triangleVertices[(i + 1) % 3];
-      
+
       // Check intersection with all 4 box edges
       if (ThrustGame.lineSegmentIntersectsBox(v1, v2, boxLeft, boxRight, boxTop, boxBottom)) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -282,21 +282,21 @@ class ThrustGame {
     const v0 = triangle[0];
     const v1 = triangle[1];
     const v2 = triangle[2];
-    
+
     // Compute barycentric coordinates
     const d00 = (v1.x - v0.x) * (v1.x - v0.x) + (v1.y - v0.y) * (v1.y - v0.y);
     const d01 = (v1.x - v0.x) * (v2.x - v0.x) + (v1.y - v0.y) * (v2.y - v0.y);
     const d11 = (v2.x - v0.x) * (v2.x - v0.x) + (v2.y - v0.y) * (v2.y - v0.y);
     const d20 = (point.x - v0.x) * (v1.x - v0.x) + (point.y - v0.y) * (v1.y - v0.y);
     const d21 = (point.x - v0.x) * (v2.x - v0.x) + (point.y - v0.y) * (v2.y - v0.y);
-    
+
     const denom = d00 * d11 - d01 * d01;
     if (Math.abs(denom) < ThrustGame.COLLISION.EPSILON) return false; // Degenerate triangle
-    
+
     const v = (d11 * d20 - d01 * d21) / denom;
     const w = (d00 * d21 - d01 * d20) / denom;
     const u = 1 - v - w;
-    
+
     // Check if point is in triangle
     return (u >= 0) && (v >= 0) && (w >= 0);
   }
@@ -314,10 +314,10 @@ class ThrustGame {
   static lineSegmentIntersectsBox(p1, p2, boxLeft, boxRight, boxTop, boxBottom) {
     // Check intersection with each of the 4 box edges
     return (
-      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxTop}, {x: boxRight, y: boxTop}) ||
-      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxTop}, {x: boxRight, y: boxBottom}) ||
-      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxRight, y: boxBottom}, {x: boxLeft, y: boxBottom}) ||
-      ThrustGame.lineSegmentsIntersect(p1, p2, {x: boxLeft, y: boxBottom}, {x: boxLeft, y: boxTop})
+      ThrustGame.lineSegmentsIntersect(p1, p2, { x: boxLeft, y: boxTop }, { x: boxRight, y: boxTop }) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, { x: boxRight, y: boxTop }, { x: boxRight, y: boxBottom }) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, { x: boxRight, y: boxBottom }, { x: boxLeft, y: boxBottom }) ||
+      ThrustGame.lineSegmentsIntersect(p1, p2, { x: boxLeft, y: boxBottom }, { x: boxLeft, y: boxTop })
     );
   }
 
@@ -344,25 +344,25 @@ class ThrustGame {
    */
   static isValidSpawnPosition(x, y, boxes, minDistance) {
     if (!boxes || boxes.length === 0) return true;
-    
+
     for (const box of boxes) {
       if (!box) continue;
-      
+
       const halfW = box.width / 2;
       const halfH = box.height / 2;
-      
+
       // Expand box by minDistance
       const boxLeft = box.x - halfW - minDistance;
       const boxRight = box.x + halfW + minDistance;
       const boxTop = box.y - halfH - minDistance;
       const boxBottom = box.y + halfH + minDistance;
-      
+
       // Check if point is inside expanded box
       if (x >= boxLeft && x <= boxRight && y >= boxTop && y <= boxBottom) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -389,24 +389,24 @@ class ThrustGame {
           count++;
         }
       }
-      
+
       if (count > 0) {
         const centerX = sumX / count;
         const centerY = sumY / count;
-        
+
         // Try to find a valid spawn position that's not inside a box
         let foundValidPosition = false;
         const maxAttempts = ThrustGame.SPAWN.MAX_ATTEMPTS;
         const searchRadius = ThrustGame.SPAWN.SEARCH_RADIUS;
         const minDistance = ThrustGame.SPAWN.MIN_DISTANCE_FROM_BOX;
-        
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           // Generate random position around the center of boxes
           const angle = Math.random() * Math.PI * 2;
           const distance = Math.random() * searchRadius;
           const testX = centerX + Math.cos(angle) * distance;
           const testY = centerY + Math.sin(angle) * distance;
-          
+
           // Check if this position is valid (not inside or too close to any box)
           if (ThrustGame.isValidSpawnPosition(testX, testY, this.mindMap.boxes, minDistance)) {
             spawnX = testX;
@@ -415,7 +415,7 @@ class ThrustGame {
             break;
           }
         }
-        
+
         // If no valid position found after all attempts, try validated fallback positions
         if (!foundValidPosition) {
           const offset = searchRadius * 1.5;
@@ -490,7 +490,7 @@ class ThrustGame {
       down: false,
       space: false
     };
-    
+
     // Reset idle detection state
     this.lastMovementTime = Date.now();
     this.isIdle = false;
@@ -528,10 +528,10 @@ class ThrustGame {
       down: false,
       space: false
     };
-    
+
     // Clear explosion animations
     this.explosions = [];
-    
+
     // Reset idle detection state to prevent stale data on restart
     this.lastBroadcastState = null;
     this.lastMovementTime = Date.now();
@@ -565,13 +565,13 @@ class ThrustGame {
 
     // Update bullets
     this.updateBullets();
-    
+
     // Update explosion animations
     this.updateExplosions();
 
     // Check collisions
     this.checkCollisions();
-    
+
     // Interpolate remote players for smooth movement (only when active)
     this.interpolateRemotePlayers();
 
@@ -656,16 +656,16 @@ class ThrustGame {
         // Check if ship triangle collides with box
         if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
           collisionDetected = true;
-          
+
           // Collision detected - handle based on velocity
           const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-          
+
           // Try to push ship out to resolve collision
           const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
-          
+
           if (separation) {
             const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
-            
+
             // Check if ship should be grounded (resting on top of box)
             // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
             if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
@@ -679,7 +679,7 @@ class ThrustGame {
               // Apply separation for high-velocity or non-resting collisions
               p.x += separation.x;
               p.y += separation.y;
-              
+
               if (velocityMagnitude > 0.5) {
                 // Significant velocity - bounce
                 p.vx *= -phys.BOUNCE_AMOUNT;
@@ -703,7 +703,7 @@ class ThrustGame {
           break; // Only handle one collision per frame
         }
       }
-      
+
       // If no collision this frame but was grounded, apply small downward movement
       // This keeps ship in contact with surface, but only if there's a surface below
       if (!collisionDetected && p.grounded) {
@@ -746,7 +746,7 @@ class ThrustGame {
     // Using constants for consistent push distances
     const d = ThrustGame.COLLISION.PUSH_OUT_DISTANCE;      // Cardinal directions
     const diag = ThrustGame.COLLISION.PUSH_OUT_DIAGONAL;   // Diagonals
-    
+
     const pushOutVectors = [
       { x: 0, y: -d },        // Push up
       { x: 0, y: d },         // Push down
@@ -765,9 +765,9 @@ class ThrustGame {
         y: player.y + sep.y,
         angle: player.angle
       };
-      
+
       const testVertices = ThrustGame.getShipTriangleVertices(testPlayer);
-      
+
       if (!ThrustGame.triangleBoxCollision(testVertices, box)) {
         return sep; // Found a valid separation
       }
@@ -838,7 +838,7 @@ class ThrustGame {
    */
   updateExplosions() {
     const now = Date.now();
-    
+
     // Remove expired explosions
     this.explosions = this.explosions.filter(explosion => {
       const elapsed = now - explosion.startTime;
@@ -893,26 +893,26 @@ class ThrustGame {
    */
   applyBulletForceToBox(box, bullet) {
     if (!box) return;
-    
+
     // Calculate normalized impact direction from bullet velocity
     const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
     if (speed < ThrustGame.COLLISION.VELOCITY_EPSILON) return; // Avoid division by zero
-    
+
     const dirX = bullet.vx / speed;
     const dirY = bullet.vy / speed;
-    
+
     // Apply small force in the direction of bullet travel
     const force = ThrustGame.BULLET.BOX_PUSH_FORCE;
     box.x += dirX * force;
     box.y += dirY * force;
-    
+
     // IMPORTANT: Also update targetX/targetY to prevent interpolation snap-back
     // TextBox interpolates towards these targets, so they must match the new position
     if (typeof box.targetX !== 'undefined' && typeof box.targetY !== 'undefined') {
       box.targetX = box.x;
       box.targetY = box.y;
     }
-    
+
     // Sync the pushed box position to collaboration if available
     // Use false for skipTransactionWrapper to ensure proper transaction
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -960,10 +960,10 @@ class ThrustGame {
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
           this.deaths++;
-          
+
           // Create explosion at death location
           this.createExplosion(this.player.x, this.player.y);
-          
+
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
@@ -980,34 +980,34 @@ class ThrustGame {
     // Only interpolate when we're actually in the game
     // This ensures zero CPU overhead when thrust mode is not active
     if (!this.active) return;
-    
+
     // Interpolation speed factor (0 = no movement, 1 = instant snap)
     // Lower values = smoother but more lag, higher = more responsive but jerkier
     // 0.3 provides a good balance for 60 FPS gameplay with 10 Hz network updates
     const interpolationFactor = 0.3;
-    
+
     for (const [clientId, player] of this.remotePlayers) {
       // Only interpolate alive players
       if (!player.alive) continue;
-      
+
       // Ensure target positions exist (they should from updateRemotePlayers)
       if (player.targetX === undefined || player.targetY === undefined || player.targetAngle === undefined) {
         continue;
       }
-      
+
       // Linear interpolation for position (lerp)
       player.x = player.x + (player.targetX - player.x) * interpolationFactor;
       player.y = player.y + (player.targetY - player.y) * interpolationFactor;
-      
+
       // Angular interpolation (handle wrapping around 2π)
       let angleDiff = player.targetAngle - player.angle;
-      
+
       // Normalize angle difference to [-π, π] for shortest rotation
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      
+
       player.angle = player.angle + angleDiff * interpolationFactor;
-      
+
       // Normalize angle to [0, 2π]
       while (player.angle < 0) player.angle += Math.PI * 2;
       while (player.angle >= Math.PI * 2) player.angle -= Math.PI * 2;
@@ -1134,7 +1134,7 @@ class ThrustGame {
     } else {
       // Update remote players only if we have collaboration
       this.updateRemotePlayers();
-      
+
       // Early exit if no remote players and not active locally
       if (this.remotePlayers.size === 0 && !this.active) {
         return;
@@ -1145,7 +1145,7 @@ class ThrustGame {
     const viewportWidth = typeof width !== 'undefined' ? width : 800;
     const viewportHeight = typeof height !== 'undefined' ? height : 600;
     let viewportBounds = null;
-    
+
     if (typeof CameraUtils !== 'undefined') {
       // Calculate visible world bounds with a margin for smooth rendering
       const margin = 500; // Extra margin to avoid pop-in
@@ -1161,7 +1161,7 @@ class ThrustGame {
     const isInViewport = (x, y) => {
       if (!viewportBounds) return true; // No culling if camera utils not available
       return x >= viewportBounds.left && x <= viewportBounds.right &&
-             y >= viewportBounds.top && y <= viewportBounds.bottom;
+        y >= viewportBounds.top && y <= viewportBounds.bottom;
     };
 
     // Draw remote players with their custom colors and names (with viewport culling)
@@ -1172,7 +1172,7 @@ class ThrustGame {
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
-    
+
     // Draw explosions for all players (before local player check)
     // This ensures explosions are visible even when not actively playing
     this.drawExplosions(viewportBounds, isInViewport);
@@ -1361,32 +1361,32 @@ class ThrustGame {
    */
   drawExplosions(viewportBounds = null, isInViewport = null) {
     const now = Date.now();
-    
+
     for (const explosion of this.explosions) {
       // Skip explosions outside viewport for performance
       if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
-      
+
       const elapsed = now - explosion.startTime;
       const progress = elapsed / explosion.duration; // 0 to 1
-      
+
       // Calculate expanding radius
       const radius = ThrustGame.EXPLOSION.MAX_RADIUS * progress;
-      
+
       // Calculate fade effect (starts fading at FADE_START progress)
       let alpha = 255;
       if (progress > ThrustGame.EXPLOSION.FADE_START) {
-        const fadeProgress = (progress - ThrustGame.EXPLOSION.FADE_START) / 
-                            (1 - ThrustGame.EXPLOSION.FADE_START);
+        const fadeProgress = (progress - ThrustGame.EXPLOSION.FADE_START) /
+          (1 - ThrustGame.EXPLOSION.FADE_START);
         alpha = 255 * (1 - fadeProgress);
       }
-      
+
       // Draw expanding red circle
       push();
       noFill();
       stroke(255, 0, 0, alpha); // Red with alpha
       strokeWeight(3);
       circle(explosion.x, explosion.y, radius * 2);
-      
+
       // Inner circle for more impact
       if (progress < 0.5) {
         strokeWeight(2);
@@ -1469,7 +1469,7 @@ class ThrustGame {
           });
         } else {
           const player = this.remotePlayers.get(clientId);
-          
+
           // Check if player just died (create explosion)
           const wasPreviouslyAlive = player.alive;
           const isNowDead = !state.thrustGame.alive;
@@ -1477,7 +1477,7 @@ class ThrustGame {
             // Create explosion at player's current position
             this.createExplosion(player.x, player.y);
           }
-          
+
           // Store target positions for interpolation
           player.targetX = state.thrustGame.x;
           player.targetY = state.thrustGame.y;
@@ -1546,7 +1546,7 @@ class ThrustGame {
     // Detect if player is moving or has any input
     const hasInput = this.keys.left || this.keys.right || this.keys.up || this.keys.down;
     const hasBullets = this.bullets.length > 0;
-    
+
     // Check if player state has changed significantly
     const p = this.player;
     const currentState = {
@@ -1557,7 +1557,7 @@ class ThrustGame {
       thrusting: this.keys.up,
       bulletCount: this.bullets.length
     };
-    
+
     // Detect movement by comparing with last broadcast state
     // On first broadcast, treat as movement to ensure initial state is sent
     let hasMovement = !this.lastBroadcastState; // True on first broadcast
@@ -1571,9 +1571,9 @@ class ThrustGame {
         currentState.bulletCount !== this.lastBroadcastState.bulletCount
       );
     }
-    
+
     const now = Date.now();
-    
+
     // Update idle state
     if (hasInput || hasBullets || hasMovement) {
       this.lastMovementTime = now;
@@ -1592,12 +1592,12 @@ class ThrustGame {
     // Build the state to broadcast - optimized for bandwidth
     // Round position/angle values to reduce precision (saves bytes in JSON)
     // Validate all values are finite before broadcasting
-    if (!Number.isFinite(currentState.x) || !Number.isFinite(currentState.y) || 
-        !Number.isFinite(currentState.angle)) {
+    if (!Number.isFinite(currentState.x) || !Number.isFinite(currentState.y) ||
+      !Number.isFinite(currentState.angle)) {
       // Invalid state - skip broadcasting to prevent NaN/Infinity issues
       return;
     }
-    
+
     const gameState = {
       x: currentState.x,
       y: currentState.y,
@@ -1617,7 +1617,7 @@ class ThrustGame {
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
-    
+
     // Save current state for next comparison
     this.lastBroadcastState = currentState;
   }
