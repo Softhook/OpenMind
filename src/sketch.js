@@ -90,10 +90,6 @@ let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
 
-// Easter egg: Thrust game
-let thrustGame = null; // ThrustGame instance
-let hasRemoteThrustPlayers = false; // Track if any remote player is in thrust mode
-
 // Presence optimization: Idle detection for cursor/selection updates
 let lastPresenceBroadcast = {
   cursorX: null,
@@ -610,7 +606,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
         if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         syncStatus = null;
-        
+
         // Clean up presence state on disconnect to prevent stale data
         lastPresenceBroadcast = {
           cursorX: null,
@@ -703,34 +699,7 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
 
     // Setup awareness listener for thrust game optimization
     // This checks if any remote player is in thrust mode to enable lazy initialization
-    if (collaborationManager && collaborationManager.awareness) {
-      const updateRemoteThrustStatus = () => {
-        const states = collaborationManager.awareness.getStates();
-        const myClientId = collaborationManager.awareness.clientID;
-        hasRemoteThrustPlayers = false;
-        
-        for (const [clientId, state] of states) {
-          if (clientId !== myClientId && state.thrustGame) {
-            hasRemoteThrustPlayers = true;
-            break;
-          }
-        }
-      };
-      
-      // Remove old listener if it exists (prevent memory leak on reconnect)
-      if (collaborationManager._thrustAwarenessListener) {
-        collaborationManager.awareness.off('change', collaborationManager._thrustAwarenessListener);
-      }
-      
-      // Store reference for cleanup
-      collaborationManager._thrustAwarenessListener = updateRemoteThrustStatus;
-      
-      // Set up listener for awareness changes
-      collaborationManager.awareness.on('change', updateRemoteThrustStatus);
-      
-      // Do initial check
-      updateRemoteThrustStatus();
-    }
+    // ThrustGame handles its own awareness check inside its static loop
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
@@ -837,29 +806,29 @@ function updateCollaborationPresence() {
   // Detect changes
   // Check if cursor went off-canvas (was visible, now null)
   const cursorBecameInvalid = wx === null && lastPresenceBroadcast.cursorX !== null;
-  
+
   // Check if cursor moved (only when both current and last are valid)
   const cursorMoved = wx !== null && lastPresenceBroadcast.cursorX !== null && (
     Math.abs(wx - lastPresenceBroadcast.cursorX) > 1 ||
     Math.abs(wy - lastPresenceBroadcast.cursorY) > 1
   );
-  
+
   const selectionChanged = !arraysEqual(selectedIds, lastPresenceBroadcast.selectedIds);
   const editingChanged = editingBoxId !== lastPresenceBroadcast.editingBoxId;
-  
+
   const now = Date.now();
-  
+
   // Idle detection: stop broadcasting if no changes for 2 seconds
   if (cursorMoved || cursorBecameInvalid || selectionChanged || editingChanged) {
     // Activity detected - reset idle state and broadcast
     lastPresenceBroadcast.time = now;
     lastPresenceBroadcast.isIdle = false;
-    
+
     // Round cursor position to reduce payload size (1 decimal = 0.1 pixel precision)
     if (wx !== null && wy !== null) {
       const roundedX = Math.round(wx * 10) / 10;
       const roundedY = Math.round(wy * 10) / 10;
-      
+
       // Validate rounded values are finite before broadcasting
       if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
         collaborationManager.updateCursor(roundedX, roundedY);
@@ -871,10 +840,10 @@ function updateCollaborationPresence() {
       lastPresenceBroadcast.cursorX = null;
       lastPresenceBroadcast.cursorY = null;
     }
-    
+
     collaborationManager.updateSelection(selectedIds);
     lastPresenceBroadcast.selectedIds = [...selectedIds]; // Copy array to avoid mutation issues
-    
+
     collaborationManager.updateEditingBox(editingBoxId);
     lastPresenceBroadcast.editingBoxId = editingBoxId;
   } else if (now - lastPresenceBroadcast.time > 2000) {
@@ -882,11 +851,11 @@ function updateCollaborationPresence() {
     if (!lastPresenceBroadcast.isIdle) {
       // Send one final update before going idle
       lastPresenceBroadcast.isIdle = true;
-      
+
       if (wx !== null && wy !== null) {
         const roundedX = Math.round(wx * 10) / 10;
         const roundedY = Math.round(wy * 10) / 10;
-        
+
         // Validate rounded values before final idle broadcast
         if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
           collaborationManager.updateCursor(roundedX, roundedY);
@@ -929,14 +898,18 @@ function drawRemoteCursors() {
 
   for (const userState of users) {
     // Check if this user is in thrust mode
-    const states = collaborationManager.awareness?.getStates();
+    // Check if this user is in thrust mode
+    // Only check if we actually have the game code loaded
     let remoteThrustState = null;
-    if (states) {
-      states.forEach((state, clientId) => {
-        if (state.user?.id === userState.user?.id && state.thrustGame) {
-          remoteThrustState = state.thrustGame;
-        }
-      });
+    if (typeof ThrustGame !== 'undefined') {
+      const states = collaborationManager.awareness?.getStates();
+      if (states) {
+        states.forEach((state, clientId) => {
+          if (state.user?.id === userState.user?.id && state.thrustGame) {
+            remoteThrustState = state.thrustGame;
+          }
+        });
+      }
     }
 
     // If user is in thrust mode and alive, draw their spaceship instead of cursor
@@ -1397,22 +1370,13 @@ function draw() {
         // Draw remote users' cursors (in world space)
         drawRemoteCursors();
       }
-      
+
       // Update thrust game physics and player state (only when active)
-      if (thrustGame && thrustGame.active) {
-        thrustGame.update();
+      // Soft dependency check - will run only if ThrustGame class is defined
+      if (typeof ThrustGame !== 'undefined') {
+        ThrustGame.loop(collaborationManager, mindMap);
       }
-      
-      // Only initialize and draw thrust game if someone is actually using it
-      // Use cached flag updated by awareness listener to avoid checking every frame
-      if (thrustGame) {
-        thrustGame.draw();
-      } else if (hasRemoteThrustPlayers) {
-        // Only create instance if someone is using thrust mode
-        thrustGame = new ThrustGame(collaborationManager, mindMap);
-        thrustGame.draw();
-      }
-      
+
       pop();
 
       // Update our presence (cursor position, selection) if connected - throttled internally
@@ -1422,15 +1386,8 @@ function draw() {
     } catch (e) {
       console.error('Error drawing mindmap:', e);
     }
-    
-    // Draw thrust game UI overlay (in screen space)
-    if (thrustGame && thrustGame.active) {
-      try {
-        thrustGame.drawUI();
-      } catch (e) {
-        console.error('Error drawing thrust game UI:', e);
-      }
-    }
+
+
 
     // Draw save indicator (in screen space, not world space)
     drawSaveIndicator();
@@ -1663,7 +1620,8 @@ function updateCursorForHover() {
   if (CameraUtils.isPanning) { cursor('grabbing'); return; }
 
   // Don't change cursor on spacebar if thrust mode is active
-  const thrustModeActive = thrustGame && thrustGame.active;
+  // Don't change cursor on spacebar if thrust mode is active
+  const thrustModeActive = (typeof ThrustGame !== 'undefined' && ThrustGame.instance && ThrustGame.instance.active);
   if (!isEditing && !thrustModeActive && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
@@ -2356,17 +2314,18 @@ function keyPressed() {
   // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
   // Check for uppercase T (which means Shift+T was pressed)
   if (key === 'T') {
-    // Use static toggle method for cleaner initialization/toggle
-    thrustGame = ThrustGame.toggle(thrustGame, collaborationManager, mindMap);
-    return false;
+    // If ThrustGame is available, let it handle the toggle content
+    if (typeof ThrustGame !== 'undefined') {
+      ThrustGame.handleInput(key, keyCode);
+      return false;
+    }
   }
-  
+
   // If thrust game is active, route keyboard events to it
-  if (thrustGame && thrustGame.active) {
-    thrustGame.handleKeyPressed(key, keyCode);
+  if (typeof ThrustGame !== 'undefined' && ThrustGame.handleInput(key, keyCode)) {
     return false; // Prevent default and stop propagation
   }
-  
+
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     // Enter/Return = Confirm and join room
@@ -2622,11 +2581,10 @@ function keyPressed() {
  */
 function keyReleased() {
   // Route to thrust game if active
-  if (thrustGame && thrustGame.active) {
-    thrustGame.handleKeyReleased(keyCode);
+  if (typeof ThrustGame !== 'undefined' && ThrustGame.handleKeyReleased(keyCode)) {
     return false;
   }
-  
+
   // Stop fallback repeat on key release
   KeyRepeat.stop(keyCode);
 }

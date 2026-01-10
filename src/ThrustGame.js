@@ -101,15 +101,187 @@ class ThrustGame {
   static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
   static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
 
+
   static SPAWN = {
     MAX_ATTEMPTS: 20,        // Maximum attempts to find valid spawn location
     SEARCH_RADIUS: 150,      // Radius around box center to search for spawn point
     MIN_DISTANCE_FROM_BOX: 30 // Minimum distance from any box to spawn
   };
 
+
+
   // ============================================================================
-  // CONSTRUCTOR
+  // SINGLETON MANAGEMENT & SOFT DEPENDENCY INTERFACE
   // ============================================================================
+
+  static instance = null;
+  static hasRemotePlayers = false;
+  static _activeManager = null; // Track which manager we are currently listening to
+
+  /**
+   * Main game loop - handles updates, drawing, and lifecycle.
+   * This is the ONLY method that needs to be called from the main sketch draw loop.
+   * Safe to call even if game is not active (zero overhead).
+   * @param {CollaborationManager} collaborationManager 
+   * @param {MindMap} mindMap 
+   */
+  static loop(collaborationManager, mindMap) {
+    // 1. Sync remote activity listener (Event-driven, not Polling)
+    // If the manager changes (or matches current but we haven't set up yet), set up listeners
+    if (collaborationManager !== ThrustGame._activeManager) {
+      ThrustGame._setupAwarenessListener(collaborationManager);
+      ThrustGame._activeManager = collaborationManager;
+
+      // If we switched managers, we should probably reset the instance to clear old state
+      if (ThrustGame.instance) {
+        ThrustGame.instance.stop(); // Clean up old state
+        ThrustGame.instance = null;
+      }
+    }
+
+    // 2. If neither active locally nor remotely meaningful, do nothing (Zero Overhead)
+    if ((!ThrustGame.instance || !ThrustGame.instance.active) && !ThrustGame.hasRemotePlayers) {
+      return;
+    }
+
+    // 3. Ensure instance exists if we need to render something
+    if (!ThrustGame.instance) {
+      ThrustGame.instance = new ThrustGame(collaborationManager, mindMap);
+    }
+
+    // Ensure dependencies are up to date
+    ThrustGame.instance.collaborationManager = collaborationManager;
+    ThrustGame.instance.mindMap = mindMap;
+
+    // 4. Update Game Logic (only if locally active)
+    if (ThrustGame.instance.active) {
+      ThrustGame.instance.update();
+    }
+
+    // 5. Draw Game (includes remote players if they exist)
+    ThrustGame.instance.draw();
+
+    // 6. Draw UI Overlay
+    if (ThrustGame.instance.active || ThrustGame.hasRemotePlayers) {
+      // Vital: Update remote player states from awareness every frame while running
+      // This ensures smooth 60fps interpolation even if the "presence check" is throttled
+      ThrustGame.instance.updateRemotePlayers();
+
+      ThrustGame.instance.drawUI();
+    }
+  }
+
+  /**
+   * Sets up awareness listener to update hasRemotePlayers flag efficiently.
+   * This restores the O(1) per frame performance by avoiding polling.
+   */
+  static _setupAwarenessListener(manager) {
+    // Clean up old listener if one exists on the previous manager
+    if (ThrustGame._cleanupListener) {
+      ThrustGame._cleanupListener();
+      ThrustGame._cleanupListener = null;
+    }
+
+    if (!manager || !manager.awareness) {
+      ThrustGame.hasRemotePlayers = false;
+      return;
+    }
+
+    // Optimization: Throttled check for awareness updates.
+    let lastCheck = 0;
+    const THROTTLE_MS = 500;
+
+    const checkActivity = () => {
+      const now = Date.now();
+      if (now - lastCheck < THROTTLE_MS) return;
+      lastCheck = now;
+
+      const states = manager.awareness.getStates();
+      const myClientId = manager.awareness.clientID;
+      let foundRemote = false;
+      for (const [clientId, state] of states) {
+        if (clientId !== myClientId && state.thrustGame) {
+          foundRemote = true;
+          break;
+        }
+      }
+      ThrustGame.hasRemotePlayers = foundRemote;
+    };
+
+    // Listen for changes
+    manager.awareness.on('change', checkActivity);
+
+    // Initial check
+    checkActivity();
+
+    // Store cleanup function
+    ThrustGame._cleanupListener = () => {
+      if (manager && manager.awareness) {
+        manager.awareness.off('change', checkActivity);
+      }
+    };
+  }
+
+  /**
+   * Checks for remote players via CollaborationManager awareness.
+   * DEPRECATED: Use _setupAwarenessListener internally instead.
+   */
+  static checkRemoteActivity(collaborationManager) {
+    // Left for compatibility if needed, but loop() now handles this better
+    if (collaborationManager !== ThrustGame._activeManager) {
+      ThrustGame._setupAwarenessListener(collaborationManager);
+      ThrustGame._activeManager = collaborationManager;
+    }
+  }
+
+
+
+  /**
+   * Static input handler
+   * @returns {boolean} True if input was consumed
+   */
+  static handleInput(key, keyCode) {
+    // Toggle with Shift+T
+    if (key === 'T') {
+      ThrustGame.toggleInternal();
+      return true; // Consume the event
+    }
+
+    if (ThrustGame.instance && ThrustGame.instance.active) {
+      ThrustGame.instance.handleKeyPressed(key, keyCode);
+      return true; // Consume event
+    }
+    return false;
+  }
+
+  /**
+   * Static key release handler
+   */
+  static handleKeyReleased(keyCode) {
+    if (ThrustGame.instance && ThrustGame.instance.active) {
+      ThrustGame.instance.handleKeyReleased(keyCode);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Internal toggle helper
+   */
+  static toggleInternal() {
+    if (!ThrustGame.instance) {
+      // Create with nulls, they will be injected in loop() or constructor
+      // We rely on loop() passing the current managers
+      ThrustGame.instance = new ThrustGame(null, null);
+    }
+
+    // If we're starting, we need to ensure active is set
+    if (!ThrustGame.instance.active) {
+      ThrustGame.instance.start();
+    } else {
+      ThrustGame.instance.stop();
+    }
+  }
 
   /**
    * Creates a new ThrustGame instance
@@ -164,32 +336,7 @@ class ThrustGame {
   // STATIC METHODS
   // ============================================================================
 
-  /**
-   * Static method to toggle thrust game on/off.
-   * Creates instance if needed, toggles state, and returns the instance.
-   * @param {ThrustGame|null} existingInstance - Existing instance or null
-   * @param {CollaborationManager} collaborationManager - Collaboration manager
-   * @param {MindMap} mindMap - Mind map reference
-   * @returns {ThrustGame} The thrust game instance
-   */
-  static toggle(existingInstance, collaborationManager, mindMap) {
-    let instance = existingInstance;
 
-    if (!instance) {
-      // Initialize thrust game on first activation
-      instance = new ThrustGame(collaborationManager, mindMap);
-    }
-
-    if (instance.active) {
-      // Stop the game
-      instance.stop();
-    } else {
-      // Start the game
-      instance.start();
-    }
-
-    return instance;
-  }
 
   // ============================================================================
   // COLLISION DETECTION HELPERS
@@ -650,97 +797,103 @@ class ThrustGame {
       const shipVertices = ThrustGame.getShipTriangleVertices(p);
       let collisionDetected = false;
 
-      for (const box of this.mindMap.boxes) {
-        if (!box) continue;
+      // Check collisions with boxes (if mindMap exists)
+      if (this.mindMap && this.mindMap.boxes) {
+        let collisionDetected = false;
+        const shipVertices = ThrustGame.getShipTriangleVertices(p);
 
-        // Check if ship triangle collides with box
-        if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
-          collisionDetected = true;
-
-          // Collision detected - handle based on velocity
-          const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-
-          // Try to push ship out to resolve collision
-          const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
-
-          if (separation) {
-            const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
-
-            // Check if ship should be grounded (resting on top of box)
-            // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
-            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
-              // Low velocity collision from above - ground the ship
-              // Don't push out, just stop at current position
-              p.vx = 0;
-              p.vy = 0;
-              p.grounded = true;
-              // Don't apply separation - keep ship at current position
-            } else {
-              // Apply separation for high-velocity or non-resting collisions
-              p.x += separation.x;
-              p.y += separation.y;
-
-              if (velocityMagnitude > 0.5) {
-                // Significant velocity - bounce
-                p.vx *= -phys.BOUNCE_AMOUNT;
-                p.vy *= -phys.BOUNCE_AMOUNT;
-              } else {
-                // Low velocity - dampen
-                p.vx *= phys.COLLISION_DAMPING;
-                p.vy *= phys.COLLISION_DAMPING;
-              }
-              p.grounded = false;
-            }
-          } else {
-            // Fallback: revert to previous position
-            p.x = prevX;
-            p.y = prevY;
-            p.vx *= -phys.BOUNCE_AMOUNT;
-            p.vy *= -phys.BOUNCE_AMOUNT;
-            p.grounded = false;
-          }
-
-          break; // Only handle one collision per frame
-        }
-      }
-
-      // If no collision this frame but was grounded, apply small downward movement
-      // This keeps ship in contact with surface, but only if there's a surface below
-      if (!collisionDetected && p.grounded) {
-        const nudge = phys.GROUNDING_NUDGE;
-        // Predictively check if moving down by the nudge would collide with any box
-        const nudgedPlayer = { x: p.x, y: p.y + nudge, angle: p.angle };
-        const nudgedVertices = ThrustGame.getShipTriangleVertices(nudgedPlayer);
-        let hasSurfaceBelow = false;
         for (const box of this.mindMap.boxes) {
           if (!box) continue;
-          if (ThrustGame.triangleBoxCollision(nudgedVertices, box)) {
-            hasSurfaceBelow = true;
-            break;
+
+          // Check if ship triangle collides with box
+          if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
+            collisionDetected = true;
+
+            // Collision detected - handle based on velocity
+            const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+
+            // Try to push ship out to resolve collision
+            const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
+
+            if (separation) {
+              const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
+
+              // Check if ship should be grounded (resting on top of box)
+              // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
+              if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
+                // Low velocity collision from above - ground the ship
+                // Don't push out, just stop at current position
+                p.vx = 0;
+                p.vy = 0;
+                p.grounded = true;
+                // Don't apply separation - keep ship at current position
+              } else {
+                // Apply separation for high-velocity or non-resting collisions
+                p.x += separation.x;
+                p.y += separation.y;
+
+                if (velocityMagnitude > 0.5) {
+                  // Significant velocity - bounce
+                  p.vx *= -phys.BOUNCE_AMOUNT;
+                  p.vy *= -phys.BOUNCE_AMOUNT;
+                } else {
+                  // Low velocity - dampen
+                  p.vx *= phys.COLLISION_DAMPING;
+                  p.vy *= phys.COLLISION_DAMPING;
+                }
+                p.grounded = false;
+              }
+            } else {
+              // Fallback: revert to previous position
+              p.x = prevX;
+              p.y = prevY;
+              p.vx *= -phys.BOUNCE_AMOUNT;
+              p.vy *= -phys.BOUNCE_AMOUNT;
+              p.grounded = false;
+            }
+
+            break; // Only handle one collision per frame
           }
         }
-        if (hasSurfaceBelow) {
-          p.y += nudge;  // Small downward nudge to re-establish collision
-        } else {
-          // No surface below - unground the ship
-          p.grounded = false;
+
+        // If no collision this frame but was grounded, apply small downward movement
+        // This keeps ship in contact with surface, but only if there's a surface below
+        if (!collisionDetected && p.grounded) {
+          const nudge = phys.GROUNDING_NUDGE;
+          // Predictively check if moving down by the nudge would collide with any box
+          const nudgedPlayer = { x: p.x, y: p.y + nudge, angle: p.angle };
+          const nudgedVertices = ThrustGame.getShipTriangleVertices(nudgedPlayer);
+          let hasSurfaceBelow = false;
+          for (const box of this.mindMap.boxes) {
+            if (!box) continue;
+            if (ThrustGame.triangleBoxCollision(nudgedVertices, box)) {
+              hasSurfaceBelow = true;
+              break;
+            }
+          }
+          if (hasSurfaceBelow) {
+            p.y += nudge;  // Small downward nudge to re-establish collision
+          } else {
+            // No surface below - unground the ship
+            p.grounded = false;
+          }
         }
       }
-    }
 
-    // No screen wrapping - player stays in world space
+      // No screen wrapping - player stays in world space
+    }
   }
 
   /**
-   * Attempts to resolve triangle-box collision by trying push-out vectors.
-   * Tests 8 directional displacement vectors to find one that resolves the collision.
-   * @param {Object} player - Player object with x, y, angle
-   * @param {Object} box - Box object with collision geometry
-   * @param {number} prevX - Previous x position (unused, kept for signature compatibility)
-   * @param {number} prevY - Previous y position (unused, kept for signature compatibility)  
-   * @param {number} prevAngle - Previous angle (unused, kept for signature compatibility)
-   * @returns {Object|null} Separation vector {x, y} or null if no resolution found
-   */
+     * Attempts to resolve triangle-box collision by trying push-out vectors.
+     * Tests 8 directional displacement vectors to find one that resolves the collision.
+     * @param {Object} player - Player object with x, y, angle
+     * @param {Object} box - Box object with collision geometry
+     * @param {number} prevX - Previous x position (unused, kept for signature compatibility)
+     * @param {number} prevY - Previous y position (unused, kept for signature compatibility)  
+     * @param {number} prevAngle - Previous angle (unused, kept for signature compatibility)
+     * @returns {Object|null} Separation vector {x, y} or null if no resolution found
+     */
   resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
     // Try small displacement vectors to push ship out of box
     // Using constants for consistent push distances
@@ -977,9 +1130,7 @@ class ThrustGame {
    * Only runs when thrust mode is active to avoid CPU overhead
    */
   interpolateRemotePlayers() {
-    // Only interpolate when we're actually in the game
-    // This ensures zero CPU overhead when thrust mode is not active
-    if (!this.active) return;
+    // Interpolate whenever called (managed by Loop for zero-overhead when dormant)
 
     // Interpolation speed factor (0 = no movement, 1 = instant snap)
     // Lower values = smoother but more lag, higher = more responsive but jerkier
@@ -1414,13 +1565,6 @@ class ThrustGame {
       return;
     }
     this.multiplayerInitialized = true;
-
-    // Listen for awareness changes to get remote player updates
-    this.collaborationManager.awareness.on('change', () => {
-      if (this.active) {
-        this.updateRemotePlayers();
-      }
-    });
 
     // Initial update to populate remote players
     this.updateRemotePlayers();
