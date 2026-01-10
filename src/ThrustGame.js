@@ -49,7 +49,8 @@ class ThrustGame {
     SPEED: 12,               // Bullet velocity
     LIFETIME: 120,           // Frames before bullet expires
     SIZE: 4,                 // Bullet radius
-    COOLDOWN: 15             // Frames between shots
+    COOLDOWN: 15,            // Frames between shots
+    BOX_PUSH_FORCE: 2        // Force applied to boxes on impact
   };
 
   static COLLISION = {
@@ -567,12 +568,33 @@ class ThrustGame {
     const p = this.player;
     const phys = ThrustGame.PHYSICS;
 
+    // Store previous state for collision resolution (position AND angle)
+    const prevX = p.x;
+    const prevY = p.y;
+    const prevAngle = p.angle;
+
     // Apply rotation
     if (this.keys.left) {
       p.angle -= phys.ROTATION_SPEED;
     }
     if (this.keys.right) {
       p.angle += phys.ROTATION_SPEED;
+    }
+
+    // Check if rotation caused collision with boxes
+    // This prevents the ship from clipping into boxes when rotating while landed
+    if (this.mindMap && this.mindMap.boxes) {
+      const shipVertices = ThrustGame.getShipTriangleVertices(p);
+      
+      for (const box of this.mindMap.boxes) {
+        if (!box) continue;
+        
+        if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
+          // Rotation caused collision - revert angle
+          p.angle = prevAngle;
+          break;
+        }
+      }
     }
 
     // Apply thrust in the direction the ship is facing
@@ -601,10 +623,6 @@ class ThrustGame {
       p.vx *= scale;
       p.vy *= scale;
     }
-
-    // Store previous position for collision resolution
-    const prevX = p.x;
-    const prevY = p.y;
 
     // Update position
     p.x += p.vx;
@@ -649,8 +667,11 @@ class ThrustGame {
       bullet.y += bullet.vy;
       bullet.lifetime--;
 
-      // Check collision with boxes
-      if (this.checkBulletBoxCollision(bullet)) {
+      // Check collision with boxes and apply force if hit
+      const hitBox = this.checkBulletBoxCollision(bullet);
+      if (hitBox) {
+        // Apply push force to the box
+        this.applyBulletForceToBox(hitBox, bullet);
         // Remove bullet on collision with box
         this.bullets.splice(i, 1);
         continue;
@@ -668,7 +689,10 @@ class ThrustGame {
     // different clients. Remote bullets are continuously re-synced from their owners,
     // so temporary desync is acceptable and self-correcting.
     for (const [bulletId, bullet] of this.remoteBullets) {
-      if (this.checkBulletBoxCollision(bullet)) {
+      const hitBox = this.checkBulletBoxCollision(bullet);
+      if (hitBox) {
+        // Apply push force to the box
+        this.applyBulletForceToBox(hitBox, bullet);
         this.remoteBullets.delete(bulletId);
       }
     }
@@ -704,10 +728,10 @@ class ThrustGame {
   /**
    * Checks if a bullet collides with any box
    * @param {Object} bullet - Bullet to check
-   * @returns {boolean} true if bullet collides with a box
+   * @returns {Object|null} The box that was hit, or null if no collision
    */
   checkBulletBoxCollision(bullet) {
-    if (!this.mindMap || !this.mindMap.boxes) return false;
+    if (!this.mindMap || !this.mindMap.boxes) return null;
 
     const bulletRadius = ThrustGame.BULLET.SIZE; // SIZE is defined as radius (4 pixels)
 
@@ -732,11 +756,32 @@ class ThrustGame {
 
       // Compare squared distance to squared radius
       if (distSq < bulletRadius * bulletRadius) {
-        return true; // Collision detected
+        return box; // Return the box that was hit
       }
     }
 
-    return false;
+    return null;
+  }
+
+  /**
+   * Applies a small push force to a box based on bullet impact
+   * @param {Object} box - The box to push
+   * @param {Object} bullet - The bullet that hit the box
+   */
+  applyBulletForceToBox(box, bullet) {
+    if (!box) return;
+    
+    // Calculate normalized impact direction from bullet velocity
+    const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
+    if (speed < 0.001) return; // Avoid division by zero
+    
+    const dirX = bullet.vx / speed;
+    const dirY = bullet.vy / speed;
+    
+    // Apply small force in the direction of bullet travel
+    const force = ThrustGame.BULLET.BOX_PUSH_FORCE;
+    box.x += dirX * force;
+    box.y += dirY * force;
   }
 
   /**
