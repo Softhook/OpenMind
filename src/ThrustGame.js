@@ -24,13 +24,15 @@ class ThrustGame {
   // ============================================================================
 
   static PHYSICS = {
-    GRAVITY: 0.03,           // Downward acceleration
-    THRUST: 0.2,             // Thrust acceleration magnitude
-    ROTATION_SPEED: 0.08,    // Angular velocity for rotation
-    MAX_SPEED: 8,            // Maximum velocity magnitude
-    DRAG: 0.98,              // Velocity dampening per frame
-    GROUNDING_VELOCITY: 0.2, // Max velocity to be considered for grounding
-    COLLISION_DAMPING: 0.4   // Velocity damping for low-speed collisions
+    GRAVITY: 0.03,                 // Downward acceleration
+    THRUST: 0.2,                   // Thrust acceleration magnitude
+    ROTATION_SPEED: 0.08,          // Angular velocity for rotation
+    MAX_SPEED: 8,                  // Maximum velocity magnitude
+    DRAG: 0.98,                    // Velocity dampening per frame
+    GROUNDING_VELOCITY: 1.0,       // Max velocity to ground ship (aggressive to stop bouncing)
+    GROUNDING_NUDGE: 0.5,          // Downward nudge to maintain ground contact (pixels)
+    COLLISION_DAMPING: 0.4,        // Velocity damping for low-speed collisions
+    BOUNCE_AMOUNT: 0.5             // Bounce damping factor for high-speed collisions
   };
 
   static PLAYER = {
@@ -647,7 +649,7 @@ class ThrustGame {
             const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
             
             // Check if ship should be grounded (resting on top of box)
-            if (velocityMagnitude < 1.0 && isBeingPushedUp) {
+            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp) {
               // Low velocity collision from above - ground the ship
               // Don't push out, just stop at current position
               p.vx = 0;
@@ -661,8 +663,8 @@ class ThrustGame {
               
               if (velocityMagnitude > 0.5) {
                 // Significant velocity - bounce
-                p.vx *= -0.5;
-                p.vy *= -0.5;
+                p.vx *= -phys.BOUNCE_AMOUNT;
+                p.vy *= -phys.BOUNCE_AMOUNT;
               } else {
                 // Low velocity - dampen
                 p.vx *= phys.COLLISION_DAMPING;
@@ -674,8 +676,8 @@ class ThrustGame {
             // Fallback: revert to previous position
             p.x = prevX;
             p.y = prevY;
-            p.vx *= -0.5;
-            p.vy *= -0.5;
+            p.vx *= -phys.BOUNCE_AMOUNT;
+            p.vy *= -phys.BOUNCE_AMOUNT;
             p.grounded = false;
           }
 
@@ -686,7 +688,7 @@ class ThrustGame {
       // If no collision this frame but was grounded, apply small downward movement
       // This keeps ship in contact with surface
       if (!collisionDetected && p.grounded) {
-        p.y += 0.5;  // Small downward nudge to re-establish collision
+        p.y += phys.GROUNDING_NUDGE;  // Small downward nudge to re-establish collision
       }
     }
 
