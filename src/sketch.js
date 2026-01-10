@@ -789,14 +789,30 @@ function updateCollaborationPresence() {
 function drawRemoteCursors() {
   // Early exit if somehow called without valid manager (defensive check)
   if (!collaborationManager) return;
-  
-  // Don't draw cursors if thrust game is active - spaceships replace cursors
-  if (thrustGame && thrustGame.active) return;
 
   const users = collaborationManager.getRemoteUsers();
   if (!users || users.length === 0) return;
 
   for (const userState of users) {
+    // Check if this user is in thrust mode
+    const states = collaborationManager.awareness?.getStates();
+    let remoteThrustState = null;
+    if (states) {
+      states.forEach((state, clientId) => {
+        if (state.user?.id === userState.user?.id && state.thrustGame) {
+          remoteThrustState = state.thrustGame;
+        }
+      });
+    }
+
+    // If user is in thrust mode and alive, draw their spaceship instead of cursor
+    if (thrustGame && thrustGame.active && remoteThrustState && remoteThrustState.alive) {
+      // Spaceship is drawn by ThrustGame.draw() as a remote player
+      // Skip drawing cursor for this user
+      continue;
+    }
+
+    // Draw regular cursor for users not in thrust mode
     if (!userState.cursor) continue;
 
     const { x, y } = userState.cursor;
