@@ -321,6 +321,9 @@ class ThrustGame {
 
     // Check collisions
     this.checkCollisions();
+    
+    // Interpolate remote players for smooth movement (only when active)
+    this.interpolateRemotePlayers();
 
     // Broadcast state to multiplayer
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -543,6 +546,48 @@ class ThrustGame {
           break;
         }
       }
+    }
+  }
+
+  /**
+   * Interpolates remote players' positions for smooth movement
+   * Only runs when thrust mode is active to avoid CPU overhead
+   */
+  interpolateRemotePlayers() {
+    // Only interpolate when we're actually in the game
+    // This ensures zero CPU overhead when thrust mode is not active
+    if (!this.active) return;
+    
+    // Interpolation speed factor (0 = no movement, 1 = instant snap)
+    // Lower values = smoother but more lag, higher = more responsive but jerkier
+    // 0.3 provides a good balance for 60 FPS gameplay with 10 Hz network updates
+    const interpolationFactor = 0.3;
+    
+    for (const [clientId, player] of this.remotePlayers) {
+      // Only interpolate alive players
+      if (!player.alive) continue;
+      
+      // Ensure target positions exist (they should from updateRemotePlayers)
+      if (player.targetX === undefined || player.targetY === undefined || player.targetAngle === undefined) {
+        continue;
+      }
+      
+      // Linear interpolation for position (lerp)
+      player.x = player.x + (player.targetX - player.x) * interpolationFactor;
+      player.y = player.y + (player.targetY - player.y) * interpolationFactor;
+      
+      // Angular interpolation (handle wrapping around 2π)
+      let angleDiff = player.targetAngle - player.angle;
+      
+      // Normalize angle difference to [-π, π] for shortest rotation
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      
+      player.angle = player.angle + angleDiff * interpolationFactor;
+      
+      // Normalize angle to [0, 2π]
+      while (player.angle < 0) player.angle += Math.PI * 2;
+      while (player.angle >= Math.PI * 2) player.angle -= Math.PI * 2;
     }
   }
 
@@ -946,15 +991,21 @@ class ThrustGame {
             alive: state.thrustGame.alive,
             thrusting: state.thrustGame.thrusting || false,
             name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
-            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR
+            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR,
+            // Interpolation targets - set initial positions to avoid jump
+            targetX: state.thrustGame.x,
+            targetY: state.thrustGame.y,
+            targetAngle: state.thrustGame.angle
           });
         } else {
           const player = this.remotePlayers.get(clientId);
-          player.x = state.thrustGame.x;
-          player.y = state.thrustGame.y;
+          // Store target positions for interpolation
+          player.targetX = state.thrustGame.x;
+          player.targetY = state.thrustGame.y;
+          player.targetAngle = state.thrustGame.angle;
+          // Update other non-interpolated properties immediately
           player.vx = state.thrustGame.vx || 0;
           player.vy = state.thrustGame.vy || 0;
-          player.angle = state.thrustGame.angle;
           player.alive = state.thrustGame.alive;
           player.thrusting = state.thrustGame.thrusting || false;
           player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
