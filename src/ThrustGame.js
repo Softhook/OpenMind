@@ -57,7 +57,7 @@ class ThrustGame {
     LIFETIME: 120,           // Frames before bullet expires
     SIZE: 4,                 // Bullet radius
     COOLDOWN: 15,            // Frames between shots
-    BOX_PUSH_FORCE: 2        // Force applied to boxes on impact
+    BOX_PUSH_FORCE: 6        // Force applied to boxes on impact
   };
 
   static COLLISION = {
