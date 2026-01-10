@@ -569,7 +569,7 @@ class ThrustGame {
     const p = this.player;
     const phys = ThrustGame.PHYSICS;
 
-    // Store previous state for collision resolution (position AND angle)
+    // Store previous state for collision resolution
     const prevX = p.x;
     const prevY = p.y;
     const prevAngle = p.angle;
@@ -580,22 +580,6 @@ class ThrustGame {
     }
     if (this.keys.right) {
       p.angle += phys.ROTATION_SPEED;
-    }
-
-    // Check if rotation caused collision with boxes
-    // This prevents the ship from clipping into boxes when rotating while landed
-    if (this.mindMap && this.mindMap.boxes) {
-      const shipVertices = ThrustGame.getShipTriangleVertices(p);
-      
-      for (const box of this.mindMap.boxes) {
-        if (!box) continue;
-        
-        if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
-          // Rotation caused collision - revert angle
-          p.angle = prevAngle;
-          break;
-        }
-      }
     }
 
     // Apply thrust in the direction the ship is facing
@@ -630,8 +614,8 @@ class ThrustGame {
     p.y += p.vy;
 
     // Check collision with boxes using triangular ship shape
+    // If collision detected, push ship out of box instead of just reverting
     if (this.mindMap && this.mindMap.boxes) {
-      // Get the triangle vertices of the ship at current position
       const shipVertices = ThrustGame.getShipTriangleVertices(p);
 
       for (const box of this.mindMap.boxes) {
@@ -639,14 +623,24 @@ class ThrustGame {
 
         // Check if ship triangle collides with box
         if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
-          // Collision! Revert to previous position and bounce
-          p.x = prevX;
-          p.y = prevY;
-
-          // Bounce effect - reverse velocity with damping
-          const bounceAmount = 0.5;
-          p.vx *= -bounceAmount;
-          p.vy *= -bounceAmount;
+          // Find the minimum displacement to separate ship from box
+          const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
+          
+          if (separation) {
+            p.x += separation.x;
+            p.y += separation.y;
+            
+            // Apply bounce effect to velocity
+            const bounceAmount = 0.5;
+            p.vx *= -bounceAmount;
+            p.vy *= -bounceAmount;
+          } else {
+            // Fallback: revert to previous position
+            p.x = prevX;
+            p.y = prevY;
+            p.vx *= -0.5;
+            p.vy *= -0.5;
+          }
 
           break; // Only handle one collision per frame
         }
@@ -654,6 +648,47 @@ class ThrustGame {
     }
 
     // No screen wrapping - player stays in world space
+  }
+
+  /**
+   * Resolves collision by finding minimum displacement to separate ship from box
+   * This allows rotation and movement while preventing clipping
+   * @param {Object} player - Player state
+   * @param {Object} box - Box to separate from
+   * @param {number} prevX - Previous X position
+   * @param {number} prevY - Previous Y position
+   * @param {number} prevAngle - Previous angle
+   * @returns {Object|null} Separation vector {x, y} or null if can't resolve
+   */
+  resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
+    // Try small displacement vectors to push ship out of box
+    const separationAttempts = [
+      { x: 0, y: -2 },  // Push up
+      { x: 0, y: 2 },   // Push down
+      { x: -2, y: 0 },  // Push left
+      { x: 2, y: 0 },   // Push right
+      { x: -1.5, y: -1.5 }, // Diagonal up-left
+      { x: 1.5, y: -1.5 },  // Diagonal up-right
+      { x: -1.5, y: 1.5 },  // Diagonal down-left
+      { x: 1.5, y: 1.5 }    // Diagonal down-right
+    ];
+
+    // Test each separation vector
+    for (const sep of separationAttempts) {
+      const testPlayer = {
+        x: player.x + sep.x,
+        y: player.y + sep.y,
+        angle: player.angle
+      };
+      
+      const testVertices = ThrustGame.getShipTriangleVertices(testPlayer);
+      
+      if (!ThrustGame.triangleBoxCollision(testVertices, box)) {
+        return sep; // Found a valid separation
+      }
+    }
+
+    return null; // Could not resolve with small displacement
   }
 
   /**
@@ -783,6 +818,12 @@ class ThrustGame {
     const force = ThrustGame.BULLET.BOX_PUSH_FORCE;
     box.x += dirX * force;
     box.y += dirY * force;
+    
+    // Sync the pushed box position to collaboration if available
+    // This prevents the position from reverting when Yjs syncs
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.collaborationManager.syncBoxToYjs(box, true);
+    }
   }
 
   /**
