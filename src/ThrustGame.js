@@ -39,6 +39,12 @@ class ThrustGame {
     FLAME_VARIATION: 5       // Random variation in flame length
   };
 
+  static EXPLOSION = {
+    DURATION: 800,           // Explosion animation duration in ms
+    MAX_RADIUS: 40,          // Maximum radius of explosion circle
+    FADE_START: 0.4          // Start fading at 40% of animation
+  };
+
   static BULLET = {
     SPEED: 12,               // Bullet velocity
     LIFETIME: 120,           // Frames before bullet expires
@@ -104,6 +110,7 @@ class ThrustGame {
     this.bullets = [];  // Local bullets
     this.remotePlayers = new Map();  // Remote players by clientId
     this.remoteBullets = new Map();  // Remote bullets by bulletId
+    this.explosions = [];  // Active explosion animations
 
     // Input state - track current frame state
     this.keys = {
@@ -123,6 +130,11 @@ class ThrustGame {
 
     // Multiplayer state
     this.multiplayerInitialized = false;
+    
+    // Idle detection for bandwidth optimization
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
+    this.lastBroadcastState = null; // Track last broadcast to detect changes
 
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -241,6 +253,11 @@ class ThrustGame {
       down: false,
       space: false
     };
+    
+    // Reset idle detection state
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
+    this.lastBroadcastState = null;
 
     // Setup multiplayer if connected (may not have been connected at construction time)
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -274,6 +291,14 @@ class ThrustGame {
       down: false,
       space: false
     };
+    
+    // Clear explosion animations
+    this.explosions = [];
+    
+    // Reset idle detection state to prevent stale data on restart
+    this.lastBroadcastState = null;
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
   }
 
   /**
@@ -303,16 +328,22 @@ class ThrustGame {
 
     // Update bullets
     this.updateBullets();
+    
+    // Update explosion animations
+    this.updateExplosions();
 
     // Check collisions
     this.checkCollisions();
+    
+    // Interpolate remote players for smooth movement (only when active)
+    this.interpolateRemotePlayers();
 
     // Broadcast state to multiplayer
     if (this.collaborationManager && this.collaborationManager.isConnected) {
-      // Throttle broadcasts (every ~50ms for smoother gameplay)
-      // 50ms = 20 updates per second, providing better responsiveness
+      // Throttle broadcasts (every ~100ms for balanced gameplay and bandwidth)
+      // 100ms = 10 updates per second, sufficient for multiplayer game
       const now = Date.now();
-      if (!this.lastBroadcast || now - this.lastBroadcast > 50) {
+      if (!this.lastBroadcast || now - this.lastBroadcast > 100) {
         this.broadcastPlayerState();
         this.lastBroadcast = now;
       }
@@ -446,6 +477,33 @@ class ThrustGame {
   }
 
   /**
+   * Creates an explosion at the specified location
+   * @param {number} x - World X coordinate
+   * @param {number} y - World Y coordinate
+   */
+  createExplosion(x, y) {
+    this.explosions.push({
+      x: x,
+      y: y,
+      startTime: Date.now(),
+      duration: ThrustGame.EXPLOSION.DURATION
+    });
+  }
+
+  /**
+   * Updates explosion animations and removes expired ones
+   */
+  updateExplosions() {
+    const now = Date.now();
+    
+    // Remove expired explosions
+    this.explosions = this.explosions.filter(explosion => {
+      const elapsed = now - explosion.startTime;
+      return elapsed < explosion.duration;
+    });
+  }
+
+  /**
    * Checks if a bullet collides with any box
    * @param {Object} bullet - Bullet to check
    * @returns {boolean} true if bullet collides with a box
@@ -523,11 +581,57 @@ class ThrustGame {
           this.player.alive = false;
           this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
           this.deaths++;
+          
+          // Create explosion at death location
+          this.createExplosion(this.player.x, this.player.y);
+          
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
         }
       }
+    }
+  }
+
+  /**
+   * Interpolates remote players' positions for smooth movement
+   * Only runs when thrust mode is active to avoid CPU overhead
+   */
+  interpolateRemotePlayers() {
+    // Only interpolate when we're actually in the game
+    // This ensures zero CPU overhead when thrust mode is not active
+    if (!this.active) return;
+    
+    // Interpolation speed factor (0 = no movement, 1 = instant snap)
+    // Lower values = smoother but more lag, higher = more responsive but jerkier
+    // 0.3 provides a good balance for 60 FPS gameplay with 10 Hz network updates
+    const interpolationFactor = 0.3;
+    
+    for (const [clientId, player] of this.remotePlayers) {
+      // Only interpolate alive players
+      if (!player.alive) continue;
+      
+      // Ensure target positions exist (they should from updateRemotePlayers)
+      if (player.targetX === undefined || player.targetY === undefined || player.targetAngle === undefined) {
+        continue;
+      }
+      
+      // Linear interpolation for position (lerp)
+      player.x = player.x + (player.targetX - player.x) * interpolationFactor;
+      player.y = player.y + (player.targetY - player.y) * interpolationFactor;
+      
+      // Angular interpolation (handle wrapping around 2π)
+      let angleDiff = player.targetAngle - player.angle;
+      
+      // Normalize angle difference to [-π, π] for shortest rotation
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      
+      player.angle = player.angle + angleDiff * interpolationFactor;
+      
+      // Normalize angle to [0, 2π]
+      while (player.angle < 0) player.angle += Math.PI * 2;
+      while (player.angle >= Math.PI * 2) player.angle -= Math.PI * 2;
     }
   }
 
@@ -643,10 +747,19 @@ class ThrustGame {
    * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
-    // Always update and draw remote players in thrust mode, even if local player isn't active
-    // This ensures remote players' spaceships are visible
-    if (this.collaborationManager && this.collaborationManager.isConnected) {
+    // Early exit if no collaboration or no remote players
+    if (!this.collaborationManager || !this.collaborationManager.isConnected) {
+      // Only draw local game elements if active
+      if (!this.active) return;
+      // Continue to draw local player below
+    } else {
+      // Update remote players only if we have collaboration
       this.updateRemotePlayers();
+      
+      // Early exit if no remote players and not active locally
+      if (this.remotePlayers.size === 0 && !this.active) {
+        return;
+      }
     }
 
     // Get viewport bounds for culling (optimization for 10+ players)
@@ -680,6 +793,10 @@ class ThrustGame {
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
+    
+    // Draw explosions for all players (before local player check)
+    // This ensures explosions are visible even when not actively playing
+    this.drawExplosions(viewportBounds, isInViewport);
 
     // Only draw local player, bullets, and UI if we're actually in thrust mode
     if (!this.active) return;
@@ -858,6 +975,49 @@ class ThrustGame {
     }
   }
 
+  /**
+   * Draws explosion animations
+   * @param {Object} viewportBounds - Viewport bounds for culling (optional)
+   * @param {Function} isInViewport - Function to check if position is in viewport (optional)
+   */
+  drawExplosions(viewportBounds = null, isInViewport = null) {
+    const now = Date.now();
+    
+    for (const explosion of this.explosions) {
+      // Skip explosions outside viewport for performance
+      if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
+      
+      const elapsed = now - explosion.startTime;
+      const progress = elapsed / explosion.duration; // 0 to 1
+      
+      // Calculate expanding radius
+      const radius = ThrustGame.EXPLOSION.MAX_RADIUS * progress;
+      
+      // Calculate fade effect (starts fading at FADE_START progress)
+      let alpha = 255;
+      if (progress > ThrustGame.EXPLOSION.FADE_START) {
+        const fadeProgress = (progress - ThrustGame.EXPLOSION.FADE_START) / 
+                            (1 - ThrustGame.EXPLOSION.FADE_START);
+        alpha = 255 * (1 - fadeProgress);
+      }
+      
+      // Draw expanding red circle
+      push();
+      noFill();
+      stroke(255, 0, 0, alpha); // Red with alpha
+      strokeWeight(3);
+      circle(explosion.x, explosion.y, radius * 2);
+      
+      // Inner circle for more impact
+      if (progress < 0.5) {
+        strokeWeight(2);
+        stroke(255, 100, 0, alpha * 0.7); // Orange
+        circle(explosion.x, explosion.y, radius * 1.5);
+      }
+      pop();
+    }
+  }
+
   // ============================================================================
   // MULTIPLAYER
   // ============================================================================
@@ -922,15 +1082,30 @@ class ThrustGame {
             alive: state.thrustGame.alive,
             thrusting: state.thrustGame.thrusting || false,
             name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
-            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR
+            color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR,
+            // Interpolation targets - set initial positions to avoid jump
+            targetX: state.thrustGame.x,
+            targetY: state.thrustGame.y,
+            targetAngle: state.thrustGame.angle
           });
         } else {
           const player = this.remotePlayers.get(clientId);
-          player.x = state.thrustGame.x;
-          player.y = state.thrustGame.y;
+          
+          // Check if player just died (create explosion)
+          const wasPreviouslyAlive = player.alive;
+          const isNowDead = !state.thrustGame.alive;
+          if (wasPreviouslyAlive && isNowDead) {
+            // Create explosion at player's current position
+            this.createExplosion(player.x, player.y);
+          }
+          
+          // Store target positions for interpolation
+          player.targetX = state.thrustGame.x;
+          player.targetY = state.thrustGame.y;
+          player.targetAngle = state.thrustGame.angle;
+          // Update other non-interpolated properties immediately
           player.vx = state.thrustGame.vx || 0;
           player.vy = state.thrustGame.vy || 0;
-          player.angle = state.thrustGame.angle;
           player.alive = state.thrustGame.alive;
           player.thrusting = state.thrustGame.thrusting || false;
           player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
@@ -989,27 +1164,83 @@ class ThrustGame {
       return;
     }
 
-    // Build the state to broadcast
+    // Detect if player is moving or has any input
+    const hasInput = this.keys.left || this.keys.right || this.keys.up || this.keys.down;
+    const hasBullets = this.bullets.length > 0;
+    
+    // Check if player state has changed significantly
+    const p = this.player;
+    const currentState = {
+      x: Math.round(p.x * 10) / 10,
+      y: Math.round(p.y * 10) / 10,
+      angle: Math.round(p.angle * 100) / 100,
+      alive: p.alive,
+      thrusting: this.keys.up,
+      bulletCount: this.bullets.length
+    };
+    
+    // Detect movement by comparing with last broadcast state
+    // On first broadcast, treat as movement to ensure initial state is sent
+    let hasMovement = !this.lastBroadcastState; // True on first broadcast
+    if (this.lastBroadcastState) {
+      hasMovement = (
+        Math.abs(currentState.x - this.lastBroadcastState.x) > 0.1 ||
+        Math.abs(currentState.y - this.lastBroadcastState.y) > 0.1 ||
+        Math.abs(currentState.angle - this.lastBroadcastState.angle) > 0.01 ||
+        currentState.alive !== this.lastBroadcastState.alive ||
+        currentState.thrusting !== this.lastBroadcastState.thrusting ||
+        currentState.bulletCount !== this.lastBroadcastState.bulletCount
+      );
+    }
+    
+    const now = Date.now();
+    
+    // Update idle state
+    if (hasInput || hasBullets || hasMovement) {
+      this.lastMovementTime = now;
+      this.isIdle = false;
+    } else if (now - this.lastMovementTime > 2000) {
+      // No movement for 2 seconds = idle
+      if (!this.isIdle) {
+        // Transition to idle - send one final update
+        this.isIdle = true;
+      } else {
+        // Already idle and sent final update - skip broadcasting
+        return;
+      }
+    }
+
+    // Build the state to broadcast - optimized for bandwidth
+    // Round position/angle values to reduce precision (saves bytes in JSON)
+    // Validate all values are finite before broadcasting
+    if (!Number.isFinite(currentState.x) || !Number.isFinite(currentState.y) || 
+        !Number.isFinite(currentState.angle)) {
+      // Invalid state - skip broadcasting to prevent NaN/Infinity issues
+      return;
+    }
+    
     const gameState = {
-      x: this.player.x,
-      y: this.player.y,
-      vx: this.player.vx,
-      vy: this.player.vy,
-      angle: this.player.angle,
-      alive: this.player.alive,
-      thrusting: this.keys.up, // Add thrust state for visual display
+      x: currentState.x,
+      y: currentState.y,
+      angle: currentState.angle,
+      alive: currentState.alive,
+      thrusting: currentState.thrusting,
+      // Note: vx/vy removed - only needed locally, remote clients can interpolate
       bullets: this.bullets.map(b => ({
         id: b.id,
-        x: b.x,
-        y: b.y,
-        vx: b.vx,
-        vy: b.vy,
+        x: Math.round(b.x * 10) / 10,
+        y: Math.round(b.y * 10) / 10,
+        vx: Math.round(b.vx * 10) / 10,
+        vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
-      }))
+      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)) // Filter invalid bullets
     };
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
+    
+    // Save current state for next comparison
+    this.lastBroadcastState = currentState;
   }
 
   /**

@@ -92,6 +92,17 @@ let menuRightEdge = 600;
 
 // Easter egg: Thrust game
 let thrustGame = null; // ThrustGame instance
+let hasRemoteThrustPlayers = false; // Track if any remote player is in thrust mode
+
+// Presence optimization: Idle detection for cursor/selection updates
+let lastPresenceBroadcast = {
+  cursorX: null,
+  cursorY: null,
+  selectedIds: [],
+  editingBoxId: null,
+  time: Date.now(), // Initialize to current time to prevent immediate idle state
+  isIdle: false
+};
 
 // Autosave state
 let autosaveTimer = null;
@@ -599,6 +610,17 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
         if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         syncStatus = null;
+        
+        // Clean up presence state on disconnect to prevent stale data
+        lastPresenceBroadcast = {
+          cursorX: null,
+          cursorY: null,
+          selectedIds: [],
+          editingBoxId: null,
+          time: Date.now(),
+          isIdle: false
+        };
+        hasRemoteThrustPlayers = false;
       }
       if (prevStatus !== syncStatus) {
         Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
@@ -679,6 +701,37 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
       }
     }
 
+    // Setup awareness listener for thrust game optimization
+    // This checks if any remote player is in thrust mode to enable lazy initialization
+    if (collaborationManager && collaborationManager.awareness) {
+      const updateRemoteThrustStatus = () => {
+        const states = collaborationManager.awareness.getStates();
+        const myClientId = collaborationManager.awareness.clientID;
+        hasRemoteThrustPlayers = false;
+        
+        for (const [clientId, state] of states) {
+          if (clientId !== myClientId && state.thrustGame) {
+            hasRemoteThrustPlayers = true;
+            break;
+          }
+        }
+      };
+      
+      // Remove old listener if it exists (prevent memory leak on reconnect)
+      if (collaborationManager._thrustAwarenessListener) {
+        collaborationManager.awareness.off('change', collaborationManager._thrustAwarenessListener);
+      }
+      
+      // Store reference for cleanup
+      collaborationManager._thrustAwarenessListener = updateRemoteThrustStatus;
+      
+      // Set up listener for awareness changes
+      collaborationManager.awareness.on('change', updateRemoteThrustStatus);
+      
+      // Do initial check
+      updateRemoteThrustStatus();
+    }
+
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
     // This preserves the user's local work when they return to offline mode
@@ -746,6 +799,7 @@ function shareSession() {
 /**
  * Updates presence information (cursor, selection) for collaboration.
  * Called from draw loop only when connected to a room.
+ * Optimized with idle detection and payload rounding to reduce bandwidth.
  */
 function updateCollaborationPresence() {
   // Early exit if somehow called without valid manager (defensive check)
@@ -754,32 +808,112 @@ function updateCollaborationPresence() {
   // Throttle updates (every ~100ms)
   if (frameCount % 6 !== 0) return;
 
-  // Update cursor position (world space)
+  // Get current cursor position (world space)
+  let wx = null, wy = null;
   if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
-    const wx = worldMouseX();
-    const wy = worldMouseY();
-    // Only update if valid numbers
-    if (Number.isFinite(wx) && Number.isFinite(wy)) {
-      collaborationManager.updateCursor(wx, wy);
+    wx = worldMouseX();
+    wy = worldMouseY();
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) {
+      wx = null;
+      wy = null;
     }
   }
 
-  // Update selection
+  // Get current selection
+  let selectedIds = [];
   if (mindMap) {
-    let selectedIds = [];
     if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
       selectedIds = Array.from(mindMap.selectedBoxes).map(b => b.id).filter(id => id);
     } else if (mindMap.selectedBox && mindMap.selectedBox.id) {
       selectedIds = [mindMap.selectedBox.id];
     }
-    collaborationManager.updateSelection(selectedIds);
-
-    // Broadcast which box is being edited (for lock indicator)
-    const editingBoxId = (mindMap.selectedBox && mindMap.selectedBox.isEditing)
-      ? mindMap.selectedBox.id
-      : null;
-    collaborationManager.updateEditingBox(editingBoxId);
   }
+
+  // Get editing state
+  const editingBoxId = (mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing)
+    ? mindMap.selectedBox.id
+    : null;
+
+  // Detect changes
+  // Check if cursor went off-canvas (was visible, now null)
+  const cursorBecameInvalid = wx === null && lastPresenceBroadcast.cursorX !== null;
+  
+  // Check if cursor moved (only when both current and last are valid)
+  const cursorMoved = wx !== null && lastPresenceBroadcast.cursorX !== null && (
+    Math.abs(wx - lastPresenceBroadcast.cursorX) > 1 ||
+    Math.abs(wy - lastPresenceBroadcast.cursorY) > 1
+  );
+  
+  const selectionChanged = !arraysEqual(selectedIds, lastPresenceBroadcast.selectedIds);
+  const editingChanged = editingBoxId !== lastPresenceBroadcast.editingBoxId;
+  
+  const now = Date.now();
+  
+  // Idle detection: stop broadcasting if no changes for 2 seconds
+  if (cursorMoved || cursorBecameInvalid || selectionChanged || editingChanged) {
+    // Activity detected - reset idle state and broadcast
+    lastPresenceBroadcast.time = now;
+    lastPresenceBroadcast.isIdle = false;
+    
+    // Round cursor position to reduce payload size (1 decimal = 0.1 pixel precision)
+    if (wx !== null && wy !== null) {
+      const roundedX = Math.round(wx * 10) / 10;
+      const roundedY = Math.round(wy * 10) / 10;
+      
+      // Validate rounded values are finite before broadcasting
+      if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
+        collaborationManager.updateCursor(roundedX, roundedY);
+        lastPresenceBroadcast.cursorX = roundedX;
+        lastPresenceBroadcast.cursorY = roundedY;
+      }
+    } else if (cursorBecameInvalid) {
+      // Cursor went off-canvas - update to null to clear remote cursor
+      lastPresenceBroadcast.cursorX = null;
+      lastPresenceBroadcast.cursorY = null;
+    }
+    
+    collaborationManager.updateSelection(selectedIds);
+    lastPresenceBroadcast.selectedIds = [...selectedIds]; // Copy array to avoid mutation issues
+    
+    collaborationManager.updateEditingBox(editingBoxId);
+    lastPresenceBroadcast.editingBoxId = editingBoxId;
+  } else if (now - lastPresenceBroadcast.time > 2000) {
+    // No activity for 2 seconds - transition to idle
+    if (!lastPresenceBroadcast.isIdle) {
+      // Send one final update before going idle
+      lastPresenceBroadcast.isIdle = true;
+      
+      if (wx !== null && wy !== null) {
+        const roundedX = Math.round(wx * 10) / 10;
+        const roundedY = Math.round(wy * 10) / 10;
+        
+        // Validate rounded values before final idle broadcast
+        if (Number.isFinite(roundedX) && Number.isFinite(roundedY)) {
+          collaborationManager.updateCursor(roundedX, roundedY);
+          lastPresenceBroadcast.cursorX = roundedX;
+          lastPresenceBroadcast.cursorY = roundedY;
+        }
+      }
+    }
+    // Idle - skip broadcasting to save bandwidth
+    return;
+  }
+}
+
+/**
+ * Helper function to compare two arrays for equality (order-independent)
+ * Uses Set comparison since selection order doesn't matter
+ */
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  // Use Set for order-independent comparison
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false; // Handles duplicates
+  for (const item of setA) {
+    if (!setB.has(item)) return false;
+  }
+  return true;
 }
 
 /**
@@ -1269,14 +1403,13 @@ function draw() {
         thrustGame.update();
       }
       
-      // Always draw thrust game (remote players in thrust mode should be visible)
-      // The draw() method internally checks if local player is active
-      // Initialize thrustGame lazily if needed for remote player rendering
-      if (!thrustGame && collaborationManager) {
-        thrustGame = new ThrustGame(collaborationManager, mindMap);
-      }
-      
+      // Only initialize and draw thrust game if someone is actually using it
+      // Use cached flag updated by awareness listener to avoid checking every frame
       if (thrustGame) {
+        thrustGame.draw();
+      } else if (hasRemoteThrustPlayers) {
+        // Only create instance if someone is using thrust mode
+        thrustGame = new ThrustGame(collaborationManager, mindMap);
         thrustGame.draw();
       }
       
