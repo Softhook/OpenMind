@@ -265,6 +265,11 @@ class ThrustGame {
     // Update player physics
     this.updatePlayerPhysics();
 
+    // Center camera on player's spaceship to keep it in the center of the screen
+    if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && typeof height !== 'undefined') {
+      CameraUtils.centerOn(this.player.x, this.player.y, width, height);
+    }
+
     // Update bullets
     this.updateBullets();
 
@@ -611,21 +616,44 @@ class ThrustGame {
     // Everything drawn here is in world space
     // No need to resetMatrix - we're already in the world transform
 
-    // Draw remote players with their custom colors and names
+    // Get viewport bounds for culling (optimization for 10+ players)
+    const viewportWidth = typeof width !== 'undefined' ? width : 800;
+    const viewportHeight = typeof height !== 'undefined' ? height : 600;
+    let viewportBounds = null;
+    
+    if (typeof CameraUtils !== 'undefined') {
+      // Calculate visible world bounds with a margin for smooth rendering
+      const margin = 500; // Extra margin to avoid pop-in
+      viewportBounds = {
+        left: CameraUtils.worldX(0) - margin,
+        right: CameraUtils.worldX(viewportWidth) + margin,
+        top: CameraUtils.worldY(0) - margin,
+        bottom: CameraUtils.worldY(viewportHeight) + margin
+      };
+    }
+
+    // Helper function to check if a position is in viewport
+    const isInViewport = (x, y) => {
+      if (!viewportBounds) return true; // No culling if camera utils not available
+      return x >= viewportBounds.left && x <= viewportBounds.right &&
+             y >= viewportBounds.top && y <= viewportBounds.bottom;
+    };
+
+    // Draw remote players with their custom colors and names (with viewport culling)
     for (const [clientId, remotePlayer] of this.remotePlayers) {
-      if (remotePlayer.alive) {
+      if (remotePlayer.alive && isInViewport(remotePlayer.x, remotePlayer.y)) {
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
 
-    // Draw local player
+    // Draw local player (always draw, even if off-screen, for consistency)
     if (this.player.alive) {
       const isInvulnerable = Date.now() < this.player.invulnerableUntil;
       this.drawPlayer(this.player, ThrustGame.COLORS.PLAYER_LOCAL, this.keys.up, isInvulnerable);
     }
 
-    // Draw bullets
-    this.drawBullets();
+    // Draw bullets (with viewport culling)
+    this.drawBullets(viewportBounds, isInViewport);
   }
 
   /**
@@ -765,14 +793,18 @@ class ThrustGame {
   }
 
   /**
-   * Draws all bullets
+   * Draws all bullets with optional viewport culling
+   * @param {Object} viewportBounds - Optional viewport bounds for culling {left, right, top, bottom}
+   * @param {Function} isInViewport - Optional function to check if position is in viewport
    */
-  drawBullets() {
+  drawBullets(viewportBounds = null, isInViewport = null) {
     // Local bullets
     noStroke();
     const localColor = ThrustGame.COLORS.BULLET_LOCAL;
     fill(localColor.r, localColor.g, localColor.b);
     for (const bullet of this.bullets) {
+      // Skip bullets outside viewport for performance
+      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
 
@@ -780,6 +812,8 @@ class ThrustGame {
     const remoteColor = ThrustGame.COLORS.BULLET_REMOTE;
     fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
+      // Skip bullets outside viewport for performance
+      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
   }
