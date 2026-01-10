@@ -682,7 +682,7 @@ class ThrustGame {
       }
       
       // If no collision this frame, reset grounded state
-      if (!collisionDetected) {
+      if (!collisionDetected && p.grounded) {
         p.grounded = false;
       }
     }
