@@ -94,6 +94,16 @@ let menuRightEdge = 600;
 let thrustGame = null; // ThrustGame instance
 let hasRemoteThrustPlayers = false; // Track if any remote player is in thrust mode
 
+// Presence optimization: Idle detection for cursor/selection updates
+let lastPresenceBroadcast = {
+  cursorX: null,
+  cursorY: null,
+  selectedIds: [],
+  editingBoxId: null,
+  time: 0,
+  isIdle: false
+};
+
 // Autosave state
 let autosaveTimer = null;
 
@@ -770,6 +780,7 @@ function shareSession() {
 /**
  * Updates presence information (cursor, selection) for collaboration.
  * Called from draw loop only when connected to a room.
+ * Optimized with idle detection and payload rounding to reduce bandwidth.
  */
 function updateCollaborationPresence() {
   // Early exit if somehow called without valid manager (defensive check)
@@ -778,32 +789,91 @@ function updateCollaborationPresence() {
   // Throttle updates (every ~100ms)
   if (frameCount % 6 !== 0) return;
 
-  // Update cursor position (world space)
+  // Get current cursor position (world space)
+  let wx = null, wy = null;
   if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
-    const wx = worldMouseX();
-    const wy = worldMouseY();
-    // Only update if valid numbers
-    if (Number.isFinite(wx) && Number.isFinite(wy)) {
-      collaborationManager.updateCursor(wx, wy);
+    wx = worldMouseX();
+    wy = worldMouseY();
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) {
+      wx = null;
+      wy = null;
     }
   }
 
-  // Update selection
+  // Get current selection
+  let selectedIds = [];
   if (mindMap) {
-    let selectedIds = [];
     if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0) {
       selectedIds = Array.from(mindMap.selectedBoxes).map(b => b.id).filter(id => id);
     } else if (mindMap.selectedBox && mindMap.selectedBox.id) {
       selectedIds = [mindMap.selectedBox.id];
     }
-    collaborationManager.updateSelection(selectedIds);
-
-    // Broadcast which box is being edited (for lock indicator)
-    const editingBoxId = (mindMap.selectedBox && mindMap.selectedBox.isEditing)
-      ? mindMap.selectedBox.id
-      : null;
-    collaborationManager.updateEditingBox(editingBoxId);
   }
+
+  // Get editing state
+  const editingBoxId = (mindMap && mindMap.selectedBox && mindMap.selectedBox.isEditing)
+    ? mindMap.selectedBox.id
+    : null;
+
+  // Detect changes
+  const cursorMoved = wx !== null && (
+    Math.abs(wx - (lastPresenceBroadcast.cursorX || 0)) > 1 ||
+    Math.abs(wy - (lastPresenceBroadcast.cursorY || 0)) > 1
+  );
+  
+  const selectionChanged = !arraysEqual(selectedIds, lastPresenceBroadcast.selectedIds);
+  const editingChanged = editingBoxId !== lastPresenceBroadcast.editingBoxId;
+  
+  const now = Date.now();
+  
+  // Idle detection: stop broadcasting if no changes for 2 seconds
+  if (cursorMoved || selectionChanged || editingChanged) {
+    // Activity detected - reset idle state and broadcast
+    lastPresenceBroadcast.time = now;
+    lastPresenceBroadcast.isIdle = false;
+    
+    // Round cursor position to reduce payload size (1 decimal = 0.1 pixel precision)
+    if (wx !== null && wy !== null) {
+      const roundedX = Math.round(wx * 10) / 10;
+      const roundedY = Math.round(wy * 10) / 10;
+      collaborationManager.updateCursor(roundedX, roundedY);
+      lastPresenceBroadcast.cursorX = roundedX;
+      lastPresenceBroadcast.cursorY = roundedY;
+    }
+    
+    collaborationManager.updateSelection(selectedIds);
+    lastPresenceBroadcast.selectedIds = selectedIds;
+    
+    collaborationManager.updateEditingBox(editingBoxId);
+    lastPresenceBroadcast.editingBoxId = editingBoxId;
+  } else if (now - lastPresenceBroadcast.time > 2000) {
+    // No activity for 2 seconds - transition to idle
+    if (!lastPresenceBroadcast.isIdle) {
+      // Send one final update before going idle
+      lastPresenceBroadcast.isIdle = true;
+      
+      if (wx !== null && wy !== null) {
+        const roundedX = Math.round(wx * 10) / 10;
+        const roundedY = Math.round(wy * 10) / 10;
+        collaborationManager.updateCursor(roundedX, roundedY);
+        lastPresenceBroadcast.cursorX = roundedX;
+        lastPresenceBroadcast.cursorY = roundedY;
+      }
+    }
+    // Idle - skip broadcasting to save bandwidth
+    return;
+  }
+}
+
+/**
+ * Helper function to compare two arrays for equality
+ */
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /**
