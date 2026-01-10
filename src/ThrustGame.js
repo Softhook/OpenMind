@@ -633,10 +633,25 @@ class ThrustGame {
             p.x += separation.x;
             p.y += separation.y;
             
-            // Apply bounce effect to velocity
-            const bounceAmount = 0.5;
-            p.vx *= -bounceAmount;
-            p.vy *= -bounceAmount;
+            // Check if ship is resting: low velocity and being pushed upward
+            const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            const isBeingPushedUp = separation.y < 0;  // Negative y = upward push
+            
+            if (velocityMagnitude > 0.5) {
+              // Significant velocity - apply bounce
+              const bounceAmount = 0.5;
+              p.vx *= -bounceAmount;
+              p.vy *= -bounceAmount;
+            } else if (velocityMagnitude < 0.1 && isBeingPushedUp) {
+              // Very low velocity and being pushed up - ship is resting
+              // Zero out velocity completely to prevent bouncing
+              p.vx = 0;
+              p.vy = 0;
+            } else {
+              // Low velocity but not quite resting - minimal bounce
+              p.vx *= 0.3;
+              p.vy *= 0.3;
+            }
           } else {
             // Fallback: revert to previous position
             p.x = prevX;
@@ -827,9 +842,9 @@ class ThrustGame {
     box.y += dirY * force;
     
     // Sync the pushed box position to collaboration if available
-    // This prevents the position from reverting when Yjs syncs
+    // Use false for skipTransactionWrapper to ensure proper transaction
     if (this.collaborationManager && this.collaborationManager.isConnected) {
-      this.collaborationManager.syncBoxToYjs(box, true);
+      this.collaborationManager.syncBoxToYjs(box, false);
     }
   }
 
