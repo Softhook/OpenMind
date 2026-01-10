@@ -100,7 +100,7 @@ let lastPresenceBroadcast = {
   cursorY: null,
   selectedIds: [],
   editingBoxId: null,
-  time: 0,
+  time: Date.now(), // Initialize to current time to prevent immediate idle state
   isIdle: false
 };
 
@@ -706,6 +706,14 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
         }
       };
       
+      // Remove old listener if it exists (prevent memory leak on reconnect)
+      if (collaborationManager._thrustAwarenessListener) {
+        collaborationManager.awareness.off('change', collaborationManager._thrustAwarenessListener);
+      }
+      
+      // Store reference for cleanup
+      collaborationManager._thrustAwarenessListener = updateRemoteThrustStatus;
+      
       // Set up listener for awareness changes
       collaborationManager.awareness.on('change', updateRemoteThrustStatus);
       
@@ -816,9 +824,13 @@ function updateCollaborationPresence() {
     : null;
 
   // Detect changes
-  const cursorMoved = wx !== null && (
-    Math.abs(wx - (lastPresenceBroadcast.cursorX || 0)) > 1 ||
-    Math.abs(wy - (lastPresenceBroadcast.cursorY || 0)) > 1
+  // Check if cursor went off-canvas (was visible, now null)
+  const cursorBecameInvalid = wx === null && lastPresenceBroadcast.cursorX !== null;
+  
+  // Check if cursor moved (only when both current and last are valid)
+  const cursorMoved = wx !== null && lastPresenceBroadcast.cursorX !== null && (
+    Math.abs(wx - lastPresenceBroadcast.cursorX) > 1 ||
+    Math.abs(wy - lastPresenceBroadcast.cursorY) > 1
   );
   
   const selectionChanged = !arraysEqual(selectedIds, lastPresenceBroadcast.selectedIds);
@@ -827,7 +839,7 @@ function updateCollaborationPresence() {
   const now = Date.now();
   
   // Idle detection: stop broadcasting if no changes for 2 seconds
-  if (cursorMoved || selectionChanged || editingChanged) {
+  if (cursorMoved || cursorBecameInvalid || selectionChanged || editingChanged) {
     // Activity detected - reset idle state and broadcast
     lastPresenceBroadcast.time = now;
     lastPresenceBroadcast.isIdle = false;
@@ -839,10 +851,14 @@ function updateCollaborationPresence() {
       collaborationManager.updateCursor(roundedX, roundedY);
       lastPresenceBroadcast.cursorX = roundedX;
       lastPresenceBroadcast.cursorY = roundedY;
+    } else if (cursorBecameInvalid) {
+      // Cursor went off-canvas - update to null to clear remote cursor
+      lastPresenceBroadcast.cursorX = null;
+      lastPresenceBroadcast.cursorY = null;
     }
     
     collaborationManager.updateSelection(selectedIds);
-    lastPresenceBroadcast.selectedIds = selectedIds;
+    lastPresenceBroadcast.selectedIds = [...selectedIds]; // Copy array to avoid mutation issues
     
     collaborationManager.updateEditingBox(editingBoxId);
     lastPresenceBroadcast.editingBoxId = editingBoxId;
@@ -866,12 +882,17 @@ function updateCollaborationPresence() {
 }
 
 /**
- * Helper function to compare two arrays for equality
+ * Helper function to compare two arrays for equality (order-independent)
+ * Uses Set comparison since selection order doesn't matter
  */
 function arraysEqual(a, b) {
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
+  // Use Set for order-independent comparison
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false; // Handles duplicates
+  for (const item of setA) {
+    if (!setB.has(item)) return false;
   }
   return true;
 }

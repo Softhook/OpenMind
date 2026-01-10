@@ -284,6 +284,11 @@ class ThrustGame {
       down: false,
       space: false
     };
+    
+    // Reset idle detection state to prevent stale data on restart
+    this.lastBroadcastState = null;
+    this.lastMovementTime = Date.now();
+    this.isIdle = false;
   }
 
   /**
