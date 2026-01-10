@@ -667,9 +667,9 @@ class ThrustGame {
             const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
             
             // Check if ship should be grounded (resting on top of box)
-            // Verify collision is from above by checking vertical velocity (downward movement)
-            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy > 0) {
-              // Low velocity downward collision from above - ground the ship
+            // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
+            if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
+              // Low velocity collision from above - ground the ship
               // Don't push out, just stop at current position
               p.vx = 0;
               p.vy = 0;
