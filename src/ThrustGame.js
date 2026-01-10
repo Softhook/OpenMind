@@ -676,6 +676,7 @@ class ThrustGame {
     // This happens regardless of whether local player is in thrust mode
     for (const [clientId, remotePlayer] of this.remotePlayers) {
       if (remotePlayer.alive && isInViewport(remotePlayer.x, remotePlayer.y)) {
+        // Draw remote players (any other player is considered an enemy)
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
@@ -817,10 +818,12 @@ class ThrustGame {
 
     pop();
 
-    // Draw player name above ship (in world space, not rotated)
+    // Draw player name above ship (in world space, not rotated).
+    // Any player other than the local player is treated as an enemy.
     if (name) {
       push();
-      fill(255);
+      const isEnemy = (player !== this.player);
+      fill(isEnemy ? 0 : 255);
       noStroke();
       textAlign(CENTER, BOTTOM);
       textSize(12);
