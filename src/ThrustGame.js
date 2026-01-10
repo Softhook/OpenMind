@@ -637,35 +637,37 @@ class ThrustGame {
         if (ThrustGame.triangleBoxCollision(shipVertices, box)) {
           collisionDetected = true;
           
-          // Collision detected - try to push ship out instead of just reverting
-          // This allows rotation on boxes by gently pushing ship away
+          // Collision detected - handle based on velocity
+          const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          
+          // Try to push ship out to resolve collision
           const separation = this.resolveTriangleBoxCollision(p, box, prevX, prevY, prevAngle);
           
           if (separation) {
-            p.x += separation.x;
-            p.y += separation.y;
+            const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
             
-            // Check if ship is resting: low velocity and being pushed upward
-            // In p5.js coordinate system: y increases downward, so negative y = upward
-            const velocityMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-            const isBeingPushedUp = separation.y < 0;  // Negative y separation = pushed upward
-            
-            if (velocityMagnitude > 0.5) {
-              // Significant velocity - apply bounce
-              const bounceAmount = 0.5;
-              p.vx *= -bounceAmount;
-              p.vy *= -bounceAmount;
-              p.grounded = false;
-            } else if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp) {
-              // Very low velocity and being pushed up - ship is resting
-              // Zero out velocity completely and mark as grounded immediately
+            // Check if ship should be grounded (resting on top of box)
+            if (velocityMagnitude < 1.0 && isBeingPushedUp) {
+              // Low velocity collision from above - ground the ship
+              // Don't push out, just stop at current position
               p.vx = 0;
               p.vy = 0;
-              p.grounded = true;  // Set grounded immediately - simple and effective
+              p.grounded = true;
+              // Don't apply separation - keep ship at current position
             } else {
-              // Low to medium velocity - dampen
-              p.vx *= phys.COLLISION_DAMPING;
-              p.vy *= phys.COLLISION_DAMPING;
+              // Apply separation for high-velocity or non-resting collisions
+              p.x += separation.x;
+              p.y += separation.y;
+              
+              if (velocityMagnitude > 0.5) {
+                // Significant velocity - bounce
+                p.vx *= -0.5;
+                p.vy *= -0.5;
+              } else {
+                // Low velocity - dampen
+                p.vx *= phys.COLLISION_DAMPING;
+                p.vy *= phys.COLLISION_DAMPING;
+              }
               p.grounded = false;
             }
           } else {
@@ -681,9 +683,10 @@ class ThrustGame {
         }
       }
       
-      // If no collision this frame, reset grounded state
+      // If no collision this frame but was grounded, apply small downward movement
+      // This keeps ship in contact with surface
       if (!collisionDetected && p.grounded) {
-        p.grounded = false;
+        p.y += 0.5;  // Small downward nudge to re-establish collision
       }
     }
 
