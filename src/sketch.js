@@ -806,7 +806,9 @@ function drawRemoteCursors() {
     }
 
     // If user is in thrust mode and alive, draw their spaceship instead of cursor
-    if (thrustGame && thrustGame.active && remoteThrustState && remoteThrustState.alive) {
+    // Note: We skip cursor even if local player isn't in thrust mode, because the remote player's
+    // spaceship should always be visible when they're in thrust mode
+    if (remoteThrustState && remoteThrustState.alive) {
       // Spaceship is drawn by ThrustGame.draw() as a remote player
       // Skip drawing cursor for this user
       continue;
@@ -1262,9 +1264,19 @@ function draw() {
         drawRemoteCursors();
       }
       
-      // Draw thrust game in world space (if active)
+      // Update thrust game physics and player state (only when active)
       if (thrustGame && thrustGame.active) {
         thrustGame.update();
+      }
+      
+      // Always draw thrust game (remote players in thrust mode should be visible)
+      // The draw() method internally checks if local player is active
+      // Initialize thrustGame lazily if needed for remote player rendering
+      if (!thrustGame && collaborationManager) {
+        thrustGame = new ThrustGame(collaborationManager, mindMap);
+      }
+      
+      if (thrustGame) {
         thrustGame.draw();
       }
       
@@ -1517,7 +1529,9 @@ function updateCursorForHover() {
   if (mindMap.draggingConnection) { cursor('grabbing'); return; }
   if (CameraUtils.isPanning) { cursor('grabbing'); return; }
 
-  if (!isEditing && keyIsDown(32)) { cursor('grab'); return; }
+  // Don't change cursor on spacebar if thrust mode is active
+  const thrustModeActive = thrustGame && thrustGame.active;
+  if (!isEditing && !thrustModeActive && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
   if (mindMap && mindMap.connections) {
@@ -2209,18 +2223,8 @@ function keyPressed() {
   // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
   // Check for uppercase T (which means Shift+T was pressed)
   if (key === 'T') {
-    if (!thrustGame) {
-      // Initialize thrust game on first activation with mindMap reference
-      thrustGame = new ThrustGame(collaborationManager, mindMap);
-    }
-    
-    if (thrustGame.active) {
-      // Stop the game
-      thrustGame.stop();
-    } else {
-      // Start the game
-      thrustGame.start();
-    }
+    // Use static toggle method for cleaner initialization/toggle
+    thrustGame = ThrustGame.toggle(thrustGame, collaborationManager, mindMap);
     return false;
   }
   

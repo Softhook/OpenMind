@@ -131,6 +131,37 @@ class ThrustGame {
   }
 
   // ============================================================================
+  // STATIC METHODS
+  // ============================================================================
+
+  /**
+   * Static method to toggle thrust game on/off.
+   * Creates instance if needed, toggles state, and returns the instance.
+   * @param {ThrustGame|null} existingInstance - Existing instance or null
+   * @param {CollaborationManager} collaborationManager - Collaboration manager
+   * @param {MindMap} mindMap - Mind map reference
+   * @returns {ThrustGame} The thrust game instance
+   */
+  static toggle(existingInstance, collaborationManager, mindMap) {
+    let instance = existingInstance;
+    
+    if (!instance) {
+      // Initialize thrust game on first activation
+      instance = new ThrustGame(collaborationManager, mindMap);
+    }
+    
+    if (instance.active) {
+      // Stop the game
+      instance.stop();
+    } else {
+      // Start the game
+      instance.start();
+    }
+    
+    return instance;
+  }
+
+  // ============================================================================
   // PLAYER MANAGEMENT
   // ============================================================================
 
@@ -611,10 +642,11 @@ class ThrustGame {
    * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
-    if (!this.active) return;
-
-    // Everything drawn here is in world space
-    // No need to resetMatrix - we're already in the world transform
+    // Always update and draw remote players in thrust mode, even if local player isn't active
+    // This ensures remote players' spaceships are visible
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.updateRemotePlayers();
+    }
 
     // Get viewport bounds for culling (optimization for 10+ players)
     const viewportWidth = typeof width !== 'undefined' ? width : 800;
@@ -640,11 +672,15 @@ class ThrustGame {
     };
 
     // Draw remote players with their custom colors and names (with viewport culling)
+    // This happens regardless of whether local player is in thrust mode
     for (const [clientId, remotePlayer] of this.remotePlayers) {
       if (remotePlayer.alive && isInViewport(remotePlayer.x, remotePlayer.y)) {
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
     }
+
+    // Only draw local player, bullets, and UI if we're actually in thrust mode
+    if (!this.active) return;
 
     // Draw local player (always draw, even if off-screen, for consistency)
     if (this.player.alive) {

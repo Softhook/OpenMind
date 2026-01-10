@@ -62,9 +62,12 @@ The game includes full multiplayer support through the CollaborationManager's aw
 The thrust game uses Yjs awareness protocol (the same system used for cursor presence) to broadcast game state:
 - Each player's position, velocity, angle, and alive status
 - All active bullets with their positions and velocities
+- Thrusting state for animated fire jet display
 - Updates are throttled to ~100ms intervals to balance responsiveness and bandwidth
 
 When you fire a bullet, it appears immediately for you and is synced to other players. Remote players see your ship in your assigned collaboration color, making it easy to identify who's who in the game.
+
+**Important**: Remote players' spaceships are visible even if you haven't activated thrust mode yourself. This ensures proper multiplayer visibility across all clients.
 
 ## Technical Details
 
@@ -96,14 +99,12 @@ The game is implemented as a separate class (`ThrustGame.js`) that:
 
 1. **Single Screen**: Game doesn't support multiple browser windows
 2. **No Persistence**: Score resets when game is toggled off
-3. **Basic Multiplayer**: Full multiplayer sync not yet implemented
-4. **No Obstacles**: No terrain or obstacles (pure space combat)
-5. **No Powerups**: No items or powerups to collect
+3. **No Obstacles**: No terrain or obstacles (pure space combat)
+4. **No Powerups**: No items or powerups to collect
 
 ## Future Enhancements
 
 Possible future additions:
-- Full multiplayer synchronization
 - Obstacles and terrain
 - Powerups and weapons variety
 - Leaderboard persistence
