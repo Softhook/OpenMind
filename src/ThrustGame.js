@@ -53,7 +53,8 @@ class ThrustGame {
   };
 
   static COLLISION = {
-    RADIUS: 15 + 4           // Player size + bullet size for collision detection
+    RADIUS: 15 + 4,          // Player size + bullet size for collision detection
+    EPSILON: 0.0001          // Small value for floating-point comparisons
   };
 
   static TIMING = {
@@ -279,7 +280,7 @@ class ThrustGame {
     const d21 = (point.x - v0.x) * (v2.x - v0.x) + (point.y - v0.y) * (v2.y - v0.y);
     
     const denom = d00 * d11 - d01 * d01;
-    if (Math.abs(denom) < 0.0001) return false; // Degenerate triangle
+    if (Math.abs(denom) < ThrustGame.COLLISION.EPSILON) return false; // Degenerate triangle
     
     const v = (d11 * d20 - d01 * d21) / denom;
     const w = (d00 * d21 - d01 * d20) / denom;
