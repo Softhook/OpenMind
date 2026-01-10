@@ -1271,6 +1271,11 @@ function draw() {
       
       // Always draw thrust game (remote players in thrust mode should be visible)
       // The draw() method internally checks if local player is active
+      // Initialize thrustGame lazily if needed for remote player rendering
+      if (!thrustGame && collaborationManager) {
+        thrustGame = new ThrustGame(collaborationManager, mindMap);
+      }
+      
       if (thrustGame) {
         thrustGame.draw();
       }
