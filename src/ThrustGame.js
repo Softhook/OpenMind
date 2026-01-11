@@ -1118,14 +1118,15 @@ class ThrustGame {
             this.score++;
             bullet.scored = true; // Mark to prevent double-counting
             
-            // Broadcast that we hit this player (for frozen/inactive tabs)
-            this.broadcastHit(clientId);
+            // Create explosion at remote player's position for immediate visual feedback
+            // Only create one explosion per bullet to avoid multiple explosions for overlapping players
+            this.createExplosion(remotePlayer.x, remotePlayer.y);
           }
           
-          // Create explosion at remote player's position for immediate visual feedback
-          this.createExplosion(remotePlayer.x, remotePlayer.y);
+          // Broadcast that we hit this player (for frozen/inactive tabs)
+          // This is outside the scored check so each hit player gets notified
+          this.broadcastHit(clientId);
           
-          // Don't break - continue checking other players, but don't increment score again
           bulletHit = true;
         }
       }
@@ -1134,55 +1135,13 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
-        // Check current position
-        const dx = bullet.x - this.player.x;
-        const dy = bullet.y - this.player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < ThrustGame.COLLISION.RADIUS) {
+        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
           // Hit! Player dies and respawns
-          this.player.alive = false;
-          this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-          this.deaths++;
-
-          // Create explosion at death location
-          this.createExplosion(this.player.x, this.player.y);
-
+          this.handlePlayerDeath();
+          
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
-        }
-        
-        // Also check if bullet trajectory passes through player
-        // This handles fast-moving bullets that might skip over player between frames
-        if (bullet.vx || bullet.vy) {
-          // Calculate where bullet was last frame (approximately)
-          const prevX = bullet.x - bullet.vx;
-          const prevY = bullet.y - bullet.vy;
-          
-          // Check if line segment from prevPos to currentPos intersects player circle
-          const closestPoint = this.getClosestPointOnLineSegment(
-            prevX, prevY, bullet.x, bullet.y,
-            this.player.x, this.player.y
-          );
-          
-          const closestDx = closestPoint.x - this.player.x;
-          const closestDy = closestPoint.y - this.player.y;
-          const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
-          
-          if (closestDist < ThrustGame.COLLISION.RADIUS) {
-            // Hit! Player dies and respawns
-            this.player.alive = false;
-            this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-            this.deaths++;
-
-            // Create explosion at death location
-            this.createExplosion(this.player.x, this.player.y);
-
-            // Remove the bullet that hit us
-            this.remoteBullets.delete(bulletId);
-            break;
-          }
         }
       }
     }
@@ -1196,58 +1155,68 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
-        // Check current position
-        const dx = bullet.x - this.player.x;
-        const dy = bullet.y - this.player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < ThrustGame.COLLISION.RADIUS) {
+        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
           // Hit! Player dies and respawns
-          this.player.alive = false;
-          this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-          this.deaths++;
-
-          // Create explosion at death location
-          this.createExplosion(this.player.x, this.player.y);
-
+          this.handlePlayerDeath();
+          
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
         }
-        
-        // Also check if bullet trajectory passes through player
-        // This handles fast-moving bullets that might skip over player between frames
-        if (bullet.vx || bullet.vy) {
-          // Calculate where bullet was last frame (approximately)
-          const prevX = bullet.x - bullet.vx;
-          const prevY = bullet.y - bullet.vy;
-          
-          // Check if line segment from prevPos to currentPos intersects player circle
-          const closestPoint = this.getClosestPointOnLineSegment(
-            prevX, prevY, bullet.x, bullet.y,
-            this.player.x, this.player.y
-          );
-          
-          const closestDx = closestPoint.x - this.player.x;
-          const closestDy = closestPoint.y - this.player.y;
-          const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
-          
-          if (closestDist < ThrustGame.COLLISION.RADIUS) {
-            // Hit! Player dies and respawns
-            this.player.alive = false;
-            this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-            this.deaths++;
-
-            // Create explosion at death location
-            this.createExplosion(this.player.x, this.player.y);
-
-            // Remove the bullet that hit us
-            this.remoteBullets.delete(bulletId);
-            break;
-          }
-        }
       }
     }
+  }
+
+  /**
+   * Handles player death, including explosion and respawn timer
+   */
+  handlePlayerDeath() {
+    this.player.alive = false;
+    this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+    this.deaths++;
+    this.createExplosion(this.player.x, this.player.y);
+  }
+
+  /**
+   * Checks if a bullet hits a target, including trajectory-based detection
+   * @param {Object} bullet - The bullet to check
+   * @param {number} targetX - Target X position
+   * @param {number} targetY - Target Y position
+   * @returns {boolean} True if bullet hit the target
+   */
+  checkBulletHit(bullet, targetX, targetY) {
+    // Check current position
+    const dx = bullet.x - targetX;
+    const dy = bullet.y - targetY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < ThrustGame.COLLISION.RADIUS) {
+      return true;
+    }
+    
+    // Also check if bullet trajectory passes through target
+    // This handles fast-moving bullets that might skip over target between frames
+    if (bullet.vx || bullet.vy) {
+      // Calculate where bullet was last frame (approximately)
+      const prevX = bullet.x - bullet.vx;
+      const prevY = bullet.y - bullet.vy;
+      
+      // Check if line segment from prevPos to currentPos intersects target circle
+      const closestPoint = this.getClosestPointOnLineSegment(
+        prevX, prevY, bullet.x, bullet.y,
+        targetX, targetY
+      );
+      
+      const closestDx = closestPoint.x - targetX;
+      const closestDy = closestPoint.y - targetY;
+      const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
+      
+      if (closestDist < ThrustGame.COLLISION.RADIUS) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**
@@ -1807,14 +1776,10 @@ class ThrustGame {
           for (const hit of state.thrustGame.hitNotifications) {
             // Check if this hit notification is for us
             // Also check invulnerability to prevent hits during respawn grace period
+            // The alive check prevents double-death if multiple players hit us in the same frame
             if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
               // We've been hit! Die and respawn
-              this.player.alive = false;
-              this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-              this.deaths++;
-              
-              // Create explosion at our location
-              this.createExplosion(this.player.x, this.player.y);
+              this.handlePlayerDeath();
               
               // Break to avoid processing multiple hits in same frame
               break;

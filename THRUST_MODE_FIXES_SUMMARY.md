@@ -51,15 +51,23 @@ const checkActivity = () => {
 ## Changes Made
 
 ### Source Code Changes
-- **src/ThrustGame.js** (16 lines changed):
-  - Line 1095: Added `createExplosion()` call when local bullet hits remote player
-  - Lines 190-202: Removed throttling logic from awareness listener
+- **src/ThrustGame.js** (multiple functional changes):
+  - Lines 161-185: Refactored `loop()` to call updateRemotePlayers before draw for proper data flow
+  - Lines 190-202: Removed throttling logic from awareness listener for immediate remote player visibility
+  - Lines 697-707: Added `updateRespawn()` method to handle respawn timing when not active
+  - Lines 1113-1129: Updated collision logic to create immediate explosions and broadcast hits
+  - Lines 1136-1189: Integrated trajectory-based collision detection in checkCollisions
+  - Lines 1195-1251: Added `checkRemoteBulletCollisions()` method for passive collision checking
+  - Lines 1257-1275: Added `getClosestPointOnLineSegment()` helper for trajectory collision math
+  - Lines 1804-1823: Implemented hit notification system for frozen/inactive tabs
+  - Lines 1920, 1933-1952: Added hit notification broadcasting and state management
 
 ### Test Files Added
 - **tests/unit/ThrustGameMultiplayer.test.js** (292 lines added):
   - 3 tests for explosion visibility
   - 3 tests for remote player visibility
-  - All tests passing
+  - 3 tests for death detection and respawn
+  - All 9 new tests passing
 
 ### Documentation Added
 - **MANUAL_TEST_THRUST_MODE.md**: Comprehensive manual testing guide with test cases and expected results
@@ -67,7 +75,7 @@ const checkActivity = () => {
 ## Test Results
 
 ### Unit Tests
-All 191 tests pass, including 6 new tests for the fixed issues:
+All 194 tests pass, including 9 new tests for the fixed issues:
 
 ```
 ✓ should create explosion when local bullet hits remote player
