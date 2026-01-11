@@ -785,8 +785,11 @@ class ThrustGame {
     this.updatePlayerPhysics();
 
     // Center camera on player's spaceship to keep it in the center of the screen
+    // Only do this if NOT panning, to allow user to look around
     if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && typeof height !== 'undefined') {
-      CameraUtils.centerOn(this.player.x, this.player.y, width, height);
+      if (!CameraUtils.isPanning) {
+        CameraUtils.centerOn(this.player.x, this.player.y, width, height);
+      }
     }
 
     // Update bullets
@@ -1394,6 +1397,8 @@ class ThrustGame {
     if (keyCode === K.SPACE || key === ' ') {
       this.fireBullet();
     }
+
+    return true; // Key handled
   }
 
   /**
