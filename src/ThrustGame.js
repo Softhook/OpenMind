@@ -158,14 +158,28 @@ class ThrustGame {
       ThrustGame.instance.update();
     }
 
-    // 5. Draw Game (includes remote players if they exist)
-    ThrustGame.instance.draw();
+    // 5. Determine if we need full game updates (active locally or remote players present)
+    const shouldUpdateGame = ThrustGame.instance.active || ThrustGame.hasRemotePlayers;
 
-    // 6. Draw UI Overlay
-    if (ThrustGame.instance.active || ThrustGame.hasRemotePlayers) {
+    // 6. Update remote player states from awareness (must happen before draw)
+    if (shouldUpdateGame) {
       // Vital: Update remote player states from awareness every frame while running
       // This ensures smooth 60fps interpolation even if the "presence check" is throttled
       ThrustGame.instance.updateRemotePlayers();
+    }
+
+    // 7. Draw Game (includes remote players if they exist)
+    ThrustGame.instance.draw();
+
+    // 8. Draw UI Overlay and handle passive collision detection
+    if (shouldUpdateGame) {
+      // Check collisions and handle respawn even when not actively playing
+      // This allows players to be hit by remote bullets even when just viewing
+      if (!ThrustGame.instance.active && ThrustGame.hasRemotePlayers) {
+        ThrustGame.instance.checkRemoteBulletCollisions();
+        ThrustGame.instance.updateRespawn();
+        ThrustGame.instance.updateExplosions(); // Clean up expired explosions
+      }
 
       ThrustGame.instance.drawUI();
     }
@@ -187,15 +201,9 @@ class ThrustGame {
       return;
     }
 
-    // Optimization: Throttled check for awareness updates.
-    let lastCheck = 0;
-    const THROTTLE_MS = 500;
-
+    // Check for remote players in thrust mode
+    // Note: Not throttled to ensure immediate visibility of remote players
     const checkActivity = () => {
-      const now = Date.now();
-      if (now - lastCheck < THROTTLE_MS) return;
-      lastCheck = now;
-
       const states = manager.awareness.getStates();
       const myClientId = manager.awareness.clientID;
       let foundRemote = false;
@@ -320,6 +328,7 @@ class ThrustGame {
 
     // Multiplayer state
     this.multiplayerInitialized = false;
+    this.pendingHitNotifications = [];  // Hit notifications to broadcast
 
     // Idle detection for bandwidth optimization
     this.lastMovementTime = Date.now();
@@ -686,6 +695,18 @@ class ThrustGame {
   }
 
   /**
+   * Handles respawn timing when player is dead
+   * Called even when not actively playing to handle respawn after being shot
+   */
+  updateRespawn() {
+    if (!this.player.alive) {
+      if (Date.now() >= this.player.respawnTime) {
+        this.respawnPlayer();
+      }
+    }
+  }
+
+  /**
    * Updates game state (physics, collisions, etc.)
    */
   update() {
@@ -695,10 +716,8 @@ class ThrustGame {
     this.syncKeyboardState();
 
     // Handle respawn timing
+    this.updateRespawn();
     if (!this.player.alive) {
-      if (Date.now() >= this.player.respawnTime) {
-        this.respawnPlayer();
-      }
       return;
     }
 
@@ -1091,12 +1110,24 @@ class ThrustGame {
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist < ThrustGame.COLLISION.RADIUS) {
-          // Hit! Remove bullet immediately and increment score
-          this.bullets.splice(i, 1);
-          this.score++;
+          // Hit detected! Increment score and create explosion for immediate feedback
+          // NOTE: We do NOT remove the bullet here - the remote player needs to detect
+          // the hit on their side to actually die. The bullet will be removed naturally
+          // when it times out or hits a box. We mark it as "scored" to avoid double-counting.
+          if (!bullet.scored) {
+            this.score++;
+            bullet.scored = true; // Mark to prevent double-counting
+            
+            // Create explosion at remote player's position for immediate visual feedback
+            // Only create one explosion per bullet to avoid multiple explosions for overlapping players
+            this.createExplosion(remotePlayer.x, remotePlayer.y);
+          }
+          
+          // Broadcast that we hit this player (for frozen/inactive tabs)
+          // This is outside the scored check so each hit player gets notified
+          this.broadcastHit(clientId);
+          
           bulletHit = true;
-          // In multiplayer, the hit player would handle their own death
-          break; // Stop checking this bullet against other players
         }
       }
     }
@@ -1104,25 +1135,112 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
-        const dx = bullet.x - this.player.x;
-        const dy = bullet.y - this.player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < ThrustGame.COLLISION.RADIUS) {
+        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
           // Hit! Player dies and respawns
-          this.player.alive = false;
-          this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
-          this.deaths++;
-
-          // Create explosion at death location
-          this.createExplosion(this.player.x, this.player.y);
-
+          this.handlePlayerDeath();
+          
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
         }
       }
     }
+  }
+
+  /**
+   * Checks remote bullets against local player only
+   * This is called even when not actively playing to allow being hit by remote bullets
+   */
+  checkRemoteBulletCollisions() {
+    // Check remote bullets against local player
+    if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
+      for (const [bulletId, bullet] of this.remoteBullets) {
+        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
+          // Hit! Player dies and respawns
+          this.handlePlayerDeath();
+          
+          // Remove the bullet that hit us
+          this.remoteBullets.delete(bulletId);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Handles player death, including explosion and respawn timer
+   */
+  handlePlayerDeath() {
+    this.player.alive = false;
+    this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+    this.deaths++;
+    this.createExplosion(this.player.x, this.player.y);
+  }
+
+  /**
+   * Checks if a bullet hits a target, including trajectory-based detection
+   * @param {Object} bullet - The bullet to check
+   * @param {number} targetX - Target X position
+   * @param {number} targetY - Target Y position
+   * @returns {boolean} True if bullet hit the target
+   */
+  checkBulletHit(bullet, targetX, targetY) {
+    // Check current position
+    const dx = bullet.x - targetX;
+    const dy = bullet.y - targetY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < ThrustGame.COLLISION.RADIUS) {
+      return true;
+    }
+    
+    // Also check if bullet trajectory passes through target
+    // This handles fast-moving bullets that might skip over target between frames
+    if (bullet.vx || bullet.vy) {
+      // Calculate where bullet was last frame (approximately)
+      const prevX = bullet.x - bullet.vx;
+      const prevY = bullet.y - bullet.vy;
+      
+      // Check if line segment from prevPos to currentPos intersects target circle
+      const closestPoint = this.getClosestPointOnLineSegment(
+        prevX, prevY, bullet.x, bullet.y,
+        targetX, targetY
+      );
+      
+      const closestDx = closestPoint.x - targetX;
+      const closestDy = closestPoint.y - targetY;
+      const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
+      
+      if (closestDist < ThrustGame.COLLISION.RADIUS) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Gets the closest point on a line segment to a given point
+   * Used for bullet trajectory collision detection
+   */
+  getClosestPointOnLineSegment(x1, y1, x2, y2, px, py) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthSquared = dx * dx + dy * dy;
+    
+    if (lengthSquared === 0) {
+      // Line segment is a point
+      return { x: x1, y: y1 };
+    }
+    
+    // Calculate t parameter (0 to 1) representing position on line segment
+    let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
+    
+    return {
+      x: x1 + t * dx,
+      y: y1 + t * dy
+    };
   }
 
   /**
@@ -1277,19 +1395,9 @@ class ThrustGame {
    * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
-    // Early exit if no collaboration or no remote players
-    if (!this.collaborationManager || !this.collaborationManager.isConnected) {
-      // Only draw local game elements if active
-      if (!this.active) return;
-      // Continue to draw local player below
-    } else {
-      // Update remote players only if we have collaboration
-      this.updateRemotePlayers();
-
-      // Early exit if no remote players and not active locally
-      if (this.remotePlayers.size === 0 && !this.active) {
-        return;
-      }
+    // Early exit if no remote players and not active locally
+    if (this.remotePlayers.size === 0 && !this.active) {
+      return;
     }
 
     // Get viewport bounds for culling (optimization for 10+ players)
@@ -1661,6 +1769,23 @@ class ThrustGame {
             }
           }
         }
+        
+        // Process hit notifications from this remote player
+        // This handles the case where our tab was frozen/inactive and we missed the collision
+        if (state.thrustGame.hitNotifications && Array.isArray(state.thrustGame.hitNotifications)) {
+          for (const hit of state.thrustGame.hitNotifications) {
+            // Check if this hit notification is for us
+            // Also check invulnerability to prevent hits during respawn grace period
+            // The alive check prevents double-death if multiple players hit us in the same frame
+            if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
+              // We've been hit! Die and respawn
+              this.handlePlayerDeath();
+              
+              // Break to avoid processing multiple hits in same frame
+              break;
+            }
+          }
+        }
       }
     });
 
@@ -1756,14 +1881,39 @@ class ThrustGame {
         vx: Math.round(b.vx * 10) / 10,
         vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
-      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)) // Filter invalid bullets
+      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)), // Filter invalid bullets
+      hitNotifications: this.pendingHitNotifications || []  // Broadcast hits for frozen tabs
     };
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
 
+    // Clear pending hit notifications after broadcast
+    this.pendingHitNotifications = [];
+
     // Save current state for next comparison
     this.lastBroadcastState = currentState;
+  }
+
+  /**
+   * Broadcasts that we hit a remote player
+   * This ensures the remote player dies even if their tab is frozen/inactive
+   * @param {string} targetClientId - The client ID of the player we hit
+   */
+  broadcastHit(targetClientId) {
+    if (!this.pendingHitNotifications) {
+      this.pendingHitNotifications = [];
+    }
+    
+    // Prevent memory leak by limiting queue size
+    // Hit notifications are cleared after each broadcast, so this should rarely happen
+    const MAX_PENDING_HITS = 10;
+    if (this.pendingHitNotifications.length < MAX_PENDING_HITS) {
+      this.pendingHitNotifications.push({
+        target: targetClientId,
+        timestamp: Date.now()
+      });
+    }
   }
 
   /**
