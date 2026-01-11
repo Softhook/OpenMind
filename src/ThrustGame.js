@@ -322,6 +322,7 @@ class ThrustGame {
 
     // Multiplayer state
     this.multiplayerInitialized = false;
+    this.pendingHitNotifications = [];  // Hit notifications to broadcast
 
     // Idle detection for bandwidth optimization
     this.lastMovementTime = Date.now();
@@ -1110,6 +1111,9 @@ class ThrustGame {
           if (!bullet.scored) {
             this.score++;
             bullet.scored = true; // Mark to prevent double-counting
+            
+            // Broadcast that we hit this player (for frozen/inactive tabs)
+            this.broadcastHit(clientId);
           }
           
           // Create explosion at remote player's position for immediate visual feedback
@@ -1800,6 +1804,26 @@ class ThrustGame {
             }
           }
         }
+        
+        // Process hit notifications from this remote player
+        // This handles the case where our tab was frozen/inactive and we missed the collision
+        if (state.thrustGame.hitNotifications && Array.isArray(state.thrustGame.hitNotifications)) {
+          for (const hit of state.thrustGame.hitNotifications) {
+            // Check if this hit notification is for us
+            if (hit.target === myClientId && this.player.alive) {
+              // We've been hit! Die and respawn
+              this.player.alive = false;
+              this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+              this.deaths++;
+              
+              // Create explosion at our location
+              this.createExplosion(this.player.x, this.player.y);
+              
+              // Break to avoid processing multiple hits in same frame
+              break;
+            }
+          }
+        }
       }
     });
 
@@ -1895,14 +1919,33 @@ class ThrustGame {
         vx: Math.round(b.vx * 10) / 10,
         vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
-      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)) // Filter invalid bullets
+      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)), // Filter invalid bullets
+      hitNotifications: this.pendingHitNotifications || []  // Broadcast hits for frozen tabs
     };
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
 
+    // Clear pending hit notifications after broadcast
+    this.pendingHitNotifications = [];
+
     // Save current state for next comparison
     this.lastBroadcastState = currentState;
+  }
+
+  /**
+   * Broadcasts that we hit a remote player
+   * This ensures the remote player dies even if their tab is frozen/inactive
+   * @param {string} targetClientId - The client ID of the player we hit
+   */
+  broadcastHit(targetClientId) {
+    if (!this.pendingHitNotifications) {
+      this.pendingHitNotifications = [];
+    }
+    this.pendingHitNotifications.push({
+      target: targetClientId,
+      timestamp: Date.now()
+    });
   }
 
   /**
