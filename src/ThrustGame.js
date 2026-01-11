@@ -158,15 +158,21 @@ class ThrustGame {
       ThrustGame.instance.update();
     }
 
-    // 5. Draw Game (includes remote players if they exist)
-    ThrustGame.instance.draw();
+    // 5. Determine if we need full game updates (active locally or remote players present)
+    const shouldUpdateGame = ThrustGame.instance.active || ThrustGame.hasRemotePlayers;
 
-    // 6. Draw UI Overlay
-    if (ThrustGame.instance.active || ThrustGame.hasRemotePlayers) {
+    // 6. Update remote player states from awareness (must happen before draw)
+    if (shouldUpdateGame) {
       // Vital: Update remote player states from awareness every frame while running
       // This ensures smooth 60fps interpolation even if the "presence check" is throttled
       ThrustGame.instance.updateRemotePlayers();
+    }
 
+    // 7. Draw Game (includes remote players if they exist)
+    ThrustGame.instance.draw();
+
+    // 8. Draw UI Overlay and handle passive collision detection
+    if (shouldUpdateGame) {
       // Check collisions and handle respawn even when not actively playing
       // This allows players to be hit by remote bullets even when just viewing
       if (!ThrustGame.instance.active && ThrustGame.hasRemotePlayers) {
