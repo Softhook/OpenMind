@@ -32,8 +32,8 @@ class ThrustGame {
     GROUNDING_VELOCITY: 1.0,       // Max velocity (pixels/frame) to treat collision as soft landing and ground ship.
     // Above this threshold, collision uses bounce/damping logic instead.
     // Range: 0.5-2.0 typical. Higher = more aggressive grounding.
-    GROUNDING_NUDGE: 0.5,          // Small downward nudge (pixels) applied when grounded but no collision detected.
-    // Keeps ship in contact with surface. Should be << player size and <= GROUNDING_VELOCITY.
+    GROUNDING_NUDGE: 1.2,          // Small downward nudge (pixels) applied when grounded.
+    // Must be slightly larger than shortest separation step (1.0) to avoid oscillation.
     COLLISION_DAMPING: 0.4,        // Velocity damping factor (0-1) for low-speed collisions. 0 = full stop, 1 = no damping.
     BOUNCE_AMOUNT: 0.5             // Bounce damping factor (0-1) for high-speed collisions. Lower = less bouncy.
   };
@@ -910,28 +910,28 @@ class ThrustGame {
             if (separation) {
               const isBeingPushedUp = separation.y < 0;  // Negative y = upward in p5.js
 
+              // Fix: Always apply separation, even when grounding, to prevent the "pinning" effect
+              p.x += separation.x;
+              p.y += separation.y;
+
               // Check if ship should be grounded (resting on top of box)
-              // Note: Using >= 0 to allow re-grounding when nudged (vy=0 after zeroing)
-              if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0) {
+              // We only ground if moving slowly downwards AND being pushed up AND NOT thrusting up
+              if (velocityMagnitude < phys.GROUNDING_VELOCITY && isBeingPushedUp && p.vy >= 0 && !this.keys.up) {
                 // Low velocity collision from above - ground the ship
-                // Don't push out, just stop at current position
                 p.vx = 0;
                 p.vy = 0;
                 p.grounded = true;
-                // Don't apply separation - keep ship at current position
+                // Separation already applied above
               } else {
-                // Apply separation for high-velocity or non-resting collisions
-                p.x += separation.x;
-                p.y += separation.y;
-
-                if (velocityMagnitude > 0.5) {
+                // Threshold for bounce slightly increased to match grounding for stability
+                if (velocityMagnitude > 1.0) {
                   // Significant velocity - bounce
                   p.vx *= -phys.BOUNCE_AMOUNT;
                   p.vy *= -phys.BOUNCE_AMOUNT;
                 } else {
-                  // Low velocity - dampen
-                  p.vx *= phys.COLLISION_DAMPING;
-                  p.vy *= phys.COLLISION_DAMPING;
+                  // Low velocity - dampen to zero to avoid jitters
+                  p.vx = 0;
+                  p.vy = 0;
                 }
                 p.grounded = false;
               }
@@ -964,7 +964,8 @@ class ThrustGame {
             }
           }
           if (hasSurfaceBelow) {
-            p.y += nudge;  // Small downward nudge to re-establish collision
+            // Static rest: we stay grounded if the probe still hits something,
+            // but we NO LONGER move the ship's actual position (vibration fix).
           } else {
             // No surface below - unground the ship
             p.grounded = false;
@@ -987,38 +988,55 @@ class ThrustGame {
      * @returns {Object|null} Separation vector {x, y} or null if no resolution found
      */
   resolveTriangleBoxCollision(player, box, prevX, prevY, prevAngle) {
-    // Try small displacement vectors to push ship out of box
-    // Using constants for consistent push distances
-    const d = ThrustGame.COLLISION.PUSH_OUT_DISTANCE;      // Cardinal directions
-    const diag = ThrustGame.COLLISION.PUSH_OUT_DIAGONAL;   // Diagonals
-
-    const pushOutVectors = [
-      { x: 0, y: -d },        // Push up
-      { x: 0, y: d },         // Push down
-      { x: -d, y: 0 },        // Push left
-      { x: d, y: 0 },         // Push right
-      { x: -diag, y: -diag }, // Diagonal up-left
-      { x: diag, y: -diag },  // Diagonal up-right
-      { x: -diag, y: diag },  // Diagonal down-left
-      { x: diag, y: diag }    // Diagonal down-right
+    // 1. Iterative search with increasing magnitudes
+    // This allows resolving deep penetrations (e.g. from high speed or rotation)
+    // Starting with 1.0 ensures we don't jump too far when clearing light overlaps
+    const magnitudes = [1, 2, 5, 10, 20];
+    const directions = [
+      { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },    // Cardinals
+      { x: -0.707, y: -0.707 }, { x: 0.707, y: -0.707 },                  // Diagonals
+      { x: -0.707, y: 0.707 }, { x: 0.707, y: 0.707 }
     ];
 
-    // Test each separation vector
-    for (const sep of pushOutVectors) {
-      const testPlayer = {
-        x: player.x + sep.x,
-        y: player.y + sep.y,
-        angle: player.angle
-      };
+    for (const mag of magnitudes) {
+      for (const dir of directions) {
+        const testPlayer = {
+          x: player.x + dir.x * mag,
+          y: player.y + dir.y * mag,
+          angle: player.angle
+        };
 
-      const testVertices = ThrustGame.getShipTriangleVertices(testPlayer);
-
-      if (!ThrustGame.triangleBoxCollision(testVertices, box)) {
-        return sep; // Found a valid separation
+        const testVertices = ThrustGame.getShipTriangleVertices(testPlayer);
+        if (!ThrustGame.triangleBoxCollision(testVertices, box)) {
+          return { x: dir.x * mag, y: dir.y * mag };
+        }
       }
     }
 
-    return null; // Could not resolve with small displacement
+    // 2. Fallback: Brute force escape from box center
+    // If cardinal searches fail, push directly away from the box's center
+    const dx = player.x - box.x;
+    const dy = player.y - box.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 0) {
+      const dirX = dx / dist;
+      const dirY = dy / dist;
+
+      // Try one large push along this vector
+      const escapeMag = 30;
+      const testPlayer = {
+        x: player.x + dirX * escapeMag,
+        y: player.y + dirY * escapeMag,
+        angle: player.angle
+      };
+
+      if (!ThrustGame.triangleBoxCollision(ThrustGame.getShipTriangleVertices(testPlayer), box)) {
+        return { x: dirX * escapeMag, y: dirY * escapeMag };
+      }
+    }
+
+    return null; // Truly stuck (should be rare now)
   }
 
   /**
