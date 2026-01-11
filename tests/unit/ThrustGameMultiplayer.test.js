@@ -111,8 +111,10 @@ describe('ThrustGame Multiplayer - Explosion Visibility', () => {
     expect(explosionsAfter).toBe(explosionsBefore + 1);
     // Expect score to increment
     expect(game.score).toBe(1);
-    // Expect bullet to be removed
-    expect(game.bullets.length).toBe(0);
+    // Bullet should NOT be removed - it continues so remote player can detect hit
+    expect(game.bullets.length).toBe(1);
+    // Bullet should be marked as scored to prevent double-counting
+    expect(game.bullets[0].scored).toBe(true);
   });
 
   test('should create explosion at correct location when remote player dies', () => {

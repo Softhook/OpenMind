@@ -1103,16 +1103,20 @@ class ThrustGame {
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist < ThrustGame.COLLISION.RADIUS) {
-          // Hit! Remove bullet immediately and increment score
-          this.bullets.splice(i, 1);
-          this.score++;
-          bulletHit = true;
+          // Hit detected! Increment score and create explosion for immediate feedback
+          // NOTE: We do NOT remove the bullet here - the remote player needs to detect
+          // the hit on their side to actually die. The bullet will be removed naturally
+          // when it times out or hits a box. We mark it as "scored" to avoid double-counting.
+          if (!bullet.scored) {
+            this.score++;
+            bullet.scored = true; // Mark to prevent double-counting
+          }
           
           // Create explosion at remote player's position for immediate visual feedback
-          // The remote player will also create their own explosion and update their state
           this.createExplosion(remotePlayer.x, remotePlayer.y);
           
-          break; // Stop checking this bullet against other players
+          // Don't break - continue checking other players, but don't increment score again
+          bulletHit = true;
         }
       }
     }
