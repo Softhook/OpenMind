@@ -154,6 +154,55 @@ let mobileNavDownButton = null;
 let isTouchDevice = false;
 
 // ============================================================================
+// EXTENSION BRIDGE (Ghost Plugin System)
+// ============================================================================
+// The ExtensionBridge allows for dynamic, lazy-loaded components (ghost plugins)
+// to attach themselves to the application lifecycle without incurring hot-path
+// overhead when dormant. Zero CPU impact during normal mind-mapping.
+
+window.ExtensionBridge = {
+  /** @type {Function|null} Hot-path draw hook */
+  draw: null,
+  /** @type {Function|null} Input handler hook */
+  handleInput: null,
+  /** @type {Function|null} Key release listener */
+  handleKeyReleased: null,
+  /** @type {Map<string, boolean>} Track loading status */
+  _loading: new Map(),
+
+  /**
+   * Lazily loads an extension script if not already loaded or loading.
+   * @param {string} name - Internal name for tracking
+   * @param {string} path - Path to the JS file
+   * @param {Function} [onLoad] - Optional callback after loading
+   */
+  load: function (name, path, onLoad) {
+    if (window[name]) {
+      if (onLoad) onLoad();
+      return;
+    }
+    if (this._loading.has(name)) {
+      // If already loading, we could queue the callback, but for now just ignore
+      return;
+    }
+    this._loading.set(name, true);
+    console.info(`[ExtensionBridge] Lazily loading ${name} from ${path}...`);
+    const script = document.createElement('script');
+    script.src = path;
+    script.onload = () => {
+      this._loading.set(name, false);
+      console.info(`[ExtensionBridge] ${name} loaded successfully.`);
+      if (onLoad) onLoad();
+    };
+    script.onerror = (e) => {
+      this._loading.delete(name);
+      console.error(`[ExtensionBridge] Failed to load ${name}:`, e);
+    };
+    document.body.appendChild(script);
+  }
+};
+
+// ============================================================================
 // KEY REPEAT MANAGER
 // ============================================================================
 // Fallback key-repeat for Backspace/Delete to ensure repeat works even if
@@ -711,6 +760,14 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
+
+    // EXTENSION BRIDGE: Notify ThrustGame of new dependencies
+    // If the game is loaded (even if dormant), we must poke it so it can
+    // re-attach its awareness listener to the NEW collaboration manager.
+    if (typeof ThrustGame !== 'undefined') {
+      ThrustGame.loop(collaborationManager, mindMap);
+    }
+
   } catch (e) {
     console.error('Failed to initialize collaboration:', e);
     // Clear timeouts on error
@@ -897,15 +954,27 @@ function drawRemoteCursors() {
 
   for (const userState of users) {
     // Check if this user is in thrust mode using their specific clientId
-    // Only check if we actually have the game code loaded
     let remoteThrustState = null;
-    if (typeof ThrustGame !== 'undefined' && userState.clientId !== undefined) {
+    if (userState.clientId !== undefined) {
       const states = collaborationManager.awareness?.getStates();
       if (states) {
-        // Use direct lookup by clientId for efficiency and multi-tab support
         const specificState = states.get(userState.clientId);
         if (specificState && specificState.thrustGame) {
           remoteThrustState = specificState.thrustGame;
+
+          // Auto-load ThrustGame if we see remote activity but it's not loaded yet
+          if (typeof ThrustGame === 'undefined') {
+            ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
+              // Remote activity detected: Attach the loop so we can render it.
+              // We do this manually here because we removed the auto-attach from the script
+              // to prevent the "Double Cleanup" issue on local start.
+              if (window.ExtensionBridge && typeof ThrustGame !== 'undefined') {
+                window.ExtensionBridge.draw = ThrustGame.loop;
+                // Run once to setup listeners immediately
+                ThrustGame.loop(collaborationManager, mindMap);
+              }
+            });
+          }
         }
       }
     }
@@ -1368,10 +1437,9 @@ function draw() {
         drawRemoteCursors();
       }
 
-      // Update thrust game physics and player state (only when active)
-      // Soft dependency check - will run only if ThrustGame class is defined
-      if (typeof ThrustGame !== 'undefined') {
-        ThrustGame.loop(collaborationManager, mindMap);
+      // Extension Bridge Hook: Hot loop (Zero overhead when ExtensionBridge.draw is null)
+      if (ExtensionBridge.draw) {
+        ExtensionBridge.draw(collaborationManager, mindMap);
       }
 
       pop();
@@ -1618,7 +1686,7 @@ function updateCursorForHover() {
 
   // Don't change cursor on spacebar if thrust mode is active
   // Don't change cursor on spacebar if thrust mode is active
-  const thrustModeActive = (typeof ThrustGame !== 'undefined' && ThrustGame.instance && ThrustGame.instance.active);
+  const thrustModeActive = (ExtensionBridge.draw && ExtensionBridge.draw.active);
   if (!isEditing && !thrustModeActive && keyIsDown(32)) { cursor('grab'); return; }
 
   // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
@@ -2309,17 +2377,20 @@ function mouseDragged() {
  */
 function keyPressed() {
   // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
-  // Check for uppercase T (which means Shift+T was pressed)
   if (key === 'T') {
-    // If ThrustGame is available, let it handle the toggle content
-    if (typeof ThrustGame !== 'undefined') {
-      ThrustGame.handleInput(key, keyCode);
+    if (typeof ThrustGame === 'undefined') {
+      ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
+        // Toggle the game once loaded
+        if (typeof ThrustGame !== 'undefined') {
+          ThrustGame.handleInput('T', 84);
+        }
+      });
       return false;
     }
   }
 
-  // If thrust game is active, route keyboard events to it
-  if (typeof ThrustGame !== 'undefined' && ThrustGame.handleInput(key, keyCode)) {
+  // Route to Extension Bridge (Ghost Plugin hook)
+  if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode)) {
     return false; // Prevent default and stop propagation
   }
 
@@ -2577,8 +2648,8 @@ function keyPressed() {
  * Handles key release events
  */
 function keyReleased() {
-  // Route to thrust game if active
-  if (typeof ThrustGame !== 'undefined' && ThrustGame.handleKeyReleased(keyCode)) {
+  // Route to Extension Bridge (Ghost Plugin hook)
+  if (ExtensionBridge.handleKeyReleased && ExtensionBridge.handleKeyReleased(keyCode)) {
     return false;
   }
 

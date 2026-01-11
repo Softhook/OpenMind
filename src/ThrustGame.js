@@ -126,88 +126,51 @@ class ThrustGame {
    * @param {MindMap} mindMap 
    */
   static loop(collaborationManager, mindMap) {
-    // 1. Sync remote activity listener (Event-driven, not Polling)
-    // If the manager changes (or matches current but we haven't set up yet), set up listeners
-    // We only set _activeManager if we successfully attached a listener.
-    // If setupAwarenessListener returns false (e.g. awareness not ready), we will retry next frame.
-    const isNewManager = collaborationManager !== ThrustGame._activeManager;
-    const hasNoListener = !ThrustGame._cleanupListener;
-
-    if (isNewManager || hasNoListener) {
-      // Clean up old listener if it exists to avoid memory leaks
-      if (ThrustGame._cleanupListener) {
-        ThrustGame._cleanupListener();
-        ThrustGame._cleanupListener = null;
-      }
-
-      if (ThrustGame._setupAwarenessListener(collaborationManager)) {
-        ThrustGame._activeManager = collaborationManager;
-
-        // If we switched managers, we should probably reset the instance to clear old state
-        if (isNewManager && ThrustGame.instance) {
-          ThrustGame.instance.stop(); // Clean up old state
-          ThrustGame.instance = null;
-        }
-      }
-    }
-
-    // 2. Performance optimization/Dormancy check (Zero Overhead)
-    // If not active locally, we need to know if there's any remote activity to justify staying awake.
-    if (!ThrustGame.instance || !ThrustGame.instance.active) {
-      // If we don't think there are remote players, do a quick check of actual awareness states.
-      // This avoids a deadlock where we never update the instance because we think no one is playing.
-      if (!ThrustGame.hasRemotePlayers) {
-        ThrustGame._checkRemoteActivity(collaborationManager);
-      }
-
-      // If still no remote players found, we can safely stay dormant.
-      if (!ThrustGame.hasRemotePlayers) {
-        return;
-      }
-    }
-
-    // 3. Ensure instance exists if we need to render something
+    // 1. Dependency injection and state management
     if (!ThrustGame.instance) {
       ThrustGame.instance = new ThrustGame(collaborationManager, mindMap);
     }
-
-    // Ensure dependencies are up to date
     ThrustGame.instance.collaborationManager = collaborationManager;
     ThrustGame.instance.mindMap = mindMap;
 
+    // 2. Setup awareness listener (O(1) event-driven check)
+    if (collaborationManager && collaborationManager !== ThrustGame._activeManager) {
+      ThrustGame._setupAwarenessListener(collaborationManager);
+      ThrustGame._activeManager = collaborationManager;
+    }
+
+    // 3. ZERO OVERHEAD DETACHMENT: Dormancy check
+    // If not active locally AND no remote players are detectable, detach from hot loop.
+    const isLocalActive = ThrustGame.instance && ThrustGame.instance.active;
+    if (!isLocalActive && !ThrustGame.hasRemotePlayers) {
+      if (window.ExtensionBridge) {
+        window.ExtensionBridge.draw = null;
+      }
+      // MEMORY CLEANUP: Destroy the instance to free up memory
+      if (ThrustGame.instance) {
+        ThrustGame.instance.destroy();
+        ThrustGame.instance = null;
+      }
+      return;
+    }
+
     // 4. Update Game Logic (only if locally active)
-    if (ThrustGame.instance.active) {
+    if (isLocalActive) {
       ThrustGame.instance.update();
     }
 
-    // 5. Determine if we need full game updates (active locally or remote players present)
-    const shouldUpdateGame = ThrustGame.instance.active || ThrustGame.hasRemotePlayers;
+    // 5. Update/Interpolate remote players (if local active or remote present)
+    ThrustGame.instance.updateRemotePlayers();
+    ThrustGame.instance.interpolateRemotePlayers();
 
-    // 6. Update remote player states from awareness (must happen before draw)
-    if (shouldUpdateGame) {
-      // Vital: Update remote player states from awareness every frame while running
-      // This ensures smooth 60fps interpolation even if the "presence check" is throttled
-      ThrustGame.instance.updateRemotePlayers();
-
-      // Also interpolate remote players for smooth movement
-      // This must happen even if local player is not in thrust mode
-      ThrustGame.instance.interpolateRemotePlayers();
-    }
-
-    // 7. Draw Game (includes remote players if they exist)
+    // 6. Draw Game & UI
     ThrustGame.instance.draw();
 
-    // 8. Draw UI Overlay and handle passive collision detection
-    if (shouldUpdateGame) {
-      // Check collisions and handle respawn even when not actively playing
-      // This allows players to be hit by remote bullets even when just viewing
-      if (!ThrustGame.instance.active && ThrustGame.hasRemotePlayers) {
-        ThrustGame.instance.updateRemoteBullets();
-        ThrustGame.instance.updateExplosions(); // Clean up expired explosions
-      }
-
-      ThrustGame.instance.drawUI();
+    if (!isLocalActive) {
+      ThrustGame.instance.updateRemoteBullets();
+      ThrustGame.instance.updateExplosions();
     }
+    ThrustGame.instance.drawUI();
   }
 
   /**
@@ -246,6 +209,11 @@ class ThrustGame {
 
     // Initial check
     checkActivity();
+
+    // If activity detected, re-attach to draw loop immediately
+    if (ThrustGame.hasRemotePlayers && window.ExtensionBridge) {
+      window.ExtensionBridge.draw = ThrustGame.loop;
+    }
 
     // Store cleanup function
     ThrustGame._cleanupListener = () => {
@@ -303,9 +271,9 @@ class ThrustGame {
       return true; // Consume the event
     }
 
+    // Zero-overhead check: If not active, don't even process key inputs
     if (ThrustGame.instance && ThrustGame.instance.active) {
-      ThrustGame.instance.handleKeyPressed(key, keyCode);
-      return true; // Consume event
+      return ThrustGame.instance.handleKeyPressed(key, keyCode);
     }
     return false;
   }
@@ -683,6 +651,12 @@ class ThrustGame {
    */
   start() {
     this.active = true;
+
+    // ATTACH TO HOT LOOP: Now that we are active, we must be in the draw loop
+    if (window.ExtensionBridge) {
+      window.ExtensionBridge.draw = ThrustGame.loop;
+    }
+
     this.player = this.createPlayer();
     this.bullets = [];
     this.score = 0;
@@ -713,6 +687,9 @@ class ThrustGame {
    * Stops the game and cleans up state
    */
   stop() {
+    // If we've already cleaned up (keys is null), don't do it again
+    if (!this.keys) return;
+
     // Set inactive first
     this.active = false;
 
@@ -758,7 +735,11 @@ class ThrustGame {
    * Fully destroys the game instance and cleans up static references
    */
   destroy() {
-    this.stop();
+    // Only call stop if not already fully stopped/inactive
+    // This prevents double "Stopped and cleaned up" logs
+    if (this.active || this.keys) {
+      this.stop();
+    }
 
     // Clear static references
     if (ThrustGame.instance === this) {
@@ -768,6 +749,9 @@ class ThrustGame {
     // Explicitly nullify references to help GC
     this.collaborationManager = null;
     this.mindMap = null;
+
+    // Ensure keys are nulled to mark as destroyed/cleaned up for idempotent stop()
+    this.keys = null;
   }
 
   /**
@@ -2051,4 +2035,21 @@ class ThrustGame {
 // Export for use in other modules (if using modules)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ThrustGame;
+}
+
+// ============================================================================
+// SELF-REGISTRATION (Extension Bridge Integration)
+// ============================================================================
+{
+  if (window.ExtensionBridge) {
+    // Register basic input hooks
+    window.ExtensionBridge.handleInput = ThrustGame.handleInput;
+    window.ExtensionBridge.handleKeyReleased = ThrustGame.handleKeyReleased;
+
+    // Expose active state for UI logic in sketch.js
+    ThrustGame.loop.active = false;
+    Object.defineProperty(ThrustGame.loop, 'active', {
+      get: () => ThrustGame.instance ? ThrustGame.instance.active : false
+    });
+  }
 }
