@@ -1810,7 +1810,8 @@ class ThrustGame {
         if (state.thrustGame.hitNotifications && Array.isArray(state.thrustGame.hitNotifications)) {
           for (const hit of state.thrustGame.hitNotifications) {
             // Check if this hit notification is for us
-            if (hit.target === myClientId && this.player.alive) {
+            // Also check invulnerability to prevent hits during respawn grace period
+            if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
               // We've been hit! Die and respawn
               this.player.alive = false;
               this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
@@ -1942,10 +1943,16 @@ class ThrustGame {
     if (!this.pendingHitNotifications) {
       this.pendingHitNotifications = [];
     }
-    this.pendingHitNotifications.push({
-      target: targetClientId,
-      timestamp: Date.now()
-    });
+    
+    // Prevent memory leak by limiting queue size
+    // Hit notifications are cleared after each broadcast, so this should rarely happen
+    const MAX_PENDING_HITS = 10;
+    if (this.pendingHitNotifications.length < MAX_PENDING_HITS) {
+      this.pendingHitNotifications.push({
+        target: targetClientId,
+        timestamp: Date.now()
+      });
+    }
   }
 
   /**
