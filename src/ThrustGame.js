@@ -103,9 +103,9 @@ class ThrustGame {
 
 
   static SPAWN = {
-    MAX_ATTEMPTS: 20,        // Maximum attempts to find valid spawn location
-    SEARCH_RADIUS: 150,      // Radius around box center to search for spawn point
-    MIN_DISTANCE_FROM_BOX: 30 // Minimum distance from any box to spawn
+    MAX_ATTEMPTS: 50,        // Maximum attempts to find valid spawn location (increased for reliability)
+    SEARCH_RADIUS: 1000,      // Radius around box center to search for spawn point (increased)
+    MIN_DISTANCE_FROM_BOX: 40 // Minimum distance from any box to spawn
   };
 
 
@@ -271,10 +271,10 @@ class ThrustGame {
    * Static input handler
    * @returns {boolean} True if input was consumed
    */
-  static handleInput(key, keyCode) {
+  static handleInput(key, keyCode, mindMap) {
     // Toggle with Shift+T
     if (key === 'T') {
-      ThrustGame.toggleInternal();
+      ThrustGame.toggleInternal(mindMap);
       return true; // Consume the event
     }
 
@@ -299,11 +299,11 @@ class ThrustGame {
   /**
    * Internal toggle helper
    */
-  static toggleInternal() {
+  static toggleInternal(mindMap) {
     if (!ThrustGame.instance) {
       // Create with nulls, they will be injected in loop() or constructor
       // We rely on loop() passing the current managers
-      ThrustGame.instance = new ThrustGame(null, null);
+      ThrustGame.instance = new ThrustGame(null, mindMap);
     }
 
     // If we're starting, we need to ensure active is set
@@ -583,8 +583,11 @@ class ThrustGame {
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           // Generate random position around the center of boxes
+          // Use square root of random for uniform distribution in circle (avoids center clustering)
+          // Or simpler: ensure we spawn at least some distance away
           const angle = Math.random() * Math.PI * 2;
-          const distance = Math.random() * searchRadius;
+          const minR = searchRadius * 0.2; // Don't spawn right at the center average
+          const distance = minR + Math.random() * (searchRadius - minR);
           const testX = centerX + Math.cos(angle) * distance;
           const testY = centerY + Math.sin(angle) * distance;
 

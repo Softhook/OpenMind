@@ -2382,7 +2382,7 @@ function keyPressed() {
       ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
         // Toggle the game once loaded
         if (typeof ThrustGame !== 'undefined') {
-          ThrustGame.handleInput('T', 84);
+          ThrustGame.handleInput('T', 84, mindMap);
         }
       });
       return false;
@@ -2391,7 +2391,7 @@ function keyPressed() {
 
   // Route to Extension Bridge (Ghost Plugin hook)
   try {
-    if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode)) {
+    if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode, mindMap)) {
       return false; // Prevent default and stop propagation
     }
   } catch (e) {
