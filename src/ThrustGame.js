@@ -187,15 +187,9 @@ class ThrustGame {
       return;
     }
 
-    // Optimization: Throttled check for awareness updates.
-    let lastCheck = 0;
-    const THROTTLE_MS = 500;
-
+    // Check for remote players in thrust mode
+    // Note: Not throttled to ensure immediate visibility of remote players
     const checkActivity = () => {
-      const now = Date.now();
-      if (now - lastCheck < THROTTLE_MS) return;
-      lastCheck = now;
-
       const states = manager.awareness.getStates();
       const myClientId = manager.awareness.clientID;
       let foundRemote = false;
@@ -1095,7 +1089,11 @@ class ThrustGame {
           this.bullets.splice(i, 1);
           this.score++;
           bulletHit = true;
-          // In multiplayer, the hit player would handle their own death
+          
+          // Create explosion at remote player's position for immediate visual feedback
+          // The remote player will also create their own explosion and update their state
+          this.createExplosion(remotePlayer.x, remotePlayer.y);
+          
           break; // Stop checking this bullet against other players
         }
       }
