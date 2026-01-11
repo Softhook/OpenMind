@@ -290,3 +290,100 @@ describe('ThrustGame Multiplayer - Remote Player Visibility', () => {
     expect(ThrustGame.instance).not.toBeNull();
   });
 });
+
+describe('ThrustGame Multiplayer - Death and Respawn', () => {
+  let game;
+  let mockCollaborationManager;
+
+  beforeEach(() => {
+    // Reset static state
+    ThrustGame.hasRemotePlayers = false;
+    ThrustGame._activeManager = null;
+    ThrustGame.instance = null;
+
+    // Create mock collaboration manager
+    mockCollaborationManager = {
+      isConnected: true,
+      awareness: {
+        clientID: 'local-client',
+        getStates: jest.fn(() => new Map()),
+        setLocalStateField: jest.fn(),
+        on: jest.fn(),
+        off: jest.fn()
+      }
+    };
+
+    game = new ThrustGame(mockCollaborationManager, null);
+    game.start();
+  });
+
+  test('should detect hit from remote bullet even when not active', () => {
+    // Set game to inactive (not in thrust mode)
+    game.active = false;
+    
+    // Make player vulnerable
+    game.player.invulnerableUntil = Date.now() - 1000;
+
+    // Add a remote bullet that will hit the player
+    game.remoteBullets.set('bullet-1', {
+      x: game.player.x,
+      y: game.player.y,
+      vx: 0,
+      vy: 0,
+      lifetime: 100,
+      clientId: 'remote-client'
+    });
+
+    // Player should be alive initially
+    expect(game.player.alive).toBe(true);
+    const initialDeaths = game.deaths;
+
+    // Check remote bullet collisions
+    game.checkRemoteBulletCollisions();
+
+    // Player should now be dead
+    expect(game.player.alive).toBe(false);
+    // Death count should increment
+    expect(game.deaths).toBe(initialDeaths + 1);
+    // Respawn time should be set
+    expect(game.player.respawnTime).toBeGreaterThan(Date.now());
+  });
+
+  test('should handle respawn after death even when not active', () => {
+    // Set game to inactive
+    game.active = false;
+
+    // Kill the player and set respawn time to past
+    game.player.alive = false;
+    game.player.respawnTime = Date.now() - 1000; // Past time
+
+    // Call updateRespawn
+    game.updateRespawn();
+
+    // Player should be alive again
+    expect(game.player.alive).toBe(true);
+  });
+
+  test('should increment death count when hit by remote bullet', () => {
+    // Make player vulnerable
+    game.player.invulnerableUntil = Date.now() - 1000;
+    
+    // Add remote bullet at player position
+    game.remoteBullets.set('bullet-1', {
+      x: game.player.x,
+      y: game.player.y,
+      vx: 0,
+      vy: 0,
+      lifetime: 100,
+      clientId: 'remote-client'
+    });
+
+    const initialDeaths = game.deaths;
+
+    // Check collisions (called from update when active)
+    game.checkCollisions();
+
+    // Death count should increment
+    expect(game.deaths).toBe(initialDeaths + 1);
+  });
+});

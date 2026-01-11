@@ -167,6 +167,14 @@ class ThrustGame {
       // This ensures smooth 60fps interpolation even if the "presence check" is throttled
       ThrustGame.instance.updateRemotePlayers();
 
+      // Check collisions and handle respawn even when not actively playing
+      // This allows players to be hit by remote bullets even when just viewing
+      if (!ThrustGame.instance.active && ThrustGame.hasRemotePlayers) {
+        ThrustGame.instance.checkRemoteBulletCollisions();
+        ThrustGame.instance.updateRespawn();
+        ThrustGame.instance.updateExplosions(); // Clean up expired explosions
+      }
+
       ThrustGame.instance.drawUI();
     }
   }
@@ -680,6 +688,18 @@ class ThrustGame {
   }
 
   /**
+   * Handles respawn timing when player is dead
+   * Called even when not actively playing to handle respawn after being shot
+   */
+  updateRespawn() {
+    if (!this.player.alive) {
+      if (Date.now() >= this.player.respawnTime) {
+        this.respawnPlayer();
+      }
+    }
+  }
+
+  /**
    * Updates game state (physics, collisions, etc.)
    */
   update() {
@@ -689,10 +709,8 @@ class ThrustGame {
     this.syncKeyboardState();
 
     // Handle respawn timing
+    this.updateRespawn();
     if (!this.player.alive) {
-      if (Date.now() >= this.player.respawnTime) {
-        this.respawnPlayer();
-      }
       return;
     }
 
@@ -1099,6 +1117,35 @@ class ThrustGame {
       }
     }
 
+    // Check remote bullets against local player
+    if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
+      for (const [bulletId, bullet] of this.remoteBullets) {
+        const dx = bullet.x - this.player.x;
+        const dy = bullet.y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < ThrustGame.COLLISION.RADIUS) {
+          // Hit! Player dies and respawns
+          this.player.alive = false;
+          this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+          this.deaths++;
+
+          // Create explosion at death location
+          this.createExplosion(this.player.x, this.player.y);
+
+          // Remove the bullet that hit us
+          this.remoteBullets.delete(bulletId);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Checks remote bullets against local player only
+   * This is called even when not actively playing to allow being hit by remote bullets
+   */
+  checkRemoteBulletCollisions() {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
