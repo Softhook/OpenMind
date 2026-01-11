@@ -2390,8 +2390,12 @@ function keyPressed() {
   }
 
   // Route to Extension Bridge (Ghost Plugin hook)
-  if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode)) {
-    return false; // Prevent default and stop propagation
+  try {
+    if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode)) {
+      return false; // Prevent default and stop propagation
+    }
+  } catch (e) {
+    console.error('Error in ExtensionBridge.handleInput:', e);
   }
 
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
@@ -2649,8 +2653,12 @@ function keyPressed() {
  */
 function keyReleased() {
   // Route to Extension Bridge (Ghost Plugin hook)
-  if (ExtensionBridge.handleKeyReleased && ExtensionBridge.handleKeyReleased(keyCode)) {
-    return false;
+  try {
+    if (ExtensionBridge.handleKeyReleased && ExtensionBridge.handleKeyReleased(keyCode)) {
+      return false;
+    }
+  } catch (e) {
+    console.error('Error in ExtensionBridge.handleKeyReleased:', e);
   }
 
   // Stop fallback repeat on key release

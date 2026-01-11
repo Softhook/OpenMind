@@ -202,6 +202,13 @@ class ThrustGame {
         }
       }
       ThrustGame.hasRemotePlayers = foundRemote;
+
+      // REACTIVATION: If remote players appear and we are dormant, wake up!
+      if (foundRemote && window.ExtensionBridge && !window.ExtensionBridge.draw) {
+        window.ExtensionBridge.draw = ThrustGame.loop;
+        // Poke the loop once to ensure instance is created if needed
+        ThrustGame.loop(manager, null);
+      }
     };
 
     // Listen for changes
