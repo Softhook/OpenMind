@@ -128,20 +128,42 @@ class ThrustGame {
   static loop(collaborationManager, mindMap) {
     // 1. Sync remote activity listener (Event-driven, not Polling)
     // If the manager changes (or matches current but we haven't set up yet), set up listeners
-    if (collaborationManager !== ThrustGame._activeManager) {
-      ThrustGame._setupAwarenessListener(collaborationManager);
-      ThrustGame._activeManager = collaborationManager;
+    // We only set _activeManager if we successfully attached a listener.
+    // If setupAwarenessListener returns false (e.g. awareness not ready), we will retry next frame.
+    const isNewManager = collaborationManager !== ThrustGame._activeManager;
+    const hasNoListener = !ThrustGame._cleanupListener;
 
-      // If we switched managers, we should probably reset the instance to clear old state
-      if (ThrustGame.instance) {
-        ThrustGame.instance.stop(); // Clean up old state
-        ThrustGame.instance = null;
+    if (isNewManager || hasNoListener) {
+      // Clean up old listener if it exists to avoid memory leaks
+      if (ThrustGame._cleanupListener) {
+        ThrustGame._cleanupListener();
+        ThrustGame._cleanupListener = null;
+      }
+
+      if (ThrustGame._setupAwarenessListener(collaborationManager)) {
+        ThrustGame._activeManager = collaborationManager;
+
+        // If we switched managers, we should probably reset the instance to clear old state
+        if (isNewManager && ThrustGame.instance) {
+          ThrustGame.instance.stop(); // Clean up old state
+          ThrustGame.instance = null;
+        }
       }
     }
 
-    // 2. If neither active locally nor remotely meaningful, do nothing (Zero Overhead)
-    if ((!ThrustGame.instance || !ThrustGame.instance.active) && !ThrustGame.hasRemotePlayers) {
-      return;
+    // 2. Performance optimization/Dormancy check (Zero Overhead)
+    // If not active locally, we need to know if there's any remote activity to justify staying awake.
+    if (!ThrustGame.instance || !ThrustGame.instance.active) {
+      // If we don't think there are remote players, do a quick check of actual awareness states.
+      // This avoids a deadlock where we never update the instance because we think no one is playing.
+      if (!ThrustGame.hasRemotePlayers) {
+        ThrustGame._checkRemoteActivity(collaborationManager);
+      }
+
+      // If still no remote players found, we can safely stay dormant.
+      if (!ThrustGame.hasRemotePlayers) {
+        return;
+      }
     }
 
     // 3. Ensure instance exists if we need to render something
@@ -180,8 +202,7 @@ class ThrustGame {
       // Check collisions and handle respawn even when not actively playing
       // This allows players to be hit by remote bullets even when just viewing
       if (!ThrustGame.instance.active && ThrustGame.hasRemotePlayers) {
-        ThrustGame.instance.checkRemoteBulletCollisions();
-        ThrustGame.instance.updateRespawn();
+        ThrustGame.instance.updateRemoteBullets();
         ThrustGame.instance.updateExplosions(); // Clean up expired explosions
       }
 
@@ -202,7 +223,7 @@ class ThrustGame {
 
     if (!manager || !manager.awareness) {
       ThrustGame.hasRemotePlayers = false;
-      return;
+      return false; // Not ready yet
     }
 
     // Check for remote players in thrust mode
@@ -231,7 +252,30 @@ class ThrustGame {
       if (manager && manager.awareness) {
         manager.awareness.off('change', checkActivity);
       }
+      // Reset state on cleanup
+      ThrustGame.hasRemotePlayers = false;
     };
+
+    return true; // Successfully attached
+  }
+
+  /**
+   * Manual check for remote activity - used as a fallback for the event listener
+   * @param {CollaborationManager} manager 
+   */
+  static _checkRemoteActivity(manager) {
+    if (!manager || !manager.awareness) return;
+
+    const states = manager.awareness.getStates();
+    const myClientId = manager.awareness.clientID;
+    let foundRemote = false;
+    for (const [clientId, state] of states) {
+      if (clientId !== myClientId && state.thrustGame) {
+        foundRemote = true;
+        break;
+      }
+    }
+    ThrustGame.hasRemotePlayers = foundRemote;
   }
 
   /**
@@ -333,6 +377,8 @@ class ThrustGame {
     // Multiplayer state
     this.multiplayerInitialized = false;
     this.pendingHitNotifications = [];  // Hit notifications to broadcast
+    this.processedHits = new Set();     // Recent hit IDs processed locally
+    this.hitBroadcastTimer = 0;         // Counter for rebroadcasting hits
 
     // Idle detection for bandwidth optimization
     this.lastMovementTime = Date.now();
@@ -692,10 +738,36 @@ class ThrustGame {
     // Clear explosion animations
     this.explosions = [];
 
+    // Clear recently processed hit IDs
+    this.processedHits.clear();
+    this.hitBroadcastTimer = 0;
+    this.pendingHitNotifications = [];
+
     // Reset idle detection state to prevent stale data on restart
     this.lastBroadcastState = null;
     this.lastMovementTime = Date.now();
     this.isIdle = false;
+
+    // IMPORTANT: Reset static notification flag to avoid stale state
+    ThrustGame.hasRemotePlayers = false;
+
+    Utils.Logger.collab('[ThrustGame] Stopped and cleaned up');
+  }
+
+  /**
+   * Fully destroys the game instance and cleans up static references
+   */
+  destroy() {
+    this.stop();
+
+    // Clear static references
+    if (ThrustGame.instance === this) {
+      ThrustGame.instance = null;
+    }
+
+    // Explicitly nullify references to help GC
+    this.collaborationManager = null;
+    this.mindMap = null;
   }
 
   /**
@@ -977,17 +1049,41 @@ class ThrustGame {
       }
     }
 
-    // Update remote bullets - check for box collisions
-    // Note: Each client independently checks remote bullets against their local boxes.
-    // This is intentional to prevent bullets from appearing to pass through boxes on
-    // different clients. Remote bullets are continuously re-synced from their owners,
-    // so temporary desync is acceptable and self-correcting.
-    for (const [bulletId, bullet] of this.remoteBullets) {
+    // 2. Update remote bullets
+    this.updateRemoteBullets();
+  }
+
+  /**
+   * Updates remote bullets independently. 
+   * Extracted from updateBullets to allow observers to see smooth movement.
+   */
+  updateRemoteBullets() {
+    for (const [id, bullet] of this.remoteBullets) {
+      // Local physics for remote bullets to ensure smooth movement between updates.
+      // Also decrement lifetime locally so they expire naturally if a client drops.
+      bullet.x += bullet.vx;
+      bullet.y += bullet.vy;
+      bullet.lifetime--;
+
+      if (bullet.lifetime <= 0) {
+        this.remoteBullets.delete(id);
+        continue;
+      }
+
+      // Check for box collisions locally for visual consistency
       const hitBox = this.checkBulletBoxCollision(bullet);
       if (hitBox) {
-        // Apply push force to the box
         this.applyBulletForceToBox(hitBox, bullet);
-        this.remoteBullets.delete(bulletId);
+        this.remoteBullets.delete(id);
+        continue;
+      }
+
+      // Check if this remote bullet hits US
+      if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
+        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
+          this.handlePlayerDeath();
+          this.remoteBullets.delete(id);
+        }
       }
     }
   }
@@ -1152,22 +1248,6 @@ class ThrustGame {
    * Checks remote bullets against local player only
    * This is called even when not actively playing to allow being hit by remote bullets
    */
-  checkRemoteBulletCollisions() {
-    // Check remote bullets against local player
-    if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
-      for (const [bulletId, bullet] of this.remoteBullets) {
-        if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
-          // Hit! Player dies and respawns
-          this.handlePlayerDeath();
-
-          // Remove the bullet that hit us
-          this.remoteBullets.delete(bulletId);
-          break;
-        }
-      }
-    }
-  }
-
   /**
    * Handles player death, including explosion and respawn timer
    */
@@ -1257,30 +1337,29 @@ class ThrustGame {
     const interpolationFactor = 0.3;
 
     for (const [clientId, player] of this.remotePlayers) {
-      // Only interpolate alive players
       if (!player.alive) continue;
 
-      // Ensure target positions exist (they should from updateRemotePlayers)
-      if (player.targetX === undefined || player.targetY === undefined || player.targetAngle === undefined) {
+      // Defensive check to prevent NaN propagation which could lead to infinite loops
+      if (!Number.isFinite(player.x) || !Number.isFinite(player.y) || !Number.isFinite(player.angle) ||
+        !Number.isFinite(player.targetX) || !Number.isFinite(player.targetY) || !Number.isFinite(player.targetAngle)) {
         continue;
       }
 
-      // Linear interpolation for position (lerp)
-      player.x = player.x + (player.targetX - player.x) * interpolationFactor;
-      player.y = player.y + (player.targetY - player.y) * interpolationFactor;
+      // Linear interpolation for position
+      player.x += (player.targetX - player.x) * interpolationFactor;
+      player.y += (player.targetY - player.y) * interpolationFactor;
 
-      // Angular interpolation (handle wrapping around 2π)
+      // Robust angular interpolation (No-Hang logic using modulo)
       let angleDiff = player.targetAngle - player.angle;
 
-      // Normalize angle difference to [-π, π] for shortest rotation
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      // Normalize angle difference to [-PI, PI] using math instead of loops
+      const TWO_PI = Math.PI * 2;
+      angleDiff = ((angleDiff + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
 
-      player.angle = player.angle + angleDiff * interpolationFactor;
+      player.angle += angleDiff * interpolationFactor;
 
-      // Normalize angle to [0, 2π]
-      while (player.angle < 0) player.angle += Math.PI * 2;
-      while (player.angle >= Math.PI * 2) player.angle -= Math.PI * 2;
+      // Normalize player angle to [0, 2PI]
+      player.angle = (player.angle % TWO_PI + TWO_PI) % TWO_PI;
     }
   }
 
@@ -1401,20 +1480,51 @@ class ThrustGame {
       return;
     }
 
-    // Draw remote players with their custom colors and names
+    // Get viewport bounds for culling (optimization for 10+ players)
+    const viewportWidth = typeof width !== 'undefined' ? width : 800;
+    const viewportHeight = typeof height !== 'undefined' ? height : 600;
+    let viewportBounds = null;
+
+    if (typeof CameraUtils !== 'undefined') {
+      // Calculate visible world bounds with a margin for smooth rendering
+      const margin = 500; // Extra margin to avoid pop-in
+      viewportBounds = {
+        left: CameraUtils.worldX(0) - margin,
+        right: CameraUtils.worldX(viewportWidth) + margin,
+        top: CameraUtils.worldY(0) - margin,
+        bottom: CameraUtils.worldY(viewportHeight) + margin
+      };
+    }
+
+    // Helper function to check if a position is in viewport
+    const isInViewport = (x, y) => {
+      if (!viewportBounds) return true; // No culling if camera utils not available
+      return x >= viewportBounds.left && x <= viewportBounds.right &&
+        y >= viewportBounds.top && y <= viewportBounds.bottom;
+    };
+
+    // Draw remote players with their custom colors and names (with viewport culling)
     // This happens regardless of whether local player is in thrust mode
     for (const [clientId, remotePlayer] of this.remotePlayers) {
-      if (remotePlayer.alive) {
-        // Draw remote players (any other player is considered an enemy)
-        this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
+      if (remotePlayer.alive && isInViewport(remotePlayer.x, remotePlayer.y)) {
+        this.drawPlayer(
+          remotePlayer,
+          remotePlayer.color,
+          remotePlayer.thrusting,
+          remotePlayer.isInvulnerable,
+          remotePlayer.name
+        );
       }
     }
 
-    // Draw explosions for all players (before local player check)
-    // This ensures explosions are visible even when not actively playing
-    this.drawExplosions();
+    // Draw all bullets (both local and remote) with viewport culling
+    // This ensures remote combat is visible even when not actively playing
+    this.drawBullets(viewportBounds, isInViewport);
 
-    // Only draw local player, bullets, and UI if we're actually in thrust mode
+    // Draw explosions for all players
+    this.drawExplosions(viewportBounds, isInViewport);
+
+    // Only draw local player and UI if we're actually in thrust mode
     if (!this.active) return;
 
     // Draw local player (always draw, even if off-screen, for consistency)
@@ -1422,9 +1532,6 @@ class ThrustGame {
       const isInvulnerable = Date.now() < this.player.invulnerableUntil;
       this.drawPlayer(this.player, ThrustGame.COLORS.PLAYER_LOCAL, this.keys.up, isInvulnerable);
     }
-
-    // Draw bullets
-    this.drawBullets();
   }
 
   /**
@@ -1436,6 +1543,9 @@ class ThrustGame {
 
     push();
     resetMatrix();
+    rectMode(CORNER);
+    textAlign(LEFT, TOP);
+    imageMode(CORNER); // Safety
 
     fill(ThrustGame.COLORS.UI_TEXT);
     textAlign(LEFT, TOP);
@@ -1493,84 +1603,80 @@ class ThrustGame {
   drawPlayer(player, color, showThrust = false, invulnerable = false, name = null) {
     push();
     translate(player.x, player.y);
+
+    // Draw player name above ship (stays upright, not rotated with ship)
+    if (name) {
+      push();
+      fill(255); // White for contrast
+      noStroke();
+      textAlign(CENTER, BOTTOM);
+      textSize(12);
+      text(name, 0, -ThrustGame.PLAYER.SIZE - 5);
+      pop();
+    }
+
+    // Draw ship (rotated)
+    push();
     rotate(player.angle);
 
     // Flash effect for invulnerability
     if (invulnerable) {
       const time = typeof millis !== 'undefined' ? millis() : Date.now();
       if (Math.floor(time / 100) % 2 === 0) {
-        pop();
+        pop(); // pop rotate
+        pop(); // pop translate
         return;
       }
     }
 
-    // Convert color to RGB if it's a hex string
-    let r, g, b;
+    // Handle color reliably
+    let r = 255, g = 255, b = 255;
     if (typeof color === 'string') {
-      // Parse hex color (e.g., "#ff6464")
       const hex = color.replace('#', '');
-      // Validate hex format (should be 6 characters)
       if (hex.length === 6 && /^[0-9A-Fa-f]{6}$/.test(hex)) {
         r = parseInt(hex.slice(0, 2), 16);
         g = parseInt(hex.slice(2, 4), 16);
         b = parseInt(hex.slice(4, 6), 16);
       } else {
-        // Fallback to default remote player color if invalid
-        const fallback = ThrustGame.COLORS.PLAYER_REMOTE;
-        r = fallback.r;
-        g = fallback.g;
-        b = fallback.b;
+        const fb = ThrustGame.COLORS.PLAYER_REMOTE;
+        r = fb.r; g = fb.g; b = fb.b;
       }
-    } else {
-      r = color.r;
-      g = color.g;
-      b = color.b;
+    } else if (color && typeof color === 'object') {
+      r = Number.isFinite(color.r) ? color.r : 255;
+      g = Number.isFinite(color.g) ? color.g : 255;
+      b = Number.isFinite(color.b) ? color.b : 255;
     }
 
-    // Draw ship as triangle
-    const halfSize = ThrustGame.PLAYER.SIZE / 2;
+    // Draw triangle ship
+    const half = ThrustGame.PLAYER.SIZE / 2;
     noStroke();
     fill(r, g, b);
-    triangle(
-      ThrustGame.PLAYER.SIZE, 0,
-      -halfSize, -halfSize,
-      -halfSize, halfSize
-    );
+    triangle(ThrustGame.PLAYER.SIZE, 0, -half, -half, -half, half);
 
-    // Draw thrust flame if thrusting
+    // Draw flame
     if (showThrust) {
-      const flame = ThrustGame.COLORS.THRUST_FLAME;
-      fill(flame.r, flame.g, flame.b);
-      const flameLength = ThrustGame.PLAYER.FLAME_BASE_LENGTH + Math.random() * ThrustGame.PLAYER.FLAME_VARIATION;
-      triangle(
-        -halfSize, -5,
-        -halfSize, 5,
-        -halfSize - flameLength, 0
-      );
+      const f = ThrustGame.COLORS.THRUST_FLAME;
+      fill(f.r, f.g, f.b);
+      triangle(-half, -5, -half, 5, -half - (ThrustGame.PLAYER.FLAME_BASE_LENGTH + Math.random() * 10), 0);
     }
 
-    pop();
-
-    // Draw player name above ship (in world space, not rotated).
-    // Any player other than the local player is treated as an enemy.
-    if (name) {
-      push();
-      const isEnemy = (player !== this.player);
-      fill(isEnemy ? 0 : 255);
-      noStroke();
-      textAlign(CENTER, BOTTOM);
-      textSize(12);
-      text(name, player.x, player.y - ThrustGame.PLAYER.SIZE - 5);
-      pop();
-    }
+    pop(); // pop rotate
+    pop(); // pop translate
   }
 
-  drawBullets() {
+  /**
+   * Draws all bullets with optional viewport culling
+   * @param {Object} viewportBounds - Optional viewport bounds for culling {left, right, top, bottom}
+   * @param {Function} isInViewport - Optional function to check if position is in viewport
+   */
+  drawBullets(viewportBounds = null, isInViewport = null) {
     // Local bullets
     noStroke();
     const localColor = ThrustGame.COLORS.BULLET_LOCAL;
     fill(localColor.r, localColor.g, localColor.b);
     for (const bullet of this.bullets) {
+      // Skip bullets outside viewport for performance
+      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
 
@@ -1578,14 +1684,23 @@ class ThrustGame {
     const remoteColor = ThrustGame.COLORS.BULLET_REMOTE;
     fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
+      // Skip bullets outside viewport for performance
+      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
   }
 
-  drawExplosions() {
+  /**
+   * Draws explosion animations
+   * @param {Object} viewportBounds - Viewport bounds for culling (optional)
+   * @param {Function} isInViewport - Function to check if position is in viewport (optional)
+   */
+  drawExplosions(viewportBounds = null, isInViewport = null) {
     const now = Date.now();
 
     for (const explosion of this.explosions) {
+      // Skip explosions outside viewport for performance
+      if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
 
       const elapsed = now - explosion.startTime;
       const progress = elapsed / explosion.duration; // 0 to 1
@@ -1662,6 +1777,15 @@ class ThrustGame {
 
       // Check if remote player has thrust game state
       if (state.thrustGame) {
+        // Validate state data before processing
+        // If coordinates are missing or invalid, skip this player to avoid NaN propagation
+        if (!state.thrustGame ||
+          !Number.isFinite(state.thrustGame.x) ||
+          !Number.isFinite(state.thrustGame.y) ||
+          !Number.isFinite(state.thrustGame.angle)) {
+          return;
+        }
+
         activeClients.add(clientId);
 
         // Update or create remote player
@@ -1669,14 +1793,15 @@ class ThrustGame {
           this.remotePlayers.set(clientId, {
             x: state.thrustGame.x,
             y: state.thrustGame.y,
-            vx: state.thrustGame.vx || 0,
-            vy: state.thrustGame.vy || 0,
+            vx: Number.isFinite(state.thrustGame.vx) ? state.thrustGame.vx : 0,
+            vy: Number.isFinite(state.thrustGame.vy) ? state.thrustGame.vy : 0,
             angle: state.thrustGame.angle,
-            alive: state.thrustGame.alive,
-            thrusting: state.thrustGame.thrusting || false,
-            name: state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME,
+            alive: state.thrustGame.alive !== false, // Default to true
+            thrusting: !!state.thrustGame.thrusting,
+            isInvulnerable: !!state.thrustGame.isInvulnerable,
+            name: (state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME).substring(0, 20),
             color: state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR,
-            // Interpolation targets - set initial positions to avoid jump
+            // Interpolation targets
             targetX: state.thrustGame.x,
             targetY: state.thrustGame.y,
             targetAngle: state.thrustGame.angle
@@ -1686,48 +1811,47 @@ class ThrustGame {
 
           // Check if player just died (create explosion)
           const wasPreviouslyAlive = player.alive;
-          const isNowDead = !state.thrustGame.alive;
+          const isNowDead = state.thrustGame.alive === false;
           if (wasPreviouslyAlive && isNowDead) {
-            // Create explosion at player's current position
             this.createExplosion(player.x, player.y);
           }
 
-          // Store target positions for interpolation
+          // Update interpolation targets
           player.targetX = state.thrustGame.x;
           player.targetY = state.thrustGame.y;
           player.targetAngle = state.thrustGame.angle;
-          // Update other non-interpolated properties immediately
-          player.vx = state.thrustGame.vx || 0;
-          player.vy = state.thrustGame.vy || 0;
-          player.alive = state.thrustGame.alive;
-          player.thrusting = state.thrustGame.thrusting || false;
-          player.name = state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME;
+
+          // Update non-interpolated properties
+          player.vx = Number.isFinite(state.thrustGame.vx) ? state.thrustGame.vx : 0;
+          player.vy = Number.isFinite(state.thrustGame.vy) ? state.thrustGame.vy : 0;
+          player.alive = state.thrustGame.alive !== false;
+          player.thrusting = !!state.thrustGame.thrusting;
+          player.isInvulnerable = !!state.thrustGame.isInvulnerable;
+          player.name = (state.user?.name || ThrustGame.DEFAULT_PLAYER_NAME).substring(0, 20);
           player.color = state.user?.color || ThrustGame.DEFAULT_PLAYER_COLOR;
         }
 
-        // Update remote bullets from this player
+        // Efficiently update remote bullets from this player
         if (state.thrustGame.bullets && Array.isArray(state.thrustGame.bullets)) {
-          // Track current bullet IDs for this client
-          const currentBulletIds = new Set(state.thrustGame.bullets.map(b => b.id).filter(id => id !== null && id !== undefined));
-
-          // Remove bullets that are no longer in the update
-          for (const [bulletId, bullet] of this.remoteBullets) {
-            if (bullet.clientId === clientId && !currentBulletIds.has(bulletId)) {
-              this.remoteBullets.delete(bulletId);
+          const currentBulletIds = new Set();
+          for (const b of state.thrustGame.bullets) {
+            if (b.id) {
+              currentBulletIds.add(b.id);
+              this.remoteBullets.set(b.id, {
+                x: b.x,
+                y: b.y,
+                vx: b.vx,
+                vy: b.vy,
+                lifetime: b.lifetime,
+                clientId: clientId
+              });
             }
           }
 
-          // Add or update current bullets
-          for (const bullet of state.thrustGame.bullets) {
-            if (bullet.id !== null && bullet.id !== undefined) {
-              this.remoteBullets.set(bullet.id, {
-                x: bullet.x,
-                y: bullet.y,
-                vx: bullet.vx,
-                vy: bullet.vy,
-                lifetime: bullet.lifetime,
-                clientId: clientId
-              });
+          // Clean up stale bullets for THIS client ONLY
+          for (const [id, bullet] of this.remoteBullets) {
+            if (bullet.clientId === clientId && !currentBulletIds.has(id)) {
+              this.remoteBullets.delete(id);
             }
           }
         }
@@ -1736,14 +1860,17 @@ class ThrustGame {
         // This handles the case where our tab was frozen/inactive and we missed the collision
         if (state.thrustGame.hitNotifications && Array.isArray(state.thrustGame.hitNotifications)) {
           for (const hit of state.thrustGame.hitNotifications) {
-            // Check if this hit notification is for us
-            // Also check invulnerability to prevent hits during respawn grace period
-            // The alive check prevents double-death if multiple players hit us in the same frame
-            if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
-              // We've been hit! Die and respawn
-              this.handlePlayerDeath();
+            // Use unique hit ID to prevent duplicate processing
+            if (hit.id && this.processedHits.has(hit.id)) continue;
 
-              // Break to avoid processing multiple hits in same frame
+            if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
+              if (hit.id) {
+                this.processedHits.add(hit.id);
+                // Prune processed hits occasionally
+                if (this.processedHits.size > 100) this.processedHits.clear();
+              }
+
+              this.handlePlayerDeath();
               break;
             }
           }
@@ -1751,7 +1878,11 @@ class ThrustGame {
       }
     });
 
-    // Remove players that are no longer present
+    // Sync the static flag with current reality
+    // This provides a redundant update path to avoid deadlocks
+    ThrustGame.hasRemotePlayers = (activeClients.size > 0);
+
+    // Remove remote players who are no longer in awareness or no longer in thrust mode
     for (const clientId of this.remotePlayers.keys()) {
       if (!activeClients.has(clientId)) {
         this.remotePlayers.delete(clientId);
@@ -1785,6 +1916,7 @@ class ThrustGame {
       y: Math.round(p.y * 10) / 10,
       angle: Math.round(p.angle * 100) / 100,
       alive: p.alive,
+      isInvulnerable: Date.now() < p.invulnerableUntil,
       thrusting: this.keys.up,
       bulletCount: this.bullets.length
     };
@@ -1834,8 +1966,8 @@ class ThrustGame {
       y: currentState.y,
       angle: currentState.angle,
       alive: currentState.alive,
+      isInvulnerable: currentState.isInvulnerable,
       thrusting: currentState.thrusting,
-      // Note: vx/vy removed - only needed locally, remote clients can interpolate
       bullets: this.bullets.map(b => ({
         id: b.id,
         x: Math.round(b.x * 10) / 10,
@@ -1843,15 +1975,19 @@ class ThrustGame {
         vx: Math.round(b.vx * 10) / 10,
         vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
-      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)), // Filter invalid bullets
-      hitNotifications: this.pendingHitNotifications || []  // Broadcast hits for frozen tabs
+      })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)),
+      hitNotifications: this.pendingHitNotifications || []
     };
 
     // Update awareness with thrust game state
     this.collaborationManager.awareness.setLocalStateField('thrustGame', gameState);
 
-    // Clear pending hit notifications after broadcast
-    this.pendingHitNotifications = [];
+    // Persist notifications for several cycles to ensure delivery
+    if (this.hitBroadcastTimer > 0) {
+      this.hitBroadcastTimer--;
+    } else {
+      this.pendingHitNotifications = [];
+    }
 
     // Save current state for next comparison
     this.lastBroadcastState = currentState;
@@ -1867,14 +2003,19 @@ class ThrustGame {
       this.pendingHitNotifications = [];
     }
 
-    // Prevent memory leak by limiting queue size
-    // Hit notifications are cleared after each broadcast, so this should rarely happen
+    // Generate unique hit ID to prevent duplicate processing
+    const hitId = `hit_${targetClientId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
     const MAX_PENDING_HITS = 10;
     if (this.pendingHitNotifications.length < MAX_PENDING_HITS) {
       this.pendingHitNotifications.push({
+        id: hitId,
         target: targetClientId,
         timestamp: Date.now()
       });
+
+      // Start/reset rebroadcast timer to ensure delivery to high-latency peers
+      this.hitBroadcastTimer = 5; // Broadcast for 5 cycles (approx 500ms)
     }
   }
 

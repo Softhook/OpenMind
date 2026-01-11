@@ -322,7 +322,7 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
   test('should detect hit from remote bullet even when not active', () => {
     // Set game to inactive (not in thrust mode)
     game.active = false;
-    
+
     // Make player vulnerable
     game.player.invulnerableUntil = Date.now() - 1000;
 
@@ -340,8 +340,8 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
     expect(game.player.alive).toBe(true);
     const initialDeaths = game.deaths;
 
-    // Check remote bullet collisions
-    game.checkRemoteBulletCollisions();
+    // Check remote bullet collisions (now part of updateRemoteBullets)
+    game.updateRemoteBullets();
 
     // Player should now be dead
     expect(game.player.alive).toBe(false);
@@ -369,7 +369,7 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
   test('should increment death count when hit by remote bullet', () => {
     // Make player vulnerable
     game.player.invulnerableUntil = Date.now() - 1000;
-    
+
     // Add remote bullet at player position
     game.remoteBullets.set('bullet-1', {
       x: game.player.x,

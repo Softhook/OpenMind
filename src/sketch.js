@@ -910,12 +910,11 @@ function drawRemoteCursors() {
       }
     }
 
-    // If user is in thrust mode and alive, draw their spaceship instead of cursor
-    // Note: We skip cursor even if local player isn't in thrust mode, because the remote player's
-    // spaceship should always be visible when they're in thrust mode
-    if (remoteThrustState && remoteThrustState.alive) {
+    // If user is in thrust mode, their presence is handled by ThrustGame.draw()
+    // We skip the cursor even if local player isn't in thrust mode, because the remote player's
+    // spaceship should always be visible when they're in thrust mode.
+    if (remoteThrustState) {
       // Spaceship is drawn by ThrustGame.draw() as a remote player
-      // Skip drawing cursor for this user
       continue;
     }
 
