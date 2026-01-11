@@ -166,6 +166,10 @@ class ThrustGame {
       // Vital: Update remote player states from awareness every frame while running
       // This ensures smooth 60fps interpolation even if the "presence check" is throttled
       ThrustGame.instance.updateRemotePlayers();
+      
+      // Also interpolate remote players for smooth movement
+      // This must happen even if local player is not in thrust mode
+      ThrustGame.instance.interpolateRemotePlayers();
     }
 
     // 7. Draw Game (includes remote players if they exist)
@@ -737,9 +741,6 @@ class ThrustGame {
 
     // Check collisions
     this.checkCollisions();
-
-    // Interpolate remote players for smooth movement (only when active)
-    this.interpolateRemotePlayers();
 
     // Broadcast state to multiplayer
     if (this.collaborationManager && this.collaborationManager.isConnected) {

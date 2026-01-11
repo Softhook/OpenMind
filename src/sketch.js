@@ -616,7 +616,6 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
           time: Date.now(),
           isIdle: false
         };
-        hasRemoteThrustPlayers = false;
       }
       if (prevStatus !== syncStatus) {
         Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
@@ -897,18 +896,17 @@ function drawRemoteCursors() {
   if (!users || users.length === 0) return;
 
   for (const userState of users) {
-    // Check if this user is in thrust mode
-    // Check if this user is in thrust mode
+    // Check if this user is in thrust mode using their specific clientId
     // Only check if we actually have the game code loaded
     let remoteThrustState = null;
-    if (typeof ThrustGame !== 'undefined') {
+    if (typeof ThrustGame !== 'undefined' && userState.clientId) {
       const states = collaborationManager.awareness?.getStates();
       if (states) {
-        states.forEach((state, clientId) => {
-          if (state.user?.id === userState.user?.id && state.thrustGame) {
-            remoteThrustState = state.thrustGame;
-          }
-        });
+        // Use direct lookup by clientId for efficiency and multi-tab support
+        const specificState = states.get(userState.clientId);
+        if (specificState && specificState.thrustGame) {
+          remoteThrustState = specificState.thrustGame;
+        }
       }
     }
 
