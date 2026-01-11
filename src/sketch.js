@@ -899,7 +899,7 @@ function drawRemoteCursors() {
     // Check if this user is in thrust mode using their specific clientId
     // Only check if we actually have the game code loaded
     let remoteThrustState = null;
-    if (typeof ThrustGame !== 'undefined' && userState.clientId) {
+    if (typeof ThrustGame !== 'undefined' && userState.clientId !== undefined) {
       const states = collaborationManager.awareness?.getStates();
       if (states) {
         // Use direct lookup by clientId for efficiency and multi-tab support

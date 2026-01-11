@@ -166,7 +166,7 @@ class ThrustGame {
       // Vital: Update remote player states from awareness every frame while running
       // This ensures smooth 60fps interpolation even if the "presence check" is throttled
       ThrustGame.instance.updateRemotePlayers();
-      
+
       // Also interpolate remote players for smooth movement
       // This must happen even if local player is not in thrust mode
       ThrustGame.instance.interpolateRemotePlayers();
@@ -1118,16 +1118,16 @@ class ThrustGame {
           if (!bullet.scored) {
             this.score++;
             bullet.scored = true; // Mark to prevent double-counting
-            
+
             // Create explosion at remote player's position for immediate visual feedback
             // Only create one explosion per bullet to avoid multiple explosions for overlapping players
             this.createExplosion(remotePlayer.x, remotePlayer.y);
           }
-          
+
           // Broadcast that we hit this player (for frozen/inactive tabs)
           // This is outside the scored check so each hit player gets notified
           this.broadcastHit(clientId);
-          
+
           bulletHit = true;
         }
       }
@@ -1139,7 +1139,7 @@ class ThrustGame {
         if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
           // Hit! Player dies and respawns
           this.handlePlayerDeath();
-          
+
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
@@ -1159,7 +1159,7 @@ class ThrustGame {
         if (this.checkBulletHit(bullet, this.player.x, this.player.y)) {
           // Hit! Player dies and respawns
           this.handlePlayerDeath();
-          
+
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
@@ -1194,29 +1194,29 @@ class ThrustGame {
     if (dist < ThrustGame.COLLISION.RADIUS) {
       return true;
     }
-    
+
     // Also check if bullet trajectory passes through target
     // This handles fast-moving bullets that might skip over target between frames
     if (bullet.vx || bullet.vy) {
       // Calculate where bullet was last frame (approximately)
       const prevX = bullet.x - bullet.vx;
       const prevY = bullet.y - bullet.vy;
-      
+
       // Check if line segment from prevPos to currentPos intersects target circle
       const closestPoint = this.getClosestPointOnLineSegment(
         prevX, prevY, bullet.x, bullet.y,
         targetX, targetY
       );
-      
+
       const closestDx = closestPoint.x - targetX;
       const closestDy = closestPoint.y - targetY;
       const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
-      
+
       if (closestDist < ThrustGame.COLLISION.RADIUS) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -1228,16 +1228,16 @@ class ThrustGame {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const lengthSquared = dx * dx + dy * dy;
-    
+
     if (lengthSquared === 0) {
       // Line segment is a point
       return { x: x1, y: y1 };
     }
-    
+
     // Calculate t parameter (0 to 1) representing position on line segment
     let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
     t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
-    
+
     return {
       x: x1 + t * dx,
       y: y1 + t * dy
@@ -1401,33 +1401,10 @@ class ThrustGame {
       return;
     }
 
-    // Get viewport bounds for culling (optimization for 10+ players)
-    const viewportWidth = typeof width !== 'undefined' ? width : 800;
-    const viewportHeight = typeof height !== 'undefined' ? height : 600;
-    let viewportBounds = null;
-
-    if (typeof CameraUtils !== 'undefined') {
-      // Calculate visible world bounds with a margin for smooth rendering
-      const margin = 500; // Extra margin to avoid pop-in
-      viewportBounds = {
-        left: CameraUtils.worldX(0) - margin,
-        right: CameraUtils.worldX(viewportWidth) + margin,
-        top: CameraUtils.worldY(0) - margin,
-        bottom: CameraUtils.worldY(viewportHeight) + margin
-      };
-    }
-
-    // Helper function to check if a position is in viewport
-    const isInViewport = (x, y) => {
-      if (!viewportBounds) return true; // No culling if camera utils not available
-      return x >= viewportBounds.left && x <= viewportBounds.right &&
-        y >= viewportBounds.top && y <= viewportBounds.bottom;
-    };
-
-    // Draw remote players with their custom colors and names (with viewport culling)
+    // Draw remote players with their custom colors and names
     // This happens regardless of whether local player is in thrust mode
     for (const [clientId, remotePlayer] of this.remotePlayers) {
-      if (remotePlayer.alive && isInViewport(remotePlayer.x, remotePlayer.y)) {
+      if (remotePlayer.alive) {
         // Draw remote players (any other player is considered an enemy)
         this.drawPlayer(remotePlayer, remotePlayer.color, remotePlayer.thrusting, false, remotePlayer.name);
       }
@@ -1435,7 +1412,7 @@ class ThrustGame {
 
     // Draw explosions for all players (before local player check)
     // This ensures explosions are visible even when not actively playing
-    this.drawExplosions(viewportBounds, isInViewport);
+    this.drawExplosions();
 
     // Only draw local player, bullets, and UI if we're actually in thrust mode
     if (!this.active) return;
@@ -1446,8 +1423,8 @@ class ThrustGame {
       this.drawPlayer(this.player, ThrustGame.COLORS.PLAYER_LOCAL, this.keys.up, isInvulnerable);
     }
 
-    // Draw bullets (with viewport culling)
-    this.drawBullets(viewportBounds, isInViewport);
+    // Draw bullets
+    this.drawBullets();
   }
 
   /**
@@ -1588,19 +1565,12 @@ class ThrustGame {
     }
   }
 
-  /**
-   * Draws all bullets with optional viewport culling
-   * @param {Object} viewportBounds - Optional viewport bounds for culling {left, right, top, bottom}
-   * @param {Function} isInViewport - Optional function to check if position is in viewport
-   */
-  drawBullets(viewportBounds = null, isInViewport = null) {
+  drawBullets() {
     // Local bullets
     noStroke();
     const localColor = ThrustGame.COLORS.BULLET_LOCAL;
     fill(localColor.r, localColor.g, localColor.b);
     for (const bullet of this.bullets) {
-      // Skip bullets outside viewport for performance
-      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
 
@@ -1608,23 +1578,14 @@ class ThrustGame {
     const remoteColor = ThrustGame.COLORS.BULLET_REMOTE;
     fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
-      // Skip bullets outside viewport for performance
-      if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
       circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
   }
 
-  /**
-   * Draws explosion animations
-   * @param {Object} viewportBounds - Viewport bounds for culling (optional)
-   * @param {Function} isInViewport - Function to check if position is in viewport (optional)
-   */
-  drawExplosions(viewportBounds = null, isInViewport = null) {
+  drawExplosions() {
     const now = Date.now();
 
     for (const explosion of this.explosions) {
-      // Skip explosions outside viewport for performance
-      if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
 
       const elapsed = now - explosion.startTime;
       const progress = elapsed / explosion.duration; // 0 to 1
@@ -1770,7 +1731,7 @@ class ThrustGame {
             }
           }
         }
-        
+
         // Process hit notifications from this remote player
         // This handles the case where our tab was frozen/inactive and we missed the collision
         if (state.thrustGame.hitNotifications && Array.isArray(state.thrustGame.hitNotifications)) {
@@ -1781,7 +1742,7 @@ class ThrustGame {
             if (hit.target === myClientId && this.player.alive && Date.now() > this.player.invulnerableUntil) {
               // We've been hit! Die and respawn
               this.handlePlayerDeath();
-              
+
               // Break to avoid processing multiple hits in same frame
               break;
             }
@@ -1905,7 +1866,7 @@ class ThrustGame {
     if (!this.pendingHitNotifications) {
       this.pendingHitNotifications = [];
     }
-    
+
     // Prevent memory leak by limiting queue size
     // Hit notifications are cleared after each broadcast, so this should rarely happen
     const MAX_PENDING_HITS = 10;
