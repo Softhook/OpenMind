@@ -1124,6 +1124,7 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
+        // Check current position
         const dx = bullet.x - this.player.x;
         const dy = bullet.y - this.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1140,6 +1141,38 @@ class ThrustGame {
           // Remove the bullet that hit us
           this.remoteBullets.delete(bulletId);
           break;
+        }
+        
+        // Also check if bullet trajectory passes through player
+        // This handles fast-moving bullets that might skip over player between frames
+        if (bullet.vx || bullet.vy) {
+          // Calculate where bullet was last frame (approximately)
+          const prevX = bullet.x - bullet.vx;
+          const prevY = bullet.y - bullet.vy;
+          
+          // Check if line segment from prevPos to currentPos intersects player circle
+          const closestPoint = this.getClosestPointOnLineSegment(
+            prevX, prevY, bullet.x, bullet.y,
+            this.player.x, this.player.y
+          );
+          
+          const closestDx = closestPoint.x - this.player.x;
+          const closestDy = closestPoint.y - this.player.y;
+          const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
+          
+          if (closestDist < ThrustGame.COLLISION.RADIUS) {
+            // Hit! Player dies and respawns
+            this.player.alive = false;
+            this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+            this.deaths++;
+
+            // Create explosion at death location
+            this.createExplosion(this.player.x, this.player.y);
+
+            // Remove the bullet that hit us
+            this.remoteBullets.delete(bulletId);
+            break;
+          }
         }
       }
     }
@@ -1153,6 +1186,7 @@ class ThrustGame {
     // Check remote bullets against local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [bulletId, bullet] of this.remoteBullets) {
+        // Check current position
         const dx = bullet.x - this.player.x;
         const dy = bullet.y - this.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1170,8 +1204,64 @@ class ThrustGame {
           this.remoteBullets.delete(bulletId);
           break;
         }
+        
+        // Also check if bullet trajectory passes through player
+        // This handles fast-moving bullets that might skip over player between frames
+        if (bullet.vx || bullet.vy) {
+          // Calculate where bullet was last frame (approximately)
+          const prevX = bullet.x - bullet.vx;
+          const prevY = bullet.y - bullet.vy;
+          
+          // Check if line segment from prevPos to currentPos intersects player circle
+          const closestPoint = this.getClosestPointOnLineSegment(
+            prevX, prevY, bullet.x, bullet.y,
+            this.player.x, this.player.y
+          );
+          
+          const closestDx = closestPoint.x - this.player.x;
+          const closestDy = closestPoint.y - this.player.y;
+          const closestDist = Math.sqrt(closestDx * closestDx + closestDy * closestDy);
+          
+          if (closestDist < ThrustGame.COLLISION.RADIUS) {
+            // Hit! Player dies and respawns
+            this.player.alive = false;
+            this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
+            this.deaths++;
+
+            // Create explosion at death location
+            this.createExplosion(this.player.x, this.player.y);
+
+            // Remove the bullet that hit us
+            this.remoteBullets.delete(bulletId);
+            break;
+          }
+        }
       }
     }
+  }
+
+  /**
+   * Gets the closest point on a line segment to a given point
+   * Used for bullet trajectory collision detection
+   */
+  getClosestPointOnLineSegment(x1, y1, x2, y2, px, py) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthSquared = dx * dx + dy * dy;
+    
+    if (lengthSquared === 0) {
+      // Line segment is a point
+      return { x: x1, y: y1 };
+    }
+    
+    // Calculate t parameter (0 to 1) representing position on line segment
+    let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
+    
+    return {
+      x: x1 + t * dx,
+      y: y1 + t * dy
+    };
   }
 
   /**
