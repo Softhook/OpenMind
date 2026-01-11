@@ -85,4 +85,6 @@ While editing a text box:
 
 ## Easter Egg 🎮
 
-OpenMind includes a hidden mini-game!
+OpenMind includes a hidden mini-game! Press **Shift+T** to toggle the thrust game on/off.
+
+For full details about controls, multiplayer support, and technical implementation, see [docs/ThrustGame.md](docs/ThrustGame.md).
