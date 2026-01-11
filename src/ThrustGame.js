@@ -1420,19 +1420,9 @@ class ThrustGame {
    * This is called WITHIN the world transform, so coordinates are in world space
    */
   draw() {
-    // Early exit if no collaboration or no remote players
-    if (!this.collaborationManager || !this.collaborationManager.isConnected) {
-      // Only draw local game elements if active
-      if (!this.active) return;
-      // Continue to draw local player below
-    } else {
-      // Update remote players only if we have collaboration
-      this.updateRemotePlayers();
-
-      // Early exit if no remote players and not active locally
-      if (this.remotePlayers.size === 0 && !this.active) {
-        return;
-      }
+    // Early exit if no remote players and not active locally
+    if (this.remotePlayers.size === 0 && !this.active) {
+      return;
     }
 
     // Get viewport bounds for culling (optimization for 10+ players)
