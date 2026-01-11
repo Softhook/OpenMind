@@ -232,8 +232,18 @@ class MindMap {
    * Updates animation states (call this every frame)
    */
   update() {
-    // Handle pan animation
-    // Handle pan animation
+    // 1. Update all boxes (coordinates, animations, interpolation)
+    // This must happen every frame even for off-screen boxes to ensure sync
+    if (this.boxes) {
+      for (let i = 0; i < this.boxes.length; i++) {
+        const box = this.boxes[i];
+        if (box && typeof box.update === 'function') {
+          box.update();
+        }
+      }
+    }
+
+    // 2. Handle camera animations (pan/zoom)
     if ((this.isPanAnimating || this.isZoomAnimating) && typeof CameraUtils !== 'undefined') {
       const widthVal = typeof width !== 'undefined' ? width : 800;
       const heightVal = typeof height !== 'undefined' ? height : 600;
@@ -302,7 +312,7 @@ class MindMap {
     const viewportWidth = typeof width !== 'undefined' ? width : 800;
     const viewportHeight = typeof height !== 'undefined' ? height : 600;
     const useCulling = typeof CameraUtils !== 'undefined' && CameraUtils.isBoxVisible;
-    
+
     // Cache viewport bounds once per frame to avoid redundant coordinate transformations
     let viewportBounds = null;
     const isBoxVisibleFast = (box) => {
@@ -313,12 +323,12 @@ class MindMap {
       const boxRight = box.x + box.width / 2;
       const boxTop = box.y - box.height / 2;
       const boxBottom = box.y + box.height / 2;
-      return !(boxRight < viewportBounds.worldLeft || 
-               boxLeft > viewportBounds.worldRight || 
-               boxBottom < viewportBounds.worldTop || 
-               boxTop > viewportBounds.worldBottom);
+      return !(boxRight < viewportBounds.worldLeft ||
+        boxLeft > viewportBounds.worldRight ||
+        boxBottom < viewportBounds.worldTop ||
+        boxTop > viewportBounds.worldBottom);
     };
-    
+
     if (useCulling) {
       const margin = 200;
       viewportBounds = {
@@ -334,7 +344,7 @@ class MindMap {
       for (let conn of this.connections) {
         if (!conn) continue;
         if (this.draggingConnection && this.draggingConnection.conn === conn) continue;
-        
+
         // Skip off-screen connections for better performance
         if (useCulling && viewportBounds) {
           const fromVisible = isBoxVisibleFast(conn.fromBox);
@@ -343,7 +353,7 @@ class MindMap {
             continue;
           }
         }
-        
+
         try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
       }
     }
@@ -352,18 +362,18 @@ class MindMap {
     if (this.boxes) {
       for (let box of this.boxes) {
         if (!box) continue;
-        
+
         // Skip off-screen boxes for better performance
         // Check cheap conditions first (selected, editing) before expensive visibility check
         // Always draw selected boxes and boxes being edited
-        if (!box.selected && 
-            !box.isEditing && 
-            useCulling && 
-            viewportBounds &&
-            !isBoxVisibleFast(box)) {
+        if (!box.selected &&
+          !box.isEditing &&
+          useCulling &&
+          viewportBounds &&
+          !isBoxVisibleFast(box)) {
           continue;
         }
-        
+
         try {
           // Pass navigation state to box for dimming effect
           box.draw(this.isArrowKeyNavigating && this.selectedBox !== box);
@@ -377,12 +387,12 @@ class MindMap {
         if (!box) continue;
         // Don't show connectors if the box is being edited
         if (box.isEditing) continue;
-        
+
         // Skip off-screen boxes for connector dots
         if (useCulling && viewportBounds && !isBoxVisibleFast(box)) {
           continue;
         }
-        
+
         const active = this.connectingFrom && this.connectingFrom.box === box;
         // During arrow-key navigation (presentation), don't show hover-triggered connectors
         if ((!this.isArrowKeyNavigating && box.isMouseOver()) || active) {
@@ -482,7 +492,9 @@ class MindMap {
       if (cluster.length < 2) continue; // Only snap when there are at least 2
       const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
       for (const it of cluster) {
-        this.boxes[it.i].x = avg;
+        const box = this.boxes[it.i];
+        box.x = avg;
+        box.targetX = avg; // Sync target to prevent rubber-banding
       }
     }
 
@@ -493,7 +505,9 @@ class MindMap {
       if (cluster.length < 2) continue;
       const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
       for (const it of cluster) {
-        this.boxes[it.i].y = avg;
+        const box = this.boxes[it.i];
+        box.y = avg;
+        box.targetY = avg; // Sync target to prevent rubber-banding
       }
     }
   }
@@ -535,6 +549,7 @@ class MindMap {
       if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       // New center x = minLeftEdge + width/2
       box.x = minLeftEdge + box.width / 2;
+      box.targetX = box.x; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -576,6 +591,7 @@ class MindMap {
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.width)) continue;
       box.x = maxRightEdge - box.width / 2;
+      box.targetX = box.x; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -617,6 +633,7 @@ class MindMap {
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       box.y = minTopEdge + box.height / 2;
+      box.targetY = box.y; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -658,6 +675,7 @@ class MindMap {
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y) || !Utils.isValidNumber(box.height)) continue;
       box.y = maxBottomEdge - box.height / 2;
+      box.targetY = box.y; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -705,6 +723,7 @@ class MindMap {
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.x)) continue;
       box.x = centerX;
+      box.targetX = centerX; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -748,6 +767,7 @@ class MindMap {
     for (const box of boxesToAlign) {
       if (!box || !Utils.isValidNumber(box.y)) continue;
       box.y = centerY;
+      box.targetY = centerY; // Sync target to prevent rubber-banding
     }
 
     this.isDirty = true;
@@ -809,6 +829,7 @@ class MindMap {
       const box = boxes[i];
       // Set new center Y
       box.y = currentTop + box.height / 2;
+      box.targetY = box.y; // Sync target to prevent rubber-banding
       // Advance currentTop for next box
       currentTop += box.height + gap;
     }
@@ -872,6 +893,7 @@ class MindMap {
       const box = boxes[i];
       // Set new center X
       box.x = currentLeft + box.width / 2;
+      box.targetX = box.x; // Sync target to prevent rubber-banding
       // Advance currentLeft for next box
       currentLeft += box.width + gap;
     }
@@ -1069,6 +1091,8 @@ class MindMap {
         const boxWidth = box.width || 100;
         box.x = x + boxWidth / 2;
         box.y = y;
+        box.targetX = box.x; // Sync target to prevent rubber-banding
+        box.targetY = box.y;
         x += boxWidth + HORIZONTAL_SPACING;
       }
     }
@@ -1083,6 +1107,8 @@ class MindMap {
           if (!box || !Utils.isValidNumber(box.x) || !Utils.isValidNumber(box.y)) continue;
           box.x += dx;
           box.y += dy;
+          box.targetX = box.x; // Sync target to prevent rubber-banding
+          box.targetY = box.y;
         }
       }
     }

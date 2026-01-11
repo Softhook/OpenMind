@@ -161,6 +161,36 @@ class TextBox {
     this.updateDimensions();
   }
 
+  /**
+   * Updates box status and animations (position interpolation)
+   * Call this every frame even if the box is off-screen.
+   */
+  update() {
+    // 1. Position Interpolation (Smooth move towards Yjs targets)
+    // PERFORMANCE: Exit early if already at target
+    if (this.x === this.targetX && this.y === this.targetY) return;
+
+    // INTERACTION SAFETY: Don't interpolate while the local user is dragging/resizing
+    if (this.isDragging || this.isResizing) {
+      this.targetX = this.x;
+      this.targetY = this.y;
+      return;
+    }
+
+    // Apply linear interpolation (lerp)
+    if (typeof this.targetX === 'number' && Math.abs(this.targetX - this.x) > 0.5) {
+      this.x = this.x + (this.targetX - this.x) * 0.2;
+    } else if (typeof this.targetX === 'number') {
+      this.x = this.targetX;
+    }
+
+    if (typeof this.targetY === 'number' && Math.abs(this.targetY - this.y) > 0.5) {
+      this.y = this.y + (this.targetY - this.y) * 0.2;
+    } else if (typeof this.targetY === 'number') {
+      this.y = this.targetY;
+    }
+  }
+
   // ============================================================================
   // MEDIA ATTACHMENT (IMAGES AND PDFs)
   // ============================================================================
@@ -523,9 +553,9 @@ class TextBox {
     // 3. updateDimensions() invalidates cache when called directly
     // 4. Direct assignment (box.text = ...) should be followed by updateDimensions()
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
-    if (this.cachedWrappedLines && 
-        this.cachedWidth === currentWidth && 
-        this.cachedText === this.text) {
+    if (this.cachedWrappedLines &&
+      this.cachedWidth === currentWidth &&
+      this.cachedText === this.text) {
       return this.cachedWrappedLines;
     }
 
@@ -736,26 +766,6 @@ class TextBox {
     // Get zoom factor for UI scaling
     const zoomFactor = Utils.getClampedZoomFactor();
 
-    // INTERPOLATION: Smoothly move towards target if not being dragged
-    if (!this.isDragging && !this.isResizing) {
-      // Simple lerp
-      if (typeof this.targetX === 'number' && Math.abs(this.targetX - this.x) > 0.5) {
-        this.x = this.x + (this.targetX - this.x) * 0.2;
-      } else if (typeof this.targetX === 'number') {
-        this.x = this.targetX;
-      }
-
-      if (typeof this.targetY === 'number' && Math.abs(this.targetY - this.y) > 0.5) {
-        this.y = this.y + (this.targetY - this.y) * 0.2;
-      } else if (typeof this.targetY === 'number') {
-        this.y = this.targetY;
-      }
-    } else {
-      // If dragging, snap target to current to avoid rubber-banding when released
-      this.targetX = this.x;
-      this.targetY = this.y;
-    }
-
     // Draw box
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
@@ -830,13 +840,13 @@ class TextBox {
       // This dramatically improves performance when viewing large maps
       const currentZoom = Utils.getCurrentZoom ? Utils.getCurrentZoom() : 1;
       const shouldSimplifyText = currentZoom < 0.35 && !this.isEditing;
-      
+
       // Pre-calculate these values for both rendering paths
       let wrappedLines = this.wrapText(this.text);
       let lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
       let startY = (this.y - this.height / 2) + this.padding + lineHeight / 2;
       let textX = this.x - this.width / 2 + this.padding;
-      
+
       // If connector dots are visible (hover OR active connection from this box),
       // slightly dim the draggable frame area so the grab-edge is visually prominent.
       const connectorsVisible = ((!(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
