@@ -1607,7 +1607,7 @@ class ThrustGame {
     // Draw player name above ship (stays upright, not rotated with ship)
     if (name) {
       push();
-      fill(255); // White for contrast
+      fill(0); // Black for readability on light backgrounds
       noStroke();
       textAlign(CENTER, BOTTOM);
       textSize(12);
