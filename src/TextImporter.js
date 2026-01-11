@@ -41,11 +41,11 @@ class TextImporter {
     }
 
     // Validate file type
-    const isTextFile = file.type.includes('text') || 
-                       file.name.endsWith('.txt') || 
-                       file.name.endsWith('.md') ||
-                       file.name.endsWith('.text');
-    
+    const isTextFile = file.type.includes('text') ||
+      file.name.endsWith('.txt') ||
+      file.name.endsWith('.md') ||
+      file.name.endsWith('.text');
+
     if (!isTextFile) {
       console.error('Invalid file type:', file.type);
       alert('Please select a text file (.txt, .md, or .text)');
@@ -99,10 +99,10 @@ class TextImporter {
 
     // Sanitize the text using the existing utility
     const sanitizedText = Utils.sanitizeText(text);
-    
+
     // Split into lines and remove empty lines at start/end
     let lines = sanitizedText.split('\n').map(line => line.trim());
-    
+
     // Remove leading and trailing empty lines
     while (lines.length > 0 && lines[0] === '') {
       lines.shift();
@@ -155,12 +155,12 @@ class TextImporter {
       // Create heading box (orange - key 2)
       const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
       headingBox.setBackgroundByKey('orange'); // Key 2 = orange
-      
+
       // Set fixed width for imported boxes
       headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
       headingBox.userResized = true;
       headingBox.updateDimensions();
-      
+
       mindMap.boxes.push(headingBox);
       allNewBoxes.push(headingBox);
 
@@ -171,23 +171,23 @@ class TextImporter {
       // Create paragraph boxes vertically under the heading
       for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
         const paragraph = paragraphs[paraIdx];
-        
+
         // Skip empty paragraphs
         if (!paragraph || paragraph.trim() === '') {
           continue;
         }
-        
+
         // Create paragraph box
         const paragraphBox = new TextBox(currentX, currentY, paragraph);
-        
+
         // Set fixed width for imported boxes
         paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
         paragraphBox.userResized = true;
         paragraphBox.updateDimensions();
-        
+
         // Adjust Y to center position
         paragraphBox.y = currentY + paragraphBox.height / 2;
-        
+
         mindMap.boxes.push(paragraphBox);
         allNewBoxes.push(paragraphBox);
 
@@ -242,169 +242,185 @@ class TextImporter {
   }
 
   /**
-   * Parses lines of text into sections with headings and paragraphs.
+   * Parses text into sections (headings + paragraphs) using the Compromise NLP library.
    * 
-   * Enhanced algorithm with improved heuristics:
+   * Enhanced NLP Algorithm:
+   * 1. Detects Markdown ATX and Setext headings first.
+   * 2. Uses NLP to identify "heading-like" fragments (short, no verbs, noun-heavy).
+   * 3. Groups sentences into paragraphs under their respective headings.
    * 
-   * **Heading Detection:**
-   * - Short standalone sentence (ends with . ! ?)
-   * - Length < 80 characters
-   * - Word count 2-10 words
-   * - No internal sentence-ending punctuation
-   * - Supports numbered lists (e.g., "1.", "4.1", "2.3.1")
-   * - Bonus indicators: all caps, title case, no commas
-   * 
-   * **Paragraph Detection:**
-   * - Each non-empty line becomes a separate paragraph box
-   * - Single empty line creates paragraph break
-   * - Multiple empty lines (2+) create section breaks
-   * 
-   * @param {string[]} lines - Array of trimmed text lines
+   * @param {string[]} lines - Array of raw lines from the text file
    * @returns {Array<{heading: string, paragraphs: string[]}>} Parsed sections
    */
   static parseTextIntoSections(lines) {
+    if (typeof nlp === 'undefined') {
+      console.warn('Compromise NLP library not loaded. Falling back to basic parsing.');
+      return this.basicFallbackParse(lines);
+    }
+
     const sections = [];
     let currentHeading = null;
     let currentParagraphs = [];
-    let currentParagraphLines = [];
+    let wasPreviousLineEmpty = true;
 
-    // Heading detection thresholds
-    const HEADING_MAX_LENGTH = 80;
-    const HEADING_VERY_SHORT = 50;
-    const HEADING_MIN_WORDS = 2;
-    const HEADING_MAX_WORDS = 10;
-    const HEADING_SIMPLE_MAX_WORDS = 7;
-    const TITLE_CASE_THRESHOLD = 0.6;
-
-    const isHeading = (line) => {
-      if (!line || line.length === 0) return false;
-      
-      // Check for numbered list format including decimal numbering
-      const numberPrefixPattern = /^\d+(\.\d+)*\s+/;
-      const hasNumberPrefix = numberPrefixPattern.test(line);
-      
-      // Remove number prefix for analysis
-      const lineWithoutNumber = hasNumberPrefix ? line.replace(numberPrefixPattern, '') : line;
-      
-      // Must end with punctuation OR have number prefix
-      const endsWithPunctuation = /[.!?]$/.test(line);
-      if (!endsWithPunctuation && !hasNumberPrefix) return false;
-      
-      // Length check
-      const isShort = lineWithoutNumber.length < HEADING_MAX_LENGTH;
-      if (!isShort) return false;
-      
-      // Remove ending punctuation once
-      const textWithoutEnding = lineWithoutNumber.replace(/[.!?]$/, '');
-      
-      // No internal punctuation
-      const hasInternalPunctuation = /[.!?]/.test(textWithoutEnding);
-      if (hasInternalPunctuation) return false;
-      
-      // Word count analysis
-      const wordCount = lineWithoutNumber.split(/\s+/).filter(Boolean).length;
-      
-      // Additional heuristics
-      const hasCommas = lineWithoutNumber.includes(',');
-      const hasSemicolon = lineWithoutNumber.includes(';');
-      const hasColon = lineWithoutNumber.includes(':');
-      const isVeryShort = lineWithoutNumber.length < HEADING_VERY_SHORT;
-      
-      // Title case detection
-      const words = textWithoutEnding.split(/\s+/).filter(Boolean);
-      const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length;
-      const isTitleCase = capitalizedWords >= Math.ceil(words.length * TITLE_CASE_THRESHOLD);
-      
-      // All caps detection
-      const isAllCaps = /^[A-Z\s.!?]+$/.test(lineWithoutNumber) && /[A-Z]/.test(lineWithoutNumber);
-      
-      // Evaluate heading criteria
-      const hasComplexPunctuation = hasCommas || hasSemicolon || hasColon;
-      const reasonableWordCount = wordCount >= HEADING_MIN_WORDS && wordCount <= HEADING_MAX_WORDS;
-      
-      const isLikelyHeading = reasonableWordCount && (
-        hasNumberPrefix ||
-        isVeryShort ||
-        (!hasComplexPunctuation && wordCount <= HEADING_SIMPLE_MAX_WORDS) ||
-        isTitleCase ||
-        isAllCaps
-      );
-      
-      return isLikelyHeading;
-    };
-
-    const finishParagraph = () => {
-      if (currentParagraphLines.length > 0) {
-        const paragraph = currentParagraphLines.join('\n').trim();
-        if (paragraph) {
-          currentParagraphs.push(paragraph);
-        }
-        currentParagraphLines = [];
-      }
-    };
-
-    const finishSection = () => {
-      finishParagraph();
-      
-      if (currentHeading) {
-        if (currentParagraphs.length === 0) {
-          sections.push({
-            heading: currentHeading,
-            paragraphs: [''] // Placeholder
-          });
-        } else {
-          sections.push({
-            heading: currentHeading,
-            paragraphs: currentParagraphs
-          });
-        }
-      }
-      currentHeading = null;
-      currentParagraphs = [];
-    };
-
-    // Process lines
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Empty line handling
-      if (line === '') {
+      const line = lines[i].trim();
+      if (!line) {
+        // Handle empty lines
         let emptyLineCount = 1;
-        while (i + 1 < lines.length && lines[i + 1] === '') {
+        while (i + 1 < lines.length && lines[i + 1].trim() === '') {
           emptyLineCount++;
           i++;
         }
 
-        finishParagraph();
-
-        // Multiple empty lines = section break
-        if (emptyLineCount >= 2) {
-          finishSection();
+        // Multi-line break resets the section if we have content
+        if (emptyLineCount >= 2 && (currentHeading || currentParagraphs.length > 0)) {
+          this.commitSection(sections, currentHeading, currentParagraphs);
+          currentHeading = null;
+          currentParagraphs = [];
         }
+
+        wasPreviousLineEmpty = true;
         continue;
       }
 
-      // Check if heading
-      if (isHeading(line)) {
-        finishSection();
+      const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : null;
+      const headingDetected = this.nlpDetectHeading(line, wasPreviousLineEmpty, nextLine);
+
+      if (headingDetected) {
+        // If we found a NEW heading format, commit previous
+        if (currentHeading || currentParagraphs.length > 0) {
+          this.commitSection(sections, currentHeading, currentParagraphs);
+        }
+
         currentHeading = line;
-        continue;
-      }
+        currentParagraphs = [];
 
-      // Regular line
-      if (!currentHeading) {
+        // If it was a Setext underline, skip the next line
+        if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) {
+          i++;
+        }
+      } else if (!currentHeading) {
+        // If no heading yet, this line MUST be the heading unless it's very long
+        // (Better to have an untitled section than lost content)
         currentHeading = line;
-        continue;
+      } else {
+        // It's a paragraph
+        currentParagraphs.push(line);
       }
 
-      // Add to paragraph and finish immediately (single-line paragraphs)
-      currentParagraphLines.push(line);
-      finishParagraph();
+      wasPreviousLineEmpty = false;
     }
 
-    // Finish remaining content
-    finishSection();
+    // Final commit
+    if (currentHeading || currentParagraphs.length > 0) {
+      this.commitSection(sections, currentHeading || 'Untitled', currentParagraphs);
+    }
 
+    return sections;
+  }
+
+  /**
+   * Helper to commit a section to the results
+   */
+  static commitSection(sections, heading, paragraphs) {
+    if (!heading && paragraphs.length === 0) return;
+
+    let processedParagraphs = paragraphs;
+
+    // Check if this is a bibliography/references section
+    // Use compromise to match keywords if available
+    let isBibliography = false;
+    if (heading && typeof nlp !== 'undefined') {
+      isBibliography = nlp(heading).match('(bibliography|references|sources|citations)').found;
+    } else if (heading) {
+      // Basic fallback check
+      const lowerHeading = heading.toLowerCase();
+      isBibliography = lowerHeading.includes('references') ||
+        lowerHeading.includes('bibliography') ||
+        lowerHeading.includes('sources');
+    }
+
+    // If bibliography, group all paragraphs into a single entry
+    if (isBibliography && paragraphs.length > 0) {
+      processedParagraphs = [paragraphs.join('\n')];
+    }
+
+    sections.push({
+      heading: heading || 'Section',
+      paragraphs: processedParagraphs.length > 0 ? processedParagraphs : ['']
+    });
+  }
+
+  /**
+   * Uses NLP and heuristics to detect if a line is a heading
+   */
+  static nlpDetectHeading(line, previousLineEmpty, nextLine) {
+    if (!line) return false;
+
+    // 1. Explicit Bibliography/Reference keywords (High Priority)
+    const isBibHeading = /^(references|bibliography|sources|citations|refrences|works cited)$/i.test(line);
+    if (isBibHeading) return true;
+
+    // 2. Hard Markdown Checks (High Confidence)
+    if (/^#+\s/.test(line)) return true;
+    if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) return true;
+
+    // 2. Clear Paragraph Patterns (Early Exit)
+    if (/^[\s]*([-*+]|\d+\.)\s/.test(line)) return false; // List items
+    if (/^[\s]*>/.test(line)) return false; // Quotes
+
+    // 3. Punctuation Check
+    // Standard headings rarely end with a period. 
+    // If it ends with . or ; it's almost certainly a paragraph.
+    if (/[.;]$/.test(line)) return false;
+
+    // 4. NLP Analysis
+    const doc = nlp(line);
+    const hasVerbs = doc.verbs().found;
+    const wordCount = doc.wordCount();
+
+    // Headings are usually short fragments
+    const isShort = wordCount > 0 && wordCount <= 12;
+    if (!isShort) return false;
+
+    // Case analysis
+    const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
+    const isTitleCase = doc.has('@isTitleCase');
+
+    // Numbered headings (e.g. "1.1 Introduction") - usually headings even if short
+    if (/^\d+(\.\d+)*\s+[A-Z]/.test(line)) return true;
+
+    // Heuristic weighting
+    // A short, verbless line is a heading if it follows a gap OR has strong formatting.
+    if (!hasVerbs) {
+      if (previousLineEmpty || isTitleCase || isAllCaps) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Fallback for when nlp library is missing
+   */
+  static basicFallbackParse(lines) {
+    // Simplified version of our previous heuristic
+    const sections = [];
+    let currentHeading = null;
+    let currentParagraphs = [];
+
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+      if (!currentHeading) {
+        currentHeading = line;
+      } else {
+        currentParagraphs.push(line);
+      }
+    }
+    if (currentHeading) {
+      sections.push({ heading: currentHeading, paragraphs: currentParagraphs });
+    }
     return sections;
   }
 }

@@ -10,6 +10,7 @@
     "postversion": "node scripts/sync-version.js && git add version.js"
   },
   "devDependencies": {
+    "compromise": "^14.14.5",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
   },
