@@ -1049,10 +1049,6 @@ class ThrustGame {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
 
-      // Store previous position for tracer rendering
-      bullet.prevX = bullet.x;
-      bullet.prevY = bullet.y;
-
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
       bullet.lifetime--;
@@ -1085,10 +1081,6 @@ class ThrustGame {
     for (const [id, bullet] of this.remoteBullets) {
       // Local physics for remote bullets to ensure smooth movement between updates.
       // Also decrement lifetime locally so they expire naturally if a client drops.
-
-      // Store previous position for tracer rendering
-      bullet.prevX = bullet.x;
-      bullet.prevY = bullet.y;
 
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
@@ -1505,8 +1497,6 @@ class ThrustGame {
       y: this.player.y + Math.sin(this.player.angle) * tipDist,
       vx: Math.cos(this.player.angle) * ThrustGame.BULLET.SPEED + this.player.vx,
       vy: Math.sin(this.player.angle) * ThrustGame.BULLET.SPEED + this.player.vy,
-      prevX: this.player.x + Math.cos(this.player.angle) * tipDist,
-      prevY: this.player.y + Math.sin(this.player.angle) * tipDist,
       lifetime: ThrustGame.BULLET.LIFETIME
     };
 
@@ -1727,33 +1717,16 @@ class ThrustGame {
     const localColor = ThrustGame.COLORS.BULLET_LOCAL;
     fill(localColor.r, localColor.g, localColor.b);
     for (const bullet of this.bullets) {
-      // Skip bullets outside viewport for performance
       if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
-
-      // Draw tracer (line from previous to current position)
-      stroke(localColor.r, localColor.g, localColor.b);
-      strokeWeight(ThrustGame.BULLET.SIZE);
-      line(bullet.prevX || bullet.x, bullet.prevY || bullet.y, bullet.x, bullet.y);
-
-      // Always draw small circle at head for impact
-      noStroke();
-      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE);
+      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
 
     // Remote bullets
     const remoteColor = ThrustGame.COLORS.BULLET_REMOTE;
+    fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
-      // Skip bullets outside viewport for performance
       if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
-
-      // Draw tracer (line from previous to current position)
-      stroke(remoteColor.r, remoteColor.g, remoteColor.b);
-      strokeWeight(ThrustGame.BULLET.SIZE);
-      line(bullet.prevX || bullet.x, bullet.prevY || bullet.y, bullet.x, bullet.y);
-
-      // Always draw small circle at head for impact
-      noStroke();
-      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE);
+      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
     }
   }
 
@@ -1947,8 +1920,6 @@ class ThrustGame {
                 this.remoteBullets.set(b.id, {
                   x: extrapolatedX,
                   y: extrapolatedY,
-                  prevX: extrapolatedX - b.vx, // Approximate previous position for first frame tracer
-                  prevY: extrapolatedY - b.vy,
                   vx: b.vx,
                   vy: b.vy,
                   targetX: extrapolatedX,
