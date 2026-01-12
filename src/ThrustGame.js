@@ -360,6 +360,7 @@ class ThrustGame {
     this.isIdle = false;
     this.lastBroadcastState = null; // Track last broadcast to detect changes
     this.remotePlayerStateTimestamps = new Map(); // Track last update time from each client
+    this.remoteClockOffsets = new Map(); // Track minimum measured delta (clock skew + base plane)
 
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -788,6 +789,11 @@ class ThrustGame {
 
     // Handle respawn timing
     this.updateRespawn();
+
+    // ALWAYS update these even if dead, so we can see the battle continue
+    this.updateBullets();
+    this.updateExplosions();
+
     if (!this.player.alive) {
       return;
     }
@@ -802,12 +808,6 @@ class ThrustGame {
         CameraUtils.centerOn(this.player.x, this.player.y, width, height);
       }
     }
-
-    // Update bullets
-    this.updateBullets();
-
-    // Update explosion animations
-    this.updateExplosions();
 
     // Check collisions
     this.checkCollisions();
@@ -1084,12 +1084,12 @@ class ThrustGame {
       // Since trajectory is a line at known speed, we lerp to corrected path
       const lerpFactor = 0.2;
       if (Number.isFinite(bullet.targetX) && Number.isFinite(bullet.targetY)) {
-        bullet.x += (bullet.targetX - bullet.x) * lerpFactor;
-        bullet.y += (bullet.targetY - bullet.y) * lerpFactor;
-
-        // Advance target position alongside bullet so interpolation continues correctly
+        // Advance target position alongside bullet BEFORE lerp so we don't create "velocity drag"
         bullet.targetX += bullet.vx;
         bullet.targetY += bullet.vy;
+
+        bullet.x += (bullet.targetX - bullet.x) * lerpFactor;
+        bullet.y += (bullet.targetY - bullet.y) * lerpFactor;
       }
 
       bullet.lifetime--;
@@ -1820,7 +1820,8 @@ class ThrustGame {
         activeClients.add(clientId);
 
         // Calculate latency for this update
-        const updateTime = state.thrustGame.t || Date.now();
+        const now = Date.now();
+        const updateTime = state.thrustGame.t || now;
 
         // Out-of-order packet protection: Skip if we've already seen a newer update from this client
         if (this.remotePlayerStateTimestamps.has(clientId)) {
@@ -1830,8 +1831,22 @@ class ThrustGame {
         }
         this.remotePlayerStateTimestamps.set(clientId, updateTime);
 
-        const latencyMs = Math.max(0, Date.now() - updateTime);
-        const latencyFrames = latencyMs / ThrustGame.TIMING.FRAME_TIME_MS;
+        // Adaptive Clock Synchronization (minDelta tracking)
+        // rawDelta = local - remote. Represents clock skew + network latency.
+        // The minimum rawDelta seen from a client is our baseline (best-case speed of light).
+        const rawDelta = now - updateTime;
+        if (!this.remoteClockOffsets.has(clientId) || rawDelta < this.remoteClockOffsets.get(clientId)) {
+          this.remoteClockOffsets.set(clientId, rawDelta);
+        }
+
+        // Relative Latency = current delay minus the best-case baseline.
+        // This isolates "the time it takes" (jitter + extra lag) from absolute clock skew.
+        const minDelta = this.remoteClockOffsets.get(clientId);
+        const effectiveLatencyMs = rawDelta - minDelta;
+
+        // Safety clamp: Limit extrapolation to 120 frames (2 seconds).
+        // This ensures the bullet can travel its full lifetime even in high-latency scenarios.
+        const latencyFrames = Math.min(120, effectiveLatencyMs / ThrustGame.TIMING.FRAME_TIME_MS);
 
         // Update or create remote player
         if (!this.remotePlayers.has(clientId)) {
@@ -1954,6 +1969,7 @@ class ThrustGame {
       if (!activeClients.has(clientId)) {
         this.remotePlayers.delete(clientId);
         this.remotePlayerStateTimestamps.delete(clientId);
+        this.remoteClockOffsets.delete(clientId);
 
         // Also remove their bullets
         for (const [bulletId, bullet] of this.remoteBullets) {
