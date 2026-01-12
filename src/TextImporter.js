@@ -389,6 +389,11 @@ class TextImporter {
    */
   static isBibliographyHeading(heading) {
     if (!heading) return false;
+
+    // Bibliography headings are short fragments, not long sentences
+    const words = heading.trim().split(/\s+/);
+    if (words.length > 5) return false;
+
     const keywords = '(bibliography|references|sources|citations|refrences|works cited)';
 
     // Check with NLP first
@@ -396,9 +401,9 @@ class TextImporter {
       if (nlp(heading).match(keywords).found) return true;
     }
 
-    // Regex fallback/supplement
+    // Regex fallback/supplement with word boundaries
     const lower = heading.toLowerCase();
-    return /references|bibliography|sources|citations|works cited/.test(lower);
+    return /\b(references|bibliography|sources|citations|works cited|works-cited)\b/.test(lower);
   }
 
   /**

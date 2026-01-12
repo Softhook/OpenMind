@@ -4247,6 +4247,9 @@ function buildTextHierarchy() {
         if (!text) return null;
         const priority = mindMap.getBoxColorPriority(box);
         const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
+
+        // Prevent double headers
+        if (prefix && text.startsWith(prefix)) return text;
         return prefix + text;
       })
       .filter(t => t !== null);
@@ -4262,12 +4265,18 @@ function buildTextHierarchy() {
 
     // Add this box's text with hierarchy prefix
     if (box.text && box.text.trim() !== '') {
+      const text = box.text.trim();
       const priority = mindMap.getBoxColorPriority(box);
       let prefix = '';
       if (priority === 1) prefix = '# ';
       else if (priority === 2) prefix = '## ';
 
-      result.push(prefix + box.text.trim());
+      // Prevent double headers
+      if (prefix && text.startsWith(prefix)) {
+        result.push(text);
+      } else {
+        result.push(prefix + text);
+      }
     }
 
     // Traverse children
@@ -4299,9 +4308,16 @@ function buildTextHierarchy() {
 
   for (let box of unvisited) {
     if (box.text && box.text.trim() !== '') {
+      const text = box.text.trim();
       const priority = mindMap.getBoxColorPriority(box);
       const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
-      result.push(prefix + box.text.trim());
+
+      // Prevent double headers
+      if (prefix && text.startsWith(prefix)) {
+        result.push(text);
+      } else {
+        result.push(prefix + text);
+      }
     }
   }
 

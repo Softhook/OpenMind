@@ -385,6 +385,22 @@ Coskun, A., Cila, N., Nicenboim, I., Frauenberger, C., Wakkary, R., Hassenzahl, 
         expect(bridleHeading).toBeUndefined();
     });
 
+    test('does not detect paragraph containing the word citations as a bibliography heading', () => {
+        const text = 'This means GenAI remixing occurs at a micro-granular level like a health bar, turret graphics, or interface details rather than through overt citations of named artists.';
+        const lines = [
+            '## 5.1 Designing with Archetypes',
+            '',
+            text,
+            '',
+            '## 5.2 Next Section'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+
+        // If it's a heading, it will be its own section
+        const containsCitationHeading = sections.find(s => s.heading.includes('rather than through overt citations'));
+        expect(containsCitationHeading).toBeUndefined();
+    });
+
     test('detectTitleIndex identifies Markdown H1 as title', () => {
         const sections = [
             { heading: 'Author: John Doe', paragraphs: [''] },
