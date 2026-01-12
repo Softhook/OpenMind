@@ -389,13 +389,16 @@ class TextImporter {
    */
   static isBibliographyHeading(heading) {
     if (!heading) return false;
+    const keywords = '(bibliography|references|sources|citations|refrences|works cited)';
+
+    // Check with NLP first
     if (typeof nlp !== 'undefined') {
-      return nlp(heading).match('(bibliography|references|sources|citations|refrences|works cited)').found;
+      if (nlp(heading).match(keywords).found) return true;
     }
+
+    // Regex fallback/supplement
     const lower = heading.toLowerCase();
-    return lower.includes('references') || lower.includes('bibliography') ||
-      lower.includes('sources') || lower.includes('citations') ||
-      lower.includes('works cited');
+    return /references|bibliography|sources|citations|works cited/.test(lower);
   }
 
   /**
@@ -434,7 +437,8 @@ class TextImporter {
     if (inBibliography) {
       // Still allow NEW numbered sections (e.g. "7. References" -> "8. Conclusion")
       // but avoid things that look like citations (Authors, Initial. (2023)...)
-      if (/^\d+(\.\d+)*\s+[A-Z]/.test(line) && !/\(\d{4}\)/.test(line)) return true;
+      // FIX: Added \.? to match the dot after the number
+      if (/^\d+(\.\d+)*\.?[\s\t]+[A-Z]/.test(line) && !/\(\d{4}\)/.test(line)) return true;
       return false;
     }
 
@@ -477,6 +481,10 @@ class TextImporter {
       const wordCount = doc.wordCount();
       if (wordCount <= 12 && previousLineEmpty) return true;
 
+      // Special case for questions: if it's a short numbered question, it's likely a heading
+      // even if there is no empty line above it (common in research papers).
+      if (line.trim().endsWith('?') && wordCount <= 15) return true;
+
       // Otherwise, keep evaluating (might still be caught by NLP or title case checks)
     }
 
@@ -487,7 +495,11 @@ class TextImporter {
     // We already handled valid numbered heads above.
     if (/[.;]$/.test(line) && !/^\d+(\.\d+)*\s/.test(line)) return false;
 
-    // 4. NLP Analysis
+    // 4. Citation check: looks like "Author, A. (Year)" or has a year in parens.
+    // Skip these as headings even if not explicitly in a bibliography section.
+    if (/\(\d{4}\)/.test(line) || /^[A-Z][a-z]+, [A-Z]\./.test(line)) return false;
+
+    // 5. NLP Analysis
     const doc = nlp(line);
     const hasVerbs = doc.verbs().found;
     const wordCount = doc.wordCount();
