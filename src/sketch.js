@@ -4242,8 +4242,14 @@ function buildTextHierarchy() {
   // If no roots found (circular graph), use all boxes sorted by position
   if (roots.length === 0) {
     return mindMap.boxes
-      .map(box => box.text || '')
-      .filter(text => text.trim() !== '');
+      .map(box => {
+        const text = (box.text || '').trim();
+        if (!text) return null;
+        const priority = mindMap.getBoxColorPriority(box);
+        const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
+        return prefix + text;
+      })
+      .filter(t => t !== null);
   }
 
   // Traverse from each root using depth-first search
@@ -4254,9 +4260,14 @@ function buildTextHierarchy() {
     if (visited.has(box)) return;
     visited.add(box);
 
-    // Add this box's text
+    // Add this box's text with hierarchy prefix
     if (box.text && box.text.trim() !== '') {
-      result.push(box.text.trim());
+      const priority = mindMap.getBoxColorPriority(box);
+      let prefix = '';
+      if (priority === 1) prefix = '# ';
+      else if (priority === 2) prefix = '## ';
+
+      result.push(prefix + box.text.trim());
     }
 
     // Traverse children
@@ -4288,7 +4299,9 @@ function buildTextHierarchy() {
 
   for (let box of unvisited) {
     if (box.text && box.text.trim() !== '') {
-      result.push(box.text.trim());
+      const priority = mindMap.getBoxColorPriority(box);
+      const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
+      result.push(prefix + box.text.trim());
     }
   }
 

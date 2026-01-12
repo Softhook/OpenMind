@@ -62,6 +62,17 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(sections[0].paragraphs[0]).toContain('This is a paragraph');
     });
 
+    test('detects heading without empty line below', () => {
+        const lines = [
+            'Main Heading',
+            'This paragraph starts immediately on the next line.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections).toHaveLength(1);
+        expect(sections[0].heading).toBe('Main Heading');
+        expect(sections[0].paragraphs[0]).toBe('This paragraph starts immediately on the next line.');
+    });
+
     test('detects all-caps heading', () => {
         const lines = [
             'CHAPTER ONE',
@@ -116,11 +127,7 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(sections[0].paragraphs[0]).toBe(longLine);
     });
 
-    test('treats disconnected short lines with punctuation as paragraphs', () => {
-        // Current logic might struggle here, but "Hello world." is arguably a paragraph if it ends with period.
-        // Ideally, if it looks like a sentence (ends with .), it's a paragraph unless it's very short and title-cased?
-        // Let's stick thereto: if it ends with punctuation, likely proper sentence/paragraph.
-        // BUT, existing logic LOVED punctuation for headers. We want to INVERT that.
+    test('treats short lines with punctuation as paragraphs, not headings', () => {
         const lines = [
             'Analysis',
             '',
@@ -129,6 +136,15 @@ describe('TextImporter.parseTextIntoSections', () => {
         const sections = TextImporterClass.parseTextIntoSections(lines);
         expect(sections[0].heading).toBe('Analysis');
         expect(sections[0].paragraphs[0]).toBe('This is a statement.');
+    });
+
+    test('allows period in numbered headings', () => {
+        const lines = [
+            '1. Introduction',
+            'Content follows.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections[0].heading).toBe('1. Introduction');
     });
 
     test('handles multiple sections', () => {
@@ -194,7 +210,7 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(sections[0].paragraphs[1]).toBe('> Still part of quote.');
     });
 
-    test('groups bibliography entries into a single box', () => {
+    test('groups bibliography entries into a single box even with empty lines', () => {
         const lines = [
             'Main Topic',
             '',
@@ -202,7 +218,10 @@ describe('TextImporter.parseTextIntoSections', () => {
             '',
             'References',
             'Smith, J. (2020). Book Title.',
+            '',
             'Doe, A. (2021). Paper Title.',
+            '',
+            '',
             'Blog, X. (2022). Website.'
         ];
         const sections = TextImporterClass.parseTextIntoSections(lines);
@@ -216,6 +235,134 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(refSection.paragraphs[0]).toContain('Doe, A.');
         expect(refSection.paragraphs[0]).toContain('Blog, X.');
         expect(refSection.paragraphs[0]).toContain('\n');
+    });
+
+    test('handles academic paper snippet: Abstract and Introduction', () => {
+        const lines = [
+            'Abstract',
+            '"Attention Is All You Need" (Vaswani et al., 2017) introduced the Transformer, a novel deep learning architecture that revolutionized sequence transduction by relying solely on attention mechanisms, thereby dispensing with recurrence and convolutions entirely.',
+            '',
+            'Introduction',
+            'Before 2017, the dominant sequence processing models, particularly for tasks like machine translation, primarily relied on recurrent neural networks (RNNs) and convolutional neural networks (CNNs).'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections).toHaveLength(2);
+        expect(sections[0].heading).toBe('Abstract');
+        expect(sections[1].heading).toBe('Introduction');
+    });
+
+    test('handles academic methodology with bold fragments and no empty lines', () => {
+        const lines = [
+            'Methodology',
+            'The Transformer architecture is an encoder-decoder model.',
+            'Self-Attention Mechanism',
+            'At its core, self-attention allows the model to weigh the importance of different words in a sequence relative to each other.',
+            'Multi-Head Attention (MHA)',
+            'Instead of performing self-attention once, MHA employs multiple attention mechanisms in parallel.'
+        ];
+        // Note: "Self-Attention Mechanism" and "Multi-Head Attention (MHA)" should be headings
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections.length).toBeGreaterThanOrEqual(3);
+        expect(sections.some(s => s.heading === 'Self-Attention Mechanism')).toBe(true);
+        expect(sections.some(s => s.heading === 'Multi-Head Attention (MHA)')).toBe(true);
+    });
+
+    test('groups complex academic references block', () => {
+        const lines = [
+            'References',
+            '* Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., & Polosukhin, I. (2017). Attention Is All You Need. Advances in Neural Information Processing Systems, 30.',
+            '',
+            '* Bahdanau, D., Cho, K., & Bengio, Y. (2014). Neural machine translation by jointly learning to align and translate. CoRR, abs/1409.0473.',
+            '',
+            '* Devlin, J., Chang, M. W., Lee, K., & Toutanova, K. (2018). BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding. arXiv preprint arXiv:1810.04805.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        const refSection = sections.find(s => s.heading === 'References');
+        expect(refSection).toBeDefined();
+        expect(refSection.paragraphs).toHaveLength(1); // Grouped
+        expect(refSection.paragraphs[0]).toContain('Vaswani');
+        expect(refSection.paragraphs[0]).toContain('Bahdanau');
+        expect(refSection.paragraphs[0]).toContain('Devlin');
+    });
+
+    test('detectTitleIndex identifies Markdown H1 as title', () => {
+        const sections = [
+            { heading: 'Author: John Doe', paragraphs: [''] },
+            { heading: '# The Real Title', paragraphs: [''] },
+            { heading: 'Abstract', paragraphs: [''] }
+        ];
+        const titleIdx = TextImporterClass.detectTitleIndex(sections);
+        expect(titleIdx).toBe(1);
+    });
+
+    test('detectTitleIndex identifies "Title:" prefix', () => {
+        const sections = [
+            { heading: 'Preprint', paragraphs: [''] },
+            { heading: 'Title: Exploring AI', paragraphs: [''] }
+        ];
+        const titleIdx = TextImporterClass.detectTitleIndex(sections);
+        expect(titleIdx).toBe(1);
+    });
+
+    test('detectTitleIndex skips preamble metadata', () => {
+        const sections = [
+            { heading: 'Submitted to NeurIPS 2024', paragraphs: [''] },
+            { heading: 'Author: Jane Smith', paragraphs: [''] },
+            { heading: 'Deep Reinforcement Learning via Proxy', paragraphs: [''] },
+            { heading: 'Abstract', paragraphs: [''] }
+        ];
+        // Should skip "Submitted..." and "Author..." and pick the third one
+        const titleIdx = TextImporterClass.detectTitleIndex(sections);
+        expect(titleIdx).toBe(2);
+    });
+
+    test('detects title with verbs if it is Title Case', () => {
+        const lines = [
+            'Attention Is All You Need',
+            'This is the first sentence of the abstract.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections).toHaveLength(1);
+        expect(sections[0].heading).toBe('Attention Is All You Need');
+    });
+
+    test('detectTitleIndex does not skip titles starting with metadata words but containing more text', () => {
+        const sections = [
+            { heading: 'Discussion on the Future of NLP', paragraphs: ['Text'] },
+            { heading: 'Results of the Experiment', paragraphs: ['Text'] }
+        ];
+        // Should NOT skip "Discussion on..." because it doesn't match the strict metadata pattern
+        const titleIdx = TextImporterClass.detectTitleIndex(sections);
+        expect(titleIdx).toBe(0);
+    });
+
+    test('round-trip: preserves structured hierarchy with double newlines', () => {
+        const lines = [
+            '# Main Title',
+            '',
+            '## Section 1',
+            'Paragraph 1',
+            '',
+            'Paragraph 2',
+            '',
+            '',
+            'Paragraph 3',
+            '',
+            '## Section 2',
+            'Final thoughts'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+
+        // Should have 3 sections regardless of double newlines between Paragraph 2 and 3
+        expect(sections).toHaveLength(3);
+        expect(sections[0].heading).toBe('# Main Title');
+        expect(sections[1].heading).toBe('## Section 1');
+
+        // Paragraphs 1, 2, and 3 should all be under Section 1
+        expect(sections[1].paragraphs).toHaveLength(3);
+        expect(sections[1].paragraphs).toContain('Paragraph 3');
+
+        expect(sections[2].heading).toBe('## Section 2');
     });
 });
 

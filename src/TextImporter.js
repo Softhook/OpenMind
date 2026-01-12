@@ -129,7 +129,7 @@ class TextImporter {
       START_X: 300,
       START_Y: 200,
       HORIZONTAL_SPACING: 450,   // Space between heading columns
-      VERTICAL_SPACING: 30,      // Gap between paragraph boxes
+      VERTICAL_SPACING: 50,      // Gap between paragraph boxes
       IMPORTED_BOX_WIDTH: 400    // Width for all imported boxes
     };
 
@@ -146,20 +146,33 @@ class TextImporter {
     const allNewBoxes = [];
     let currentX = IMPORT_LAYOUT.START_X;
 
+    // Detect the title section index
+    const titleSectionIdx = this.detectTitleIndex(sections);
+
     // Process each section
     for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
       const section = sections[sectionIdx];
       const heading = section.heading;
       const paragraphs = section.paragraphs;
 
-      // Create heading box (orange - key 2)
+      // Create heading box
       const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
-      headingBox.setBackgroundByKey('orange'); // Key 2 = orange
+
+      // Style title red (key 3), others orange (key 2)
+      if (sectionIdx === titleSectionIdx) {
+        headingBox.setBackgroundByKey('red');
+      } else {
+        headingBox.setBackgroundByKey('orange');
+      }
 
       // Set fixed width for imported boxes
       headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
       headingBox.userResized = true;
       headingBox.updateDimensions();
+
+      // Ensure target position is updated
+      headingBox.targetX = headingBox.x;
+      headingBox.targetY = headingBox.y;
 
       mindMap.boxes.push(headingBox);
       allNewBoxes.push(headingBox);
@@ -187,6 +200,10 @@ class TextImporter {
 
         // Adjust Y to center position
         paragraphBox.y = currentY + paragraphBox.height / 2;
+
+        // Ensure target position is updated to prevent interpolation snap-back
+        paragraphBox.targetX = paragraphBox.x;
+        paragraphBox.targetY = paragraphBox.y;
 
         mindMap.boxes.push(paragraphBox);
         allNewBoxes.push(paragraphBox);
@@ -262,6 +279,10 @@ class TextImporter {
     let currentHeading = null;
     let currentParagraphs = [];
     let wasPreviousLineEmpty = true;
+    let inBibliography = false;
+
+    // Detect if the document uses Markdown style headers (#)
+    const hasMarkdownHeaders = lines.some(l => /^#+\s/.test(l.trim()));
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -273,11 +294,11 @@ class TextImporter {
           i++;
         }
 
-        // Multi-line break resets the section if we have content
-        if (emptyLineCount >= 2 && (currentHeading || currentParagraphs.length > 0)) {
-          this.commitSection(sections, currentHeading, currentParagraphs);
-          currentHeading = null;
-          currentParagraphs = [];
+        // Multi-line break used to reset the section, but now we keep paragraphs 
+        // together in the same column unless a new heading is explicitly detected.
+        // This ensures a "neat round trip" where sequential white boxes stay grouped.
+        if (inBibliography && (currentHeading || currentParagraphs.length > 0)) {
+          // Keep bibliography behavior
         }
 
         wasPreviousLineEmpty = true;
@@ -285,10 +306,10 @@ class TextImporter {
       }
 
       const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : null;
-      const headingDetected = this.nlpDetectHeading(line, wasPreviousLineEmpty, nextLine);
+      const headingDetected = this.nlpDetectHeading(line, wasPreviousLineEmpty, nextLine, hasMarkdownHeaders);
 
       if (headingDetected) {
-        // If we found a NEW heading format, commit previous
+        // If we found a NEW heading, commit previous
         if (currentHeading || currentParagraphs.length > 0) {
           this.commitSection(sections, currentHeading, currentParagraphs);
         }
@@ -296,14 +317,16 @@ class TextImporter {
         currentHeading = line;
         currentParagraphs = [];
 
+        // Check if this new heading is a bibliography
+        inBibliography = this.isBibliographyHeading(line);
+
         // If it was a Setext underline, skip the next line
         if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) {
           i++;
         }
       } else if (!currentHeading) {
-        // If no heading yet, this line MUST be the heading unless it's very long
-        // (Better to have an untitled section than lost content)
         currentHeading = line;
+        inBibliography = this.isBibliographyHeading(line);
       } else {
         // It's a paragraph
         currentParagraphs.push(line);
@@ -321,6 +344,61 @@ class TextImporter {
   }
 
   /**
+   * Identifies the index of the most likely title section.
+   * Scans early sections for Markdown H1, "Title:" markers, or short fragments
+   * that don't look like metadata.
+   */
+  static detectTitleIndex(sections) {
+    if (sections.length === 0) return -1;
+
+    // Matches standalone sections or explicit metadata prefixes
+    const metadataKeywords = /^(author|date|doi|issn|preprint|page|submitted|id|abstract|introduction|methodology|results|discussion|conclusion|references|bibliography)$|^(author|date|doi|issn|id|title):|^submitted to/i;
+
+    // Scan the first few sections (title is usually near the top)
+    const scanLimit = Math.min(sections.length, 5);
+
+    // Priority 1: Markdown H1 or "Title:" prefix
+    for (let i = 0; i < scanLimit; i++) {
+      const h = sections[i].heading.trim();
+      if (/^#\s/.test(h) || /^title:\s*/i.test(h)) {
+        return i;
+      }
+    }
+
+    // Priority 2: First short heading that isn't common metadata
+    for (let i = 0; i < scanLimit; i++) {
+      const h = sections[i].heading.trim();
+      // Use NLP word count for consistency
+      const doc = nlp(h);
+      const wordCount = doc.wordCount();
+
+      // Titles are usually fragments, 1-15 words, no terminal punctuation
+      if (!metadataKeywords.test(h)) {
+        if (wordCount >= 1 && wordCount <= 15 && !/[.;]$/.test(h)) {
+          return i;
+        }
+      }
+    }
+
+    // Fallback: first section
+    return 0;
+  }
+
+  /**
+   * Checks if a heading string indicates a bibliography section
+   */
+  static isBibliographyHeading(heading) {
+    if (!heading) return false;
+    if (typeof nlp !== 'undefined') {
+      return nlp(heading).match('(bibliography|references|sources|citations|refrences|works cited)').found;
+    }
+    const lower = heading.toLowerCase();
+    return lower.includes('references') || lower.includes('bibliography') ||
+      lower.includes('sources') || lower.includes('citations') ||
+      lower.includes('works cited');
+  }
+
+  /**
    * Helper to commit a section to the results
    */
   static commitSection(sections, heading, paragraphs) {
@@ -329,17 +407,7 @@ class TextImporter {
     let processedParagraphs = paragraphs;
 
     // Check if this is a bibliography/references section
-    // Use compromise to match keywords if available
-    let isBibliography = false;
-    if (heading && typeof nlp !== 'undefined') {
-      isBibliography = nlp(heading).match('(bibliography|references|sources|citations)').found;
-    } else if (heading) {
-      // Basic fallback check
-      const lowerHeading = heading.toLowerCase();
-      isBibliography = lowerHeading.includes('references') ||
-        lowerHeading.includes('bibliography') ||
-        lowerHeading.includes('sources');
-    }
+    let isBibliography = this.isBibliographyHeading(heading);
 
     // If bibliography, group all paragraphs into a single entry
     if (isBibliography && paragraphs.length > 0) {
@@ -355,30 +423,37 @@ class TextImporter {
   /**
    * Uses NLP and heuristics to detect if a line is a heading
    */
-  static nlpDetectHeading(line, previousLineEmpty, nextLine) {
+  static nlpDetectHeading(line, previousLineEmpty, nextLine, hasMarkdownHeaders = false) {
     if (!line) return false;
 
-    // 1. Explicit Bibliography/Reference keywords (High Priority)
-    const isBibHeading = /^(references|bibliography|sources|citations|refrences|works cited)$/i.test(line);
-    if (isBibHeading) return true;
-
-    // 2. Hard Markdown Checks (High Confidence)
+    // 1. Hard Markdown Checks (High Confidence)
     if (/^#+\s/.test(line)) return true;
     if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) return true;
+
+    // IF DOCUMENT USES MARKDOWN HEADERS: Only follow Markdown/Explicit rules
+    // This ensures a "neat round trip" for exported .md files.
+    if (hasMarkdownHeaders) {
+      if (this.isBibliographyHeading(line)) return true;
+      return false;
+    }
 
     // 2. Clear Paragraph Patterns (Early Exit)
     if (/^[\s]*([-*+]|\d+\.)\s/.test(line)) return false; // List items
     if (/^[\s]*>/.test(line)) return false; // Quotes
 
-    // 3. Punctuation Check
-    // Standard headings rarely end with a period. 
-    // If it ends with . or ; it's almost certainly a paragraph.
-    if (/[.;]$/.test(line)) return false;
+    // 3. Punctuation Check - Headings rarely end with a period.
+    // However, if it's a short numbered heading (e.g. "1. Introduction"), it's fine.
+    if (/[.;]$/.test(line) && !/^\d+(\.\d+)*\s/.test(line)) return false;
 
     // 4. NLP Analysis
     const doc = nlp(line);
     const hasVerbs = doc.verbs().found;
     const wordCount = doc.wordCount();
+
+    // 5. Context-aware check: If NO empty line, we need stronger signals
+    const nextDoc = nextLine ? nlp(nextLine) : null;
+    const nextHasVerbs = nextDoc ? nextDoc.verbs().found : false;
+    const nextEndsWithPunctuation = nextLine && /[.?!]$/.test(nextLine);
 
     // Headings are usually short fragments
     const isShort = wordCount > 0 && wordCount <= 12;
@@ -388,14 +463,27 @@ class TextImporter {
     const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
     const isTitleCase = doc.has('@isTitleCase');
 
-    // Numbered headings (e.g. "1.1 Introduction") - usually headings even if short
+    // Numbered headings (e.g. "1.1 Introduction")
     if (/^\d+(\.\d+)*\s+[A-Z]/.test(line)) return true;
 
     // Heuristic weighting
-    // A short, verbless line is a heading if it follows a gap OR has strong formatting.
-    if (!hasVerbs) {
-      if (previousLineEmpty || isTitleCase || isAllCaps) return true;
+    // A short line is likely a heading if it has no verbs (noun fragment) 
+    // OR it contains verbs but is in Title Case (e.g. "Attention Is All You Need")
+    if (!hasVerbs || isTitleCase) {
+      // If it's title case or all caps, it's a strong signal
+      if (isTitleCase || isAllCaps) return true;
+
+      // If no empty line, but next line looks like a proper sentence starting a paragraph
+      if (!previousLineEmpty && nextLine && (nextHasVerbs || nextEndsWithPunctuation)) {
+        return true;
+      }
+
+      // If previous line WAS empty, we're more lenient
+      if (previousLineEmpty) return true;
     }
+
+    // Special case: Explicit Bibliography keywords (High Priority)
+    if (this.isBibliographyHeading(line)) return true;
 
     return false;
   }
