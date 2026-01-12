@@ -652,6 +652,12 @@ class ThrustGame {
     this.player.alive = true;
     this.player.respawnTime = 0;
     this.player.invulnerableUntil = Date.now() + ThrustGame.PLAYER.INVULNERABLE_TIME;
+
+    // Immediate unthrottled broadcast of respawn state for instant visibility across network
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.broadcastPlayerState();
+      this.lastBroadcast = Date.now(); // Reset throttle timer
+    }
   }
 
   // ============================================================================
@@ -794,6 +800,15 @@ class ThrustGame {
     this.updateBullets();
     this.updateExplosions();
 
+    // Broadcast state to multiplayer even if dead (to sync "alive: false" status)
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      const now = Date.now();
+      if (!this.lastBroadcast || now - this.lastBroadcast > 100) {
+        this.broadcastPlayerState();
+        this.lastBroadcast = now;
+      }
+    }
+
     if (!this.player.alive) {
       return;
     }
@@ -811,17 +826,6 @@ class ThrustGame {
 
     // Check collisions
     this.checkCollisions();
-
-    // Broadcast state to multiplayer
-    if (this.collaborationManager && this.collaborationManager.isConnected) {
-      // Throttle broadcasts (every ~100ms for balanced gameplay and bandwidth)
-      // 100ms = 10 updates per second, sufficient for multiplayer game
-      const now = Date.now();
-      if (!this.lastBroadcast || now - this.lastBroadcast > 100) {
-        this.broadcastPlayerState();
-        this.lastBroadcast = now;
-      }
-    }
   }
 
   /**
@@ -1045,6 +1049,10 @@ class ThrustGame {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
 
+      // Store previous position for tracer rendering
+      bullet.prevX = bullet.x;
+      bullet.prevY = bullet.y;
+
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
       bullet.lifetime--;
@@ -1077,6 +1085,11 @@ class ThrustGame {
     for (const [id, bullet] of this.remoteBullets) {
       // Local physics for remote bullets to ensure smooth movement between updates.
       // Also decrement lifetime locally so they expire naturally if a client drops.
+
+      // Store previous position for tracer rendering
+      bullet.prevX = bullet.x;
+      bullet.prevY = bullet.y;
+
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
 
@@ -1285,6 +1298,12 @@ class ThrustGame {
     this.player.respawnTime = Date.now() + ThrustGame.PLAYER.RESPAWN_TIME;
     this.deaths++;
     this.createExplosion(this.player.x, this.player.y);
+
+    // Immediate unthrottled broadcast of death state for instant visibility suppression
+    if (this.collaborationManager && this.collaborationManager.isConnected) {
+      this.broadcastPlayerState();
+      this.lastBroadcast = Date.now(); // Reset throttle timer
+    }
   }
 
   /**
@@ -1486,6 +1505,8 @@ class ThrustGame {
       y: this.player.y + Math.sin(this.player.angle) * tipDist,
       vx: Math.cos(this.player.angle) * ThrustGame.BULLET.SPEED + this.player.vx,
       vy: Math.sin(this.player.angle) * ThrustGame.BULLET.SPEED + this.player.vy,
+      prevX: this.player.x + Math.cos(this.player.angle) * tipDist,
+      prevY: this.player.y + Math.sin(this.player.angle) * tipDist,
       lifetime: ThrustGame.BULLET.LIFETIME
     };
 
@@ -1708,16 +1729,31 @@ class ThrustGame {
     for (const bullet of this.bullets) {
       // Skip bullets outside viewport for performance
       if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
-      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
+
+      // Draw tracer (line from previous to current position)
+      stroke(localColor.r, localColor.g, localColor.b);
+      strokeWeight(ThrustGame.BULLET.SIZE);
+      line(bullet.prevX || bullet.x, bullet.prevY || bullet.y, bullet.x, bullet.y);
+
+      // Always draw small circle at head for impact
+      noStroke();
+      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE);
     }
 
     // Remote bullets
     const remoteColor = ThrustGame.COLORS.BULLET_REMOTE;
-    fill(remoteColor.r, remoteColor.g, remoteColor.b);
     for (const [bulletId, bullet] of this.remoteBullets) {
       // Skip bullets outside viewport for performance
       if (isInViewport && !isInViewport(bullet.x, bullet.y)) continue;
-      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE * 2);
+
+      // Draw tracer (line from previous to current position)
+      stroke(remoteColor.r, remoteColor.g, remoteColor.b);
+      strokeWeight(ThrustGame.BULLET.SIZE);
+      line(bullet.prevX || bullet.x, bullet.prevY || bullet.y, bullet.x, bullet.y);
+
+      // Always draw small circle at head for impact
+      noStroke();
+      circle(bullet.x, bullet.y, ThrustGame.BULLET.SIZE);
     }
   }
 
@@ -1911,6 +1947,8 @@ class ThrustGame {
                 this.remoteBullets.set(b.id, {
                   x: extrapolatedX,
                   y: extrapolatedY,
+                  prevX: extrapolatedX - b.vx, // Approximate previous position for first frame tracer
+                  prevY: extrapolatedY - b.vy,
                   vx: b.vx,
                   vy: b.vy,
                   targetX: extrapolatedX,
