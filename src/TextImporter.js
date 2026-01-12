@@ -306,7 +306,7 @@ class TextImporter {
       }
 
       const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : null;
-      const headingDetected = this.nlpDetectHeading(line, wasPreviousLineEmpty, nextLine, hasMarkdownHeaders);
+      const headingDetected = this.nlpDetectHeading(line, wasPreviousLineEmpty, nextLine, hasMarkdownHeaders, inBibliography);
 
       if (headingDetected) {
         // If we found a NEW heading, commit previous
@@ -423,12 +423,20 @@ class TextImporter {
   /**
    * Uses NLP and heuristics to detect if a line is a heading
    */
-  static nlpDetectHeading(line, previousLineEmpty, nextLine, hasMarkdownHeaders = false) {
+  static nlpDetectHeading(line, previousLineEmpty, nextLine, hasMarkdownHeaders = false, inBibliography = false) {
     if (!line) return false;
 
     // 1. Hard Markdown Checks (High Confidence)
     if (/^#+\s/.test(line)) return true;
     if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) return true;
+
+    // IF IN A BIBLIOGRAPHY SECTION: Skip fragment detection to avoid false positives with citations
+    if (inBibliography) {
+      // Still allow NEW numbered sections (e.g. "7. References" -> "8. Conclusion")
+      // but avoid things that look like citations (Authors, Initial. (2023)...)
+      if (/^\d+(\.\d+)*\s+[A-Z]/.test(line) && !/\(\d{4}\)/.test(line)) return true;
+      return false;
+    }
 
     // IF DOCUMENT USES MARKDOWN HEADERS: Only follow Markdown/Explicit rules
     // This ensures a "neat round trip" for exported .md files.
@@ -457,11 +465,15 @@ class TextImporter {
         if (nextNumberedMatch) return false;
       }
 
-      // If it ends with punctuation like a sentence, it's likely a list item/paragraph
-      if (/[.?!:]\s*$/.test(line)) return false;
+      // If it ends with punctuation like a sentence (period, exclamation, colon), 
+      // it's likely a list item/paragraph. However, we allow QUESTION MARKS for headings.
+      if (/[.!:]\s*$/.test(line)) return false;
+
+      // Use NLP to verify if it's a single sentence
+      const doc = nlp(line);
+      if (doc.sentences().length > 1) return false;
 
       // If it's short and isolated (preceded by empty line), it's likely a heading
-      const doc = nlp(line);
       const wordCount = doc.wordCount();
       if (wordCount <= 12 && previousLineEmpty) return true;
 

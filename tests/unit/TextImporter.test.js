@@ -147,6 +147,34 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(sections[0].heading).toBe('1. Introduction');
     });
 
+    test('detects numbered headings formulated as questions', () => {
+        const lines = [
+            '1. Introduction',
+            'This is a short introduction.',
+            '',
+            '2. How has design engaged with GenAI?',
+            'Current research on GenAI in design takes several forms.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        // Should have 2 sections: "1. Introduction" and "2. How has design engaged..."
+        expect(sections).toHaveLength(2);
+        expect(sections[1].heading).toBe('2. How has design engaged with GenAI?');
+    });
+
+    test('detects numbered headings with tabs', () => {
+        const lines = [
+            '2.	Discussion',
+            'Some discussion.',
+            '',
+            '3.\tMy method',
+            'This paper uses a reflective method.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections).toHaveLength(2);
+        expect(sections[0].heading).toBe('2.	Discussion');
+        expect(sections[1].heading).toBe('3.\tMy method');
+    });
+
     test('detects numbered heading after a paragraph', () => {
         const lines = [
             'This is an initial paragraph.',
@@ -311,6 +339,21 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(refSection.paragraphs[0]).toContain('Vaswani');
         expect(refSection.paragraphs[0]).toContain('Bahdanau');
         expect(refSection.paragraphs[0]).toContain('Devlin');
+    });
+
+    test('does not detect citations as headings inside bibliography', () => {
+        const lines = [
+            '7. References',
+            '',
+            'Abdallah, Y. K., & Estévez, A. T. (2023). Biomaterials Research-Driven Design Visualized by AI Text-Prompt-Generated Images. Designs, 7(2). https://doi.org/10.3390/designs7020048',
+            '',
+            'Bridle, J. (2023). The stupidity of AI. The Guardian. https://www.theguardian.com/technology/2023/mar/16/the-stupidity-of-ai-artificial-intelligence-dall-e-chatgpt'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        // "7. References" should be the only heading
+        expect(sections).toHaveLength(1);
+        expect(sections[0].heading).toBe('7. References');
+        expect(sections[0].paragraphs[0]).toContain('Bridle, J.');
     });
 
     test('detectTitleIndex identifies Markdown H1 as title', () => {
