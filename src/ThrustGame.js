@@ -359,6 +359,7 @@ class ThrustGame {
     this.lastMovementTime = Date.now();
     this.isIdle = false;
     this.lastBroadcastState = null; // Track last broadcast to detect changes
+    this.remotePlayerStateTimestamps = new Map(); // Track last update time from each client
 
     // Setup multiplayer if available
     if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -1078,6 +1079,19 @@ class ThrustGame {
       // Also decrement lifetime locally so they expire naturally if a client drops.
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
+
+      // Interpolate towards target (smooth out jitter and drift)
+      // Since trajectory is a line at known speed, we lerp to corrected path
+      const lerpFactor = 0.2;
+      if (Number.isFinite(bullet.targetX) && Number.isFinite(bullet.targetY)) {
+        bullet.x += (bullet.targetX - bullet.x) * lerpFactor;
+        bullet.y += (bullet.targetY - bullet.y) * lerpFactor;
+
+        // Advance target position alongside bullet so interpolation continues correctly
+        bullet.targetX += bullet.vx;
+        bullet.targetY += bullet.vy;
+      }
+
       bullet.lifetime--;
 
       if (bullet.lifetime <= 0) {
@@ -1805,6 +1819,20 @@ class ThrustGame {
 
         activeClients.add(clientId);
 
+        // Calculate latency for this update
+        const updateTime = state.thrustGame.t || Date.now();
+
+        // Out-of-order packet protection: Skip if we've already seen a newer update from this client
+        if (this.remotePlayerStateTimestamps.has(clientId)) {
+          if (updateTime <= this.remotePlayerStateTimestamps.get(clientId)) {
+            return;
+          }
+        }
+        this.remotePlayerStateTimestamps.set(clientId, updateTime);
+
+        const latencyMs = Math.max(0, Date.now() - updateTime);
+        const latencyFrames = latencyMs / ThrustGame.TIMING.FRAME_TIME_MS;
+
         // Update or create remote player
         if (!this.remotePlayers.has(clientId)) {
           this.remotePlayers.set(clientId, {
@@ -1854,14 +1882,36 @@ class ThrustGame {
           for (const b of state.thrustGame.bullets) {
             if (b.id) {
               currentBulletIds.add(b.id);
-              this.remoteBullets.set(b.id, {
-                x: b.x,
-                y: b.y,
-                vx: b.vx,
-                vy: b.vy,
-                lifetime: b.lifetime,
-                clientId: clientId
-              });
+
+              // Extrapolate current position based on latency
+              const extrapolatedX = b.x + b.vx * latencyFrames;
+              const extrapolatedY = b.y + b.vy * latencyFrames;
+              const adjustedLifetime = b.lifetime - latencyFrames;
+
+              // Don't add bullets that have already expired due to latency
+              if (adjustedLifetime <= 0) continue;
+
+              if (!this.remoteBullets.has(b.id)) {
+                // NEW bullet: Initialize with extrapolated position
+                this.remoteBullets.set(b.id, {
+                  x: extrapolatedX,
+                  y: extrapolatedY,
+                  vx: b.vx,
+                  vy: b.vy,
+                  targetX: extrapolatedX,
+                  targetY: extrapolatedY,
+                  lifetime: adjustedLifetime,
+                  clientId: clientId
+                });
+              } else {
+                // EXISTING bullet: Update target and physics, but don't snap x,y
+                const bullet = this.remoteBullets.get(b.id);
+                bullet.targetX = extrapolatedX;
+                bullet.targetY = extrapolatedY;
+                bullet.vx = b.vx;
+                bullet.vy = b.vy;
+                bullet.lifetime = adjustedLifetime;
+              }
             }
           }
 
@@ -1903,6 +1953,7 @@ class ThrustGame {
     for (const clientId of this.remotePlayers.keys()) {
       if (!activeClients.has(clientId)) {
         this.remotePlayers.delete(clientId);
+        this.remotePlayerStateTimestamps.delete(clientId);
 
         // Also remove their bullets
         for (const [bulletId, bullet] of this.remoteBullets) {
@@ -1979,6 +2030,7 @@ class ThrustGame {
     }
 
     const gameState = {
+      t: now, // Timestamp for latency calculation
       x: currentState.x,
       y: currentState.y,
       angle: currentState.angle,
