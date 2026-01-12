@@ -438,11 +438,41 @@ class TextImporter {
     }
 
     // 2. Clear Paragraph Patterns (Early Exit)
-    if (/^[\s]*([-*+]|\d+\.)\s/.test(line)) return false; // List items
+    // Bullet points are always list items
+    if (/^[\s]*([-*+])\s/.test(line)) return false;
+
+    // Numbered lines - check if it's a heading or a list item
+    // Matches "1. ", "1.1 ", "1.2.3 ", etc. Supporting both space and tab.
+    const numberedMatch = line.match(/^(\d+(?:\.\d+)*)\.[\s\t]+(.*)/);
+    if (numberedMatch) {
+      const number = numberedMatch[1];
+      const title = numberedMatch[2];
+
+      // Multi-level (1.1, 1.2.3) are almost certainly headings
+      if (number.includes('.')) return true;
+
+      // If followed by another sequential-looking number, it's likely a list
+      if (nextLine) {
+        const nextNumberedMatch = nextLine.match(/^(\d+(?:\.\d+)*)\.[\s\t]+/);
+        if (nextNumberedMatch) return false;
+      }
+
+      // If it ends with punctuation like a sentence, it's likely a list item/paragraph
+      if (/[.?!:]\s*$/.test(line)) return false;
+
+      // If it's short and isolated (preceded by empty line), it's likely a heading
+      const doc = nlp(line);
+      const wordCount = doc.wordCount();
+      if (wordCount <= 12 && previousLineEmpty) return true;
+
+      // Otherwise, keep evaluating (might still be caught by NLP or title case checks)
+    }
+
     if (/^[\s]*>/.test(line)) return false; // Quotes
 
     // 3. Punctuation Check - Headings rarely end with a period.
     // However, if it's a short numbered heading (e.g. "1. Introduction"), it's fine.
+    // We already handled valid numbered heads above.
     if (/[.;]$/.test(line) && !/^\d+(\.\d+)*\s/.test(line)) return false;
 
     // 4. NLP Analysis
@@ -459,11 +489,14 @@ class TextImporter {
     const isShort = wordCount > 0 && wordCount <= 12;
     if (!isShort) return false;
 
-    // Case analysis
+    // Case analysis - more robust Title Case check than compromise's loose default
     const isAllCaps = line === line.toUpperCase() && /[A-Z]/.test(line);
-    const isTitleCase = doc.has('@isTitleCase');
+    const words = line.split(/\s+/).filter(w => w.length > 0);
+    const cappedWords = words.filter(w => /^[A-Z]/.test(w));
+    // Most words capped (ignoring typical small words)
+    const isTitleCase = words.length > 0 && (cappedWords.length / words.length >= 0.7 || doc.has('@isTitleCase'));
 
-    // Numbered headings (e.g. "1.1 Introduction")
+    // Numbered headings (already covered by specialized logic above, but keeping regex fallback)
     if (/^\d+(\.\d+)*\s+[A-Z]/.test(line)) return true;
 
     // Heuristic weighting
@@ -474,6 +507,7 @@ class TextImporter {
       if (isTitleCase || isAllCaps) return true;
 
       // If no empty line, but next line looks like a proper sentence starting a paragraph
+      // This helps catch headings like "Playful Intervention" that are immediately followed by a block of text
       if (!previousLineEmpty && nextLine && (nextHasVerbs || nextEndsWithPunctuation)) {
         return true;
       }

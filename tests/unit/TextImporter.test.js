@@ -147,6 +147,34 @@ describe('TextImporter.parseTextIntoSections', () => {
         expect(sections[0].heading).toBe('1. Introduction');
     });
 
+    test('detects numbered heading after a paragraph', () => {
+        const lines = [
+            'This is an initial paragraph.',
+            '',
+            '3. My method',
+            '',
+            'This is the method description.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        // Should have two sections: the first one (fallback title), and "3. My method"
+        expect(sections.length).toBeGreaterThanOrEqual(2);
+        const methodSection = sections.find(s => s.heading.includes('My method'));
+        expect(methodSection).toBeDefined();
+        expect(methodSection.heading).toBe('3. My method');
+    });
+
+    test('detects sub-heading without empty lines in a sequence', () => {
+        const lines = [
+            'This is an introductory paragraph that setting the context.',
+            'Playful Intervention',
+            'This is the follow-up paragraph detail.'
+        ];
+        const sections = TextImporterClass.parseTextIntoSections(lines);
+        expect(sections.length).toBeGreaterThanOrEqual(2);
+        const heading = sections.find(s => s.heading === 'Playful Intervention');
+        expect(heading).toBeDefined();
+    });
+
     test('handles multiple sections', () => {
         const lines = [
             'Section 1',
