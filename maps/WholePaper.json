@@ -1,13 +1,13 @@
 {
   "boxes": [
     {
-      "id": "627b08b6-0583-4893-b2f9-c0b5d73ce2d2",
-      "x": 300,
-      "y": 285.5,
-      "text": "Blank Blanka",
+      "id": "85c88817-1569-48aa-b38d-f40690396cfd",
+      "x": 2100,
+      "y": 494.5,
+      "text": "Abstract: Generative AI (GenAI) has sparked intense media debate, yet design research has often echoed these narratives rather than examining how GenAI reshapes everyday design practice. This paper presents a year-long auto-ethnographic study involving 34 games and apps created through vibe coding, a GenAI-native approach that uses natural language prompts to generate code. The study reveals distinct qualities that unsettle design processes: playful intervention, creative forgetting, spectral echoes, inventive excess, and fragile limits. Two key insights emerge: designing with GenAI requires deliberate engagement with cultural archetypes and treating AI as an unruly collaborator. Drawing on John Oswald’s 1985 concept of ‘plunderphonics’, the paper situates GenAI within a lineage of experimental art and design tactics. The paper offers auto-ethnographic insights into how GenAI reshapes design practice and introduces ‘plundergeist’ as a critical and playful ethos for designing with GenAI through cultural plundering and unruly collaboration.",
       "imageUrl": null,
       "width": 400,
-      "height": 45,
+      "height": 423,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -15,66 +15,24 @@
       }
     },
     {
-      "id": "ce464ad7-082b-4444-9296-755f5b7a68a6",
-      "x": 300,
-      "y": 371,
-      "text": "aAffiliation name LEAVE BLANK FOR INITIAL SUBMISSION",
-      "imageUrl": null,
-      "width": 400,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "ba8f6cde-ac74-477e-872c-c9c45c8494d9",
-      "x": 300,
-      "y": 467,
-      "text": "*Corresponding author e-mail: LEAVE BLANK FOR INITIAL SUBMISSION",
-      "imageUrl": null,
-      "width": 400,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "cabf40bf-4327-4a72-b8ea-7bf1db50b1b4",
-      "x": 300,
-      "y": 563,
-      "text": "https://doi.org/10.21606/drs.2026.XXX LEAVE BLANK FOR INITIAL SUBMISSION",
-      "imageUrl": null,
-      "width": 400,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "6f549998-b88a-42d4-8396-ba94a9ca1a10",
-      "x": 300,
-      "y": 1112,
+      "id": "7f2f37f2-e2dd-4a2d-9b02-afd9a08079ac",
+      "x": 2550,
+      "y": 198.48512957882548,
       "text": "Keywords: Generative AI; Vibe Coding; Auto-ethnography; Design Research",
       "imageUrl": null,
       "width": 400,
       "height": 66,
       "backgroundColor": {
         "r": 255,
-        "g": 255,
-        "b": 255
+        "g": 200,
+        "b": 140
       }
     },
     {
-      "id": "b5759093-4d3b-4379-bfe4-bb9b89cce893",
-      "x": 750,
+      "id": "57344a7f-4343-4a82-851a-0c3f8770553a",
+      "x": 3000,
       "y": 200,
-      "text": "1 Introduction",
+      "text": "1.\tIntroduction",
       "imageUrl": null,
       "width": 400,
       "height": 45,
@@ -85,10 +43,10 @@
       }
     },
     {
-      "id": "bb0e556a-0939-4417-9e5e-c138a416f77d",
-      "x": 750,
-      "y": 443,
-      "text": "Generative AI (GenAI) entered public consciousness in 2022 with the emergence of Large Language Models (LLMs), which quickly gained widespread attention. From mainstream media to academics across diverse disciplines, concerns have emerged about GenAI’s impacts. Headlines warn of the death of creativity, job displacement, excessive energy consumption, and ethical biases with dramatic societal consequences (Bridle, 2023; WEF, 2023; Zygadlo, 2024). These themes are also reflected in the design literature, which has many conceptual pieces and opinion surveys yet only limited empirical studies of design practice. While valuable, conceptual approaches tend to mirror mainstream discourse and do not attend empirically to how these tools are transforming t he everyday practices of designers. The danger lies in designers and educators adopting or rejecting GenAI without fully understanding the unique differences it brings to the design process.",
+      "id": "43c04aea-ebaa-47fe-86ce-2d17aa6aac42",
+      "x": 3000,
+      "y": 463,
+      "text": "Generative AI (GenAI) entered public consciousness in 2022 with the emergence of Large Language Models (LLMs), which quickly gained widespread attention. From mainstream media to academics across diverse disciplines, concerns have emerged about GenAI’s impacts. Headlines warn of the death of creativity, job displacement, excessive energy consumption, and ethical biases with dramatic societal consequences (Bridle, 2023; WEF, 2023; Zygadlo, 2024). These themes are also reflected in the design literature, which has many conceptual pieces and opinion surveys yet only limited empirical studies of design practice. While valuable, conceptual approaches tend to mirror mainstream discourse and do not attend empirically to how these tools are transforming the everyday practices of designers. The danger lies in designers and educators adopting or rejecting GenAI without fully understanding the unique differences it brings to the design process.",
       "imageUrl": null,
       "width": 400,
       "height": 381,
@@ -99,9 +57,23 @@
       }
     },
     {
-      "id": "74a599e1-8e1b-4af9-a070-da26361208b2",
-      "x": 750,
-      "y": 1328,
+      "id": "a0e96f15-d784-4458-8612-a08ba53b0cc8",
+      "x": 3000,
+      "y": 915,
+      "text": "This paper addresses the need for more reflective accounts that document the affordances of designing with GenAI. It presents a year-long auto-ethnographic study that highlights the pragmatics of working with GenAI, focusing on the designer’s actions, decisions, and processes. The study centres on a subset of GenAI known as ‘vibe coding’ (Karpathy, 2025), where natural language prompts are used to generate computer code and, in this study, were used to prototype 34 games and apps. Vibe coding is a technology-native approach that emerged with the advent of GenAI. Recently named Collins Dictionary’s word of the year (Cress, 2025), it provides a timely lens for examining the shifting relationship between designers and AI tools. To explore these shifts, this study draws on media theory approaches from Lev Manovich (2002) and John Oswald (1985), both of whom emphasise how the distinctive affordances of media shape creative practice. Together, these perspectives help clarify what is unique about designing with GenAI rather than simply using digital tools.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 423,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "416ffc5d-b878-49e4-8b52-2ec816bf54bb",
+      "x": 3000,
+      "y": 1388,
       "text": "The paper presents a series of auto-ethnographic observations of working with GenAI such as playful intervention, creative forgetting, spectral echoes, inventive excess, and fragile limits and offers two key findings. First, it suggests that designing with AI represents an ontological shift from working with existing design tools, since working with GenAI involves collaborating with an unruly collaborator that at times invents, disrupts and forgets the design being created. Second, designing with GenAI involves an engagement with archetypes. This can manifest either as explicit remixing of existing ideas or as an unreflective blurring of established cultural tropes. GenAI represents an unavoidable engagement with the cultural history embedded in its training data. This paper introduces ‘plundergeist’, an approach that frames designing with GenAI through an experimental ethos grounded in critical art and design traditions. Rather than treating GenAI as wholly novel, plundergeist positions it as a medium that designers can engage and shape using established creative methods.",
       "imageUrl": null,
       "width": 400,
@@ -113,9 +85,9 @@
       }
     },
     {
-      "id": "77ffe550-8a71-454f-8f78-04322207c24c",
-      "x": 750,
-      "y": 1634,
+      "id": "a4c60422-c2fd-46eb-828d-212e8d265fef",
+      "x": 3000,
+      "y": 1714,
       "text": "This paper begins by reviewing current approaches to AI in design and highlighting the importance of pragmatic studies of GenAI. It then details the methodology used, shares observations from the case study, and concludes with reflections on what this means for design.",
       "imageUrl": null,
       "width": 400,
@@ -127,10 +99,10 @@
       }
     },
     {
-      "id": "5cb26716-a9f2-4deb-9b9c-8cd50f189cff",
-      "x": 1200,
+      "id": "5d37fec2-0e79-4271-8ac3-ce7228b3d558",
+      "x": 3450,
       "y": 200,
-      "text": "2 How has design engaged with GenAI?",
+      "text": "2.\tHow has design engaged with GenAI?",
       "imageUrl": null,
       "width": 400,
       "height": 45,
@@ -141,9 +113,9 @@
       }
     },
     {
-      "id": "953c4ff6-cb79-41eb-97db-d56f9af23c47",
-      "x": 1200,
-      "y": 548,
+      "id": "e5012a9c-9118-4a47-977a-4940bd291b60",
+      "x": 3450,
+      "y": 568,
       "text": "Current research on GenAI in design takes several forms, including surveys and interviews with designers (Kalving et al., 2024), small-scale empirical studies with students as well as theoretical reflections on design practice. Much of this work has focused on image-generation tools such as Midjourney, with far less attention paid to text-based models (Tan, 2024). A recurring concern is around authorship and the use of copyrighted material in AI training datasets (Abdallah & Estévez, 2023; Cui et al., 2024; Van Der Maden et al., 2024). The broader worry is that designers’ authorship and agency may be diminished through the rise of GenAI. Muller and colleagues (2023) note that much GenAI research is normative, beginning from assumptions about good or bad AI outputs, rather than examining the transformational and creative potential of these systems. Although there are numerous studies exploring students’ use of AI, these typically take place in controlled education settings (Wang & Han, 2023), and there remains surprisingly little research on professional design practice. Research offering narratives of designers reflecting on how GenAI influences their work (Li & Park, 2025; Marttila et al., 2025) are only just beginning to emerge, and a significant gap persists. Studies on AI coding assistance, such as vibe coding, only appear in the HCI and computer science literatures, and due to the novelty of these practices, much of the research remains at the preprint stage (Geng et al., 2025; Sapkota et al., 2025).",
       "imageUrl": null,
       "width": 400,
@@ -155,9 +127,9 @@
       }
     },
     {
-      "id": "f9df63f3-ddbe-4b29-824d-0163486f8a38",
-      "x": 1200,
-      "y": 1137.5,
+      "id": "599d4dc1-ee47-403e-9b8c-108c6e6908de",
+      "x": 3450,
+      "y": 1177.5,
       "text": "A revealing pattern is the widespread use of the term ‘hallucination’ to describe GenAI outputs which is found across academia (Hicks et al., 2024) and within design literature (del Campo & Leach, 2022; Hernández-Ramírez & Ferreira, 2024; Muehlhaus & Steimle, 2024). In mainstream media, hallucination serves as shorthand for when AI gets facts wrong, for instance, failing to count the number of ‘r’s in ‘strawberry’. Yet this term misrepresents the probabilistic nature of GenAI, which lacks any inherent sense of truth or falsity. Its outputs are shaped by technical affordances such as tokenisation. Within computer science, it is widely accepted that these issues are fundamental technical characteristics of LLMs (Xu et al., 2025) and not resolvable flaws (Banerjee et al., 2025). More critically, the metaphor of hallucination oversimplifies the complex nature of AI practice. It risks introducing a moralistic framework that assumes a stable, universal standard of correctness. As Huijg (2020) argues, neuronormativity, the assumption of a single standard of cognition, limits accounts of agency. By adopting such a metaphor for AI, we risk constraining our understanding of GenAI and obscuring its ontological uniqueness. To get beyond such metaphors requires more engagement with the practice of GenAI in everyday contexts and a focus on the reflective practices of the designer.",
       "imageUrl": null,
       "width": 400,
@@ -169,9 +141,9 @@
       }
     },
     {
-      "id": "bcbd6614-6c33-41ef-97ae-7892f1f4f86a",
-      "x": 1200,
-      "y": 1590.5,
+      "id": "1541f128-49d3-44c2-bda1-4037f25dfc64",
+      "x": 3450,
+      "y": 1650.5,
       "text": "There is a long history of reflection in design at a theoretical level through notions such as ‘reflection-in-action’ (Schön, 1983), yet there the focus is on reflective thinking in relation to a specific design challenge. The approach I propose is more a long-term reflective activity that runs in parallel to design work and does not try to solve design problems. It is more deliberately focused on the individual, involving creating design as well as use of self-reflective instruments such as diaries to externalise thoughts. This approach draws inspiration from the social sciences and the arts, through auto-ethnography, which is becoming an accepted method in design (Schouwenberg & Kaethler, 2021) , where it often involves designers setting up their own projects to critically examine their decisions, successes, and failures.",
       "imageUrl": null,
       "width": 400,
@@ -183,9 +155,9 @@
       }
     },
     {
-      "id": "408349b4-4eb1-4034-b114-bb8d6f674927",
-      "x": 1200,
-      "y": 1938.5,
+      "id": "bed0ea4e-03cd-4005-8cc3-808792521a3f",
+      "x": 3450,
+      "y": 2018.5,
       "text": "There have been some interesting auto-ethnographic studies of GenAI (de Roock, 2024; Kuka et al., 2025; Panke, 2025), which offer a long-term engagement with AI that highlights the ambiguity of using AI in practice and move beyond many of the tropes in the literature. One example is Boxleitner’s PLAI (2024), which involves a practice-based, method focused on GenAI image generation that includes the prompts, visual outputs, and critical reflections. What is useful about this approach is that it acknowledges AI's strengths and limitations while arguing that GenAI presents a distinctively new and different intelligence. I have found only a single auto-ethnography that has engaged with vibe coding in design (Ali, 2025), yet this seems like an important area to extend.",
       "imageUrl": null,
       "width": 400,
@@ -197,9 +169,9 @@
       }
     },
     {
-      "id": "a5932cdb-9727-49ff-a2d9-fe0121f8af24",
-      "x": 1200,
-      "y": 2192,
+      "id": "40cb4723-4931-4533-86a1-d0c8d38a6791",
+      "x": 3450,
+      "y": 2292,
       "text": "This review highlights the need for more pragmatic engagements with the practice of GenAI and the potential for auto-ethnographic methods to offer a way into this complexity that focuses on the reflective practice of the designer as well as the material specificities of GenAI.",
       "imageUrl": null,
       "width": 400,
@@ -211,10 +183,10 @@
       }
     },
     {
-      "id": "f025e316-cf0a-4293-898f-bd3cb5e9562d",
-      "x": 1650,
+      "id": "86fe6f87-1072-4d41-8e43-e27b752896f9",
+      "x": 3900,
       "y": 200,
-      "text": "3. My method",
+      "text": "3.\tMy method",
       "imageUrl": null,
       "width": 400,
       "height": 45,
@@ -225,9 +197,9 @@
       }
     },
     {
-      "id": "26a9a00e-7164-4f5d-839b-b4d694058ec7",
-      "x": 1650,
-      "y": 401,
+      "id": "24887f45-a0c6-4bd6-ad0d-2bd532be8ec5",
+      "x": 3900,
+      "y": 421,
       "text": "This paper uses a reflective method for engaging with AI that is personal, yet informed by a lineage of art and design tactics. Theoretically this approach was informed by Manovich’s ‘The Language of New Media’ (2002) and recent work on GenAI (Manovich & Arielli, 2024) which argue for understanding GenAI as a medium with unique qualities that need to be situated within a history of new media. A key reference is Oswald’s 1985 concept of ‘plunderphonics’ which was a creative response to the technologies of audio sampling and prevalent public discussions about copyright. These historical perspectives situate my observations of GenAI into a lineage of art and design tactics of media experimentation.",
       "imageUrl": null,
       "width": 400,
@@ -239,9 +211,9 @@
       }
     },
     {
-      "id": "59950f34-4512-4696-ba7e-f5334335dfa3",
-      "x": 1650,
-      "y": 770,
+      "id": "f684173f-4021-4d4f-8b0c-a11630f3fa15",
+      "x": 3900,
+      "y": 810,
       "text": "Over the course of a year, I created 34 prototype games and apps with multiple chat-based LLM agents including ChatGPT, Claude, and Grok. These were re-imaginings of games from my teenage years in the 1990s at the threshold of the 8-bit/16-bit eras. The aim was not to produce polished artefacts but to use them as reflective devices for exploring the design process with GenAI. Each project was abandoned once its conceptual space felt saturated. Before focusing on games, I experimented with GenAI in image, sound, and video production, including creating an extended tarot card graphic project. However, these proved static and finite, whereas game-making offered playful interactivity and iterative play, which proved to be key to understanding the specifics of GenAI. Distinctively, I used code to procedurally generate the graphics in the games and did not generate external art assets. This meant the whole of the look and feel of the games were mediated by GenAI.",
       "imageUrl": null,
       "width": 400,
@@ -253,9 +225,9 @@
       }
     },
     {
-      "id": "9f620765-cee2-4bd1-a26f-7e6e06e8e0d6",
-      "x": 1650,
-      "y": 1265,
+      "id": "ee7866eb-051c-4e3c-9213-2368920fc0df",
+      "x": 3900,
+      "y": 1325,
       "text": "Technically, the process involved using Visual Studio Code to prompt a variety of GenAI models to generate JavaScript with the P5.js library, which provides visual shortcuts for graphics. Generated text files were run on a local server and archived in a GitHub repository (see Data Availability section). This workflow evolved as new AI tools appeared over the duration of the study. Despite my programming experience, I relied on natural language prompts rather than writing code manually, for example: “Make me a 4-player game of Pong controlled by the keyboard in P5.js”. This approach aligns with the ethos of vibe coding popularised by Karpathy, ”where you fully give in to the vibes, embrace exponentials, and forget that the code even exists” (2025). The emphasis of this approach is on the high-level experience of designing with code rather than the technical aspects of how the code works. Karpathy suggests “it's not really coding - I just see stuff, say stuff, run stuff, and copy paste stuff, and it mostly works” (ibid). This casual way of working eliminates much of the labour I observed when using GenAI for image generation, which required significant manual labour in image editing. Due to the focus on design judgement rather than technical process and the fact that vibe coding was a GenAI-native approach, I assumed this method would offer a clear perspective on the new role between designer and AI tool.",
       "imageUrl": null,
       "width": 400,
@@ -267,9 +239,9 @@
       }
     },
     {
-      "id": "4174ea51-bc78-41dc-98d8-a31af634f696",
-      "x": 1650,
-      "y": 1749.5,
+      "id": "4e8688b7-5b84-46f8-9484-4839fdd62b47",
+      "x": 3900,
+      "y": 1829.5,
       "text": "A distinctive feature of this method was the pressure-free context in which the prototypes were created in my spare time, often designed for two players and tested through co-play with my son. This relational approach provided immediate feedback, surfacing frustrations and inspiring new features (e.g., “Add a volcano!”). Co-play became both an experimental situation and a rapid evaluation mechanism. I maintained a textual diary tracing the genealogy of design decisions to trace how features originated and evolved. This was made easier by the way the tools keep an archive of prompts and thus enables a reconstruction of the design process. These records were accompanied by reflections on moments of surprise, or frustration during the process. Such journal writing enables the designer to frame their own position and cultivate a reflective space in which the distinctive aspects of GenAI become visible.",
       "imageUrl": null,
       "width": 400,
@@ -281,9 +253,9 @@
       }
     },
     {
-      "id": "aabe68fd-2fc3-4570-9214-c44f293fc071",
-      "x": 1650,
-      "y": 2045,
+      "id": "2ea213da-a003-4890-a7b7-8dfcf48544ed",
+      "x": 3900,
+      "y": 2145,
       "text": "To analyse these observations, the notes were clustered into related themes to identify the distinctive elements of working with Gen AI. I triangulated these themes via informal discussions where I compared my insights with design colleagues. To write up these themes involved picking the observational vignettes that could best illustrate these themes.",
       "imageUrl": null,
       "width": 400,
@@ -295,8 +267,8 @@
       }
     },
     {
-      "id": "85ed9769-9360-426c-81a6-b50a8843333c",
-      "x": 2100,
+      "id": "7efa906a-47e1-4c0a-8956-ef465979af19",
+      "x": 4350,
       "y": 200,
       "text": "4.\tObservations",
       "imageUrl": null,
@@ -309,9 +281,9 @@
       }
     },
     {
-      "id": "7603b45b-1a08-47b1-91e0-2ac7f6d1b035",
-      "x": 2100,
-      "y": 285.5,
+      "id": "b3b18771-a4ec-4cf3-9dca-d5d465aa57f7",
+      "x": 4350,
+      "y": 305.5,
       "text": "The observations are grouped into keywords to clarify patterns in designing with GenAI.",
       "imageUrl": null,
       "width": 400,
@@ -323,8 +295,8 @@
       }
     },
     {
-      "id": "b39fbf70-d43b-4879-95eb-befb61f8ff0d",
-      "x": 2550,
+      "id": "a710a19e-4639-4cee-97aa-60be0d575176",
+      "x": 4800,
       "y": 200,
       "text": "4.1\tPlayful Intervention",
       "imageUrl": null,
@@ -337,9 +309,9 @@
       }
     },
     {
-      "id": "7230b032-1fb1-4c19-a46f-2f45549bce17",
-      "x": 2550,
-      "y": 495.5,
+      "id": "2477732a-c45e-4c89-bc07-0afb308a0cab",
+      "x": 4800,
+      "y": 515.5,
       "text": "What I immediately found engaging about working with GenAI was the freedom to experiment without a fixed goal and the delight of being surprised by its responses. Take the Orbitals game, which began as a simple two-player asteroids-style game where spaceships cooperated to shoot aliens. I asked the AI to generate sounds, and it used oscillators to create tones for shots and explosions rather than realistic samples. The result was mechanical bleeps and clunks more like repetitive machinery. On a whim, I prompted: “Can you turn this into a rhythm sound game?”. I had no expectation of what this would create, and it took time to understand what the AI had produced, which was a temporal grid structure into which it placed the game sounds. Shooting or interacting with the world would set off sounds that were quantised to become looping drum pattern with syncopated hi-hats. I pushed further, asking it to generate additional sounds and a melodic fanfare for level completion. Soon, I was adding power-ups for their sonic qualities rather than their gameplay effects. The result was harshly compelling, and I found myself playing with my eyes closed, listening rather than aiming, as the sounds spiralled out of control when the screen filled with bullets.",
       "imageUrl": null,
       "width": 400,
@@ -351,8 +323,22 @@
       }
     },
     {
-      "id": "4d99a204-4bba-44e0-a5f1-ee492f30ca26",
-      "x": 3000,
+      "id": "7914e52d-fb56-4d42-bdab-332d3178eeb8",
+      "x": 4800,
+      "y": 988.5,
+      "text": "What was significant was that the game evolved through interaction, not intention. I didn’t have a plan but was making choices driven by what felt interesting and pleasurable, and I spent as much time playing the game as building it. This process became an iterative loop of play, reflect, prompt, repeat. I felt both pushed and pulled by the AI in trying to shape something enjoyable to play. I would never have made this game by hand not because it was complicated or unique, but because it simply wasn’t something I had thought about, I had to experience it to imagine it. Equally important was the low-risk nature of working with GenAI. Because I was using a version control system this meant I could use a nonlinear workflow and revisit earlier ideas that worked better, remixed them with current fragments and try different directions. I knew that if things broke, I could rewind, which made me braver in my experiments.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 360,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "c845e326-e605-4139-805e-79abd114a95b",
+      "x": 5250,
       "y": 200,
       "text": "4.2\tCreative Forgetting",
       "imageUrl": null,
@@ -365,9 +351,9 @@
       }
     },
     {
-      "id": "714598d6-1cb7-465d-96a4-c74a70d47ca6",
-      "x": 3000,
-      "y": 411.5,
+      "id": "20a0787d-c67c-491e-bca7-d152034a49d7",
+      "x": 5250,
+      "y": 431.5,
       "text": "While the GenAI was adding new elements, it was also removing them without any instruction from me. In the Neptune game, I had created barrage balloons that the base launches to dissuade aliens from attacking. These balloons were designed with a physics simulation to sway in Neptune’s strong winds, and I was quite happy with my implementation. It was only later that I noticed the fact that the balloons were suddenly flying straight up. My first reaction was frustration to fix it with the prompt “Analyse the wind direction issue with the balloons”. Then I reflected and realised that while playing I hadn't noticed this, in fact, the new balloons behaviour created a visual contrast with the Neptune-native reeds that were swaying with the wind (Figure 1) and decided to keep the ‘choice’ the AI had made.",
       "imageUrl": null,
       "width": 400,
@@ -379,9 +365,9 @@
       }
     },
     {
-      "id": "fb4357f1-b282-4a06-801d-c032141d0f37",
-      "x": 3000,
-      "y": 654.5,
+      "id": "9677bc11-2dcf-4017-beec-7b5e81350464",
+      "x": 5250,
+      "y": 694.5,
       "text": "Figure 1:\tScreenshot from the Neptune game showing the yellow barrage balloons and Neptune-native reeds bending with the prevailing winds. Note the green health bars on the alien nests.",
       "imageUrl": null,
       "width": 400,
@@ -393,9 +379,9 @@
       }
     },
     {
-      "id": "eba9da57-9780-4ece-8480-fdb2b17b1007",
-      "x": 3000,
-      "y": 1002.5,
+      "id": "0a1807b0-b618-4d83-8702-750073de7f26",
+      "x": 5250,
+      "y": 1062.5,
       "text": "This kind of forgetting could be frustrating and time-consuming. At times, it felt as though the AI was designing on its own while I acted as a quality controller, chasing after it. I had to repeatedly test for unexpected issues to ensure the AI hadn’t broken or removed something. Yet forgetting was also creative. When features fell away, the design evolved fluidly, free from old redundant structures, and forced me to clarify what truly mattered in the project. Interestingly, this technical forgetting often mirrored my own mental forgetting of elements over time. Fundamentally, it forced me to continue to make deliberate design choices about priorities. Traditional design software assumes continuous progress toward a fixed goal and does not support this kind of selective loss. In contrast, working with GenAI was close to Adrian Ward’s ‘Auto-Illustrator’ (2000), which mimics the Adobe Illustrator interface but offers a wilfully resistant user experience where shapes move and change without deliberate user input (Albert, 2001). Surprisingly today’s GenAI recreates the avant-garde ethos that artists cultivated 25 years ago when they critiqued user interface design. This highlights how GenAI creates an unfamiliar and demanding relationship with the user forcing a process that requires high flexibility and adaptability on the part of the designer.",
       "imageUrl": null,
       "width": 400,
@@ -407,8 +393,8 @@
       }
     },
     {
-      "id": "a776bcb5-2b84-4da4-a575-5a1ce2d26966",
-      "x": 3450,
+      "id": "b740cc56-efe9-49f3-b0b7-7430645ab18a",
+      "x": 5700,
       "y": 200,
       "text": "4.3\tSpectral Echoes",
       "imageUrl": null,
@@ -421,9 +407,9 @@
       }
     },
     {
-      "id": "a89db3e5-95ef-45ae-889b-13af8c6eaea5",
-      "x": 3450,
-      "y": 506,
+      "id": "e3f30bd6-c606-4765-b172-f225a2ed4a3a",
+      "x": 5700,
+      "y": 526,
       "text": "Working with GenAI revealed how genre conventions are embedded in its outputs. I often felt as though I was co-designing with ghostly presences from the dataset that were shaping the aesthetic and logic of each project. For example, when recreating the Olympics game where players compete in a range of sports, the AI reproduced obsolete interaction patterns such as frantic key-mashing and a timing bar that unpredictably rises and falls, faithfully bringing back game mechanics long abandoned. Similarly, in the Neptune game, the AI kept inserting green health bars and gun barrel graphics, despite my repeated efforts to remove them. These visual interactional conventions are inherited from countless other games and must be deeply embedded in the AI’s training data. In the end I accepted the health bars because they suited the retro feel of the game, see Figure 1. Rather than resisting conventions, I began actively designing with them by prompting deliberate mashups like combining Tetris, Breakout, and Sea Wolf in one game, or creating a four-player version of Pong. These experiments revealed the AI’s capacity for generating surprising hybrids that challenged my assumptions about win conditions such as turning Pong into a collaborative game of keeping the ball in play.",
       "imageUrl": null,
       "width": 400,
@@ -435,9 +421,9 @@
       }
     },
     {
-      "id": "95472e4f-03b1-4a55-b014-aef516de3c89",
-      "x": 3450,
-      "y": 917,
+      "id": "b828bafc-13e7-44fd-99d1-28c158c592df",
+      "x": 5700,
+      "y": 957,
       "text": "My feeling was that GenAI’s strong bias toward conventions make designing with archetypes and genre far easier than against them. Yet this comes with a danger of reproducing clichés. Nevertheless, these conventions can be a highly creative resource that acknowledges the shared cultural language that the designer is positioned in and potentially allows them to create mashups that can be both familiar and surprising in how they relate to genre conventions. This makes designing with GenAI a lively and unexpectedly ‘social’ way of designing that locates the designer in a vast space of cultural history and experimentation.",
       "imageUrl": null,
       "width": 400,
@@ -449,8 +435,8 @@
       }
     },
     {
-      "id": "7df413f2-4994-467c-bf31-ceec2c1dffaa",
-      "x": 3900,
+      "id": "e685549b-ebd0-42b0-bf34-b59b981e522c",
+      "x": 6150,
       "y": 200,
       "text": "4.4\tInventive Excess",
       "imageUrl": null,
@@ -463,9 +449,9 @@
       }
     },
     {
-      "id": "c1b860d6-2480-4d65-919f-3d0e6ea58b80",
-      "x": 3900,
-      "y": 296,
+      "id": "d8c60561-b6ee-4f94-890c-70f5f0a8731e",
+      "x": 6150,
+      "y": 316,
       "text": "One feature of working with GenAI is its tendency to produce content and material far beyond the needs of a project.",
       "imageUrl": null,
       "width": 400,
@@ -477,9 +463,9 @@
       }
     },
     {
-      "id": "ac2bc568-8884-4df5-bced-5421c2f029a5",
-      "x": 3900,
-      "y": 413,
+      "id": "b1646158-b030-4a75-a479-e4aff5dc6b1d",
+      "x": 6150,
+      "y": 453,
       "text": "Figure 2:\tScreenshot from the Zelda game showing the town of DunEldford, the two hamlets of Kingbury and Gildwick, the player in blue and three orange enemies.",
       "imageUrl": null,
       "width": 400,
@@ -491,9 +477,9 @@
       }
     },
     {
-      "id": "678d57ce-5479-487b-b201-bd82e6261cd0",
-      "x": 3900,
-      "y": 719,
+      "id": "a54b093d-1fd9-4a3b-9ac8-ebfc9173259d",
+      "x": 6150,
+      "y": 779,
       "text": "In my Zelda clone, the prompt to “Generate village names” resulted in it implementing an elaborate medieval naming system using genuine Saxon prefixes and suffixes. When two hamlets are positioned close together, they form into a town that receives a multi-barrelled name (Figure 2), evoking migration patterns and the linguistic history of an organically grown world. This unexpected sophistication exceeded the game’s simple player goal of collecting coins and avoiding orange blob enemies. Similarly, the Neptune game, which was a simple Defender-style arcade game, became layered with narrative. With a few prompts, the AI generated something like Orson Welles’ ‘War of the Worlds’ radio play (1938). The audio consists of hundreds of news-style reports, research findings, and alien poetry spoken by different text-to-speech voices. I provided a small example text, and the AI would improvise on this seed and generate hundreds more. These audio fragments, which accompany the gameplay, create a complex experience where the player is flying a spaceship on Neptune while hearing about the alien assault in progress on Earth. The result is immersive and surprisingly emotionally resonant.",
       "imageUrl": null,
       "width": 400,
@@ -505,9 +491,9 @@
       }
     },
     {
-      "id": "0fe739cb-b915-4a81-9d63-f31ae8d15c45",
-      "x": 3900,
-      "y": 1109,
+      "id": "3ac2068a-1e91-4d70-8134-0b46cb19b1e3",
+      "x": 6150,
+      "y": 1189,
       "text": "GenAI’s ability to extrapolate ideas makes it a powerful collaborator for conjuring ecosystems and doing world-building. What began as an attempt to create simple clones of Zelda and Defender evolved into richly layered environments, with GenAI introducing emotional depth and complexity into JavaScript code in ways that felt almost uncanny. This abundance highlights how AI can lavish attention on aspects that would normally remain undefined in many designs due to time pressure and labour constraints. Rather than designing every detail, designers can set a tone and allow the AI to generate complex worlds.",
       "imageUrl": null,
       "width": 400,
@@ -519,8 +505,8 @@
       }
     },
     {
-      "id": "66f91d27-0f8a-4411-95f9-366cdc8a4566",
-      "x": 4350,
+      "id": "d7a7c901-1e55-41ac-99f2-57eb30955cc2",
+      "x": 6600,
       "y": 200,
       "text": "4.5\tFragile Limits",
       "imageUrl": null,
@@ -533,9 +519,9 @@
       }
     },
     {
-      "id": "1d9baea4-3c09-4056-b3a1-9aaf1e26c5f4",
-      "x": 4350,
-      "y": 390.5,
+      "id": "e4abb1e2-64d5-4fd8-9357-2df1deda791f",
+      "x": 6600,
+      "y": 410.5,
       "text": "I noticed something surprising: my projects often reached a point where the AI would keep making mistakes. Every adjustment I made seemed to break something else. The Reactor Dive game was an example of this. I managed to achieve a strong atmospheric quality in the game through its visuals and sound effects. But when I tried to introduce background music using an external sound tracker module, the application collapsed. I ended up with two separate branches that could no longer be merged: one with beautiful graphics and interesting gameplay, the other with rich sound. The two versions could never be reconciled, forcing me to choose between two incompatible worlds.",
       "imageUrl": null,
       "width": 400,
@@ -547,9 +533,9 @@
       }
     },
     {
-      "id": "8f9e303d-1223-4bc7-bace-7835f6c7083f",
-      "x": 4350,
-      "y": 717.5,
+      "id": "5173b1d4-1da2-458f-acfc-e7fe92e6e9e5",
+      "x": 6600,
+      "y": 757.5,
       "text": "This experience revealed that vibe coding works best at early stages, when ideas are fluid and exploratory, but becomes increasingly fragile as projects grow more complex. There seems to be a kind of optimum complexity—a point beyond which further refinement doesn’t improve the outcome. Many in the vibe coding community have identified this problem and tried to mitigate it through technical means, but these remain partial solutions. The result is that GenAI excels at rapid prototyping but struggles with sustained development. As one meme in the community puts it, AI gets you 80% of the way there—but the final 20% is almost impossible. GenAI feels perfect as a prototyping medium, yet inherently limited when it comes to full production.",
       "imageUrl": null,
       "width": 400,
@@ -561,8 +547,8 @@
       }
     },
     {
-      "id": "f4562ed0-817b-4295-b0b2-6fef27edbe18",
-      "x": 4800,
+      "id": "db2d1d20-5c11-4018-887e-7af02931f875",
+      "x": 7050,
       "y": 200,
       "text": "5.\tFindings",
       "imageUrl": null,
@@ -575,10 +561,10 @@
       }
     },
     {
-      "id": "58c739b4-f15b-408a-b52c-4699de2edc46",
-      "x": 4800,
-      "y": 296,
-      "text": "In this section, I want to expand the sense of some o f these observations of designing with GenAI using Oswald’s plunderphonics.",
+      "id": "3b9018f9-ae5f-4564-a7ec-1f0b4a31884f",
+      "x": 7050,
+      "y": 316,
+      "text": "In this section, I want to expand the sense of some of these observations of designing with GenAI using Oswald’s plunderphonics.",
       "imageUrl": null,
       "width": 400,
       "height": 87,
@@ -589,9 +575,9 @@
       }
     },
     {
-      "id": "16afc728-804a-44b9-9266-8e232edc5b4d",
-      "x": 4800,
-      "y": 518,
+      "id": "07ab1544-6596-453b-b609-5e68de4bd7ac",
+      "x": 7050,
+      "y": 558,
       "text": "At the heart of plunderphonics is the idea that all creative work builds on what already exists. Oswald argues that all artists who claim originality depend on instruments, sound settings, and cultural artefacts made by others and provocatively suggests that “blank tape is derivative, nothing of itself” (1985, para. 6). Rather than pursuing solitary originality, he advocates for a practice of remixing existing materials and argues that everyday activities like making compilation cassette tapes are meaningful creative constructions. Oswald suggests that everyone needs to become an active listener that engages critically and creatively with media on its own terms and within its constraints. Oswald (1985) writes:",
       "imageUrl": null,
       "width": 400,
@@ -603,9 +589,9 @@
       }
     },
     {
-      "id": "b7bffe35-c034-4883-89e4-523503b7ed7a",
-      "x": 4800,
-      "y": 761,
+      "id": "f75b4d5a-d5d9-4a4d-b296-c4a33692bf56",
+      "x": 7050,
+      "y": 821,
       "text": "“An active listener might speed up a piece of music in order to perceive more clearly its macrostructure, or slow it down to hear articulation and detail more precisely [when] portions of pieces are juxtaposed for comparison or played simultaneously” (Oswald, 1985, para. 21)",
       "imageUrl": null,
       "width": 400,
@@ -617,9 +603,9 @@
       }
     },
     {
-      "id": "36dafdd3-aa14-48c9-ae97-676fac9b6dc0",
-      "x": 4800,
-      "y": 941,
+      "id": "93da6a70-d795-48d4-b64b-a4112cd2b1b2",
+      "x": 7050,
+      "y": 1021,
       "text": "In Oswald’s approach a medium can be explored through low-tech and low skilled ways offering an accessible, democratic model of creativity where anyone can be an active listener, not just artists and designers. From a GenAI perspective, the notion of an active listener raises interesting questions about what it means to be active with this medium.",
       "imageUrl": null,
       "width": 400,
@@ -631,8 +617,8 @@
       }
     },
     {
-      "id": "b232d4d9-7a6a-4387-9a77-dab3aa1445d4",
-      "x": 5250,
+      "id": "a0d4e0de-2408-402d-9252-403598cc391e",
+      "x": 7500,
       "y": 200,
       "text": "5.1\tDesigning with Archetypes",
       "imageUrl": null,
@@ -645,9 +631,9 @@
       }
     },
     {
-      "id": "ae876b1d-6d0c-4bdd-b2bd-d1a3b7d682ce",
-      "x": 5250,
-      "y": 569,
+      "id": "ab7ea7f1-0735-4e93-98a1-ee6d0c0910c5",
+      "x": 7500,
+      "y": 589,
       "text": "My experiments in making games, felt very much like I was sampling an existing culture with preset elements. Just as musicians use instruments made by others, when designers use GenAI they are reconfiguring artefacts made by an unknowable mass of people across time and place. However, the comparison between sampling and GenAI also exposes key differences. Oswald used sampling to create recognisable references to existing works, yet GenAI obscures its sources, rendering them unattributable. This means GenAI remixing occurs at a micro-granular level like a health bar, turret graphics, or interface details rather than through overt citation of named artists. This cultural recycling at a micro-granular level is one of the defining characteristics of this medium. Working with GenAI makes engagement with premade material unavoidable, raising questions about originality and authorship. This can provoke anxiety or, alternatively, be embraced as an affirmative choice akin to plunderphonics. In actively engaging with archetypes, the creator becomes less a solitary author and more a curator of existing material. Yet this is not a po-faced archivist who just logs items and keeps their hands clean. Oswald’s model of active listening offers an empowering vision for AI-based creativity that is physically engaged with materials rather than removed from them. Techniques of collage, bricolage and readymades have been art and design techniques since the start of the 20th century. Extending these logics, we can think of the designer using GenAI as an active curator that affirmatively and deliberately remixes everything that has come before.",
       "imageUrl": null,
       "width": 400,
@@ -659,8 +645,8 @@
       }
     },
     {
-      "id": "a7d32d80-9abe-4856-86bd-6c632c808e29",
-      "x": 5700,
+      "id": "261b0e0f-09b6-4b1a-8d4a-c855e93a3023",
+      "x": 7950,
       "y": 200,
       "text": "5.2\tDesigning with an Unruly Collaborator",
       "imageUrl": null,
@@ -673,9 +659,9 @@
       }
     },
     {
-      "id": "5f16444c-d7cb-48cc-919e-8f21b3a2dad0",
-      "x": 5700,
-      "y": 506,
+      "id": "46efe7e4-1d8a-4fac-85ca-bc36af4e9f11",
+      "x": 7950,
+      "y": 526,
       "text": "Through my experiments, I came to understand GenAI not as a tool but as an unruly collaborator. Drawing on plunderphonics, this can be seen as a more-than-human collaboration, where the boundaries between creator and AI tool blur (Coskun et al., 2022). This is not a new idea, but one Oswald attributes to J.S.Bach, \"all one has to do is hit the right notes at the right time and the thing plays itself\" (1985, para. 17). Designing with GenAI extends the blurring between human and machinic agency, making authorship distributed and emergent. Yet this collaborator often forgets and disrupts the design process. Unlike traditional coding, which tends to follow a linear process, working with AI is ontologically distinct from most design and places the designer in a state of flux. This instability is not a flaw to be corrected but a defining feature. While attempts to control it can manage the chaos, it cannot be eliminated - at least with LLMs. I argue that framing GenAI as an unruly collaborator is more helpful and tangible than ‘hallucinations’, which imply error and impose narrow standards of normality. As my observations show, this unruliness can be highly generative and surprising. This unruliness calls for a distinctive mode of practice: one that is adaptive, responsive, and open to the AI’s interventions.",
       "imageUrl": null,
       "width": 400,
@@ -687,8 +673,8 @@
       }
     },
     {
-      "id": "f09ee557-b621-4d60-b234-1e34e9d66b16",
-      "x": 6150,
+      "id": "a207d4ee-24c8-4dff-a8d6-e14ee4e009d7",
+      "x": 8400,
       "y": 200,
       "text": "5.3\tPlundergeist",
       "imageUrl": null,
@@ -701,9 +687,9 @@
       }
     },
     {
-      "id": "9ce90d1c-cdd2-4df3-ac33-cce0d3488979",
-      "x": 6150,
-      "y": 306.5,
+      "id": "98e6dc15-e9b0-48f1-b8cf-c66f0490ec63",
+      "x": 8400,
+      "y": 326.5,
       "text": "Extending Oswald’s concept, this paper initiates plundergeist as an ethos for designing with GenAI. The term combines ‘plunder’ and ‘geist’ (German for ghost) to describe specific qualities of AI-based design.",
       "imageUrl": null,
       "width": 400,
@@ -715,9 +701,9 @@
       }
     },
     {
-      "id": "4cdbec26-14ce-4d77-9813-029a3a4f4031",
-      "x": 6150,
-      "y": 591.5,
+      "id": "d70b3550-ea20-420a-9f53-8777353b9f24",
+      "x": 8400,
+      "y": 631.5,
       "text": "The ‘plunder’ aspect foregrounds how using GenAI draws upon the artefacts, conventions, and materials embedded in its training data. Just as Oswald claims that blank tape is derivative, there is no such thing as a neutral computer when every transistor and training point is saturated with human intentions and cultural histories. Rather than anxiously defending authorship or copyright, plundergeist embraces a deliberate, critical relationship with our cultural inheritance where designers are always plundering from cultural history. This can be liberating and dismantle the myth of the solitary creator and present a more realistic account of what it means to design with GenAI. The second part of the term, ‘geist’ captures the uncanny, unpredictable qualities of working with AI as an unruly Poltergeist. GenAI introduces its own logics that are sometimes frustrating and sometimes delightful. Thinking of GenAI as a ghost in the machine reminds us that designing with it is not about efficiency but about difference.",
       "imageUrl": null,
       "width": 400,
@@ -729,9 +715,9 @@
       }
     },
     {
-      "id": "39648373-6472-4d32-8dbf-0f8cf8d45824",
-      "x": 6150,
-      "y": 866,
+      "id": "c29c6a9c-bb07-4085-9797-700d6dc4fc15",
+      "x": 8400,
+      "y": 926,
       "text": "Plundergeist foregrounds the experimental, and spectral character of GenAI and invites designers to engage critically and playfully with AI via a lineage of creative media tactics.",
       "imageUrl": null,
       "width": 400,
@@ -743,10 +729,10 @@
       }
     },
     {
-      "id": "e4dce24d-fae2-41a0-b7e5-cae9188a1860",
-      "x": 6600,
+      "id": "1e430773-0e19-496d-b6d4-c549534577be",
+      "x": 8850,
       "y": 200,
-      "text": "6 Conclusions",
+      "text": "6.\tConclusions",
       "imageUrl": null,
       "width": 400,
       "height": 45,
@@ -757,9 +743,9 @@
       }
     },
     {
-      "id": "de21cdfb-da37-405f-9da9-999bb965504f",
-      "x": 6600,
-      "y": 338,
+      "id": "05f46f69-a26c-4c73-bd4e-6f1e397bd034",
+      "x": 8850,
+      "y": 358,
       "text": "This paper argues that reflective, media-native design methods are essential for understanding GenAI’s distinctive affordances. Using a year-long auto-ethnographic study with vibe coding, I identified qualities such as playful intervention, creative forgetting, spectral echoes, inventive excess, and fragile limits that unsettle narratives of AI as either a productivity tool or an existential threat.",
       "imageUrl": null,
       "width": 400,
@@ -771,9 +757,9 @@
       }
     },
     {
-      "id": "e2c4c835-1af1-4baa-90ec-3b2560481d65",
-      "x": 6600,
-      "y": 591.5,
+      "id": "4c8a6df1-f032-4438-9073-47bc6dcbcac8",
+      "x": 8850,
+      "y": 631.5,
       "text": "Building on these observations, I introduce the concept of plundergeist as a pragmatic design ethos for engaging with GenAI. It recognises the cultural plundering involved in training GenAI as well as its spectral, unruly qualities. Plundergeist situates GenAI within a lineage of experimental media practices, drawing inspiration from Oswald’s plunderphonics and Manovich’s media theory, and dismantles myths of solitary originality. These insights have practical relevance for design education, where reflective methods can help students move beyond narratives of replacement or efficiency and towards critical, playful experimentation.",
       "imageUrl": null,
       "width": 400,
@@ -785,9 +771,23 @@
       }
     },
     {
-      "id": "edaa7891-d177-4b17-bf08-1cc16c0b174a",
-      "x": 6600,
-      "y": 1088,
+      "id": "3389a37f-18f2-4f83-bb58-a1bd1b4f67bb",
+      "x": 8850,
+      "y": 936.5,
+      "text": "Finally, this paper captures what working with GenAI feels like in late 2025, a moment that will inevitably date. Yet the principle of using media-native methods to engage AI will remain vital as technologies and practices change. Continuous, pragmatic and reflective experimentation is essential for understanding GenAI’s affordances and limitations in practice. The paper argues that GenAI needs to be understood through everyday practice, and that its future potential rests on designers adopting a critical and experimental ethos.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "d5e4ee6b-cc5f-49c3-838d-7cbfeb7c452b",
+      "x": 8850,
+      "y": 1168,
       "text": "Data Availability: All the games referenced in this paper are available on the author’s GitHub page as JavaScript programs that run in modern browsers. The GitHub allows the archive of git commits to be examined and the creation process to be followed.",
       "imageUrl": null,
       "width": 400,
@@ -799,9 +799,9 @@
       }
     },
     {
-      "id": "65e40eeb-f397-45a7-839f-48c1e517e0f1",
-      "x": 6600,
-      "y": 1247,
+      "id": "bd4b4616-bcea-418e-87d9-a62ba18bf193",
+      "x": 8850,
+      "y": 1347,
       "text": "Acknowledgements: Most of the game code was generated using GenAI tools (Copilot, Claude, ChatGPT, Grok), while the paper was written manually with limited AI-assisted editing. In both cases, the priority was reflective judgement and a consistent authorial voice.",
       "imageUrl": null,
       "width": 400,
@@ -813,8 +813,8 @@
       }
     },
     {
-      "id": "e5d6bc9c-f7ee-49fe-9ade-a0d9c787b54e",
-      "x": 7050,
+      "id": "7e4e6dc0-6eab-4b85-ba32-e921619b29ad",
+      "x": 9300,
       "y": 200,
       "text": "7.\tReferences",
       "imageUrl": null,
@@ -827,27 +827,13 @@
       }
     },
     {
-      "id": "4b3d79ed-89d7-4918-9332-e93ea8d7d4de",
-      "x": 7500,
-      "y": 200,
-      "text": "About the Authors:",
+      "id": "0f93864c-72c2-4433-9803-e5403c71c87f",
+      "x": 9300,
+      "y": 1681,
+      "text": "Abdallah, Y. K., & Estévez, A. T. (2023). Biomaterials Research-Driven Design Visualized by AI Text-Prompt-Generated Images. Designs, 7(2). https://doi.org/10.3390/designs7020048\nAlbert, S. (2001). Useless Utilities. Netuser Conference in Sofia.\nAli, U. (2025). FluxZayn: An Auto-Ethnographic Case Study in Vibe Coding a Generative AI Extension for Stable Diffusion WEBUI Forge. https://doi.org/https://doi.org/10.17866/rd.salford.29829107.v1\nBanerjee, S., Agarwal, A., & Singla, S. (2025). LLMs Will Always Hallucinate, and We Need to Live with This. Lecture Notes in Networks and Systems, 1554 LNNS, 624–648. https://doi.org/10.1007/978-3-031-99965-9_39\nBoxleitner, A. M. (2024). Visual Intelligence in Design and Art: An Experimental Handbook with Artificial Intelligence. BXL.\nBridle, J. (2023). The stupidity of AI. The Guardian. https://www.theguardian.com/technology/2023/mar/16/the-stupidity-of-ai-artificial-intelligence-dall-e-chatgpt\nCoskun, A., Cila, N., Nicenboim, I., Frauenberger, C., Wakkary, R., Hassenzahl, M., Mancini, C., Giaccardi, E., & Forlano, L. (2022). More-than-human Concepts, Methodologies, and Practices in HCI. CHI ’22 Extended Abstracts, April 29–May 05, 2022, New Orleans, 1–5. https://doi.org/10.1145/3491101.3516503\nCress, L. (2025). “Vibe coding” named word of the year by Collins Dictionary. BBC News.\nCui, S., Liu, F., Li, B., & Yuan, X. (2024). Sharing instead of being infringed: How to build a responsible community for online artwork sharing? DRS2024: Boston, 23–28. https://doi.org/10.21606/drs.2024.417\nde Roock, R. S. (2024). To Become an Object Among Objects: Generative Artificial “Intelligence,” Writing, and Linguistic White Supremacy. Reading Research Quarterly, 59(4), 590–608. https://doi.org/10.1002/rrq.569\ndel Campo, M., & Leach, N. (2022). Can Machines Hallucinate Architecture? AI as Design Method. Architectural Design, 92(3), 6–13. https://doi.org/10.1002/ad.2807\nGeng, F., Shah, A., Li, H., Mulla, N., Swanson, S., Raj, G. S., Zingaro, D., & Porter, L. (2025). Exploring Student-AI Interactions in Vibe Coding. In Conference 2025 (Vol. 1, Issue 1). arXiv. http://arxiv.org/abs/2507.22614\nHernández-Ramírez, R., & Ferreira, J. B. (2024). The Future End of Design Work: A Critical Overview of Managerialism, Generative AI, and the Nature of Knowledge Work, and Why Craft Remains Relevant. She Ji, 10(4), 414–440. https://doi.org/10.1016/j.sheji.2024.11.002\nHicks, M. T., Humphries, J., & Slater, J. (2024). ChatGPT is bullshit. Ethics and Information Technology, 26(2), 1–10. https://doi.org/10.1007/s10676-024-09775-5\nHuijg, D. D. (2020). Neuronormativity in theorising agency. Neurodiversity Studies, 213–217. https://doi.org/10.4324/9780429322297-20\nKalving, M., Colley, A., & Häkkilä, J. (2024). Where AI and Design Meet - Designers’ Perceptions of AI Tools. NordiCHI 2024, October 13–16, 2024, Uppsala, Sweden. https://doi.org/10.1145/3679318.3685388\nKarpathy, A. (2025). There’s a new kind of coding I call “vibe coding.” X (Twitter). https://x.com/karpathy/status/1886192184808149383\nKuka, L., Hörmann, C., & Sabitzer, B. (2025). A Young Researcher’s Dual Lens: A Twofold Autoethnographic Exploration of Generative AI in the Realms of Doing Research and Teaching Computer Science and Media Design Education. International Conference on Computer Supported Education, CSEDU - Proceedings, 1(Csedu), 299–306. https://doi.org/10.5220/0013226200003932\nLi, Y., & Park, H. (2025). Generative AI in Service Design: An Explorative Diary Study in Discovery Process. ServDes 2025: Empowering Diversity, Nurturing Lasting Impact, 6–10 October, Hyderabad.\nManovich, L. (2002). The Language of New Media. MIT Press.\nManovich, L., & Arielli, E. (2024). Artificial Aesthetics: Generative AI, Art and Visual Media. https://iuav.academia.edu/EmanueleArielli/Books.%0Ahttps://manovich.net/index.php/projects/artificial-aesthetics\nMarttila, S., Fischer, L. H., & Sandbukt, S. (2025). Tracing human-AI relations: a participatory approach to GenAI integration in creative public service work. ServDes 2025: Empowering Diversity, Nurturing Lasting Impact, 6–10 October, Hyderabad, India. https://doi.org/10.21606/servdes2025.49\nMuehlhaus, M., & Steimle, J. (2024). Interaction Design with Generative AI: An Empirical Study of Emerging Strategies Across the Four Phases of Design. 1(1). http://arxiv.org/abs/2411.02662\nMuller, M., Chilton, L. B., Kantosalo, A., Liao, Q. V., Maher, M. Lou, Martin, C. P., & Walsh, G. (2023). GenAICHI 2023: Generative AI and HCI at CHI 2023. Conference on Human Factors in Computing Systems - Proceedings. https://doi.org/10.1145/3544549.3573794\nOswald, J. (1985). “Plunderphonics, or Audio Piracy as a Compositional Prerogative.” 1–3.\nPanke, S. (2025). How Can (A)I Research This? An Autoethnographic Exploration of Generative AI in Research, Teaching and Instructional Design. Journal of Teacher Education, 76(3), 230–244. https://doi.org/10.1177/00224871251325065\nSapkota, R., Roumeliotis, K. I., & Karkee, M. (2025). Vibe Coding vs. Agentic Coding: Fundamentals and Practical Implications of Agentic AI. http://arxiv.org/abs/2505.19443\nSchön, D. A. (1983). The Reflective Practitioner: How Professionals Think in Action. Basic Books.\nSchouwenberg, L., & Kaethler, M. (Eds.). (2021). The Auto-Ethnographic Turn. Valiz.\nTan, L. (2024). Using ChatGPT to extract design concepts from stories. The 7th International Conference for Design Education Researchers, 29 November - 1 December 2023. https://doi.org/10.21606/drslxd.2024.054\nVan Der Maden, W., Van Beek, E., van der Burg, V., Halperin, B. A., Jääskeläinen, P., Kang, E., Kun, P., Lomas, J. D., Merritt, T., Lindley, J., Muller, M., Nicenboim, I., & Zhu, J. (2024). Death of the Design Researcher? Creating Knowledge Resources for Designers Using Generative AI. DIS 2024 - Proceedings of the 2024 ACM Designing Interactive Systems Conference, 396–400. https://doi.org/10.1145/3656156.3658398\nWang, D., & Han, J. (2023). Exploring the Impact of Generative Stimuli on the Creativity of Designers in Combinational Design. Proceedings of the Design Society, 3(July), 1805–1814. https://doi.org/10.1017/pds.2023.181\nWEF. (2023). Future of jobs report 2023. In World Economic Forum (Issue January).\nWelles, O. (1938). War of the Worlds. https://archive.org/details/war-of-the-worlds_mixdown3\nXu, Z., Jain, S., & Kankanhalli, M. (2025). Hallucination is Inevitable: An Innate Limitation of Large Language Models. http://arxiv.org/abs/2401.11817\nZygadlo, R. (2024). Should Artists Be Terrified of AI Replacing Them? Guardian. https://www.theguardian.com/lifeandstyle/article/2024/aug/11/should-artists-be-terrified-of-ai-replacing-them#:~:text=\nAbout the Authors:\nAuthor 1 blank [X Author Bio]",
       "imageUrl": null,
       "width": 400,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "id": "9ef1de23-a2d4-4ba7-a224-0f4ac25dc69e",
-      "x": 7500,
-      "y": 275,
-      "text": "Author 1 blank [X Author Bio]",
-      "imageUrl": null,
-      "width": 400,
-      "height": 45,
+      "height": 2817,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -855,9 +841,9 @@
       }
     },
     {
-      "id": "e68010ac-c388-45a2-87b8-6220d989a3ba",
-      "x": 300,
-      "y": 200,
+      "id": "057ee240-4da3-4a1d-8dcb-c32a1d78a158",
+      "x": 2100,
+      "y": 198.48512957882548,
       "text": "Plundergeist: Exploring Generative AI through Vibe Coding as Reflective Design Practice",
       "imageUrl": null,
       "width": 400,
@@ -867,360 +853,274 @@
         "g": 140,
         "b": 140
       }
-    },
-    {
-      "id": "971fa4bc-79b4-46fb-a828-f1f1933a5cb4",
-      "x": 2550,
-      "y": 948.5,
-      "text": "What was significant was that the game evolved through interaction, not intention. I didn’t have a plan but was making choices driven by what felt interesting and pleasurable, and I spent as much time playing the game as building it. This process became an iterative loop of play, reflect, prompt, repeat. I felt both pushed and pulled by the AI in trying to shape something enjoyable to play. I would never have made this game by hand not because it was complicated or unique, but because it simply wasn’t something I had thought about, I had to experience it to imagine it. Equally important was the low-risk nature of working with GenAI. Because I was using a version control system this meant I could use a nonlinear workflow and revisit earlier ideas that worked better, remixed them with current fragments and try different directions. I knew that if things broke, I could rewind, which made me braver in my experiments.",
-      "imageUrl": null,
-      "width": 400,
-      "height": 360,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "63a963a9-bc50-47a5-ad3f-c985c14effdf",
-      "x": 300,
-      "y": 837.5,
-      "text": "Abstract: Generative AI (GenAI) has sparked intense media debate, yet design research has often echoed these narratives rather than examining how GenAI reshapes everyday design practice. This paper presents a year-long auto-ethnographic study involving 34 games and apps created through vibe coding, a GenAI-native approach that uses natural language prompts to generate code. The study reveals distinct qualities that unsettle design processes: playful intervention, creative forgetting, spectral echoes, inventive excess, and fragile limits. Two key insights emerge: designing with GenAI requires deliberate engagement with cultural archetypes and treating AI as an unruly collaborator. Drawing on John Oswald’s 1985 concept of ‘plunderphonics’, the paper situates GenAI within a lineage of experimental art and design tactics. The paper offers auto-ethnographic insights into how GenAI reshapes design practice and introduces ‘plundergeist’ as a critical and playful ethos for designing with GenAI through cultural plundering and unruly collaboration.",
-      "imageUrl": null,
-      "width": 400,
-      "height": 423,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "2552d70b-4cf6-4d5e-a603-fd88452921e3",
-      "x": 6600,
-      "y": 876.5,
-      "text": "Finally, this paper captures what working with GenAI feels like in late 2025, a moment that will inevitably date. Yet the principle of using media-native methods to engage AI will remain vital as technologies and practices change. Continuous, pragmatic and reflective experimentation is essential for understanding GenAI’s affordances and limitations in practice. The paper argues that GenAI needs to be understood through everyday practice, and that its future potential rests on designers adopting a critical and experimental ethos.",
-      "imageUrl": null,
-      "width": 400,
-      "height": 234,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "df00da6e-37ea-4bcd-ad49-b6c3bbd683d2",
-      "x": 750,
-      "y": 875,
-      "text": "This paper addresses the need for more reflective accounts that document the affordances of designing with GenAI. It presents a year-long auto-ethnographic study that highlights the pragmatics of working with GenAI, focusing on the designer’s actions, decisions, and processes. The study centres on a subset of GenAI known as ‘vibe coding’ (Karpathy, 2025), where natural language prompts are used to generate computer code and, in this study, were used to prototype 34 games and apps. Vibe coding is a technology-native approach that emerged with the advent of GenAI. Recently named Collins Dictionary’s word of the year (Cress, 2025), it provides a timely lens for examining the shifting relationship between designers and AI tools. To explore these shifts, this study draws on media theory approaches from Lev Manovich (2002) and John Oswald (1985), both of whom emphasise how the distinctive affordances of media shape creative practice. Together, these perspectives help clarify what is unique about designing with GenAI rather than simply using digital tools.",
-      "imageUrl": null,
-      "width": 400,
-      "height": 423,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
     }
   ],
   "connections": [
     {
-      "fromId": "e68010ac-c388-45a2-87b8-6220d989a3ba",
-      "toId": "627b08b6-0583-4893-b2f9-c0b5d73ce2d2",
-      "from": 61,
-      "to": 0
-    },
-    {
-      "fromId": "627b08b6-0583-4893-b2f9-c0b5d73ce2d2",
-      "toId": "ce464ad7-082b-4444-9296-755f5b7a68a6",
-      "from": 0,
-      "to": 1
-    },
-    {
-      "fromId": "ce464ad7-082b-4444-9296-755f5b7a68a6",
-      "toId": "ba8f6cde-ac74-477e-872c-c9c45c8494d9",
-      "from": 1,
-      "to": 2
-    },
-    {
-      "fromId": "ba8f6cde-ac74-477e-872c-c9c45c8494d9",
-      "toId": "cabf40bf-4327-4a72-b8ea-7bf1db50b1b4",
+      "fromId": "57344a7f-4343-4a82-851a-0c3f8770553a",
+      "toId": "43c04aea-ebaa-47fe-86ce-2d17aa6aac42",
       "from": 2,
       "to": 3
     },
     {
-      "fromId": "cabf40bf-4327-4a72-b8ea-7bf1db50b1b4",
-      "toId": "63a963a9-bc50-47a5-ad3f-c985c14effdf",
+      "fromId": "43c04aea-ebaa-47fe-86ce-2d17aa6aac42",
+      "toId": "a0e96f15-d784-4458-8612-a08ba53b0cc8",
       "from": 3,
-      "to": 63
-    },
-    {
-      "fromId": "63a963a9-bc50-47a5-ad3f-c985c14effdf",
-      "toId": "6f549998-b88a-42d4-8396-ba94a9ca1a10",
-      "from": 63,
       "to": 4
     },
     {
-      "fromId": "b5759093-4d3b-4379-bfe4-bb9b89cce893",
-      "toId": "bb0e556a-0939-4417-9e5e-c138a416f77d",
+      "fromId": "a0e96f15-d784-4458-8612-a08ba53b0cc8",
+      "toId": "416ffc5d-b878-49e4-8b52-2ec816bf54bb",
+      "from": 4,
+      "to": 5
+    },
+    {
+      "fromId": "416ffc5d-b878-49e4-8b52-2ec816bf54bb",
+      "toId": "a4c60422-c2fd-46eb-828d-212e8d265fef",
       "from": 5,
       "to": 6
     },
     {
-      "fromId": "bb0e556a-0939-4417-9e5e-c138a416f77d",
-      "toId": "df00da6e-37ea-4bcd-ad49-b6c3bbd683d2",
-      "from": 6,
-      "to": 65
-    },
-    {
-      "fromId": "df00da6e-37ea-4bcd-ad49-b6c3bbd683d2",
-      "toId": "74a599e1-8e1b-4af9-a070-da26361208b2",
-      "from": 65,
-      "to": 7
-    },
-    {
-      "fromId": "74a599e1-8e1b-4af9-a070-da26361208b2",
-      "toId": "77ffe550-8a71-454f-8f78-04322207c24c",
+      "fromId": "5d37fec2-0e79-4271-8ac3-ce7228b3d558",
+      "toId": "e5012a9c-9118-4a47-977a-4940bd291b60",
       "from": 7,
       "to": 8
     },
     {
-      "fromId": "5cb26716-a9f2-4deb-9b9c-8cd50f189cff",
-      "toId": "953c4ff6-cb79-41eb-97db-d56f9af23c47",
+      "fromId": "e5012a9c-9118-4a47-977a-4940bd291b60",
+      "toId": "599d4dc1-ee47-403e-9b8c-108c6e6908de",
+      "from": 8,
+      "to": 9
+    },
+    {
+      "fromId": "599d4dc1-ee47-403e-9b8c-108c6e6908de",
+      "toId": "1541f128-49d3-44c2-bda1-4037f25dfc64",
       "from": 9,
       "to": 10
     },
     {
-      "fromId": "953c4ff6-cb79-41eb-97db-d56f9af23c47",
-      "toId": "f9df63f3-ddbe-4b29-824d-0163486f8a38",
+      "fromId": "1541f128-49d3-44c2-bda1-4037f25dfc64",
+      "toId": "bed0ea4e-03cd-4005-8cc3-808792521a3f",
       "from": 10,
       "to": 11
     },
     {
-      "fromId": "f9df63f3-ddbe-4b29-824d-0163486f8a38",
-      "toId": "bcbd6614-6c33-41ef-97ae-7892f1f4f86a",
+      "fromId": "bed0ea4e-03cd-4005-8cc3-808792521a3f",
+      "toId": "40cb4723-4931-4533-86a1-d0c8d38a6791",
       "from": 11,
       "to": 12
     },
     {
-      "fromId": "bcbd6614-6c33-41ef-97ae-7892f1f4f86a",
-      "toId": "408349b4-4eb1-4034-b114-bb8d6f674927",
-      "from": 12,
-      "to": 13
-    },
-    {
-      "fromId": "408349b4-4eb1-4034-b114-bb8d6f674927",
-      "toId": "a5932cdb-9727-49ff-a2d9-fe0121f8af24",
+      "fromId": "86fe6f87-1072-4d41-8e43-e27b752896f9",
+      "toId": "24887f45-a0c6-4bd6-ad0d-2bd532be8ec5",
       "from": 13,
       "to": 14
     },
     {
-      "fromId": "f025e316-cf0a-4293-898f-bd3cb5e9562d",
-      "toId": "26a9a00e-7164-4f5d-839b-b4d694058ec7",
+      "fromId": "24887f45-a0c6-4bd6-ad0d-2bd532be8ec5",
+      "toId": "f684173f-4021-4d4f-8b0c-a11630f3fa15",
+      "from": 14,
+      "to": 15
+    },
+    {
+      "fromId": "f684173f-4021-4d4f-8b0c-a11630f3fa15",
+      "toId": "ee7866eb-051c-4e3c-9213-2368920fc0df",
       "from": 15,
       "to": 16
     },
     {
-      "fromId": "26a9a00e-7164-4f5d-839b-b4d694058ec7",
-      "toId": "59950f34-4512-4696-ba7e-f5334335dfa3",
+      "fromId": "ee7866eb-051c-4e3c-9213-2368920fc0df",
+      "toId": "4e8688b7-5b84-46f8-9484-4839fdd62b47",
       "from": 16,
       "to": 17
     },
     {
-      "fromId": "59950f34-4512-4696-ba7e-f5334335dfa3",
-      "toId": "9f620765-cee2-4bd1-a26f-7e6e06e8e0d6",
+      "fromId": "4e8688b7-5b84-46f8-9484-4839fdd62b47",
+      "toId": "2ea213da-a003-4890-a7b7-8dfcf48544ed",
       "from": 17,
       "to": 18
     },
     {
-      "fromId": "9f620765-cee2-4bd1-a26f-7e6e06e8e0d6",
-      "toId": "4174ea51-bc78-41dc-98d8-a31af634f696",
-      "from": 18,
-      "to": 19
-    },
-    {
-      "fromId": "4174ea51-bc78-41dc-98d8-a31af634f696",
-      "toId": "aabe68fd-2fc3-4570-9214-c44f293fc071",
+      "fromId": "7efa906a-47e1-4c0a-8956-ef465979af19",
+      "toId": "b3b18771-a4ec-4cf3-9dca-d5d465aa57f7",
       "from": 19,
       "to": 20
     },
     {
-      "fromId": "85ed9769-9360-426c-81a6-b50a8843333c",
-      "toId": "7603b45b-1a08-47b1-91e0-2ac7f6d1b035",
+      "fromId": "a710a19e-4639-4cee-97aa-60be0d575176",
+      "toId": "2477732a-c45e-4c89-bc07-0afb308a0cab",
       "from": 21,
       "to": 22
     },
     {
-      "fromId": "b39fbf70-d43b-4879-95eb-befb61f8ff0d",
-      "toId": "7230b032-1fb1-4c19-a46f-2f45549bce17",
-      "from": 23,
-      "to": 24
+      "fromId": "2477732a-c45e-4c89-bc07-0afb308a0cab",
+      "toId": "7914e52d-fb56-4d42-bdab-332d3178eeb8",
+      "from": 22,
+      "to": 23
     },
     {
-      "fromId": "7230b032-1fb1-4c19-a46f-2f45549bce17",
-      "toId": "971fa4bc-79b4-46fb-a828-f1f1933a5cb4",
+      "fromId": "c845e326-e605-4139-805e-79abd114a95b",
+      "toId": "20a0787d-c67c-491e-bca7-d152034a49d7",
       "from": 24,
-      "to": 62
+      "to": 25
     },
     {
-      "fromId": "4d99a204-4bba-44e0-a5f1-ee492f30ca26",
-      "toId": "714598d6-1cb7-465d-96a4-c74a70d47ca6",
+      "fromId": "20a0787d-c67c-491e-bca7-d152034a49d7",
+      "toId": "9677bc11-2dcf-4017-beec-7b5e81350464",
       "from": 25,
       "to": 26
     },
     {
-      "fromId": "714598d6-1cb7-465d-96a4-c74a70d47ca6",
-      "toId": "fb4357f1-b282-4a06-801d-c032141d0f37",
+      "fromId": "9677bc11-2dcf-4017-beec-7b5e81350464",
+      "toId": "0a1807b0-b618-4d83-8702-750073de7f26",
       "from": 26,
       "to": 27
     },
     {
-      "fromId": "fb4357f1-b282-4a06-801d-c032141d0f37",
-      "toId": "eba9da57-9780-4ece-8480-fdb2b17b1007",
-      "from": 27,
-      "to": 28
+      "fromId": "b740cc56-efe9-49f3-b0b7-7430645ab18a",
+      "toId": "e3f30bd6-c606-4765-b172-f225a2ed4a3a",
+      "from": 28,
+      "to": 29
     },
     {
-      "fromId": "a776bcb5-2b84-4da4-a575-5a1ce2d26966",
-      "toId": "a89db3e5-95ef-45ae-889b-13af8c6eaea5",
+      "fromId": "e3f30bd6-c606-4765-b172-f225a2ed4a3a",
+      "toId": "b828bafc-13e7-44fd-99d1-28c158c592df",
       "from": 29,
       "to": 30
     },
     {
-      "fromId": "a89db3e5-95ef-45ae-889b-13af8c6eaea5",
-      "toId": "95472e4f-03b1-4a55-b014-aef516de3c89",
-      "from": 30,
-      "to": 31
+      "fromId": "e685549b-ebd0-42b0-bf34-b59b981e522c",
+      "toId": "d8c60561-b6ee-4f94-890c-70f5f0a8731e",
+      "from": 31,
+      "to": 32
     },
     {
-      "fromId": "7df413f2-4994-467c-bf31-ceec2c1dffaa",
-      "toId": "c1b860d6-2480-4d65-919f-3d0e6ea58b80",
+      "fromId": "d8c60561-b6ee-4f94-890c-70f5f0a8731e",
+      "toId": "b1646158-b030-4a75-a479-e4aff5dc6b1d",
       "from": 32,
       "to": 33
     },
     {
-      "fromId": "c1b860d6-2480-4d65-919f-3d0e6ea58b80",
-      "toId": "ac2bc568-8884-4df5-bced-5421c2f029a5",
+      "fromId": "b1646158-b030-4a75-a479-e4aff5dc6b1d",
+      "toId": "a54b093d-1fd9-4a3b-9ac8-ebfc9173259d",
       "from": 33,
       "to": 34
     },
     {
-      "fromId": "ac2bc568-8884-4df5-bced-5421c2f029a5",
-      "toId": "678d57ce-5479-487b-b201-bd82e6261cd0",
+      "fromId": "a54b093d-1fd9-4a3b-9ac8-ebfc9173259d",
+      "toId": "3ac2068a-1e91-4d70-8134-0b46cb19b1e3",
       "from": 34,
       "to": 35
     },
     {
-      "fromId": "678d57ce-5479-487b-b201-bd82e6261cd0",
-      "toId": "0fe739cb-b915-4a81-9d63-f31ae8d15c45",
-      "from": 35,
-      "to": 36
+      "fromId": "d7a7c901-1e55-41ac-99f2-57eb30955cc2",
+      "toId": "e4abb1e2-64d5-4fd8-9357-2df1deda791f",
+      "from": 36,
+      "to": 37
     },
     {
-      "fromId": "66f91d27-0f8a-4411-95f9-366cdc8a4566",
-      "toId": "1d9baea4-3c09-4056-b3a1-9aaf1e26c5f4",
+      "fromId": "e4abb1e2-64d5-4fd8-9357-2df1deda791f",
+      "toId": "5173b1d4-1da2-458f-acfc-e7fe92e6e9e5",
       "from": 37,
       "to": 38
     },
     {
-      "fromId": "1d9baea4-3c09-4056-b3a1-9aaf1e26c5f4",
-      "toId": "8f9e303d-1223-4bc7-bace-7835f6c7083f",
-      "from": 38,
-      "to": 39
+      "fromId": "db2d1d20-5c11-4018-887e-7af02931f875",
+      "toId": "3b9018f9-ae5f-4564-a7ec-1f0b4a31884f",
+      "from": 39,
+      "to": 40
     },
     {
-      "fromId": "f4562ed0-817b-4295-b0b2-6fef27edbe18",
-      "toId": "58c739b4-f15b-408a-b52c-4699de2edc46",
+      "fromId": "3b9018f9-ae5f-4564-a7ec-1f0b4a31884f",
+      "toId": "07ab1544-6596-453b-b609-5e68de4bd7ac",
       "from": 40,
       "to": 41
     },
     {
-      "fromId": "58c739b4-f15b-408a-b52c-4699de2edc46",
-      "toId": "16afc728-804a-44b9-9266-8e232edc5b4d",
+      "fromId": "07ab1544-6596-453b-b609-5e68de4bd7ac",
+      "toId": "f75b4d5a-d5d9-4a4d-b296-c4a33692bf56",
       "from": 41,
       "to": 42
     },
     {
-      "fromId": "16afc728-804a-44b9-9266-8e232edc5b4d",
-      "toId": "b7bffe35-c034-4883-89e4-523503b7ed7a",
+      "fromId": "f75b4d5a-d5d9-4a4d-b296-c4a33692bf56",
+      "toId": "93da6a70-d795-48d4-b64b-a4112cd2b1b2",
       "from": 42,
       "to": 43
     },
     {
-      "fromId": "b7bffe35-c034-4883-89e4-523503b7ed7a",
-      "toId": "36dafdd3-aa14-48c9-ae97-676fac9b6dc0",
-      "from": 43,
-      "to": 44
+      "fromId": "a0d4e0de-2408-402d-9252-403598cc391e",
+      "toId": "ab7ea7f1-0735-4e93-98a1-ee6d0c0910c5",
+      "from": 44,
+      "to": 45
     },
     {
-      "fromId": "b232d4d9-7a6a-4387-9a77-dab3aa1445d4",
-      "toId": "ae876b1d-6d0c-4bdd-b2bd-d1a3b7d682ce",
-      "from": 45,
-      "to": 46
+      "fromId": "261b0e0f-09b6-4b1a-8d4a-c855e93a3023",
+      "toId": "46efe7e4-1d8a-4fac-85ca-bc36af4e9f11",
+      "from": 46,
+      "to": 47
     },
     {
-      "fromId": "a7d32d80-9abe-4856-86bd-6c632c808e29",
-      "toId": "5f16444c-d7cb-48cc-919e-8f21b3a2dad0",
-      "from": 47,
-      "to": 48
+      "fromId": "a207d4ee-24c8-4dff-a8d6-e14ee4e009d7",
+      "toId": "98e6dc15-e9b0-48f1-b8cf-c66f0490ec63",
+      "from": 48,
+      "to": 49
     },
     {
-      "fromId": "f09ee557-b621-4d60-b234-1e34e9d66b16",
-      "toId": "9ce90d1c-cdd2-4df3-ac33-cce0d3488979",
+      "fromId": "98e6dc15-e9b0-48f1-b8cf-c66f0490ec63",
+      "toId": "d70b3550-ea20-420a-9f53-8777353b9f24",
       "from": 49,
       "to": 50
     },
     {
-      "fromId": "9ce90d1c-cdd2-4df3-ac33-cce0d3488979",
-      "toId": "4cdbec26-14ce-4d77-9813-029a3a4f4031",
+      "fromId": "d70b3550-ea20-420a-9f53-8777353b9f24",
+      "toId": "c29c6a9c-bb07-4085-9797-700d6dc4fc15",
       "from": 50,
       "to": 51
     },
     {
-      "fromId": "4cdbec26-14ce-4d77-9813-029a3a4f4031",
-      "toId": "39648373-6472-4d32-8dbf-0f8cf8d45824",
-      "from": 51,
-      "to": 52
+      "fromId": "1e430773-0e19-496d-b6d4-c549534577be",
+      "toId": "05f46f69-a26c-4c73-bd4e-6f1e397bd034",
+      "from": 52,
+      "to": 53
     },
     {
-      "fromId": "e4dce24d-fae2-41a0-b7e5-cae9188a1860",
-      "toId": "de21cdfb-da37-405f-9da9-999bb965504f",
+      "fromId": "05f46f69-a26c-4c73-bd4e-6f1e397bd034",
+      "toId": "4c8a6df1-f032-4438-9073-47bc6dcbcac8",
       "from": 53,
       "to": 54
     },
     {
-      "fromId": "de21cdfb-da37-405f-9da9-999bb965504f",
-      "toId": "e2c4c835-1af1-4baa-90ec-3b2560481d65",
+      "fromId": "4c8a6df1-f032-4438-9073-47bc6dcbcac8",
+      "toId": "3389a37f-18f2-4f83-bb58-a1bd1b4f67bb",
       "from": 54,
       "to": 55
     },
     {
-      "fromId": "e2c4c835-1af1-4baa-90ec-3b2560481d65",
-      "toId": "2552d70b-4cf6-4d5e-a603-fd88452921e3",
+      "fromId": "3389a37f-18f2-4f83-bb58-a1bd1b4f67bb",
+      "toId": "d5e4ee6b-cc5f-49c3-838d-7cbfeb7c452b",
       "from": 55,
-      "to": 64
-    },
-    {
-      "fromId": "2552d70b-4cf6-4d5e-a603-fd88452921e3",
-      "toId": "edaa7891-d177-4b17-bf08-1cc16c0b174a",
-      "from": 64,
       "to": 56
     },
     {
-      "fromId": "edaa7891-d177-4b17-bf08-1cc16c0b174a",
-      "toId": "65e40eeb-f397-45a7-839f-48c1e517e0f1",
+      "fromId": "d5e4ee6b-cc5f-49c3-838d-7cbfeb7c452b",
+      "toId": "bd4b4616-bcea-418e-87d9-a62ba18bf193",
       "from": 56,
       "to": 57
     },
     {
-      "fromId": "4b3d79ed-89d7-4918-9332-e93ea8d7d4de",
-      "toId": "9ef1de23-a2d4-4ba7-a224-0f4ac25dc69e",
-      "from": 59,
-      "to": 60
+      "fromId": "7e4e6dc0-6eab-4b85-ba32-e921619b29ad",
+      "toId": "0f93864c-72c2-4433-9803-e5403c71c87f",
+      "from": 58,
+      "to": 59
+    },
+    {
+      "fromId": "057ee240-4da3-4a1d-8dcb-c32a1d78a158",
+      "toId": "85c88817-1569-48aa-b38d-f40690396cfd",
+      "from": 60,
+      "to": 0
     }
   ],
-  "lastModified": 1767981557206,
-  "name": "WholePaper.json"
+  "lastModified": 1768234244494,
+  "name": "Todo.json"
 }
