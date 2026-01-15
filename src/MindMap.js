@@ -1911,6 +1911,8 @@ class MindMap {
       if (gestureActive) this.isSaved = false;
     } catch (_) { }
 
+    const draggingBoxes = [];
+
     for (let box of this.boxes) {
       if (!box) continue;
       // If this is the actively edited box and selection is in progress, update selection
@@ -1918,9 +1920,105 @@ class MindMap {
         box.updateSelection(mx, my);
       } else {
         box.drag(mx, my);
+        if (box.isDragging) {
+          draggingBoxes.push(box);
+        }
         box.resize(mx, my);
       }
     }
+
+    // Apply gentle snap-to-grid only when the grid overlay is visible
+    this._applyGridSnapping(draggingBoxes);
+  }
+
+  /**
+   * Applies a soft snap-to-grid to all actively dragged boxes when the grid is visible.
+   * Uses the primary selected box (or the first dragged box) as the anchor so groups
+   * stay together instead of each box snapping independently.
+   * @param {Array<TextBox>} draggingBoxes - Boxes currently being dragged
+   */
+  _applyGridSnapping(draggingBoxes) {
+    if (!draggingBoxes || draggingBoxes.length === 0) return;
+    if (typeof isGridVisible === 'undefined' || !isGridVisible) return;
+
+    const snapDelta = this._computeGridSnapDelta(draggingBoxes);
+    if (!snapDelta) return;
+
+    for (const box of draggingBoxes) {
+      box.x += snapDelta.dx;
+      box.y += snapDelta.dy;
+    }
+  }
+
+  /**
+   * Computes the translation needed to snap the anchor box to the nearest grid line.
+   * Prefers center snapping, but will also consider top-left alignment when that is
+   * closer, matching common design tools. Snapping is axis-aware so you can snap
+   * horizontally without being forced vertically (and vice-versa).
+   * @param {Array<TextBox>} draggingBoxes - Boxes currently being dragged
+   * @returns {{dx:number, dy:number}|null}
+   */
+  _computeGridSnapDelta(draggingBoxes) {
+    const anchorBox = (this.selectedBox && this.selectedBox.isDragging)
+      ? this.selectedBox
+      : draggingBoxes[0];
+
+    if (!anchorBox || !Number.isFinite(anchorBox.x) || !Number.isFinite(anchorBox.y)) {
+      return null;
+    }
+
+    const { spacing, threshold } = this._getGridSnapSettings();
+    if (!Number.isFinite(spacing) || spacing <= 0) return null;
+
+    const width = Number.isFinite(anchorBox.width) ? anchorBox.width : 0;
+    const height = Number.isFinite(anchorBox.height) ? anchorBox.height : 0;
+    const halfW = width / 2;
+    const halfH = height / 2;
+
+    // Candidate targets: box center or top-left corner aligned to the grid
+    const centerTargetX = Math.round(anchorBox.x / spacing) * spacing;
+    const centerTargetY = Math.round(anchorBox.y / spacing) * spacing;
+
+    const topLeftX = anchorBox.x - halfW;
+    const topLeftY = anchorBox.y - halfH;
+    const cornerTargetX = Math.round(topLeftX / spacing) * spacing + halfW;
+    const cornerTargetY = Math.round(topLeftY / spacing) * spacing + halfH;
+
+    const chooseAxisTarget = (current, centerCandidate, cornerCandidate) => {
+      const centerDist = Math.abs(centerCandidate - current);
+      const cornerDist = Math.abs(cornerCandidate - current);
+      return (cornerDist < centerDist)
+        ? { target: cornerCandidate, dist: cornerDist }
+        : { target: centerCandidate, dist: centerDist };
+    };
+
+    const snapX = chooseAxisTarget(anchorBox.x, centerTargetX, cornerTargetX);
+    const snapY = chooseAxisTarget(anchorBox.y, centerTargetY, cornerTargetY);
+
+    const dx = (snapX.dist <= threshold) ? (snapX.target - anchorBox.x) : 0;
+    const dy = (snapY.dist <= threshold) ? (snapY.target - anchorBox.y) : 0;
+
+    if (dx === 0 && dy === 0) return null;
+    return { dx, dy };
+  }
+
+  /**
+   * Derives snap settings from global grid and camera state.
+   * Uses a screen-space threshold so the magnet feels consistent at different zooms.
+   * @returns {{spacing:number, threshold:number}}
+   */
+  _getGridSnapSettings() {
+    const spacing = (typeof GRID_CONFIG !== 'undefined' && GRID_CONFIG && Number.isFinite(GRID_CONFIG.SPACING))
+      ? GRID_CONFIG.SPACING
+      : 100;
+
+    const baseScreenTolerancePx = 12; // pleasant magnetic feel without being grabby
+    const zoom = (typeof CameraUtils !== 'undefined' && Number.isFinite(CameraUtils.zoom) && CameraUtils.zoom > 0)
+      ? CameraUtils.zoom
+      : 1;
+
+    const threshold = baseScreenTolerancePx / Math.max(zoom, 0.0001);
+    return { spacing, threshold };
   }
 
   /**
