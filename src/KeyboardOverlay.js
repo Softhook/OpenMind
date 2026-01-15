@@ -59,6 +59,7 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Scroll Wheel', description: 'Zoom in and out' },
     { keys: 'F', description: 'Toggle fullscreen view' },
+    { keys: 'G', description: 'Toggle grid background (local only)' },
     { keys: '-', description: 'Fit and center the entire map' },
     { keys: '+', description: 'Zoom to selected elements' },
     { keys: 'Cmd/Ctrl + Click', description: 'Open hyperlink in new tab' },

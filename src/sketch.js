@@ -66,6 +66,13 @@ const UI_COLORS = {
   CONNECTION: { normal: 80, selected: { r: 100, g: 150, b: 255 } }
 };
 
+// Grid rendering options (local-only overlay)
+const GRID_CONFIG = {
+  SPACING: 100,
+  LINE_COLOR: { r: 210, g: 210, b: 210 },
+  ORIGIN_COLOR: { r: 220, g: 60, b: 60 }
+};
+
 // ============================================================================
 // GLOBAL STATE
 // ============================================================================
@@ -152,6 +159,7 @@ let mobileNavOverlay = null;
 let mobileNavUpButton = null;
 let mobileNavDownButton = null;
 let isTouchDevice = false;
+let isGridVisible = false; // Local grid overlay toggle
 
 // ============================================================================
 // EXTENSION BRIDGE (Ghost Plugin System)
@@ -1091,6 +1099,49 @@ function screenY(worldY) {
   return CameraUtils.screenY(worldY);
 }
 
+/**
+ * Draws a world-space grid behind content for local debugging/navigation.
+ */
+function drawGrid() {
+  if (typeof CameraUtils === 'undefined') return;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+
+  const left = CameraUtils.worldX(0);
+  const right = CameraUtils.worldX(width);
+  const top = CameraUtils.worldY(0);
+  const bottom = CameraUtils.worldY(height);
+
+  if (![left, right, top, bottom].every(Number.isFinite)) return;
+
+  const spacing = GRID_CONFIG.SPACING;
+  const startX = Math.floor(left / spacing) * spacing;
+  const endX = Math.ceil(right / spacing) * spacing;
+  const startY = Math.floor(top / spacing) * spacing;
+  const endY = Math.ceil(bottom / spacing) * spacing;
+
+  push();
+  const lineWeight = Math.max(0.2, 0.8 / CameraUtils.zoom);
+  stroke(GRID_CONFIG.LINE_COLOR.r, GRID_CONFIG.LINE_COLOR.g, GRID_CONFIG.LINE_COLOR.b);
+  strokeWeight(lineWeight);
+
+  for (let x = startX; x <= endX; x += spacing) {
+    line(x, top, x, bottom);
+  }
+  for (let y = startY; y <= endY; y += spacing) {
+    line(left, y, right, y);
+  }
+
+  stroke(GRID_CONFIG.ORIGIN_COLOR.r, GRID_CONFIG.ORIGIN_COLOR.g, GRID_CONFIG.ORIGIN_COLOR.b);
+  strokeWeight(Math.max(0.2, 0.8 / CameraUtils.zoom));
+  line(0, top, 0, bottom);
+  line(left, 0, right, 0);
+  pop();
+}
+
+function toggleGridVisibility() {
+  isGridVisible = !isGridVisible;
+}
+
 // ============================================================================
 // P5.JS SETUP AND DRAW
 // ============================================================================
@@ -1417,6 +1468,10 @@ function draw() {
       push();
       translate(CameraUtils.x, CameraUtils.y);
       scale(CameraUtils.zoom);
+
+      if (isGridVisible) {
+        drawGrid();
+      }
       mindMap.draw();
 
       // Draw selection rectangle if selecting multiple boxes
@@ -2559,6 +2614,11 @@ function keyPressed() {
     const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18); // CMD/CTRL/ALT
     if (!hasModifier && (key === 'n' || key === 'N')) {
       createNewBox();
+      return false;
+    }
+    // Toggle local-only grid overlay: press G key
+    if (!hasModifier && (key === 'g' || key === 'G')) {
+      toggleGridVisibility();
       return false;
     }
     // Reset view: press - (or _) or Home key
