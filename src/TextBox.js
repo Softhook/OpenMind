@@ -482,6 +482,18 @@ class TextBox {
   updateDimensions() {
     if (this.text == null) this.text = '';
 
+    // Preserve the current top-left anchor so text reflow keeps the box pinned.
+    // Fall back to the last known anchor if current dimensions are invalid (e.g., during construction).
+    const hasValidCenter = Number.isFinite(this.x) && Number.isFinite(this.y);
+    const hasValidSize = Number.isFinite(this.width) && Number.isFinite(this.height);
+    let anchorLeft = (hasValidCenter && hasValidSize) ? (this.x - this.width / 2) : null;
+    let anchorTop = (hasValidCenter && hasValidSize) ? (this.y - this.height / 2) : null;
+
+    if ((anchorLeft === null || anchorTop === null) && Number.isFinite(this._anchorLeft) && Number.isFinite(this._anchorTop)) {
+      anchorLeft = this._anchorLeft;
+      anchorTop = this._anchorTop;
+    }
+
     // Invalidate all caches when dimensions change
     this.cachedWrappedLines = null;
     this.cachedWidth = null;
@@ -524,6 +536,23 @@ class TextBox {
     // Height: always reflow to fit wrapped lines for the current width
     const lineHeight = this.fontSize * TextBox.LINE_HEIGHT_MULTIPLIER;
     this.height = max(this.minHeight, wrappedLines.length * lineHeight + this.padding * 2);
+
+    // Re-anchor to keep the original top-left position stable when text changes
+    if (anchorLeft !== null && anchorTop !== null && isFinite(this.width) && isFinite(this.height)) {
+      this.x = anchorLeft + this.width / 2;
+      this.y = anchorTop + this.height / 2;
+      this._anchorLeft = anchorLeft;
+      this._anchorTop = anchorTop;
+      // Keep interpolation targets in sync to avoid drifting back toward stale targetX/targetY
+      this.targetX = this.x;
+      this.targetY = this.y;
+    } else if (isFinite(this.x) && isFinite(this.y) && isFinite(this.width) && isFinite(this.height)) {
+      // Establish anchor for the next resize if it was missing before
+      this._anchorLeft = this.x - this.width / 2;
+      this._anchorTop = this.y - this.height / 2;
+      this.targetX = this.x;
+      this.targetY = this.y;
+    }
   }
 
   /**

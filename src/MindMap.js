@@ -1912,6 +1912,7 @@ class MindMap {
     } catch (_) { }
 
     const draggingBoxes = [];
+    const resizingBoxes = [];
 
     for (let box of this.boxes) {
       if (!box) continue;
@@ -1924,11 +1925,15 @@ class MindMap {
           draggingBoxes.push(box);
         }
         box.resize(mx, my);
+        if (box.isResizing) {
+          resizingBoxes.push(box);
+        }
       }
     }
 
     // Apply gentle snap-to-grid only when the grid overlay is visible
     this._applyGridSnapping(draggingBoxes);
+    this._applyGridSnappingDuringResize(resizingBoxes);
   }
 
   /**
@@ -2000,6 +2005,62 @@ class MindMap {
 
     if (dx === 0 && dy === 0) return null;
     return { dx, dy };
+  }
+
+  /**
+   * Applies snap-to-grid while resizing. Only the moving bottom/right edges are snapped
+   * so the anchored top-left remains stable. Keeps widths/heights above minimums.
+   * @param {Array<TextBox>} resizingBoxes - Boxes currently being resized
+   */
+  _applyGridSnappingDuringResize(resizingBoxes) {
+    if (!resizingBoxes || resizingBoxes.length === 0) return;
+    if (typeof isGridVisible === 'undefined' || !isGridVisible) return;
+
+    const { spacing, threshold } = this._getGridSnapSettings();
+    if (!Number.isFinite(spacing) || spacing <= 0) return;
+
+    for (const box of resizingBoxes) {
+      if (!box) continue;
+
+      const minW = Number.isFinite(box.minWidth) ? box.minWidth : 0;
+      const minH = Number.isFinite(box.minHeight) ? box.minHeight : 0;
+
+      const left = Number.isFinite(box.resizeStartLeft)
+        ? box.resizeStartLeft
+        : (Number.isFinite(box.x) && Number.isFinite(box.width) ? box.x - box.width / 2 : null);
+      const top = Number.isFinite(box.resizeStartTop)
+        ? box.resizeStartTop
+        : (Number.isFinite(box.y) && Number.isFinite(box.height) ? box.y - box.height / 2 : null);
+
+      if (!Number.isFinite(left) || !Number.isFinite(top)) continue;
+
+      let width = Number.isFinite(box.width) ? box.width : 0;
+      let height = Number.isFinite(box.height) ? box.height : 0;
+
+      const right = left + width;
+      const bottom = top + height;
+
+      const snappedRight = Math.round(right / spacing) * spacing;
+      const snappedBottom = Math.round(bottom / spacing) * spacing;
+
+      const deltaRight = snappedRight - right;
+      const deltaBottom = snappedBottom - bottom;
+
+      if (Math.abs(deltaRight) <= threshold) {
+        width = Math.max(minW, snappedRight - left);
+      }
+      if (Math.abs(deltaBottom) <= threshold) {
+        height = Math.max(minH, snappedBottom - top);
+      }
+
+      // Update size and recenter to keep top-left anchored
+      if (width !== box.width || height !== box.height) {
+        box.width = width;
+        box.height = height;
+        box.x = left + width / 2;
+        box.y = top + height / 2;
+      }
+    }
   }
 
   /**
