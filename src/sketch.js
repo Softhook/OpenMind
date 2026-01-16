@@ -1732,6 +1732,9 @@ function updateCursorForHover() {
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   if (!validMouse) { cursor('default'); return; }
 
+  // Respect only the top-most hovered box for hover-driven cursors
+  const topHoverBox = mindMap._topHoverBox || mindMap.getTopMostBoxUnderMouse();
+
   // Panning cursor states (only when spacebar is held)
   const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
   const hasMulti = mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0;
@@ -1760,6 +1763,10 @@ function updateCursorForHover() {
     const box = mindMap.boxes[i];
     if (!box) continue;
     if (!box.isMouseOver()) continue;
+
+    if (topHoverBox && box !== topHoverBox) {
+      continue; // ignore underlying boxes for hover cursors
+    }
 
     if (box.isMouseOverResizeHandle && box.isMouseOverResizeHandle()) {
       cursor('nwse-resize');

@@ -493,3 +493,119 @@ describe('Sketch.js Integration for Local Data Management', () => {
         expect(sketchCode).toMatch(/roomInfo\s*\?\s*roomInfo\.isStarting/);
     });
 });
+
+describe('Remote Drag Synchronization', () => {
+    test('should apply remote box position updates from Yjs', () => {
+        // Require side-effect module to attach CollaborationManager to window/global
+        require('../../src/CollaborationManager');
+        const CollaborationManager = (typeof window !== 'undefined' && window.CollaborationManager)
+            ? window.CollaborationManager
+            : global.CollaborationManager;
+        // Provide Utils for TextBox runtime use
+        require('../../src/utils');
+        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
+            ? (window.OpenMindUtils || window.Utils)
+            : {};
+        // Stub p5 text measurement helpers used during TextBox construction
+        global.textSize = jest.fn();
+        global.textWidth = jest.fn(() => 10);
+        global.max = Math.max;
+        global.min = Math.min;
+        const TextBox = require('../../src/TextBox');
+
+        const cm = new CollaborationManager();
+
+        // Minimal mind map stub with a single box
+        const box = new TextBox(0, 0, 'hi');
+        cm.mindMap = {
+            boxes: [box],
+            connections: [],
+            getBoxById: (id) => (id === box.id ? box : null),
+            isDirty: false,
+            selectedBox: null
+        };
+
+        // Simulate a remote update by directly applying Yjs payload
+        const remoteData = { id: box.id, x: 120, y: 220 };
+        cm._applyBoxFromYjs(box.id, remoteData, false, true);
+
+        // Update targets should reflect the remote position
+        expect(box.targetX).toBe(120);
+        expect(box.targetY).toBe(220);
+
+        // After several frames, the box should converge toward the target
+        for (let i = 0; i < 32; i++) {
+            box.update();
+        }
+        expect(Math.abs(box.x - 120)).toBeLessThan(2);
+        expect(Math.abs(box.y - 220)).toBeLessThan(2);
+    });
+
+    test('should snap positions when snapToPosition is true', () => {
+        require('../../src/CollaborationManager');
+        const CollaborationManager = (typeof window !== 'undefined' && window.CollaborationManager)
+            ? window.CollaborationManager
+            : global.CollaborationManager;
+        require('../../src/utils');
+        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
+            ? (window.OpenMindUtils || window.Utils)
+            : {};
+        global.textSize = jest.fn();
+        global.textWidth = jest.fn(() => 10);
+        global.max = Math.max;
+        global.min = Math.min;
+        const TextBox = require('../../src/TextBox');
+
+        const cm = new CollaborationManager();
+        const box = new TextBox(5, 7, 'snap');
+        cm.mindMap = {
+            boxes: [box],
+            connections: [],
+            getBoxById: (id) => (id === box.id ? box : null),
+            isDirty: false,
+            selectedBox: null
+        };
+
+        const remoteData = { id: box.id, x: 200, y: 300 };
+        cm._applyBoxFromYjs(box.id, remoteData, true, true);
+
+        expect(box.x).toBe(200);
+        expect(box.y).toBe(300);
+        expect(box.targetX).toBe(200);
+        expect(box.targetY).toBe(300);
+    });
+
+    test('should clear faux style ranges when remote payload omits them', () => {
+        require('../../src/CollaborationManager');
+        const CollaborationManager = (typeof window !== 'undefined' && window.CollaborationManager)
+            ? window.CollaborationManager
+            : global.CollaborationManager;
+        require('../../src/utils');
+        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
+            ? (window.OpenMindUtils || window.Utils)
+            : {};
+        global.textSize = jest.fn();
+        global.textWidth = jest.fn(() => 10);
+        global.max = Math.max;
+        global.min = Math.min;
+        const TextBox = require('../../src/TextBox');
+
+        const cm = new CollaborationManager();
+        const box = new TextBox(0, 0, 'styles');
+        box.boldRanges = [{ start: 0, end: 2 }];
+        box.italicRanges = [{ start: 2, end: 4 }];
+        cm.mindMap = {
+            boxes: [box],
+            connections: [],
+            getBoxById: (id) => (id === box.id ? box : null),
+            isDirty: false,
+            selectedBox: null
+        };
+
+        const remoteData = { id: box.id, boldRanges: null, italicRanges: null };
+        cm._applyBoxFromYjs(box.id, remoteData, false, true);
+
+        expect(box.boldRanges).toEqual([]);
+        expect(box.italicRanges).toEqual([]);
+    });
+});

@@ -82,6 +82,9 @@ class MindMap {
     this.boxes = [];
     this.connections = [];
 
+    // Track the top-most box under the pointer for hover-only visuals
+    this._topHoverBox = null;
+
     // Default storage key for autosave
     this.storageKey = 'openmind_autosave';
 
@@ -368,6 +371,9 @@ class MindMap {
 
     // Draw boxes
     if (this.boxes) {
+      // Compute the top-most hovered box once per frame so hover visuals do not leak to underlying boxes
+      this._topHoverBox = this.getTopMostBoxUnderMouse();
+
       for (let box of this.boxes) {
         if (!box) continue;
 
@@ -403,7 +409,8 @@ class MindMap {
 
         const active = this.connectingFrom && this.connectingFrom.box === box;
         // During arrow-key navigation (presentation), don't show hover-triggered connectors
-        if ((!this.isArrowKeyNavigating && box.isMouseOver()) || active) {
+        const isTopHover = this._topHoverBox === box;
+        if ((!this.isArrowKeyNavigating && isTopHover) || active) {
           try { box.drawConnectors(!!active); } catch (e) { }
         }
       }

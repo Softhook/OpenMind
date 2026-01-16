@@ -814,6 +814,13 @@ class CollaborationManager {
             imageUrl: box.imageUrl || null,
             highlights: Array.isArray(box.highlights) && box.highlights.length > 0
                 ? box.highlights.map(h => ({ start: h.start, end: h.end, color: h.color }))
+                : null,
+            // Persist faux styles so collaborators and undo/redo keep them in sync
+            boldRanges: Array.isArray(box.boldRanges) && box.boldRanges.length > 0
+                ? box.boldRanges.map(r => ({ start: r.start, end: r.end }))
+                : null,
+            italicRanges: Array.isArray(box.italicRanges) && box.italicRanges.length > 0
+                ? box.italicRanges.map(r => ({ start: r.start, end: r.end }))
                 : null
         };
     }
@@ -1110,21 +1117,23 @@ class CollaborationManager {
 
         if (box) {
             // Update position: snap immediately or interpolate
-            if (typeof data.x === 'number') {
-                if (snapToPosition) {
-                    box.x = data.x;
-                    box.targetX = data.x;
-                } else {
-                    box.targetX = data.x;
-                }
+            const shouldSnapX = snapToPosition && typeof data.x === 'number';
+            const shouldSnapY = snapToPosition && typeof data.y === 'number';
+            const pendingTargetX = (!snapToPosition && typeof data.x === 'number') ? data.x : box.targetX;
+            const pendingTargetY = (!snapToPosition && typeof data.y === 'number') ? data.y : box.targetY;
+
+            if (shouldSnapX) {
+                box.x = data.x;
+                box.targetX = data.x;
+            } else if (typeof data.x === 'number') {
+                box.targetX = data.x;
             }
-            if (typeof data.y === 'number') {
-                if (snapToPosition) {
-                    box.y = data.y;
-                    box.targetY = data.y;
-                } else {
-                    box.targetY = data.y;
-                }
+
+            if (shouldSnapY) {
+                box.y = data.y;
+                box.targetY = data.y;
+            } else if (typeof data.y === 'number') {
+                box.targetY = data.y;
             }
 
             // Update existing box with validation
@@ -1156,7 +1165,26 @@ class CollaborationManager {
             } else if (data.highlights === null && (forceApply || !box.isEditing)) {
                 box.highlights = [];
             }
+
+            // Sync faux-bold/italic ranges; clear when absent to avoid stale styling
+            if (Array.isArray(data.boldRanges) && (forceApply || !box.isEditing)) {
+                box.boldRanges = data.boldRanges.map(r => ({ start: r.start, end: r.end }));
+            } else if (data.boldRanges === null && (forceApply || !box.isEditing)) {
+                box.boldRanges = [];
+            }
+
+            if (Array.isArray(data.italicRanges) && (forceApply || !box.isEditing)) {
+                box.italicRanges = data.italicRanges.map(r => ({ start: r.start, end: r.end }));
+            } else if (data.italicRanges === null && (forceApply || !box.isEditing)) {
+                box.italicRanges = [];
+            }
             box.updateDimensions();
+
+            // Restore pending targets when we only want interpolation (avoid reset inside updateDimensions)
+            if (!snapToPosition) {
+                if (typeof pendingTargetX === 'number') box.targetX = pendingTargetX;
+                if (typeof pendingTargetY === 'number') box.targetY = pendingTargetY;
+            }
         } else {
             // Create new box
             if (typeof TextBox !== 'undefined') {

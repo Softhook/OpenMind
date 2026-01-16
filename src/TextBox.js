@@ -799,6 +799,9 @@ class TextBox {
     // Get zoom factor for UI scaling
     const zoomFactor = Utils.getClampedZoomFactor();
 
+    // Only the top-most hovered box should display hover visuals/rollovers
+    const isTopHover = (typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox === this);
+
     // Draw box
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
@@ -811,7 +814,7 @@ class TextBox {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
       stroke(selColor.r, selColor.g, selColor.b);
       strokeWeight(2.5 / zoomFactor);
-    } else if (this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
+    } else if (isTopHover && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Hover state uses the box background color
       // Disabled while navigating between boxes with arrow keys (presentation mode)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
@@ -864,7 +867,7 @@ class TextBox {
 
       // If connector dots are visible (hover OR active connection from this box),
       // slightly dim the draggable frame area so the grab-edge is visually prominent.
-      const connectorsVisible = ((!(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && this.isMouseOver()) ||
+      const connectorsVisible = ((!(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating) && isTopHover) ||
         (typeof mindMap !== 'undefined' && mindMap.connectingFrom && mindMap.connectingFrom.box === this));
       if (connectorsVisible && !this.isEditing) {
         // Compute edge thresholds matching isMouseOnEdge logic
@@ -1021,7 +1024,7 @@ class TextBox {
 
     // Draw resize handle in bottom-right corner (only when not editing)
     // Hide hover-triggered resize handle during arrow-key navigation
-    if (!this.isEditing && ((this.isMouseOver() && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) || this.isResizing)) {
+    if (!this.isEditing && (((isTopHover && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) || this.isResizing))) {
       // Use helper for zoom factor
       const currentZoom = Utils.getCurrentZoom();
       const zoomFactor = Utils.getClampedZoomFactor();
@@ -1189,6 +1192,10 @@ class TextBox {
    */
   isMouseOverResizeHandle() {
     if (!this.selected) return false;
+    // Only the top-most hovered box should expose its resize handle
+    if (typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox && mindMap._topHoverBox !== this) {
+      return false;
+    }
     const zoomFactor = Utils.getClampedZoomFactor();
     const scaledHandleSize = this.resizeHandleSize / zoomFactor;
     let handleX = this.x + this.width / 2 - scaledHandleSize;
