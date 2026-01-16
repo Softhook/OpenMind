@@ -62,6 +62,11 @@ class CollaborationManager {
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
+    // 1000ms timeout chosen based on typical typing pause patterns:
+    // - Fast typing: 100-200ms between characters
+    // - Natural pauses: 500-1500ms (thinking, reading, correcting)
+    // - 1000ms provides good balance: groups continuous typing while respecting natural breaks
+    static TEXT_UNDO_GROUP_TIMEOUT = 1000; // ms - time to wait before closing text edit undo group
 
     // Sync verification timing - adjusted for free server cold start (30-60s)
     static SYNC_VERIFICATION_DELAY = 10000; // ms - delay before first verification (10s for cold start)
@@ -125,6 +130,12 @@ class CollaborationManager {
 
         // Debounce timers for text sync during editing
         this.textSyncTimers = new Map(); // boxId -> timeoutId
+        
+        // Text editing undo grouping state
+        this.textEditUndoTimer = null; // Timer to close text edit undo group
+        this.textEditUndoTimerLastReset = 0; // Timestamp of last timer reset
+        this.isTextEditUndoGroupOpen = false; // Whether we're in a text edit undo group
+        this.currentEditingBoxId = null; // Track which box is currently being edited for undo grouping
 
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
@@ -191,8 +202,13 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
+            // trackedOrigins: Yjs automatically adds this.undoManager to this set, ensuring only
+            // transactions with origin=this.undoManager are tracked. By specifying an empty Set,
+            // we ensure ONLY transactions with this.undoManager as origin are tracked.
+            // This prevents tracking remote changes or internal sync operations.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
+                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
+                trackedOrigins: new Set([]) // Yjs auto-adds this.undoManager to this set
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
@@ -394,6 +410,21 @@ class CollaborationManager {
     destroy() {
         this.disconnect();
 
+        // Clean up text editing undo group timer
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+            this.textEditUndoTimer = null;
+        }
+        this.isTextEditUndoGroupOpen = false;
+        this.currentEditingBoxId = null;
+        this.textEditUndoTimerLastReset = 0;
+
+        // Clean up text sync timers
+        for (const timer of this.textSyncTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.textSyncTimers.clear();
+
         // Now destroy Yjs state
         if (this.undoManager) {
             this.undoManager.destroy();
@@ -426,6 +457,12 @@ class CollaborationManager {
         if (!this.undoManager) return false;
         if (this.undoManager.undoStack.length === 0) return false;
 
+        // Close any open text editing undo group before performing undo
+        // This ensures the current text edit is completed and captured
+        if (this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+        }
+
         this.undoManager.undo();
         Utils.Logger.debug('[Undo] Performed');
 
@@ -443,6 +480,12 @@ class CollaborationManager {
     redo() {
         if (!this.undoManager) return false;
         if (this.undoManager.redoStack.length === 0) return false;
+
+        // Close any open text editing undo group before performing redo
+        // This ensures consistency in undo/redo behavior
+        if (this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+        }
 
         this.undoManager.redo();
         Utils.Logger.debug('[Redo] Performed');
@@ -492,9 +535,18 @@ class CollaborationManager {
             throw new TypeError('transact() requires a function callback');
         }
 
+        // Close any open text editing undo group before starting a new transaction
+        // This ensures text edits don't get mixed with other operations
+        if (this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+        }
+
         if (this.ydoc && this.undoManager) {
             // Set origin to undoManager so it knows to track this transaction
             this.ydoc.transact(callback, this.undoManager);
+            // Explicitly call stopCapturing to ensure this transaction is separate
+            // from any subsequent operations
+            this.undoManager.stopCapturing();
         } else if (this.ydoc) {
             // Fallback without undo manager
             this.ydoc.transact(callback);
@@ -516,6 +568,73 @@ class CollaborationManager {
     }
 
     /**
+     * Starts a text editing undo group if not already open.
+     * Text edits within a group are undone/redone together as one operation.
+     * @private
+     */
+    _startTextEditUndoGroup() {
+        if (this.isTextEditUndoGroupOpen) {
+            // Group already open, just reset the timer
+            this._resetTextEditUndoTimer();
+            return;
+        }
+
+        this.isTextEditUndoGroupOpen = true;
+        this._resetTextEditUndoTimer();
+    }
+
+    /**
+     * Resets the timer that closes the text editing undo group.
+     * Called on each text edit to extend the group while typing continues.
+     * Optimized to avoid unnecessary timer churn during rapid typing.
+     * @private
+     */
+    _resetTextEditUndoTimer() {
+        const now = Date.now();
+        const timeSinceLastReset = now - this.textEditUndoTimerLastReset;
+        
+        // Skip timer reset if we just reset it recently (< 100ms ago)
+        // This reduces timer churn during very rapid typing while still
+        // maintaining the 1s timeout for closing the undo group
+        if (timeSinceLastReset < 100 && this.textEditUndoTimer) {
+            return;
+        }
+
+        // Clear existing timer
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+        }
+
+        // Set new timer to close the group after inactivity
+        this.textEditUndoTimer = setTimeout(() => {
+            this._closeTextEditUndoGroup();
+        }, CollaborationManager.TEXT_UNDO_GROUP_TIMEOUT);
+        
+        this.textEditUndoTimerLastReset = now;
+    }
+
+    /**
+     * Closes the current text editing undo group.
+     * This creates an undo boundary, making all edits since _startTextEditUndoGroup()
+     * undoable as a single operation.
+     * @private
+     */
+    _closeTextEditUndoGroup() {
+        if (!this.isTextEditUndoGroupOpen) return;
+
+        this.isTextEditUndoGroupOpen = false;
+        this.textEditUndoTimerLastReset = 0; // Reset timestamp
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+            this.textEditUndoTimer = null;
+        }
+
+        // Stop capturing to close the undo boundary
+        this.stopCapturing();
+        Utils.Logger.debug('[Undo] Closed text edit group');
+    }
+
+    /**
      * Sets up MindMap static callbacks for local → Yjs sync
      * @private
      */
@@ -531,8 +650,8 @@ class CollaborationManager {
                 this.deleteBoxFromYjs(boxId);
             };
 
-            MindMap.onConnectionsChange = () => {
-                this.syncConnectionsToYjs();
+            MindMap.onConnectionsChange = (skipTransactionWrapper = false) => {
+                this.syncConnectionsToYjs(skipTransactionWrapper);
             };
         }
     }
@@ -698,7 +817,16 @@ class CollaborationManager {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
         // Debounce text sync during active editing to reduce network traffic
+        // AND group text edits for meaningful undo boundaries
         if (box.isEditing) {
+            // Start/extend text editing undo group for THIS box
+            // If switching boxes, close previous group first
+            if (this.currentEditingBoxId && this.currentEditingBoxId !== box.id) {
+                this._closeTextEditUndoGroup();
+            }
+            this.currentEditingBoxId = box.id;
+            this._startTextEditUndoGroup();
+
             // Capture boxId, not the box object, to avoid stale reference issues
             const boxId = box.id;
 
@@ -717,6 +845,13 @@ class CollaborationManager {
                         this.ydoc.transact(() => {
                             this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                         }, this.undoManager);
+                        // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
+                        // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
+                        // which ultimately calls stopCapturing(). Note: if a non-text operation occurs before
+                        // this debounce fires, that later operation may call stopCapturing() and close the
+                        // current text-edit group, so the text edit and that operation can end up in the
+                        // same undo item. This timing-dependent grouping is intentional but important to
+                        // be aware of when reasoning about undo boundaries.
                     } else if (currentBox) {
                         // Fallback without undo tracking
                         this.yboxes.set(boxId, this._boxToYjsData(currentBox));
@@ -726,6 +861,13 @@ class CollaborationManager {
 
             this.textSyncTimers.set(boxId, timer);
             return;
+        }
+
+        // If we were editing and now stopped, close the text editing undo group
+        // This ensures the undo boundary is created when user stops typing
+        if (this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+            this.currentEditingBoxId = null;
         }
 
         // When skipTransactionWrapper=true, we're already inside a transaction
@@ -741,6 +883,9 @@ class CollaborationManager {
             this.ydoc.transact(() => {
                 this.yboxes.set(box.id, this._boxToYjsData(box));
             }, this.undoManager);
+            // Call stopCapturing to ensure each sync operation is a separate undo item
+            // This prevents accidental merging with subsequent operations
+            this.undoManager.stopCapturing();
         } else {
             // Fallback without undo tracking
             this.yboxes.set(box.id, this._boxToYjsData(box));
@@ -755,11 +900,26 @@ class CollaborationManager {
     deleteBoxFromYjs(boxId) {
         if (!this.yboxes || !boxId || this.isSyncing) return;
 
+        // If deleting the box currently being edited, close its text editing undo group
+        if (this.currentEditingBoxId === boxId && this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+            this.currentEditingBoxId = null;
+        }
+
+        // Clear any pending text sync timer for this box
+        const timer = this.textSyncTimers.get(boxId);
+        if (timer) {
+            clearTimeout(timer);
+            this.textSyncTimers.delete(boxId);
+        }
+
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
             this.ydoc.transact(() => {
                 this.yboxes.delete(boxId);
             }, this.undoManager);
+            // Ensure this deletion is a separate undo item
+            this.undoManager.stopCapturing();
         } else {
             // Fallback without undo tracking
             this.yboxes.delete(boxId);
@@ -769,8 +929,9 @@ class CollaborationManager {
     /**
      * Syncs connections to Yjs
      * Call this when connections change
+     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations)
      */
-    syncConnectionsToYjs() {
+    syncConnectionsToYjs(skipTransactionWrapper = false) {
         if (!this.yconnections || !this.mindMap || this.isSyncing) return;
 
         // Get current local connections as ID pairs
@@ -778,12 +939,21 @@ class CollaborationManager {
             .filter(c => c && c.fromBox && c.toBox)
             .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
 
+        // When skipTransactionWrapper=true, we're already inside a transaction
+        // from _wrapInTransaction, so we just sync directly without creating a new transaction
+        if (skipTransactionWrapper) {
+            this._syncConnectionsToYjsImpl(localConns);
+            return;
+        }
+
         // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
             this.ydoc.transact(() => {
                 this._syncConnectionsToYjsImpl(localConns);
             }, this.undoManager);
+            // Ensure connection changes are a separate undo item
+            this.undoManager.stopCapturing();
         } else if (this.ydoc) {
             // Fallback without undo tracking
             this.ydoc.transact(() => {

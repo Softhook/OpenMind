@@ -52,7 +52,17 @@ OpenMind supports real-time collaborative editing using WebSocket synchronizatio
 - Cmd/Ctrl+C: copy selected box(es)
 - Cmd/Ctrl+V: paste copied box(es) at the cursor location
 - Cmd/Ctrl+Z: undo last action
+- Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y: redo last undone action
 - **Shift+T: toggle Easter egg thrust game** 🎮
+
+### Undo/Redo Behavior
+
+OpenMind provides intelligent, per-user undo/redo that works seamlessly in both solo and collaborative environments:
+
+- **Action-based undo**: Each meaningful action (alignment, deletion, paste, etc.) creates one undo step
+- **Smart text editing**: Continuous typing is grouped into a single undo step. Pausing for 1 second or clicking away creates an undo boundary
+- **Per-user tracking**: In collaborative sessions, undo/redo only affects YOUR changes, not other users' changes
+- **No time-based grouping**: Operations are never grouped automatically by time - each distinct action is separate
 
 While editing a text box:
 

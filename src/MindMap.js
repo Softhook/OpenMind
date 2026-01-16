@@ -129,14 +129,18 @@ class MindMap {
    * @param {TextBox} box - The box to add
    */
   addBox(box) {
-    this.pushUndo();
-    this.boxes.push(box);
-    this.isDirty = true;
+    // Wrap in transaction for proper undo tracking
+    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
+    this._wrapInTransaction(() => {
+      this.boxes.push(box);
+      this.isDirty = true;
 
-    // Notify collaboration system
-    if (MindMap.onBoxChange && box) {
-      MindMap.onBoxChange(box);
-    }
+      // Notify collaboration system
+      // Pass skipTransactionWrapper=true since we're already in a transaction
+      if (MindMap.onBoxChange && box) {
+        MindMap.onBoxChange(box, true);
+      }
+    });
   }
 
   /**
@@ -175,14 +179,18 @@ class MindMap {
       }
     }
 
-    this.pushUndo();
-    this.connections.push(new Connection(fromBox, toBox));
-    this.isDirty = true;
+    // Wrap in transaction for proper undo tracking
+    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
+    this._wrapInTransaction(() => {
+      this.connections.push(new Connection(fromBox, toBox));
+      this.isDirty = true;
 
-    // Notify collaboration system
-    if (MindMap.onConnectionsChange) {
-      MindMap.onConnectionsChange();
-    }
+      // Notify collaboration system
+      // Pass skipTransactionWrapper=true since we're already in a transaction
+      if (MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange(true);
+      }
+    });
   }
 
   /**
@@ -1803,26 +1811,26 @@ class MindMap {
         if (!duplicate) {
           if (droppedOn !== originalTo) {
             this.pushUndo();
-            conn.toBox = droppedOn;
             changed = true;
+            
+            // Wrap connection reattachment in transaction for proper undo tracking
+            this._wrapInTransaction(() => {
+              conn.toBox = droppedOn;
+              // Sync connection change to collaboration
+              // Pass skipTransactionWrapper=true since we're in a transaction
+              if (MindMap.onConnectionsChange) {
+                MindMap.onConnectionsChange(true);
+              }
+            });
           }
         }
       }
 
       // If not changed, keep original
-      conn.toBox = changed ? conn.toBox : originalTo;
+      if (!changed) {
+        conn.toBox = originalTo;
+      }
       this.draggingConnection = null;
-
-      // Sync connection change to collaboration if reattached
-      if (changed && MindMap.onConnectionsChange) {
-        MindMap.onConnectionsChange();
-      }
-
-      // Only close undo boundary if connection was actually reattached
-      // This prevents capturing unrelated changes from other users during the drag
-      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
-        collaborationManager.stopCapturing();
-      }
       return;
     }
 
@@ -2092,16 +2100,12 @@ class MindMap {
     // =========================================================================
     // TEXT EDITING KEY HANDLING
     // =========================================================================
-    // With captureTimeout: 0 (action-based undo), each keystroke creates a 
-    // separate undo step. This is technically correct but may not match user 
-    // expectations (e.g., typing "hello" = 5 undo steps).
-    // 
-    // POTENTIAL IMPROVEMENTS for future consideration:
-    // - Implement word-boundary detection to group characters into words
-    // - Add a small captureTimeout (e.g., 300ms) specifically for text editing
-    // - Detect "pause" in typing to create natural undo boundaries
-    // 
-    // Current behavior prioritizes consistency with other action-based operations.
+    // Text editing undo uses intelligent grouping:
+    // - Continuous typing is grouped into a single undo step
+    // - Pauses in typing (1 second) create undo boundaries
+    // - Stopping editing (clicking away) closes the current undo group
+    // This provides natural, meaningful undo behavior while preserving
+    // multi-user per-user undo tracking via Yjs UndoManager.
     // =========================================================================
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
@@ -2136,9 +2140,17 @@ class MindMap {
             console.error('Clipboard cut not supported:', e);
           }
           // Delete selection regardless of clipboard outcome
+          // Wrap in transaction to make cut a discrete operation, not grouped with typing
           this.pushUndo();
           if (this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
-            this.selectedBox.deleteSelection();
+            this._wrapInTransaction(() => {
+              this.selectedBox.deleteSelection();
+              // Notify collaboration system
+              // Pass skipTransactionWrapper=true since we're in a transaction
+              if (MindMap.onBoxChange && this.selectedBox) {
+                MindMap.onBoxChange(this.selectedBox, true);
+              }
+            });
           }
           return;
         } else if (key === 'v' || key === 'V') {
@@ -2148,7 +2160,15 @@ class MindMap {
               navigator.clipboard.readText().then(text => {
                 if (text && this.selectedBox) {
                   this.pushUndo();
-                  this.selectedBox.pasteText(text);
+                  // Wrap in transaction to make paste a discrete operation
+                  this._wrapInTransaction(() => {
+                    this.selectedBox.pasteText(text);
+                    // Notify collaboration system
+                    // Pass skipTransactionWrapper=true since we're in a transaction
+                    if (MindMap.onBoxChange && this.selectedBox) {
+                      MindMap.onBoxChange(this.selectedBox, true);
+                    }
+                  });
                 }
               }).catch(err => {
                 console.error('Failed to paste text: ', err);
@@ -2160,14 +2180,20 @@ class MindMap {
           return;
         } else if (key === 'b' || key === 'B') {
           // Highlight selected text (toggle)
+          // This is a discrete formatting action, not continuous text input
+          // Wrap in transaction for separate undo item
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
               this.pushUndo();
-              this.selectedBox.toggleHighlightOnSelection();
-              // Notify collaboration system of highlight change
-              if (MindMap.onBoxChange) {
-                MindMap.onBoxChange(this.selectedBox);
-              }
+              
+              this._wrapInTransaction(() => {
+                this.selectedBox.toggleHighlightOnSelection();
+                // Notify collaboration system of highlight change
+                // Pass skipTransactionWrapper=true since we're already in a transaction
+                if (MindMap.onBoxChange) {
+                  MindMap.onBoxChange(this.selectedBox, true);
+                }
+              });
             }
           } catch (e) { console.error('Highlight toggle failed', e); }
           return;
@@ -2334,11 +2360,16 @@ class MindMap {
       // Space: reverse selected connection when not editing
       if (this.selectedConnection) {
         this.pushUndo();
-        this.selectedConnection.reverse();
-        // Sync connection change to collaboration
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
-        }
+        
+        // Wrap connection reverse in transaction for proper undo tracking
+        this._wrapInTransaction(() => {
+          this.selectedConnection.reverse();
+          // Sync connection change to collaboration
+          // Pass skipTransactionWrapper=true since we're in a transaction
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange(true);
+          }
+        });
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
