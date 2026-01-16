@@ -2225,6 +2225,7 @@ class MindMap {
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations
       if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17))) { // CMD or CTRL key
+        const isShift = keyIsDown(16);
         if (key === 'a' || key === 'A') {
           // Select all text
           this.selectedBox.selectAll();
@@ -2293,17 +2294,14 @@ class MindMap {
             console.error('Clipboard paste not supported:', e);
           }
           return;
-        } else if (key === 'b' || key === 'B') {
-          // Highlight selected text (toggle)
-          // This is a discrete formatting action, not continuous text input
-          // Wrap in transaction for separate undo item
+        } else if (isShift && (key === 'b' || key === 'B')) {
+          // Highlight selected text (toggle) with Cmd/Ctrl+Shift+B
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
               this.pushUndo();
-              
+
               this._wrapInTransaction(() => {
                 this.selectedBox.toggleHighlightOnSelection();
-                // Notify collaboration system of highlight change
                 // Pass skipTransactionWrapper=true since we're already in a transaction
                 if (MindMap.onBoxChange) {
                   MindMap.onBoxChange(this.selectedBox, true);
@@ -2311,6 +2309,34 @@ class MindMap {
               });
             }
           } catch (e) { console.error('Highlight toggle failed', e); }
+          return;
+        } else if (key === 'b' || key === 'B') {
+          // Faux bold via outline stroke
+          try {
+            if (this.selectedBox && typeof this.selectedBox.toggleBoldOutlineOnSelection === 'function') {
+              this.pushUndo();
+              this._wrapInTransaction(() => {
+                this.selectedBox.toggleBoldOutlineOnSelection();
+                if (MindMap.onBoxChange) {
+                  MindMap.onBoxChange(this.selectedBox, true);
+                }
+              });
+            }
+          } catch (e) { console.error('Bold toggle failed', e); }
+          return;
+        } else if (key === 'i' || key === 'I') {
+          // Faux italic via shear transform
+          try {
+            if (this.selectedBox && typeof this.selectedBox.toggleItalicSlantOnSelection === 'function') {
+              this.pushUndo();
+              this._wrapInTransaction(() => {
+                this.selectedBox.toggleItalicSlantOnSelection();
+                if (MindMap.onBoxChange) {
+                  MindMap.onBoxChange(this.selectedBox, true);
+                }
+              });
+            }
+          } catch (e) { console.error('Italic toggle failed', e); }
           return;
         }
       }

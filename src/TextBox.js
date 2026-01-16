@@ -33,6 +33,8 @@ class TextBox {
   static FONT_SIZE = 14;                    // Default font size
   static CORNER_RADIUS = 6;                 // Rounded corner radius
   static LINE_HEIGHT_MULTIPLIER = 1.5;      // Line height as multiple of font size
+  static BOLD_STROKE_WEIGHT = 0.8;          // Stroke weight used to fake bold without reflow
+  static ITALIC_SHEAR_RADIANS = -0.24;      // Shear angle (radians) to fake italic (lean left)
 
   // Interaction constants
   static RESIZE_HANDLE_SIZE = 18;           // Size of resize handle in corner
@@ -155,6 +157,8 @@ class TextBox {
 
     // Text features
     this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
+    this.boldRanges = [];       // Array of {start, end} for faux-bold stroke rendering
+    this.italicRanges = [];     // Array of {start, end} for faux-italic slant
     this.cachedLinks = null;    // Cached array of {start, end, url}
 
     // Calculate initial dimensions
@@ -956,19 +960,43 @@ class TextBox {
             }
 
             // Set color based on whether character is in a link
+            const linkColor = TextBox.COLORS.LINK_TEXT;
             if (isInLink) {
-              const linkColor = TextBox.COLORS.LINK_TEXT;
               fill(linkColor.r, linkColor.g, linkColor.b); // Blue for links
             } else {
               fill(0); // Black for regular text
             }
+
+            const isBold = this._isIndexInRanges(this.boldRanges, absCharPos);
+            const isItalic = this._isIndexInRanges(this.italicRanges, absCharPos);
 
             // For spaces, use measured width to ensure they take up space
             if (char === ' ') {
               // Draw a space by moving position (p5 text(' ') might collapse)
               xPos += textWidth(' ');
             } else {
-              text(char, xPos, startY + i * lineHeight);
+              const yPos = startY + i * lineHeight;
+              if (isItalic) {
+                push();
+                translate(xPos, yPos);
+                shearX(TextBox.ITALIC_SHEAR_RADIANS);
+                if (isBold) {
+                  stroke(isInLink ? linkColor.r : 0, isInLink ? linkColor.g : 0, isInLink ? linkColor.b : 0);
+                  strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
+                } else {
+                  noStroke();
+                }
+                text(char, 0, 0);
+                pop();
+              } else {
+                if (isBold) {
+                  stroke(isInLink ? linkColor.r : 0, isInLink ? linkColor.g : 0, isInLink ? linkColor.b : 0);
+                  strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
+                } else {
+                  noStroke();
+                }
+                text(char, xPos, yPos);
+              }
               xPos += textWidth(char);
             }
           }
@@ -1912,14 +1940,145 @@ class TextBox {
   }
 
   /**
-   * Apply an edit delta to all highlights so they remain valid after text edits.
-   * editStart: index where edit begins (in pre-edit coordinates)
-   * removedLen: number of characters removed at editStart
-   * addedLen: number of characters inserted at editStart
+   * Merge and normalize style ranges (bold/italic) into non-overlapping segments.
+   * @param {Array<{start:number,end:number}>} ranges
+   * @param {number} textLen
+   * @returns {Array<{start:number,end:number}>}
+   * @private
    */
-  applyEditDelta(editStart, removedLen, addedLen) {
-    if (!this.highlights || this.highlights.length === 0) return;
-    const textLen = (this.text != null) ? this.text.length : 0;
+  _mergeRanges(ranges, textLen) {
+    if (!Array.isArray(ranges) || ranges.length === 0) return [];
+    const cleaned = [];
+    for (const r of ranges) {
+      if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+      const start = Math.max(0, Math.min(textLen, Math.floor(r.start)));
+      const end = Math.max(0, Math.min(textLen, Math.floor(r.end)));
+      if (end <= start) continue;
+      cleaned.push({ start, end });
+    }
+    cleaned.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const r of cleaned) {
+      const last = merged[merged.length - 1];
+      if (last && r.start <= last.end) {
+        last.end = Math.max(last.end, r.end);
+      } else {
+        merged.push({ ...r });
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Toggle a style range (bold/italic) for the current selection without changing layout.
+   * @param {'boldRanges'|'italicRanges'} rangeKey
+   * @private
+   */
+  _toggleRange(rangeKey) {
+    this._ensureText();
+    const selection = this._getOrderedSelection();
+    if (!selection || !rangeKey) return;
+
+    const textLen = this.text.length;
+    const selStart = Math.max(0, Math.min(textLen, selection.start));
+    const selEnd = Math.max(0, Math.min(textLen, selection.end));
+    if (selEnd <= selStart) return;
+
+    const ranges = Array.isArray(this[rangeKey]) ? [...this[rangeKey]] : [];
+
+    // Determine if selection fully covered by existing ranges
+    let pieces = [];
+    for (const r of ranges) {
+      if (!r) continue;
+      const a = Math.max(selStart, Math.max(0, Math.min(textLen, r.start)));
+      const b = Math.min(selEnd, Math.max(0, Math.min(textLen, r.end)));
+      if (a < b) pieces.push({ start: a, end: b });
+    }
+    pieces.sort((A, B) => A.start - B.start);
+    let merged = [];
+    for (const p of pieces) {
+      if (merged.length === 0 || merged[merged.length - 1].end < p.start) {
+        merged.push({ ...p });
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, p.end);
+      }
+    }
+
+    let cur = selStart;
+    let fullyCovered = merged.length > 0;
+    for (const m of merged) {
+      if (m.start > cur) { fullyCovered = false; break; }
+      cur = Math.max(cur, m.end);
+    }
+    if (cur < selEnd) fullyCovered = false;
+
+    if (fullyCovered) {
+      // Remove selection range from style ranges (split if needed)
+      const newRanges = [];
+      for (const r of ranges) {
+        if (!r) continue;
+        const rStart = Math.max(0, Math.min(textLen, r.start));
+        const rEnd = Math.max(0, Math.min(textLen, r.end));
+        if (rEnd <= selStart || rStart >= selEnd) {
+          newRanges.push(r);
+        } else {
+          if (rStart < selStart) {
+            newRanges.push({ start: rStart, end: selStart });
+          }
+          if (rEnd > selEnd) {
+            newRanges.push({ start: selEnd, end: rEnd });
+          }
+        }
+      }
+      this[rangeKey] = this._mergeRanges(newRanges, textLen);
+    } else {
+      ranges.push({ start: selStart, end: selEnd });
+      this[rangeKey] = this._mergeRanges(ranges, textLen);
+    }
+  }
+
+  /**
+   * Toggle faux-bold (stroke outline) on the current selection.
+   */
+  toggleBoldOutlineOnSelection() {
+    this._toggleRange('boldRanges');
+  }
+
+  /**
+   * Toggle faux-italic (shear) on the current selection.
+   */
+  toggleItalicSlantOnSelection() {
+    this._toggleRange('italicRanges');
+  }
+
+  /**
+   * Check if an absolute character index is within any given ranges.
+   * @param {Array<{start:number,end:number}>} ranges
+   * @param {number} idx
+   * @returns {boolean}
+   * @private
+   */
+  _isIndexInRanges(ranges, idx) {
+    if (!Array.isArray(ranges) || !Number.isFinite(idx)) return false;
+    for (const r of ranges) {
+      if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+      if (idx >= r.start && idx < r.end) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Adjust style/highlight ranges after an edit delta so indices stay aligned.
+   * @param {Array<{start:number,end:number, color?:object}>} ranges
+   * @param {number} editStart
+   * @param {number} removedLen
+   * @param {number} addedLen
+   * @param {number} textLen
+   * @returns {Array}
+   * @private
+   */
+  _applyEditDeltaToRanges(ranges, editStart, removedLen, addedLen, textLen) {
+    if (!Array.isArray(ranges) || ranges.length === 0) return [];
     const removed = Math.max(0, Number.isFinite(removedLen) ? removedLen : 0);
     const added = Math.max(0, Number.isFinite(addedLen) ? addedLen : 0);
     const net = added - removed;
@@ -1928,24 +2087,39 @@ class TextBox {
       if (!Number.isFinite(pos)) return pos;
       if (pos < editStart) return pos;
       if (pos >= editStart + removed) return pos + net;
-      // pos is inside removed region -> map to editStart
       return editStart;
     };
 
-    const newHighlights = [];
-    for (const h of this.highlights) {
-      if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') continue;
-      const s = Math.max(0, Math.min(textLen, Math.floor(h.start)));
-      const e = Math.max(0, Math.min(textLen, Math.floor(h.end)));
+    const adjusted = [];
+    for (const r of ranges) {
+      if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+      const s = Math.max(0, Math.min(textLen, Math.floor(r.start)));
+      const e = Math.max(0, Math.min(textLen, Math.floor(r.end)));
       if (e <= s) continue;
       const ns = mapPos(s);
       const ne = mapPos(e);
       if (ne > ns) {
-        newHighlights.push({ start: ns, end: ne, color: h.color });
+        if (r.color) {
+          adjusted.push({ start: ns, end: ne, color: r.color });
+        } else {
+          adjusted.push({ start: ns, end: ne });
+        }
       }
-      // else drop empty/invalid highlight
     }
-    this.highlights = newHighlights;
+    return adjusted;
+  }
+
+  /**
+   * Apply an edit delta to all highlights so they remain valid after text edits.
+   * editStart: index where edit begins (in pre-edit coordinates)
+   * removedLen: number of characters removed at editStart
+   * addedLen: number of characters inserted at editStart
+   */
+  applyEditDelta(editStart, removedLen, addedLen) {
+    const textLen = (this.text != null) ? this.text.length : 0;
+    this.highlights = this._applyEditDeltaToRanges(this.highlights, editStart, removedLen, addedLen, textLen);
+    this.boldRanges = this._applyEditDeltaToRanges(this.boldRanges, editStart, removedLen, addedLen, textLen);
+    this.italicRanges = this._applyEditDeltaToRanges(this.italicRanges, editStart, removedLen, addedLen, textLen);
   }
 
   // ============================================================================
@@ -2289,7 +2463,9 @@ class TextBox {
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor,
-      highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined
+      highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined,
+      boldRanges: Array.isArray(this.boldRanges) && this.boldRanges.length > 0 ? this.boldRanges.map(r => ({ start: r.start, end: r.end })) : undefined,
+      italicRanges: Array.isArray(this.italicRanges) && this.italicRanges.length > 0 ? this.italicRanges.map(r => ({ start: r.start, end: r.end })) : undefined
     };
   }
 
@@ -2385,6 +2561,32 @@ class TextBox {
           color = { r: 255, g: 255, b: 0, a: 180 };
         }
         box.highlights.push({ start, end, color });
+      }
+    }
+
+    // Load faux-bold ranges
+    if (Array.isArray(data.boldRanges)) {
+      box.boldRanges = [];
+      const textLen = String(box.text || '').length;
+      for (const r of data.boldRanges) {
+        if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+        const start = Math.max(0, Math.min(textLen, Math.floor(r.start)));
+        const end = Math.max(0, Math.min(textLen, Math.floor(r.end)));
+        if (start >= end) continue;
+        box.boldRanges.push({ start, end });
+      }
+    }
+
+    // Load faux-italic ranges
+    if (Array.isArray(data.italicRanges)) {
+      box.italicRanges = [];
+      const textLen = String(box.text || '').length;
+      for (const r of data.italicRanges) {
+        if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+        const start = Math.max(0, Math.min(textLen, Math.floor(r.start)));
+        const end = Math.max(0, Math.min(textLen, Math.floor(r.end)));
+        if (start >= end) continue;
+        box.italicRanges.push({ start, end });
       }
     }
     // PDF embedding removed: we no longer load or store PDF URLs. If a map

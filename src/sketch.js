@@ -3831,8 +3831,39 @@ function exportPNG() {
       } catch (_) { }
 
       for (let i = 0; i < wrappedLines.length; i++) {
-        if (wrappedLines[i] != null) {
-          pg.text(String(wrappedLines[i]), textX, startY + i * lineHeight);
+        let lineText = wrappedLines[i];
+        if (lineText == null) continue;
+
+        const lineStartPos = (box.cachedLineCharMap && box.cachedLineCharMap[i] !== undefined)
+          ? box.cachedLineCharMap[i]
+          : 0;
+
+        let xPos = textX;
+        for (let ci = 0; ci < lineText.length; ci++) {
+          const ch = lineText[ci];
+          const absPos = lineStartPos + ci;
+          const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
+          const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
+
+          if (ch === ' ') {
+            xPos += pg.textWidth(' ');
+            continue;
+          }
+
+          const yPos = startY + i * lineHeight;
+          pg.push();
+          pg.translate(xPos, yPos);
+          if (isItalic) pg.shearX(TextBox.ITALIC_SHEAR_RADIANS);
+          if (isBold) {
+            pg.stroke(0);
+            pg.strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
+          } else {
+            pg.noStroke();
+          }
+          pg.text(ch, 0, 0);
+          pg.pop();
+
+          xPos += pg.textWidth(ch);
         }
       }
     }
@@ -4153,11 +4184,27 @@ async function exportPDF() {
       let startY = ty(box.y - box.height / 2) + ts(box.padding);
       let textX = tx(box.x - box.width / 2 + box.padding);
 
-      // Draw persistent highlights behind text using rectangles
+      // Helper: measure text width in current PDF font with scaling
+      const textWidthPdf = (s) => {
+        try { return pdf.getTextWidth(String(s)); } catch (_) { return String(s).length * (box.fontSize * 0.6); }
+      };
+
+      // Use native font weights/styles for export (bold/italic) and accurate measurements
+      const pdfFontName = 'helvetica';
+      let currentStyle = 'normal';
+      const ensureFont = (style) => {
+        if (currentStyle !== style) {
+          pdf.setFont(pdfFontName, style);
+          currentStyle = style;
+        }
+      };
+
+      // Draw persistent highlights behind text using rectangles, accounting for bold/italic width
       try {
         if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
           const textStr = String(box.text || '');
           const map = box.cachedLineCharMap || [];
+
           const getLinePos = (absPos) => {
             if (!map || map.length === 0) return { lineIndex: 0, posInLine: 0 };
             let idx = 0;
@@ -4171,10 +4218,22 @@ async function exportPDF() {
             const posInLine = Math.min(absPos - map[idx], (wrappedLines[idx] || '').length);
             return { lineIndex: idx, posInLine };
           };
-          // jsPDF lacks textWidth per font; approximate via splitting and measuring using pdf.getTextWidth
-          const textWidthPdf = (s) => {
-            try { return ts(pdf.getTextWidth(String(s))); } catch (_) { return ts(String(s).length * (box.fontSize * 0.6)); }
+
+          const measureStyledWidth = (lineText, startIdx, endIdx, lineStartPos) => {
+            if (!lineText) return 0;
+            let w = 0;
+            const limit = Math.min(endIdx, lineText.length);
+            for (let k = startIdx; k < limit; k++) {
+              const absPos = lineStartPos + k;
+              const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
+              const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
+              const style = (isBold && isItalic) ? 'bolditalic' : (isBold ? 'bold' : (isItalic ? 'italic' : 'normal'));
+              ensureFont(style);
+              w += textWidthPdf(lineText[k]);
+            }
+            return w;
           };
+
           for (const hl of box.highlights) {
             if (!hl || hl.start == null || hl.end == null) continue;
             const start = Math.max(0, Math.min(textStr.length, Math.floor(hl.start)));
@@ -4186,25 +4245,27 @@ async function exportPDF() {
             const eInfo = getLinePos(end);
             if (sInfo.lineIndex === eInfo.lineIndex) {
               const lineText = wrappedLines[sInfo.lineIndex] || '';
-              const x1 = textX + textWidthPdf(lineText.slice(0, Math.max(0, sInfo.posInLine)));
-              const x2 = textX + textWidthPdf(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+              const lineStartPos = (map && map[sInfo.lineIndex] !== undefined) ? map[sInfo.lineIndex] : 0;
+              const x1 = textX + measureStyledWidth(lineText, 0, Math.max(0, sInfo.posInLine), lineStartPos);
+              const x2 = textX + measureStyledWidth(lineText, 0, Math.max(0, eInfo.posInLine), lineStartPos);
               const yTop = startY + sInfo.lineIndex * lineHeight;
               pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
             } else {
               for (let li = sInfo.lineIndex; li <= eInfo.lineIndex; li++) {
                 if (li < 0 || li >= wrappedLines.length) continue;
                 const lineText = wrappedLines[li] || '';
+                const lineStartPos = (map && map[li] !== undefined) ? map[li] : 0;
                 const yTop = startY + li * lineHeight;
                 let x1, x2;
                 if (li === sInfo.lineIndex) {
-                  x1 = textX + textWidthPdf(lineText.slice(0, Math.max(0, sInfo.posInLine)));
-                  x2 = textX + textWidthPdf(lineText);
+                  x1 = textX + measureStyledWidth(lineText, 0, Math.max(0, sInfo.posInLine), lineStartPos);
+                  x2 = textX + measureStyledWidth(lineText, 0, lineText.length, lineStartPos);
                 } else if (li === eInfo.lineIndex) {
                   x1 = textX;
-                  x2 = textX + textWidthPdf(lineText.slice(0, Math.max(0, eInfo.posInLine)));
+                  x2 = textX + measureStyledWidth(lineText, 0, Math.max(0, eInfo.posInLine), lineStartPos);
                 } else {
                   x1 = textX;
-                  x2 = textX + textWidthPdf(lineText);
+                  x2 = textX + measureStyledWidth(lineText, 0, lineText.length, lineStartPos);
                 }
                 pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
               }
@@ -4216,8 +4277,28 @@ async function exportPDF() {
       } catch (_) { }
 
       for (let i = 0; i < wrappedLines.length; i++) {
-        if (wrappedLines[i] != null) {
-          pdf.text(String(wrappedLines[i]), textX, startY + i * lineHeight, { baseline: 'top' });
+        const lineText = wrappedLines[i];
+        if (lineText == null) continue;
+
+        const lineStartPos = (box.cachedLineCharMap && box.cachedLineCharMap[i] !== undefined)
+          ? box.cachedLineCharMap[i]
+          : 0;
+
+        let xPos = textX;
+        for (let ci = 0; ci < lineText.length; ci++) {
+          const ch = lineText[ci];
+          const absPos = lineStartPos + ci;
+          const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
+          const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
+
+          const style = (isBold && isItalic) ? 'bolditalic' : (isBold ? 'bold' : (isItalic ? 'italic' : 'normal'));
+          ensureFont(style);
+
+          const w = textWidthPdf(ch);
+          const yTop = startY + i * lineHeight;
+
+          pdf.text(String(ch), xPos, yTop, { baseline: 'top' });
+          xPos += w;
         }
       }
     }
