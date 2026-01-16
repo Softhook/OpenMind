@@ -7,76 +7,49 @@
  * - Pan and Zoom operations
  * - Viewport fitting
  *
- * It serves as the single source of truth for camera position,
- * replacing scattered global variables.
+ * Behavior is unchanged; implementation now uses a small class to centralize
+ * state and reuse internal helpers.
  */
 
-const CameraUtils = {
-    // Core state
-    x: 0,
-    y: 0,
-    zoom: 1,
+class CameraManager {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.zoom = 1;
 
-    // Pan state
-    isPanning: false,
-    panStartMouseX: 0,
-    panStartMouseY: 0,
-    panStartCamX: 0,
-    panStartCamY: 0,
-    rightPanActive: false,
-    suppressNextRightClick: false,
+        this.isPanning = false;
+        this.panStartMouseX = 0;
+        this.panStartMouseY = 0;
+        this.panStartCamX = 0;
+        this.panStartCamY = 0;
+        this.rightPanActive = false;
+        this.suppressNextRightClick = false;
+    }
 
-
-    // ============================================================================
-    // COORDINATE TRANSFORMS
-    // ============================================================================
-
-    /**
-     * Converts world X coordinate to screen space
-     * @param {number} worldX - World X coordinate
-     * @returns {number} Screen X coordinate
-     */
+    // -------------------------------------------------------------------------
+    // Coordinate transforms
+    // -------------------------------------------------------------------------
     screenX(worldX) {
         return worldX * this.zoom + this.x;
-    },
+    }
 
-    /**
-     * Converts world Y coordinate to screen space
-     * @param {number} worldY - World Y coordinate
-     * @returns {number} Screen Y coordinate
-     */
     screenY(worldY) {
         return worldY * this.zoom + this.y;
-    },
+    }
 
-    /**
-     * Converts screen X coordinate to world space
-     * @param {number} screenX - Screen X coordinate
-     * @returns {number} World X coordinate
-     */
     worldX(screenX) {
-        const safeZoom = this.zoom > 0 ? this.zoom : 1;
+        const safeZoom = this._safeZoom();
         return (screenX - this.x) / safeZoom;
-    },
+    }
 
-    /**
-     * Converts screen Y coordinate to world space
-     * @param {number} screenY - Screen Y coordinate
-     * @returns {number} World Y coordinate
-     */
     worldY(screenY) {
-        const safeZoom = this.zoom > 0 ? this.zoom : 1;
+        const safeZoom = this._safeZoom();
         return (screenY - this.y) / safeZoom;
-    },
+    }
 
-
-    // ============================================================================
-    // STATE MANAGEMENT
-    // ============================================================================
-
-    /**
-     * Resets camera to default state (0,0 position, 1x zoom)
-     */
+    // -------------------------------------------------------------------------
+    // State management
+    // -------------------------------------------------------------------------
     reset() {
         this.x = 0;
         this.y = 0;
@@ -84,31 +57,16 @@ const CameraUtils = {
         this.isPanning = false;
         this.rightPanActive = false;
         this.suppressNextRightClick = false;
-    },
+    }
 
-    /**
-     * Centers camera on a world position
-     * @param {number} worldX - World X to center on
-     * @param {number} worldY - World Y to center on
-     * @param {number} viewWidth - Viewport width
-     * @param {number} viewHeight - Viewport height
-     */
     centerOn(worldX, worldY, viewWidth, viewHeight) {
         this.x = viewWidth / 2 - worldX * this.zoom;
         this.y = viewHeight / 2 - worldY * this.zoom;
-    },
+    }
 
-
-    // ============================================================================
-    // INTERACTION HANDLERS
-    // ============================================================================
-
-    /**
-     * Starts a pan operation
-     * @param {number} mouseX - Starting mouse X
-     * @param {number} mouseY - Starting mouse Y
-     * @param {boolean} isRightButton - Whether initiated by right mouse button
-     */
+    // -------------------------------------------------------------------------
+    // Interaction handlers
+    // -------------------------------------------------------------------------
     startPan(mouseX, mouseY, isRightButton = false) {
         this.isPanning = true;
         this.panStartMouseX = mouseX;
@@ -116,110 +74,73 @@ const CameraUtils = {
         this.panStartCamX = this.x;
         this.panStartCamY = this.y;
         this.rightPanActive = isRightButton;
-    },
+    }
 
-    /**
-     * Updates camera position during pan
-     * @param {number} mouseX - Current mouse X
-     * @param {number} mouseY - Current mouse Y
-     */
     updatePan(mouseX, mouseY) {
         if (!this.isPanning) return;
         this.x = this.panStartCamX + (mouseX - this.panStartMouseX);
         this.y = this.panStartCamY + (mouseY - this.panStartMouseY);
-    },
+    }
 
-    /**
-     * Ends the current pan operation
-     */
     endPan() {
         if (this.rightPanActive) {
             this.suppressNextRightClick = true;
         }
         this.isPanning = false;
         this.rightPanActive = false;
-    },
+    }
 
-    /**
-     * Applies zoom centered on a point
-     * @param {number} factor - Zoom factor (> 1 = zoom in)
-     * @param {number} centerX - Screen X to zoom around
-     * @param {number} centerY - Screen Y to zoom around
-     * @param {number} minZoom - Minimum zoom level
-     * @param {number} maxZoom - Maximum zoom level
-     */
     zoomAt(factor, centerX, centerY, minZoom, maxZoom) {
-        // Compute world point under center before zoom
         const wx = this.worldX(centerX);
         const wy = this.worldY(centerY);
 
-        // Apply zoom with constraints
         const newZoom = Math.max(minZoom, Math.min(maxZoom, this.zoom * factor));
 
-        // Adjust camera to keep same world point under center
         this.x = centerX - wx * newZoom;
         this.y = centerY - wy * newZoom;
         this.zoom = newZoom;
-    },
+    }
 
-
-    // ============================================================================
-    // VIEWPORT CULLING
-    // ============================================================================
-
-    /**
-     * Checks if a box is visible in the current viewport
-     * Includes a margin to prevent pop-in/pop-out during pan
-     * @param {Object} box - Box with x, y, width, height properties
-     * @param {number} viewportWidth - Viewport width in screen pixels
-     * @param {number} viewportHeight - Viewport height in screen pixels
-     * @param {number} margin - Extra margin in world space (default: 200)
-     * @returns {boolean} true if box is visible or near visible area
-     */
+    // -------------------------------------------------------------------------
+    // Viewport culling
+    // -------------------------------------------------------------------------
     isBoxVisible(box, viewportWidth, viewportHeight, margin = 200) {
         if (!box || box.x == null || box.y == null || box.width == null || box.height == null) {
-            // Invalid box - skip rendering for performance
-            // (would show errors in console from box.draw() if we tried to render)
             return false;
         }
 
-        // Convert viewport bounds to world space
         const worldLeft = this.worldX(0) - margin;
         const worldRight = this.worldX(viewportWidth) + margin;
         const worldTop = this.worldY(0) - margin;
         const worldBottom = this.worldY(viewportHeight) + margin;
 
-        // Box bounds in world space
         const boxLeft = box.x - box.width / 2;
         const boxRight = box.x + box.width / 2;
         const boxTop = box.y - box.height / 2;
         const boxBottom = box.y + box.height / 2;
 
-        // Check if box intersects viewport (with margin)
         return !(boxRight < worldLeft || boxLeft > worldRight || boxBottom < worldTop || boxTop > worldBottom);
-    },
+    }
 
-    /**
-     * Checks if a connection is visible in the current viewport
-     * @param {Object} conn - Connection with fromBox and toBox
-     * @param {number} viewportWidth - Viewport width in screen pixels
-     * @param {number} viewportHeight - Viewport height in screen pixels
-     * @param {number} margin - Extra margin in world space (default: 200)
-     * @returns {boolean} true if connection is visible or near visible area
-     */
     isConnectionVisible(conn, viewportWidth, viewportHeight, margin = 200) {
         if (!conn || !conn.fromBox || !conn.toBox) {
-            // Invalid connection - skip rendering for performance
             return false;
         }
 
-        // If either box is visible, draw the connection
         return this.isBoxVisible(conn.fromBox, viewportWidth, viewportHeight, margin) ||
                this.isBoxVisible(conn.toBox, viewportWidth, viewportHeight, margin);
     }
-};
 
-// Export globally
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+    _safeZoom() {
+        return this.zoom > 0 ? this.zoom : 1;
+    }
+}
+
+const CameraUtils = new CameraManager();
+
 if (typeof window !== 'undefined') {
     window.CameraUtils = CameraUtils;
 }
