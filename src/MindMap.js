@@ -2164,14 +2164,20 @@ class MindMap {
           return;
         } else if (key === 'b' || key === 'B') {
           // Highlight selected text (toggle)
+          // This is a discrete formatting action, not continuous text input
+          // Wrap in transaction for separate undo item
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
               this.pushUndo();
-              this.selectedBox.toggleHighlightOnSelection();
-              // Notify collaboration system of highlight change
-              if (MindMap.onBoxChange) {
-                MindMap.onBoxChange(this.selectedBox);
-              }
+              
+              this._wrapInTransaction(() => {
+                this.selectedBox.toggleHighlightOnSelection();
+                // Notify collaboration system of highlight change
+                // Pass skipTransactionWrapper=true since we're already in a transaction
+                if (MindMap.onBoxChange) {
+                  MindMap.onBoxChange(this.selectedBox, true);
+                }
+              });
             }
           } catch (e) { console.error('Highlight toggle failed', e); }
           return;
