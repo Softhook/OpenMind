@@ -1142,20 +1142,6 @@ function toggleGridVisibility() {
   isGridVisible = !isGridVisible;
 }
 
-// Temporary debug helper to inspect undo state when shortcuts fire
-function logUndoDebug(context) {
-  if (!collaborationManager) return;
-  const um = collaborationManager.undoManager;
-  const undoCount = um && um.undoStack ? um.undoStack.length : 0;
-  const redoCount = um && um.redoStack ? um.redoStack.length : 0;
-  console.debug('[UndoDebug]', context, {
-    canUndo: collaborationManager.canUndo && collaborationManager.canUndo(),
-    canRedo: collaborationManager.canRedo && collaborationManager.canRedo(),
-    undoCount,
-    redoCount
-  });
-}
-
 // ============================================================================
 // P5.JS SETUP AND DRAW
 // ============================================================================
@@ -2531,10 +2517,8 @@ function keyPressed() {
       if ((isCmd && (key === 'z' || key === 'Z') && isShift) || (isCmd && (key === 'y' || key === 'Y'))) {
         // Always use collaborationManager for redo (unified undo system)
         if (collaborationManager) {
-          logUndoDebug('shortcut:redo-before');
           if (collaborationManager.canRedo && collaborationManager.canRedo()) {
             collaborationManager.redo();
-            logUndoDebug('shortcut:redo-after');
           }
         }
         return false; // prevent browser redo
@@ -2544,10 +2528,8 @@ function keyPressed() {
       if (isCmd && (key === 'z' || key === 'Z') && !isShift) {
         // Always use collaborationManager for undo (unified undo system)
         if (collaborationManager) {
-          logUndoDebug('shortcut:undo-before');
           if (collaborationManager.canUndo && collaborationManager.canUndo()) {
             collaborationManager.undo();
-            logUndoDebug('shortcut:undo-after');
           }
         }
         return false; // prevent browser undo

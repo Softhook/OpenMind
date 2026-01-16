@@ -555,10 +555,6 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }
 
-        const shouldLogTxn = typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
-        const beforeUndo = this.undoManager ? this.undoManager.undoStack.length : 0;
-        const beforeRedo = this.undoManager ? this.undoManager.redoStack.length : 0;
-
         if (this.ydoc && this.undoManager) {
             // Set origin to undoManager so it knows to track this transaction
             this.ydoc.transact(callback, this.undoManager);
@@ -568,18 +564,6 @@ class CollaborationManager {
         } else {
             // Fallback: just execute the callback if ydoc is not available
             callback();
-        }
-
-        if (shouldLogTxn && this.undoManager) {
-            const afterUndo = this.undoManager.undoStack.length;
-            const afterRedo = this.undoManager.redoStack.length;
-            console.debug('[UndoDebug][txn]', {
-                label,
-                beforeUndo,
-                afterUndo,
-                beforeRedo,
-                afterRedo
-            });
         }
     }
 
@@ -868,24 +852,10 @@ class CollaborationManager {
                 if (this.yboxes && this.mindMap) {
                     const currentBox = this.mindMap.getBoxById(boxId);
                     if (currentBox && this.ydoc && this.undoManager) {
-                        const shouldLogTxn = typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
-                        const beforeUndo = shouldLogTxn ? this.undoManager.undoStack.length : 0;
-                        const beforeRedo = shouldLogTxn ? this.undoManager.redoStack.length : 0;
-
                         // Wrap in transaction with origin to track in undo
                         this.ydoc.transact(() => {
                             this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                         }, this.undoManager);
-
-                        if (shouldLogTxn) {
-                            console.debug('[UndoDebug][txn]', {
-                                label: 'textSyncDebounce',
-                                beforeUndo,
-                                afterUndo: this.undoManager.undoStack.length,
-                                beforeRedo,
-                                afterRedo: this.undoManager.redoStack.length
-                            });
-                        }
                         // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
                         // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
                         // which ultimately calls stopCapturing(). Note: if a non-text operation occurs before
@@ -1077,24 +1047,6 @@ class CollaborationManager {
 
             this.isSyncing = true;
             try {
-                const shouldLogUndoDebug = this._isPerformingUndoRedo && typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
-                if (isUndoRedo && shouldLogUndoDebug) {
-                    // Debug state for undo/redo to diagnose missing visual updates
-                    const stackInfo = {
-                        undo: this.undoManager?.undoStack?.length ?? 0,
-                        redo: this.undoManager?.redoStack?.length ?? 0
-                    };
-                    // Show a sample of the first changed key to correlate with UI
-                    const sampleKey = event.changes.keys.keys().next().value;
-                    const sampleData = sampleKey ? this.yboxes.get(sampleKey) : null;
-                    console.debug('[UndoDebug][apply] isUndoRedo', {
-                        keysChanged: event.changes.keys.size,
-                        sampleKey,
-                        sampleData,
-                        stackInfo
-                    });
-                }
-
                 event.changes.keys.forEach((change, key) => {
                     if (change.action === 'add' || change.action === 'update') {
                         const data = this.yboxes.get(key);
