@@ -202,12 +202,13 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
-            // trackedOrigins: Set([this.undoManager]) is automatically added by Yjs
-            // By specifying trackedOrigins, we ensure ONLY transactions with this origin are tracked
-            // This prevents tracking remote changes or internal sync operations
+            // trackedOrigins: Yjs automatically adds this.undoManager to this set, ensuring only
+            // transactions with origin=this.undoManager are tracked. By specifying an empty Set,
+            // we ensure ONLY transactions with this.undoManager as origin are tracked.
+            // This prevents tracking remote changes or internal sync operations.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins: new Set([]) // UndoManager instance is auto-added; only track those
+                trackedOrigins: new Set([]) // Yjs auto-adds this.undoManager to this set
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
@@ -844,8 +845,13 @@ class CollaborationManager {
                         this.ydoc.transact(() => {
                             this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                         }, this.undoManager);
-                        // Don't call stopCapturing() here - we're inside a text editing undo group
-                        // The group will be closed by _closeTextEditUndoGroup() which calls stopCapturing()
+                        // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
+                        // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
+                        // which ultimately calls stopCapturing(). Note: if a non-text operation occurs before
+                        // this debounce fires, that later operation may call stopCapturing() and close the
+                        // current text-edit group, so the text edit and that operation can end up in the
+                        // same undo item. This timing-dependent grouping is intentional but important to
+                        // be aware of when reasoning about undo boundaries.
                     } else if (currentBox) {
                         // Fallback without undo tracking
                         this.yboxes.set(boxId, this._boxToYjsData(currentBox));

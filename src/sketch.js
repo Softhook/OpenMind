@@ -2631,13 +2631,16 @@ function keyPressed() {
       setMaxZoom();
       return false;
     }
+    // Helper to check if collaborationManager is available
+    const hasCollabManager = typeof collaborationManager !== 'undefined' && collaborationManager;
+    
     // Left-align selected boxes: press A key
     if (!hasModifier && (key === 'a' || key === 'A')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.leftAlignSelectedBoxes) {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.leftAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesVertically();
@@ -2654,7 +2657,7 @@ function keyPressed() {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.bottomAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesHorizontally();
@@ -2671,7 +2674,7 @@ function keyPressed() {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.rightAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesVertically();
@@ -2688,7 +2691,7 @@ function keyPressed() {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.topAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesHorizontally();
@@ -2705,7 +2708,7 @@ function keyPressed() {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.horizontalCenterAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesHorizontally();
@@ -2722,7 +2725,7 @@ function keyPressed() {
         const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
         
         // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+        if (shouldDistribute && hasCollabManager) {
           collaborationManager.transact(() => {
             mindMap.centerAlignSelectedBoxes();
             mindMap.distributeSelectedBoxesVertically();

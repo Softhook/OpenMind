@@ -129,9 +129,8 @@ class MindMap {
    * @param {TextBox} box - The box to add
    */
   addBox(box) {
-    this.pushUndo();
-    
     // Wrap in transaction for proper undo tracking
+    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
     this._wrapInTransaction(() => {
       this.boxes.push(box);
       this.isDirty = true;
@@ -180,9 +179,8 @@ class MindMap {
       }
     }
 
-    this.pushUndo();
-    
     // Wrap in transaction for proper undo tracking
+    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
     this._wrapInTransaction(() => {
       this.connections.push(new Connection(fromBox, toBox));
       this.isDirty = true;
