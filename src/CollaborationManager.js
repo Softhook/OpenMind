@@ -201,8 +201,12 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
+            // trackedOrigins: Set([this.undoManager]) is automatically added by Yjs
+            // By specifying trackedOrigins, we ensure ONLY transactions with this origin are tracked
+            // This prevents tracking remote changes or internal sync operations
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
-                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT
+                captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
+                trackedOrigins: new Set([]) // UndoManager instance is auto-added; only track those
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
