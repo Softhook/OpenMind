@@ -1135,7 +1135,9 @@ class CollaborationManager {
             // This prevents lag from causing text loss
             // When undo/redo fires while a box is still in editing mode,
             // force-apply the text so the user actually sees the change.
-            if (typeof data.text === 'string' && (forceApply || !box.isEditing)) {
+            if (typeof data.text === 'string' && !box.isEditing) {
+                box.text = data.text;
+            } else if (typeof data.text === 'string' && forceApply) {
                 box.text = data.text;
             }
 

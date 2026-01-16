@@ -480,7 +480,7 @@ class TextBox {
    * user customization.
    */
   updateDimensions() {
-    if (this.text == null) this.text = '';
+    this._ensureText();
 
     // Preserve the current top-left anchor so text reflow keeps the box pinned.
     // Fall back to the last known anchor if current dimensions are invalid (e.g., during construction).
@@ -938,7 +938,7 @@ class TextBox {
         textSize(this.fontSize);
 
         // Draw selection highlight if there's a selection
-        if (this.isEditing && this.selectionStart !== -1 && this.selectionEnd !== -1) {
+        if (this.isEditing && this._hasSelection(true)) {
           this.drawSelection(wrappedLines, textX, startY, lineHeight);
         }
 
@@ -1284,6 +1284,32 @@ class TextBox {
     return Utils.isWhitespace(ch);
   }
 
+  // Internal helpers
+  _ensureText() {
+    if (this.text === null || this.text === undefined) {
+      this.text = '';
+    }
+  }
+
+  _hasSelection(includeEmpty = false) {
+    const hasMarkers = this.selectionStart !== -1 && this.selectionEnd !== -1;
+    if (!hasMarkers) return false;
+    return includeEmpty || this.selectionStart !== this.selectionEnd;
+  }
+
+  _clearSelection() {
+    this.selectionStart = -1;
+    this.selectionEnd = -1;
+  }
+
+  _getOrderedSelection(includeEmpty = false) {
+    if (!this._hasSelection(includeEmpty)) return null;
+    const start = Math.min(this.selectionStart, this.selectionEnd);
+    const end = Math.max(this.selectionStart, this.selectionEnd);
+    if (!includeEmpty && start === end) return null;
+    return { start, end };
+  }
+
   /**
    * Starts editing mode at the given mouse position
    * @param {number} mx - Mouse X in world coordinates (optional)
@@ -1298,10 +1324,7 @@ class TextBox {
 
     this.isEditing = true;
 
-    // Ensure text is defined
-    if (this.text == null) {
-      this.text = '';
-    }
+    this._ensureText();
 
     // If mouse coordinates provided, position cursor at click location
     if (mx !== null && my !== null && !isNaN(mx) && !isNaN(my)) {
@@ -1313,8 +1336,7 @@ class TextBox {
     // Clamp cursor position to valid range
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
 
-    this.selectionStart = -1;
-    this.selectionEnd = -1;
+    this._clearSelection();
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
 
@@ -1449,8 +1471,7 @@ class TextBox {
       this.selected = true;
       this.isEditing = false;
       this.isSelecting = false;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
       this.resetCursorBlink();
       // Start dragging when user clicks inside the image (but don't start drag if over resize handle)
       if (!this.isMouseOverResizeHandle()) {
@@ -1476,7 +1497,7 @@ class TextBox {
 
     // If Shift is held and there's already a selection, extend it
     if (keyIsDown(16)) { // Shift key
-      if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+      if (this._hasSelection(true)) {
         this.selectionEnd = pos;
         this.cursorPosition = pos;
         this.resetCursorBlink();
@@ -1506,7 +1527,7 @@ class TextBox {
 
   // Select word boundaries around a position
   selectWordAt(pos) {
-    if (this.text == null) this.text = '';
+    this._ensureText();
     pos = constrain(pos, 0, this.text.length);
     if (this.text.length === 0) {
       this.selectionStart = 0;
@@ -1535,10 +1556,7 @@ class TextBox {
    * @param {string} char - Character to add
    */
   addChar(char) {
-    // Ensure text is defined
-    if (this.text === null || this.text === undefined) {
-      this.text = '';
-    }
+    this._ensureText();
 
     // Validate char
     if (char === null || char === undefined) {
@@ -1549,7 +1567,7 @@ class TextBox {
     char = Utils.sanitizeText(char);
 
     // If there's a selection, replace it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
     }
 
@@ -1569,20 +1587,19 @@ class TextBox {
    * Removes the character before the cursor (Backspace)
    */
   removeChar() {
-    if (this.text === null || this.text === undefined) this.text = '';
+    this._ensureText();
     if (this.text.length > 0) {
       // Only treat as a selection delete when the selection is non-empty.
       // A zero-length selection (caret) should not be deleted as a selection
       // because that would swallow the first Backspace after clicking to place
       // the caret. Clear zero-length selection and fall through to remove
       // the character before the caret.
-      if (this.selectionStart !== -1 && this.selectionEnd !== -1 && this.selectionStart !== this.selectionEnd) {
+      if (this._hasSelection()) {
         this.deleteSelection();
       } else {
         // Clear any zero-length selection markers
-        if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
-          this.selectionStart = -1;
-          this.selectionEnd = -1;
+        if (this._hasSelection(true)) {
+          this._clearSelection();
         }
         if (this.cursorPosition > 0) {
           const delPos = this.cursorPosition - 1;
@@ -1601,12 +1618,13 @@ class TextBox {
    * Forward delete - removes the character after the cursor (Delete key)
    */
   removeForwardChar() {
-    if (!this.text || this.text.length === 0) {
+    this._ensureText();
+    if (this.text.length === 0) {
       this.resetCursorBlink();
       return;
     }
     // If there's a selection, delete it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
     } else if (this.cursorPosition < this.text.length) {
       // Delete character after cursor
@@ -1622,11 +1640,9 @@ class TextBox {
    * Deletes the previous word (Alt/Ctrl+Backspace)
    */
   deleteWordLeft() {
-    if (!this.text) {
-      this.text = '';
-    }
+    this._ensureText();
     // If there's a selection, delete it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
       this.resetCursorBlink();
       return;
@@ -1655,11 +1671,9 @@ class TextBox {
    * Deletes the next word (Alt/Ctrl+Delete)
    */
   deleteWordRight() {
-    if (!this.text) {
-      this.text = '';
-    }
+    this._ensureText();
     // If there's a selection, delete it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
       this.resetCursorBlink();
       return;
@@ -1688,9 +1702,9 @@ class TextBox {
    * Deletes from cursor to start of current line (Cmd+Backspace)
    */
   deleteToLineStart() {
-    if (!this.text) this.text = '';
+    this._ensureText();
     // If there's a selection, delete it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
       this.resetCursorBlink();
       return;
@@ -1712,9 +1726,9 @@ class TextBox {
    * Deletes from cursor to end of current line (Cmd+Delete)
    */
   deleteToLineEnd() {
-    if (!this.text) this.text = '';
+    this._ensureText();
     // If there's a selection, delete it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
+    if (this._hasSelection(true)) {
       this.deleteSelection();
       this.resetCursorBlink();
       return;
@@ -1745,29 +1759,25 @@ class TextBox {
    * @returns {string} Selected text or empty string
    */
   getSelectedText() {
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
-      let start = min(this.selectionStart, this.selectionEnd);
-      let end = max(this.selectionStart, this.selectionEnd);
-      return this.text.slice(start, end);
-    }
-    return '';
+    const selection = this._getOrderedSelection(true);
+    if (!selection) return '';
+    return this.text.slice(selection.start, selection.end);
   }
 
   /**
    * Deletes the currently selected text
    */
   deleteSelection() {
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
-      let start = min(this.selectionStart, this.selectionEnd);
-      let end = max(this.selectionStart, this.selectionEnd);
-      const removedLen = end - start;
-      this.applyEditDelta(start, removedLen, 0);
-      this.text = this.text.slice(0, start) + this.text.slice(end);
-      this.cursorPosition = start;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
-      this.updateDimensions();
-    }
+    const selection = this._getOrderedSelection(true);
+    if (!selection) return;
+
+    const { start, end } = selection;
+    const removedLen = end - start;
+    this.applyEditDelta(start, removedLen, 0);
+    this.text = this.text.slice(0, start) + this.text.slice(end);
+    this.cursorPosition = start;
+    this._clearSelection();
+    this.updateDimensions();
   }
 
   /**
@@ -1780,10 +1790,7 @@ class TextBox {
       return;
     }
 
-    // Ensure text is defined
-    if (this.text === null || this.text === undefined) {
-      this.text = '';
-    }
+    this._ensureText();
 
     // Sanitize pasted text to normalize line endings and remove invisible characters
     pastedText = Utils.sanitizeText(pastedText);
@@ -1792,16 +1799,18 @@ class TextBox {
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
 
     // If there's a selection, replace it
-    if (this.selectionStart !== -1 && this.selectionEnd !== -1) {
-      let start = min(this.selectionStart, this.selectionEnd);
-      let end = max(this.selectionStart, this.selectionEnd);
+    const hasSelection = this._hasSelection(true);
+
+    if (hasSelection) {
+      const selection = this._getOrderedSelection(true);
+      const start = selection ? selection.start : 0;
+      const end = selection ? selection.end : 0;
       const removedLen = end - start;
       const addedLen = pastedText.length;
       this.applyEditDelta(start, removedLen, addedLen);
       this.text = this.text.slice(0, start) + pastedText + this.text.slice(end);
       this.cursorPosition = start + pastedText.length;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
     } else {
       // No selection, insert at cursor position
       const insertPos = this.cursorPosition;
@@ -1835,15 +1844,15 @@ class TextBox {
    * Add highlight for the current selection. Adds highlights only for the unhighlighted parts of the selection.
    */
   toggleHighlightOnSelection(color = { r: 255, g: 255, b: 0, a: 180 }) {
-    if (this.selectionStart == null || this.selectionEnd == null) return;
-    let start = Math.min(this.selectionStart, this.selectionEnd);
-    let end = Math.max(this.selectionStart, this.selectionEnd);
-    if (start === end) return; // nothing selected
+    this._ensureText();
+    const selection = this._getOrderedSelection();
+    if (!selection) return; // nothing selected
+    let { start, end } = selection;
 
     if (!this.highlights) this.highlights = [];
 
     // Determine whether the entire selection is already covered by existing highlights
-    const textLen = (this.text != null) ? this.text.length : 0;
+    const textLen = this.text.length;
     const selStart = Math.max(0, Math.min(textLen, start));
     const selEnd = Math.max(0, Math.min(textLen, end));
 
@@ -2400,25 +2409,19 @@ class TextBox {
   }
 
   moveCursorLeft() {
-    if (this.text == null) {
-      this.text = '';
-    }
+    this._ensureText();
     if (this.cursorPosition > 0) {
       this.cursorPosition--;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
       this.resetCursorBlink();
     }
   }
 
   moveCursorRight() {
-    if (this.text == null) {
-      this.text = '';
-    }
+    this._ensureText();
     if (this.cursorPosition < this.text.length) {
       this.cursorPosition++;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
       this.resetCursorBlink();
     }
   }
@@ -2435,8 +2438,7 @@ class TextBox {
       // Use character map to get the absolute position
       let prevLineStart = this.cachedLineCharMap[lineIndex - 1];
       this.cursorPosition = prevLineStart + newPosInLine;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
       this.resetCursorBlink();
     }
   }
@@ -2453,8 +2455,7 @@ class TextBox {
       // Use character map to get the absolute position
       let nextLineStart = this.cachedLineCharMap[lineIndex + 1];
       this.cursorPosition = nextLineStart + newPosInLine;
-      this.selectionStart = -1;
-      this.selectionEnd = -1;
+      this._clearSelection();
       this.resetCursorBlink();
     }
   }
@@ -2465,9 +2466,7 @@ class TextBox {
       return { lineIndex: 0, posInLine: 0 };
     }
 
-    if (this.text == null) {
-      this.text = '';
-    }
+    this._ensureText();
 
     // Ensure cursor position is valid
     this.cursorPosition = constrain(this.cursorPosition, 0, this.text.length);
@@ -2724,5 +2723,13 @@ class TextBox {
     }
 
     return { lineIndex, posInLine };
+  }
+}
+
+// Expose TextBox for environments (tests, browser) that rely on a global binding
+if (typeof globalThis !== 'undefined') {
+  globalThis.TextBox = TextBox;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TextBox;
   }
 }

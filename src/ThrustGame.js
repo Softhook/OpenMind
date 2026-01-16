@@ -104,7 +104,7 @@ class ThrustGame {
 
   static SPAWN = {
     MAX_ATTEMPTS: 50,        // Maximum attempts to find valid spawn location (increased for reliability)
-    SEARCH_RADIUS: 1000,      // Radius around box center to search for spawn point (increased)
+    SEARCH_RADIUS: 150,      // Radius around box center to search for spawn point
     MIN_DISTANCE_FROM_BOX: 40 // Minimum distance from any box to spawn
   };
 

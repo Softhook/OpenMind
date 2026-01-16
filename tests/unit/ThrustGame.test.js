@@ -12,6 +12,7 @@ const sandbox = {
   Date: Date,
   Math: Math,
   module: { exports: {} },
+  window: {},
   // Mock p5.js functions
   push: jest.fn(),
   pop: jest.fn(),
