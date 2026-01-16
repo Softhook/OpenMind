@@ -2634,9 +2634,16 @@ function keyPressed() {
     // Left-align selected boxes: press A key
     if (!hasModifier && (key === 'a' || key === 'A')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.leftAlignSelectedBoxes) {
-        mindMap.leftAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
-          mindMap.distributeSelectedBoxesVertically();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.leftAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesVertically();
+          });
+        } else {
+          mindMap.leftAlignSelectedBoxes();
         }
       }
       return false;
@@ -2644,9 +2651,16 @@ function keyPressed() {
     // Bottom-align selected boxes: press S key
     if (!hasModifier && (key === 's' || key === 'S')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.bottomAlignSelectedBoxes) {
-        mindMap.bottomAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
-          mindMap.distributeSelectedBoxesHorizontally();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.bottomAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesHorizontally();
+          });
+        } else {
+          mindMap.bottomAlignSelectedBoxes();
         }
       }
       return false;
@@ -2654,9 +2668,16 @@ function keyPressed() {
     // Right-align selected boxes: press D key
     if (!hasModifier && (key === 'd' || key === 'D')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.rightAlignSelectedBoxes) {
-        mindMap.rightAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
-          mindMap.distributeSelectedBoxesVertically();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.rightAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesVertically();
+          });
+        } else {
+          mindMap.rightAlignSelectedBoxes();
         }
       }
       return false;
@@ -2664,9 +2685,16 @@ function keyPressed() {
     // Top-align selected boxes: press W key
     if (!hasModifier && (key === 'w' || key === 'W')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.topAlignSelectedBoxes) {
-        mindMap.topAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
-          mindMap.distributeSelectedBoxesHorizontally();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.topAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesHorizontally();
+          });
+        } else {
+          mindMap.topAlignSelectedBoxes();
         }
       }
       return false;
@@ -2674,9 +2702,16 @@ function keyPressed() {
     // Horizontal center alignment: press Q key
     if (!hasModifier && (key === 'q' || key === 'Q')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.horizontalCenterAlignSelectedBoxes) {
-        mindMap.horizontalCenterAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
-          mindMap.distributeSelectedBoxesHorizontally();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.horizontalCenterAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesHorizontally();
+          });
+        } else {
+          mindMap.horizontalCenterAlignSelectedBoxes();
         }
       }
       return false;
@@ -2684,9 +2719,16 @@ function keyPressed() {
     // Vertical center alignment: press E key
     if (!hasModifier && (key === 'e' || key === 'E')) {
       if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.centerAlignSelectedBoxes) {
-        mindMap.centerAlignSelectedBoxes();
-        if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
-          mindMap.distributeSelectedBoxesVertically();
+        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
+        
+        // If combining align + distribute, wrap in single transaction
+        if (shouldDistribute && typeof collaborationManager !== 'undefined' && collaborationManager) {
+          collaborationManager.transact(() => {
+            mindMap.centerAlignSelectedBoxes();
+            mindMap.distributeSelectedBoxesVertically();
+          });
+        } else {
+          mindMap.centerAlignSelectedBoxes();
         }
       }
       return false;
