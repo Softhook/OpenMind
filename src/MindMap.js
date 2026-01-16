@@ -130,13 +130,17 @@ class MindMap {
    */
   addBox(box) {
     this.pushUndo();
-    this.boxes.push(box);
-    this.isDirty = true;
+    
+    // Wrap in transaction for proper undo tracking
+    this._wrapInTransaction(() => {
+      this.boxes.push(box);
+      this.isDirty = true;
 
-    // Notify collaboration system
-    if (MindMap.onBoxChange && box) {
-      MindMap.onBoxChange(box);
-    }
+      // Notify collaboration system
+      if (MindMap.onBoxChange && box) {
+        MindMap.onBoxChange(box);
+      }
+    });
   }
 
   /**
@@ -176,13 +180,17 @@ class MindMap {
     }
 
     this.pushUndo();
-    this.connections.push(new Connection(fromBox, toBox));
-    this.isDirty = true;
+    
+    // Wrap in transaction for proper undo tracking
+    this._wrapInTransaction(() => {
+      this.connections.push(new Connection(fromBox, toBox));
+      this.isDirty = true;
 
-    // Notify collaboration system
-    if (MindMap.onConnectionsChange) {
-      MindMap.onConnectionsChange();
-    }
+      // Notify collaboration system
+      if (MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
+      }
+    });
   }
 
   /**
