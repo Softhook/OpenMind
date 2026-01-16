@@ -2427,6 +2427,64 @@ function mouseDragged() {
   }
 }
 
+const alignmentShortcuts = {
+  a: { align: 'leftAlignSelectedBoxes', distribute: 'distributeSelectedBoxesVertically' },
+  d: { align: 'rightAlignSelectedBoxes', distribute: 'distributeSelectedBoxesVertically' },
+  w: { align: 'topAlignSelectedBoxes', distribute: 'distributeSelectedBoxesHorizontally' },
+  s: { align: 'bottomAlignSelectedBoxes', distribute: 'distributeSelectedBoxesHorizontally' },
+  q: { align: 'horizontalCenterAlignSelectedBoxes', distribute: 'distributeSelectedBoxesHorizontally' },
+  e: { align: 'centerAlignSelectedBoxes', distribute: 'distributeSelectedBoxesVertically' }
+};
+
+const nonEditingShortcuts = [
+  { keys: ['n'], action: () => createNewBox() },
+  { keys: ['g'], action: () => toggleGridVisibility() },
+  { keys: ['-', '_'], keyCodes: [36], action: () => resetView() },
+  { keys: ['=', '+'], action: () => setMaxZoom() }
+];
+
+function handleNonEditingShortcut(keyChar, keyCode, hasModifier) {
+  if (hasModifier) return false;
+  const lower = keyChar ? keyChar.toLowerCase() : '';
+
+  for (const entry of nonEditingShortcuts) {
+    const matchesKey = lower && entry.keys && entry.keys.includes(lower);
+    const matchesCode = entry.keyCodes && entry.keyCodes.includes(keyCode);
+    if (!matchesKey && !matchesCode) continue;
+
+    if (typeof entry.action === 'function') {
+      entry.action();
+      return true;
+    }
+  }
+  return false;
+}
+
+function handleAlignmentShortcut(keyChar, mindMapInstance, hasModifier, collabManager) {
+  if (!keyChar || typeof keyChar !== 'string') return false;
+
+  const entry = alignmentShortcuts[keyChar.toLowerCase()];
+  if (!entry || hasModifier) return false;
+
+  if (!mindMapInstance || !mindMapInstance.selectedBoxes || mindMapInstance.selectedBoxes.size === 0) return false;
+
+  const alignFn = mindMapInstance[entry.align];
+  if (!alignFn) return false;
+
+  const distributeFn = mindMapInstance[entry.distribute];
+  const shouldDistribute = keyIsDown(16) && distributeFn;
+
+  if (shouldDistribute && collabManager) {
+    collabManager.transact(() => {
+      alignFn.call(mindMapInstance);
+      distributeFn.call(mindMapInstance);
+    });
+  } else {
+    alignFn.call(mindMapInstance);
+  }
+  return true;
+}
+
 /**
  * Handles key press events
  */
@@ -2616,128 +2674,13 @@ function keyPressed() {
   // Global shortcut: N key to create a new box when not editing text
   if (mindMap && (!mindMap.selectedBox || !mindMap.selectedBox.isEditing)) {
     const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18); // CMD/CTRL/ALT
-    if (!hasModifier && (key === 'n' || key === 'N')) {
-      createNewBox();
-      return false;
-    }
-    // Toggle local-only grid overlay: press G key
-    if (!hasModifier && (key === 'g' || key === 'G')) {
-      toggleGridVisibility();
-      return false;
-    }
-    // Reset view: press - (or _) or Home key
-    if (!hasModifier && (key === '-' || key === '_' || keyCode === 36)) {
-      resetView();
-      return false;
-    }
-    // Maximum zoom: press = (or +)
-    if (!hasModifier && (key === '=' || key === '+')) {
-      setMaxZoom();
+    if (handleNonEditingShortcut(key, keyCode, hasModifier)) {
       return false;
     }
     // Helper to check if collaborationManager is available
     const hasCollabManager = typeof collaborationManager !== 'undefined' && collaborationManager;
-    
-    // Left-align selected boxes: press A key
-    if (!hasModifier && (key === 'a' || key === 'A')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.leftAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.leftAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesVertically();
-          });
-        } else {
-          mindMap.leftAlignSelectedBoxes();
-        }
-      }
-      return false;
-    }
-    // Bottom-align selected boxes: press S key
-    if (!hasModifier && (key === 's' || key === 'S')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.bottomAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.bottomAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesHorizontally();
-          });
-        } else {
-          mindMap.bottomAlignSelectedBoxes();
-        }
-      }
-      return false;
-    }
-    // Right-align selected boxes: press D key
-    if (!hasModifier && (key === 'd' || key === 'D')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.rightAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.rightAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesVertically();
-          });
-        } else {
-          mindMap.rightAlignSelectedBoxes();
-        }
-      }
-      return false;
-    }
-    // Top-align selected boxes: press W key
-    if (!hasModifier && (key === 'w' || key === 'W')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.topAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.topAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesHorizontally();
-          });
-        } else {
-          mindMap.topAlignSelectedBoxes();
-        }
-      }
-      return false;
-    }
-    // Horizontal center alignment: press Q key
-    if (!hasModifier && (key === 'q' || key === 'Q')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.horizontalCenterAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.horizontalCenterAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesHorizontally();
-          });
-        } else {
-          mindMap.horizontalCenterAlignSelectedBoxes();
-        }
-      }
-      return false;
-    }
-    // Vertical center alignment: press E key
-    if (!hasModifier && (key === 'e' || key === 'E')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.centerAlignSelectedBoxes) {
-        const shouldDistribute = keyIsDown(16) && mindMap.distributeSelectedBoxesVertically;
-        
-        // If combining align + distribute, wrap in single transaction
-        if (shouldDistribute && hasCollabManager) {
-          collaborationManager.transact(() => {
-            mindMap.centerAlignSelectedBoxes();
-            mindMap.distributeSelectedBoxesVertically();
-          });
-        } else {
-          mindMap.centerAlignSelectedBoxes();
-        }
-      }
+
+    if (handleAlignmentShortcut(key, mindMap, hasModifier, hasCollabManager)) {
       return false;
     }
     // Hierarchical layout in place: press R key

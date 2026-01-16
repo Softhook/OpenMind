@@ -836,31 +836,13 @@ class TextBox {
           image(this.img, this.x, this.y, drawW, drawH);
         } catch (e) {
           // fallback: draw placeholder
-          fill(220);
-          noStroke();
-          rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
-          fill(80);
-          textAlign(CENTER, CENTER);
-          textSize(12);
-          text('Image', this.x, this.y);
+          this._drawImagePlaceholder('Image', 80);
         }
       } else if (this.imageLoadError) {
-        fill(240);
-        noStroke();
-        rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
-        fill(120);
-        textAlign(CENTER, CENTER);
-        textSize(12);
-        text('Failed to load image', this.x, this.y);
+        this._drawImagePlaceholder('Failed to load image');
       } else {
         // Loading placeholder
-        fill(240);
-        noStroke();
-        rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
-        fill(100);
-        textAlign(CENTER, CENTER);
-        textSize(12);
-        text('Loading image...', this.x, this.y);
+        this._drawImagePlaceholder('Loading image...', 100);
       }
       // Continue so dimming overlay and handles are applied to image boxes as well
     } else {
@@ -1103,6 +1085,17 @@ class TextBox {
     return pts[side] || null;
   }
 
+  _drawImagePlaceholder(label, textColor = 120) {
+    // Simple centered placeholder used for image states (loading/error/fallback)
+    fill(240);
+    noStroke();
+    rect(this.x - this.width / 2 + 4, this.y - this.height / 2 + 4, this.width - 8, this.height - 8, 0);
+    fill(textColor);
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    text(label, this.x, this.y);
+  }
+
   /**
    * Gets which connector is under the mouse cursor
    * @param {number} hitRadius - Hit detection radius in pixels
@@ -1220,7 +1213,7 @@ class TextBox {
 
   getCursorPositionFromMouse(mx, my) {
     // Validate mouse coordinates
-    if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+    if (!this._hasValidCoords(mx, my)) {
       return this.text ? this.text.length : 0;
     }
 
@@ -1310,6 +1303,10 @@ class TextBox {
     return { start, end };
   }
 
+  _hasValidCoords(x, y) {
+    return !(x == null || y == null || Number.isNaN(x) || Number.isNaN(y));
+  }
+
   /**
    * Starts editing mode at the given mouse position
    * @param {number} mx - Mouse X in world coordinates (optional)
@@ -1327,7 +1324,7 @@ class TextBox {
     this._ensureText();
 
     // If mouse coordinates provided, position cursor at click location
-    if (mx !== null && my !== null && !isNaN(mx) && !isNaN(my)) {
+    if (this._hasValidCoords(mx, my)) {
       this.cursorPosition = this.getCursorPositionFromMouse(mx, my);
     } else {
       this.cursorPosition = this.text.length;
@@ -1977,7 +1974,7 @@ class TextBox {
   drag(mx, my) {
     if (this.isDragging) {
       // Validate mouse coordinates
-      if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+      if (!this._hasValidCoords(mx, my)) {
         return;
       }
 
@@ -2052,7 +2049,7 @@ class TextBox {
   resize(mx, my) {
     if (this.isResizing) {
       // Validate mouse coordinates
-      if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
+      if (!this._hasValidCoords(mx, my)) {
         return;
       }
 
