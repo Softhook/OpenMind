@@ -54,8 +54,8 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'W', description: 'Align selected boxes to the top (Shift+W distributes horizontally)' },
     { keys: 'Q', description: 'Align selected boxes to the horizontal centre (Shift+Q distributes horizontally)' },
     { keys: 'E', description: 'Align selected boxes to the vertical centre (Shift+E distributes vertically)' },
-    { keys: 'R', description: 'Apply hierarchical layout in place (keep current position)' },
-    { keys: 'Arrow Keys', description: 'Navigate between boxes' },
+    { keys: 'R', description: 'Apply hierarchical layout to selection' },
+    { keys: 'Arrow Keys', description: 'Presentation Mode: Navigate between boxes' },
     { keys: 'Space/Right Mouse', description: 'Pan the canvas' },
     { keys: 'Scroll Wheel', description: 'Zoom in and out' },
     { keys: 'F', description: 'Toggle fullscreen view' },
@@ -67,7 +67,6 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + B', description: 'Highlight selected text' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
-    { keys: 'Cmd/Ctrl + Shift + Z', description: 'Redo the last undone change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
     { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
 ];
