@@ -844,6 +844,8 @@ class CollaborationManager {
                         this.ydoc.transact(() => {
                             this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                         }, this.undoManager);
+                        // Don't call stopCapturing() here - we're inside a text editing undo group
+                        // The group will be closed by _closeTextEditUndoGroup() which calls stopCapturing()
                     } else if (currentBox) {
                         // Fallback without undo tracking
                         this.yboxes.set(boxId, this._boxToYjsData(currentBox));

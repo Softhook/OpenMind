@@ -1813,26 +1813,26 @@ class MindMap {
         if (!duplicate) {
           if (droppedOn !== originalTo) {
             this.pushUndo();
-            conn.toBox = droppedOn;
             changed = true;
+            
+            // Wrap connection reattachment in transaction for proper undo tracking
+            this._wrapInTransaction(() => {
+              conn.toBox = droppedOn;
+              // Sync connection change to collaboration
+              // Pass skipTransactionWrapper=true since we're in a transaction
+              if (MindMap.onConnectionsChange) {
+                MindMap.onConnectionsChange(true);
+              }
+            });
           }
         }
       }
 
       // If not changed, keep original
-      conn.toBox = changed ? conn.toBox : originalTo;
+      if (!changed) {
+        conn.toBox = originalTo;
+      }
       this.draggingConnection = null;
-
-      // Sync connection change to collaboration if reattached
-      if (changed && MindMap.onConnectionsChange) {
-        MindMap.onConnectionsChange();
-      }
-
-      // Only close undo boundary if connection was actually reattached
-      // This prevents capturing unrelated changes from other users during the drag
-      if (changed && typeof collaborationManager !== 'undefined' && collaborationManager) {
-        collaborationManager.stopCapturing();
-      }
       return;
     }
 
@@ -2142,9 +2142,17 @@ class MindMap {
             console.error('Clipboard cut not supported:', e);
           }
           // Delete selection regardless of clipboard outcome
+          // Wrap in transaction to make cut a discrete operation, not grouped with typing
           this.pushUndo();
           if (this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
-            this.selectedBox.deleteSelection();
+            this._wrapInTransaction(() => {
+              this.selectedBox.deleteSelection();
+              // Notify collaboration system
+              // Pass skipTransactionWrapper=true since we're in a transaction
+              if (MindMap.onBoxChange && this.selectedBox) {
+                MindMap.onBoxChange(this.selectedBox, true);
+              }
+            });
           }
           return;
         } else if (key === 'v' || key === 'V') {
@@ -2154,7 +2162,15 @@ class MindMap {
               navigator.clipboard.readText().then(text => {
                 if (text && this.selectedBox) {
                   this.pushUndo();
-                  this.selectedBox.pasteText(text);
+                  // Wrap in transaction to make paste a discrete operation
+                  this._wrapInTransaction(() => {
+                    this.selectedBox.pasteText(text);
+                    // Notify collaboration system
+                    // Pass skipTransactionWrapper=true since we're in a transaction
+                    if (MindMap.onBoxChange && this.selectedBox) {
+                      MindMap.onBoxChange(this.selectedBox, true);
+                    }
+                  });
                 }
               }).catch(err => {
                 console.error('Failed to paste text: ', err);
@@ -2346,11 +2362,16 @@ class MindMap {
       // Space: reverse selected connection when not editing
       if (this.selectedConnection) {
         this.pushUndo();
-        this.selectedConnection.reverse();
-        // Sync connection change to collaboration
-        if (MindMap.onConnectionsChange) {
-          MindMap.onConnectionsChange();
-        }
+        
+        // Wrap connection reverse in transaction for proper undo tracking
+        this._wrapInTransaction(() => {
+          this.selectedConnection.reverse();
+          // Sync connection change to collaboration
+          // Pass skipTransactionWrapper=true since we're in a transaction
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange(true);
+          }
+        });
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
