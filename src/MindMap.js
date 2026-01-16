@@ -137,8 +137,9 @@ class MindMap {
       this.isDirty = true;
 
       // Notify collaboration system
+      // Pass skipTransactionWrapper=true since we're already in a transaction
       if (MindMap.onBoxChange && box) {
-        MindMap.onBoxChange(box);
+        MindMap.onBoxChange(box, true);
       }
     });
   }
@@ -187,8 +188,9 @@ class MindMap {
       this.isDirty = true;
 
       // Notify collaboration system
+      // Pass skipTransactionWrapper=true since we're already in a transaction
       if (MindMap.onConnectionsChange) {
-        MindMap.onConnectionsChange();
+        MindMap.onConnectionsChange(true);
       }
     });
   }

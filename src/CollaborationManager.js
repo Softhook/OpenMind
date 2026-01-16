@@ -649,8 +649,8 @@ class CollaborationManager {
                 this.deleteBoxFromYjs(boxId);
             };
 
-            MindMap.onConnectionsChange = () => {
-                this.syncConnectionsToYjs();
+            MindMap.onConnectionsChange = (skipTransactionWrapper = false) => {
+                this.syncConnectionsToYjs(skipTransactionWrapper);
             };
         }
     }
@@ -921,14 +921,22 @@ class CollaborationManager {
     /**
      * Syncs connections to Yjs
      * Call this when connections change
+     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations)
      */
-    syncConnectionsToYjs() {
+    syncConnectionsToYjs(skipTransactionWrapper = false) {
         if (!this.yconnections || !this.mindMap || this.isSyncing) return;
 
         // Get current local connections as ID pairs
         const localConns = this.mindMap.connections
             .filter(c => c && c.fromBox && c.toBox)
             .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
+
+        // When skipTransactionWrapper=true, we're already inside a transaction
+        // from _wrapInTransaction, so we just sync directly without creating a new transaction
+        if (skipTransactionWrapper) {
+            this._syncConnectionsToYjsImpl(localConns);
+            return;
+        }
 
         // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
         // Wrap in transaction with origin to track in undo
