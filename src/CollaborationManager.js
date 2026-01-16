@@ -62,6 +62,7 @@ class CollaborationManager {
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
+    static TEXT_UNDO_GROUP_TIMEOUT = 1000; // ms - time to wait before closing text edit undo group
 
     // Sync verification timing - adjusted for free server cold start (30-60s)
     static SYNC_VERIFICATION_DELAY = 10000; // ms - delay before first verification (10s for cold start)
@@ -125,6 +126,10 @@ class CollaborationManager {
 
         // Debounce timers for text sync during editing
         this.textSyncTimers = new Map(); // boxId -> timeoutId
+        
+        // Text editing undo grouping state
+        this.textEditUndoTimer = null; // Timer to close text edit undo group
+        this.isTextEditUndoGroupOpen = false; // Whether we're in a text edit undo group
 
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
@@ -394,6 +399,13 @@ class CollaborationManager {
     destroy() {
         this.disconnect();
 
+        // Clean up text editing undo group timer
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+            this.textEditUndoTimer = null;
+        }
+        this.isTextEditUndoGroupOpen = false;
+
         // Now destroy Yjs state
         if (this.undoManager) {
             this.undoManager.destroy();
@@ -513,6 +525,59 @@ class CollaborationManager {
             this.undoManager.clear();
             Utils.Logger.debug('[Undo] History cleared');
         }
+    }
+
+    /**
+     * Starts a text editing undo group if not already open.
+     * Text edits within a group are undone/redone together as one operation.
+     * @private
+     */
+    _startTextEditUndoGroup() {
+        if (this.isTextEditUndoGroupOpen) {
+            // Group already open, just reset the timer
+            this._resetTextEditUndoTimer();
+            return;
+        }
+
+        this.isTextEditUndoGroupOpen = true;
+        this._resetTextEditUndoTimer();
+    }
+
+    /**
+     * Resets the timer that closes the text editing undo group.
+     * Called on each text edit to extend the group while typing continues.
+     * @private
+     */
+    _resetTextEditUndoTimer() {
+        // Clear existing timer
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+        }
+
+        // Set new timer to close the group after inactivity
+        this.textEditUndoTimer = setTimeout(() => {
+            this._closeTextEditUndoGroup();
+        }, CollaborationManager.TEXT_UNDO_GROUP_TIMEOUT);
+    }
+
+    /**
+     * Closes the current text editing undo group.
+     * This creates an undo boundary, making all edits since _startTextEditUndoGroup()
+     * undoable as a single operation.
+     * @private
+     */
+    _closeTextEditUndoGroup() {
+        if (!this.isTextEditUndoGroupOpen) return;
+
+        this.isTextEditUndoGroupOpen = false;
+        if (this.textEditUndoTimer) {
+            clearTimeout(this.textEditUndoTimer);
+            this.textEditUndoTimer = null;
+        }
+
+        // Stop capturing to close the undo boundary
+        this.stopCapturing();
+        Utils.Logger.debug('[Undo] Closed text edit group');
     }
 
     /**
@@ -698,7 +763,11 @@ class CollaborationManager {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
         // Debounce text sync during active editing to reduce network traffic
+        // AND group text edits for meaningful undo boundaries
         if (box.isEditing) {
+            // Start/extend text editing undo group
+            this._startTextEditUndoGroup();
+
             // Capture boxId, not the box object, to avoid stale reference issues
             const boxId = box.id;
 
@@ -726,6 +795,12 @@ class CollaborationManager {
 
             this.textSyncTimers.set(boxId, timer);
             return;
+        }
+
+        // If we were editing and now stopped, close the text editing undo group
+        // This ensures the undo boundary is created when user stops typing
+        if (this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
         }
 
         // When skipTransactionWrapper=true, we're already inside a transaction

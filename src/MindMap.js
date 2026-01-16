@@ -2092,16 +2092,12 @@ class MindMap {
     // =========================================================================
     // TEXT EDITING KEY HANDLING
     // =========================================================================
-    // With captureTimeout: 0 (action-based undo), each keystroke creates a 
-    // separate undo step. This is technically correct but may not match user 
-    // expectations (e.g., typing "hello" = 5 undo steps).
-    // 
-    // POTENTIAL IMPROVEMENTS for future consideration:
-    // - Implement word-boundary detection to group characters into words
-    // - Add a small captureTimeout (e.g., 300ms) specifically for text editing
-    // - Detect "pause" in typing to create natural undo boundaries
-    // 
-    // Current behavior prioritizes consistency with other action-based operations.
+    // Text editing undo uses intelligent grouping:
+    // - Continuous typing is grouped into a single undo step
+    // - Pauses in typing (1 second) create undo boundaries
+    // - Stopping editing (clicking away) closes the current undo group
+    // This provides natural, meaningful undo behavior while preserving
+    // multi-user per-user undo tracking via Yjs UndoManager.
     // =========================================================================
     if (this.selectedBox && this.selectedBox.isEditing) {
       // Check for CMD/CTRL key combinations

@@ -2633,8 +2633,7 @@ function keyPressed() {
     }
     // Left-align selected boxes: press A key
     if (!hasModifier && (key === 'a' || key === 'A')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.leftAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.leftAlignSelectedBoxes) {
         mindMap.leftAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
           mindMap.distributeSelectedBoxesVertically();
@@ -2644,8 +2643,7 @@ function keyPressed() {
     }
     // Bottom-align selected boxes: press S key
     if (!hasModifier && (key === 's' || key === 'S')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.bottomAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.bottomAlignSelectedBoxes) {
         mindMap.bottomAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
           mindMap.distributeSelectedBoxesHorizontally();
@@ -2655,8 +2653,7 @@ function keyPressed() {
     }
     // Right-align selected boxes: press D key
     if (!hasModifier && (key === 'd' || key === 'D')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.rightAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.rightAlignSelectedBoxes) {
         mindMap.rightAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
           mindMap.distributeSelectedBoxesVertically();
@@ -2666,8 +2663,7 @@ function keyPressed() {
     }
     // Top-align selected boxes: press W key
     if (!hasModifier && (key === 'w' || key === 'W')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.topAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.topAlignSelectedBoxes) {
         mindMap.topAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
           mindMap.distributeSelectedBoxesHorizontally();
@@ -2677,8 +2673,7 @@ function keyPressed() {
     }
     // Horizontal center alignment: press Q key
     if (!hasModifier && (key === 'q' || key === 'Q')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.horizontalCenterAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.horizontalCenterAlignSelectedBoxes) {
         mindMap.horizontalCenterAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesHorizontally) {
           mindMap.distributeSelectedBoxesHorizontally();
@@ -2688,8 +2683,7 @@ function keyPressed() {
     }
     // Vertical center alignment: press E key
     if (!hasModifier && (key === 'e' || key === 'E')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.centerAlignSelectedBoxes) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.centerAlignSelectedBoxes) {
         mindMap.centerAlignSelectedBoxes();
         if (keyIsDown(16) && mindMap.distributeSelectedBoxesVertically) {
           mindMap.distributeSelectedBoxesVertically();
@@ -2699,8 +2693,7 @@ function keyPressed() {
     }
     // Hierarchical layout in place: press R key
     if (!hasModifier && (key === 'r' || key === 'R')) {
-      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.pushUndo && mindMap.hierarchicalLayout) {
-        mindMap.pushUndo();
+      if (mindMap.selectedBoxes && mindMap.selectedBoxes.size > 0 && mindMap.hierarchicalLayout) {
         mindMap.hierarchicalLayout();
       }
       return false;
@@ -2750,7 +2743,6 @@ function createNewBox() {
     console.error('MindMap not initialized');
     return;
   }
-  if (mindMap.pushUndo) mindMap.pushUndo();
 
   // Create box at cursor position in world space if over canvas, else at viewport center
   let x, y;
@@ -3129,7 +3121,6 @@ function handleCanvasDrop(e) {
 async function createPdfBox(urlOrFile, filename, worldX, worldY) {
   try {
     if (!mindMap) return;
-    mindMap.pushUndo && mindMap.pushUndo();
     const box = new TextBox(worldX, worldY, filename || 'PDF');
     // Add box immediately so user sees it while we render a preview asynchronously
     mindMap.addBox(box);
@@ -3199,7 +3190,6 @@ async function createPdfBox(urlOrFile, filename, worldX, worldY) {
 function createImageBox(url, worldX, worldY) {
   try {
     if (!mindMap) return;
-    mindMap.pushUndo();
     const box = new TextBox(worldX, worldY, '');
     box.setImageFromUrl(url);
     mindMap.addBox(box);
@@ -3220,7 +3210,6 @@ function createImageBox(url, worldX, worldY) {
 function createFilePathBox(pathOrUrl, worldX, worldY) {
   try {
     if (!mindMap) return;
-    mindMap.pushUndo();
 
     // Create the link text - use file:// protocol for local paths
     let linkText = pathOrUrl;
@@ -3283,38 +3272,62 @@ async function mergeMapData(data, wx, wy) {
     const baseIndex = mindMap.boxes ? mindMap.boxes.length : 0;
     const newBoxes = [];
 
-    // Single undo snapshot for the merge
-    mindMap.pushUndo && mindMap.pushUndo();
-
-    // Create new boxes with positional offset so import center maps to drop point
-    const offsetX = wx - importCenterX;
-    const offsetY = wy - importCenterY;
-    for (const b of data.boxes) {
-      try {
-        const bcopy = Object.assign({}, b);
-        bcopy.x = (bcopy.x != null && isFinite(bcopy.x)) ? (bcopy.x + offsetX) : (wx + offsetX);
-        bcopy.y = (bcopy.y != null && isFinite(bcopy.y)) ? (bcopy.y + offsetY) : (wy + offsetY);
-        const newBox = TextBox.fromJSON(bcopy);
-        if (newBox) {
-          mindMap.boxes.push(newBox);
-          newBoxes.push(newBox);
-        }
-      } catch (e) {
-        console.warn('Failed to import box', e);
-      }
+    // Wrap entire merge operation in a transaction for single undo step
+    if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+      collaborationManager.transact(() => {
+        performMerge();
+      });
+    } else {
+      performMerge();
     }
 
-    // Append connections, remapping indices
-    if (Array.isArray(data.connections)) {
-      for (const c of data.connections) {
+    function performMerge() {
+      // Create new boxes with positional offset so import center maps to drop point
+      const offsetX = wx - importCenterX;
+      const offsetY = wy - importCenterY;
+      for (const b of data.boxes) {
         try {
-          if (!c || typeof c !== 'object') continue;
-          const mapped = { from: (Number.isFinite(c.from) ? c.from : 0) + baseIndex, to: (Number.isFinite(c.to) ? c.to : 0) + baseIndex };
-          const conn = Connection.fromJSON(mapped, mindMap.boxes);
-          if (conn) mindMap.connections.push(conn);
+          const bcopy = Object.assign({}, b);
+          bcopy.x = (bcopy.x != null && isFinite(bcopy.x)) ? (bcopy.x + offsetX) : (wx + offsetX);
+          bcopy.y = (bcopy.y != null && isFinite(bcopy.y)) ? (bcopy.y + offsetY) : (wy + offsetY);
+          const newBox = TextBox.fromJSON(bcopy);
+          if (newBox) {
+            mindMap.boxes.push(newBox);
+            newBoxes.push(newBox);
+          }
         } catch (e) {
-          console.warn('Failed to import connection', e);
+          console.warn('Failed to import box', e);
         }
+      }
+
+      // Append connections, remapping indices
+      if (Array.isArray(data.connections)) {
+        for (const c of data.connections) {
+          try {
+            if (!c || typeof c !== 'object') continue;
+            const mapped = { from: (Number.isFinite(c.from) ? c.from : 0) + baseIndex, to: (Number.isFinite(c.to) ? c.to : 0) + baseIndex };
+            const conn = Connection.fromJSON(mapped, mindMap.boxes);
+            if (conn) mindMap.connections.push(conn);
+          } catch (e) {
+            console.warn('Failed to import connection', e);
+          }
+        }
+      }
+
+      mindMap.isDirty = true;
+      mindMap.isSaved = false;
+
+      // Sync new boxes to collaboration system
+      if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+        for (const nb of newBoxes) {
+          if (nb && nb.id) {
+            MindMap.onBoxChange(nb);
+          }
+        }
+      }
+      // Sync connections
+      if (typeof MindMap !== 'undefined' && MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
       }
     }
 
@@ -3327,22 +3340,6 @@ async function mergeMapData(data, wx, wy) {
         mindMap.panToBox && mindMap.panToBox(newBoxes[0], true);
       }
     } catch (_) { }
-
-    mindMap.isDirty = true;
-    mindMap.isSaved = false;
-
-    // Sync new boxes to collaboration system
-    if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-      for (const nb of newBoxes) {
-        if (nb && nb.id) {
-          MindMap.onBoxChange(nb);
-        }
-      }
-    }
-    // Sync connections
-    if (typeof MindMap !== 'undefined' && MindMap.onConnectionsChange) {
-      MindMap.onConnectionsChange();
-    }
 
     try { mindMap.saveToLocalStorage && mindMap.saveToLocalStorage(); } catch (_) { }
   } catch (e) {
