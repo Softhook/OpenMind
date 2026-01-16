@@ -1142,9 +1142,9 @@ class MindMap {
    * @param {Function} operation - The operation to execute
    * @private
    */
-  _wrapInTransaction(operation) {
+  _wrapInTransaction(operation, label = '') {
     if (typeof collaborationManager !== 'undefined' && collaborationManager) {
-      collaborationManager.transact(operation);
+      collaborationManager.transact(operation, label);
     } else {
       operation();
     }
@@ -1864,23 +1864,25 @@ class MindMap {
     // Group all drag/resize operations in a single transaction for grouped undo
     if (wasInteracting) {
       this._wrapInTransaction(() => {
-        // Stop dragging all boxes
+        const changedBoxes = [];
+
+        // Stop dragging all boxes and collect only those that actually moved
         for (const box of boxesThatWereDragging) {
-          box.stopDrag(true); // skipSync=true
+          const changed = box.stopDrag(true); // skipSync=true
+          if (changed) changedBoxes.push(box);
         }
 
-        // Stop resizing all boxes
+        // Stop resizing all boxes and collect only those that actually changed size
         for (const box of boxesThatWereResizing) {
-          box.stopResize(true); // skipSync=true
+          const changed = box.stopResize(true); // skipSync=true
+          if (changed) changedBoxes.push(box);
         }
 
-        // Batch sync ALL boxes that were interacting (not just those that changed)
-        // This maintains consistency with original behavior and ensures proper
-        // collaborative sync and targetX/targetY updates
-        // Pass skipTransactionWrapper=true since we're already in a transaction
-        const allInteractingBoxes = [...boxesThatWereDragging, ...boxesThatWereResizing];
-        this._notifyBoxesChanged(allInteractingBoxes, true);
-      });
+        // Sync only boxes that changed to avoid empty undo entries when no movement occurred
+        if (changedBoxes.length > 0) {
+          this._notifyBoxesChanged(changedBoxes, true); // already in a transaction
+        }
+      }, 'dragRelease');
 
       // Close the undo boundary to ensure the transaction is captured as a single undo item
       // This is important when captureTimeout=0 (action-based undo)

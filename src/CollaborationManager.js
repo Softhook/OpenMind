@@ -137,6 +137,9 @@ class CollaborationManager {
         this.isTextEditUndoGroupOpen = false; // Whether we're in a text edit undo group
         this.currentEditingBoxId = null; // Track which box is currently being edited for undo grouping
 
+        // Debug flag for targeted undo/redo logging
+        this._isPerformingUndoRedo = false;
+
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
 
@@ -202,14 +205,15 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
-            // trackedOrigins: Yjs automatically adds this.undoManager to this set, ensuring only
-            // transactions with origin=this.undoManager are tracked. By specifying an empty Set,
-            // we ensure ONLY transactions with this.undoManager as origin are tracked.
-            // This prevents tracking remote changes or internal sync operations.
+            // trackedOrigins must explicitly include the origin used in transactions.
+            // Using an empty set previously prevented ANY captures, so add undoManager after creation.
+            const trackedOrigins = new Set();
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins: new Set([]) // Yjs auto-adds this.undoManager to this set
+                trackedOrigins
             });
+            // Ensure all transactions we tag with `this.undoManager` are tracked for undo/redo
+            trackedOrigins.add(this.undoManager);
 
             // Set up observers for Yjs → local sync (including undo/redo)
             this._setupObservers();
@@ -463,7 +467,12 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }
 
-        this.undoManager.undo();
+        this._isPerformingUndoRedo = true;
+        try {
+            this.undoManager.undo();
+        } finally {
+            this._isPerformingUndoRedo = false;
+        }
         Utils.Logger.debug('[Undo] Performed');
 
         // Trigger redraw
@@ -487,7 +496,12 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }
 
-        this.undoManager.redo();
+        this._isPerformingUndoRedo = true;
+        try {
+            this.undoManager.redo();
+        } finally {
+            this._isPerformingUndoRedo = false;
+        }
         Utils.Logger.debug('[Redo] Performed');
 
         // Trigger redraw
@@ -530,7 +544,7 @@ class CollaborationManager {
      * Use this for atomic operations like creating/deleting boxes, alignment, etc.
      * @param {Function} callback - Function to execute within the transaction
      */
-    transact(callback) {
+    transact(callback, label = '') {
         if (typeof callback !== 'function') {
             throw new TypeError('transact() requires a function callback');
         }
@@ -541,18 +555,31 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }
 
+        const shouldLogTxn = typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
+        const beforeUndo = this.undoManager ? this.undoManager.undoStack.length : 0;
+        const beforeRedo = this.undoManager ? this.undoManager.redoStack.length : 0;
+
         if (this.ydoc && this.undoManager) {
             // Set origin to undoManager so it knows to track this transaction
             this.ydoc.transact(callback, this.undoManager);
-            // Explicitly call stopCapturing to ensure this transaction is separate
-            // from any subsequent operations
-            this.undoManager.stopCapturing();
         } else if (this.ydoc) {
             // Fallback without undo manager
             this.ydoc.transact(callback);
         } else {
             // Fallback: just execute the callback if ydoc is not available
             callback();
+        }
+
+        if (shouldLogTxn && this.undoManager) {
+            const afterUndo = this.undoManager.undoStack.length;
+            const afterRedo = this.undoManager.redoStack.length;
+            console.debug('[UndoDebug][txn]', {
+                label,
+                beforeUndo,
+                afterUndo,
+                beforeRedo,
+                afterRedo
+            });
         }
     }
 
@@ -841,10 +868,24 @@ class CollaborationManager {
                 if (this.yboxes && this.mindMap) {
                     const currentBox = this.mindMap.getBoxById(boxId);
                     if (currentBox && this.ydoc && this.undoManager) {
+                        const shouldLogTxn = typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
+                        const beforeUndo = shouldLogTxn ? this.undoManager.undoStack.length : 0;
+                        const beforeRedo = shouldLogTxn ? this.undoManager.redoStack.length : 0;
+
                         // Wrap in transaction with origin to track in undo
                         this.ydoc.transact(() => {
                             this.yboxes.set(boxId, this._boxToYjsData(currentBox));
                         }, this.undoManager);
+
+                        if (shouldLogTxn) {
+                            console.debug('[UndoDebug][txn]', {
+                                label: 'textSyncDebounce',
+                                beforeUndo,
+                                afterUndo: this.undoManager.undoStack.length,
+                                beforeRedo,
+                                afterRedo: this.undoManager.redoStack.length
+                            });
+                        }
                         // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
                         // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
                         // which ultimately calls stopCapturing(). Note: if a non-text operation occurs before
@@ -880,12 +921,9 @@ class CollaborationManager {
 
         // For non-editing changes (atomic operations), sync immediately with transaction origin
         if (this.ydoc && this.undoManager) {
-            this.ydoc.transact(() => {
+            this.transact(() => {
                 this.yboxes.set(box.id, this._boxToYjsData(box));
-            }, this.undoManager);
-            // Call stopCapturing to ensure each sync operation is a separate undo item
-            // This prevents accidental merging with subsequent operations
-            this.undoManager.stopCapturing();
+            }, 'syncBoxToYjs');
         } else {
             // Fallback without undo tracking
             this.yboxes.set(box.id, this._boxToYjsData(box));
@@ -915,11 +953,9 @@ class CollaborationManager {
 
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
-            this.ydoc.transact(() => {
+            this.transact(() => {
                 this.yboxes.delete(boxId);
-            }, this.undoManager);
-            // Ensure this deletion is a separate undo item
-            this.undoManager.stopCapturing();
+            }, 'deleteBox');
         } else {
             // Fallback without undo tracking
             this.yboxes.delete(boxId);
@@ -949,11 +985,9 @@ class CollaborationManager {
         // Optimize with proper diff to avoid clearing all connections (O(n) instead of O(n²))
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
-            this.ydoc.transact(() => {
+            this.transact(() => {
                 this._syncConnectionsToYjsImpl(localConns);
-            }, this.undoManager);
-            // Ensure connection changes are a separate undo item
-            this.undoManager.stopCapturing();
+            }, 'syncConnections');
         } else if (this.ydoc) {
             // Fallback without undo tracking
             this.ydoc.transact(() => {
@@ -1043,10 +1077,30 @@ class CollaborationManager {
 
             this.isSyncing = true;
             try {
+                const shouldLogUndoDebug = this._isPerformingUndoRedo && typeof window !== 'undefined' && window.OPENMIND_UNDO_DEBUG === true;
+                if (isUndoRedo && shouldLogUndoDebug) {
+                    // Debug state for undo/redo to diagnose missing visual updates
+                    const stackInfo = {
+                        undo: this.undoManager?.undoStack?.length ?? 0,
+                        redo: this.undoManager?.redoStack?.length ?? 0
+                    };
+                    // Show a sample of the first changed key to correlate with UI
+                    const sampleKey = event.changes.keys.keys().next().value;
+                    const sampleData = sampleKey ? this.yboxes.get(sampleKey) : null;
+                    console.debug('[UndoDebug][apply] isUndoRedo', {
+                        keysChanged: event.changes.keys.size,
+                        sampleKey,
+                        sampleData,
+                        stackInfo
+                    });
+                }
+
                 event.changes.keys.forEach((change, key) => {
                     if (change.action === 'add' || change.action === 'update') {
                         const data = this.yboxes.get(key);
-                        this._applyBoxFromYjs(key, data);
+                        // Force apply during undo/redo and snap to the saved position so the change is visible immediately
+                        const snap = isUndoRedo ? true : false;
+                        this._applyBoxFromYjs(key, data, snap, isUndoRedo);
                     } else if (change.action === 'delete') {
                         this._deleteBoxFromLocal(key);
                     }
@@ -1097,7 +1151,7 @@ class CollaborationManager {
      * @param {boolean} snapToPosition - If true, set x/y directly instead of using interpolation
      * @private
      */
-    _applyBoxFromYjs(boxId, data, snapToPosition = false) {
+    _applyBoxFromYjs(boxId, data, snapToPosition = false, forceApply = false) {
         if (!this.mindMap || !data) return;
 
         let box = this.mindMap.getBoxById(boxId);
@@ -1127,7 +1181,9 @@ class CollaborationManager {
 
             // IMPORTANT: Don't overwrite text while user is actively editing
             // This prevents lag from causing text loss
-            if (typeof data.text === 'string' && !box.isEditing) {
+            // When undo/redo fires while a box is still in editing mode,
+            // force-apply the text so the user actually sees the change.
+            if (typeof data.text === 'string' && (forceApply || !box.isEditing)) {
                 box.text = data.text;
             }
 
@@ -1141,9 +1197,9 @@ class CollaborationManager {
                 box.imageUrl = data.imageUrl;
             }
             // Sync highlights (only when not editing to avoid conflicts)
-            if (Array.isArray(data.highlights) && !box.isEditing) {
+            if (Array.isArray(data.highlights) && (forceApply || !box.isEditing)) {
                 box.highlights = data.highlights.map(h => ({ start: h.start, end: h.end, color: h.color }));
-            } else if (data.highlights === null && !box.isEditing) {
+            } else if (data.highlights === null && (forceApply || !box.isEditing)) {
                 box.highlights = [];
             }
             box.updateDimensions();
@@ -1201,7 +1257,7 @@ class CollaborationManager {
         // Apply each Yjs box to local state (snap to position immediately on initial rebuild)
         this.yboxes.forEach((data, boxId) => {
             yjsBoxIds.add(boxId);
-            this._applyBoxFromYjs(boxId, data, true); // snapToPosition = true
+            this._applyBoxFromYjs(boxId, data, true, true); // snapToPosition = true, forceApply = true
         });
 
         // Remove local boxes that don't exist in Yjs

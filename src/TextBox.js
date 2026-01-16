@@ -1321,6 +1321,9 @@ class TextBox {
   }
 
   stopEditing() {
+    // No-op if we're not actually editing to avoid unnecessary sync/undo entries
+    if (!this.isEditing) return;
+
     this.isEditing = false;
     this.isSelecting = false;
     this.updateDimensions();
