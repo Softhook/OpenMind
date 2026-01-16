@@ -62,6 +62,10 @@ class CollaborationManager {
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
+    // 1000ms timeout chosen based on typical typing pause patterns:
+    // - Fast typing: 100-200ms between characters
+    // - Natural pauses: 500-1500ms (thinking, reading, correcting)
+    // - 1000ms provides good balance: groups continuous typing while respecting natural breaks
     static TEXT_UNDO_GROUP_TIMEOUT = 1000; // ms - time to wait before closing text edit undo group
 
     // Sync verification timing - adjusted for free server cold start (30-60s)
@@ -129,6 +133,7 @@ class CollaborationManager {
         
         // Text editing undo grouping state
         this.textEditUndoTimer = null; // Timer to close text edit undo group
+        this.textEditUndoTimerLastReset = 0; // Timestamp of last timer reset
         this.isTextEditUndoGroupOpen = false; // Whether we're in a text edit undo group
 
         // Retry timer for initial sync race condition
@@ -546,9 +551,20 @@ class CollaborationManager {
     /**
      * Resets the timer that closes the text editing undo group.
      * Called on each text edit to extend the group while typing continues.
+     * Optimized to avoid unnecessary timer churn during rapid typing.
      * @private
      */
     _resetTextEditUndoTimer() {
+        const now = Date.now();
+        const timeSinceLastReset = now - this.textEditUndoTimerLastReset;
+        
+        // Skip timer reset if we just reset it recently (< 100ms ago)
+        // This reduces timer churn during very rapid typing while still
+        // maintaining the 1s timeout for closing the undo group
+        if (timeSinceLastReset < 100 && this.textEditUndoTimer) {
+            return;
+        }
+
         // Clear existing timer
         if (this.textEditUndoTimer) {
             clearTimeout(this.textEditUndoTimer);
@@ -558,6 +574,8 @@ class CollaborationManager {
         this.textEditUndoTimer = setTimeout(() => {
             this._closeTextEditUndoGroup();
         }, CollaborationManager.TEXT_UNDO_GROUP_TIMEOUT);
+        
+        this.textEditUndoTimerLastReset = now;
     }
 
     /**
@@ -570,6 +588,7 @@ class CollaborationManager {
         if (!this.isTextEditUndoGroupOpen) return;
 
         this.isTextEditUndoGroupOpen = false;
+        this.textEditUndoTimerLastReset = 0; // Reset timestamp
         if (this.textEditUndoTimer) {
             clearTimeout(this.textEditUndoTimer);
             this.textEditUndoTimer = null;
