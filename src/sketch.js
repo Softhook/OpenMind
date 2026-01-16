@@ -2872,6 +2872,16 @@ async function handleFileLoad(file) {
         }
 
         resetView();
+        
+        // Clear undo history after loading file to prevent undo from reverting the load
+        if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+          try {
+            collaborationManager.clearUndoHistory();
+            Utils.Logger.state('[File] Cleared undo history after file load');
+          } catch (e) {
+            console.warn('Failed to clear undo history after file load:', e);
+          }
+        }
       } catch (e) {
         throw e;
       }
