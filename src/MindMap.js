@@ -933,6 +933,24 @@ class MindMap {
    * @private
    */
   _performHierarchicalLayout(boxesToLayout) {
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const avg = (values) => {
+      if (!Array.isArray(values) || values.length === 0) return null;
+      const finite = values.filter(Number.isFinite);
+      if (finite.length === 0) return null;
+      return finite.reduce((sum, v) => sum + v, 0) / finite.length;
+    };
+    const getBoxWidth = (box) => {
+      if (!box) return 80;
+      if (Utils.isValidNumber(box.width)) return Math.max(60, box.width);
+      return 100;
+    };
+    const getBoxHeight = (box) => {
+      if (!box) return 60;
+      if (Utils.isValidNumber(box.height)) return Math.max(40, box.height);
+      return 60;
+    };
+
     const getBounds = (boxes) => {
       let minX = Infinity;
       let maxX = -Infinity;
@@ -1002,11 +1020,39 @@ class MindMap {
       return priorityA - priorityB;
     });
 
-    // Layout configuration using class constants
+    // Layout configuration using class constants with adaptive spacing bounds
     const HORIZONTAL_SPACING = MindMap.LAYOUT.HORIZONTAL_SPACING;
     const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
     const START_X = MindMap.LAYOUT.START_X;
     const START_Y = MindMap.LAYOUT.START_Y;
+    const MIN_GAP_X = Math.max(60, HORIZONTAL_SPACING * 0.55);
+    const MAX_GAP_X = Math.max(MIN_GAP_X * 1.25, HORIZONTAL_SPACING * 1.15);
+    const MIN_GAP_Y = Math.max(60, VERTICAL_SPACING);
+    const EXTERNAL_PULL = 0.4; // weight for external anchors vs parents
+    const GROUP_EXTERNAL_BLEND = 0.35; // how much group centering leans toward external anchors
+
+    // Capture anchors to boxes that connect to nodes outside the selection.
+    // This keeps the layout sensitive to external context without moving those nodes.
+    const externalAnchors = new Map(); // box -> average external X
+    for (const box of boxesToLayout) {
+      let sum = 0;
+      let count = 0;
+      for (const conn of this.connections) {
+        if (!conn || !conn.fromBox || !conn.toBox) continue;
+        if (conn.fromBox === box && !boxSet.has(conn.toBox) && Utils.isValidNumber(conn.toBox.x)) {
+          sum += conn.toBox.x;
+          count++;
+        }
+        if (conn.toBox === box && !boxSet.has(conn.fromBox) && Utils.isValidNumber(conn.fromBox.x)) {
+          sum += conn.fromBox.x;
+          count++;
+        }
+      }
+      if (count > 0) {
+        externalAnchors.set(box, sum / count);
+      }
+    }
+    const externalCenterX = avg(Array.from(externalAnchors.values()));
 
     // Assign levels using BFS from roots
     const levels = new Map(); // box -> level (0 = root)
@@ -1052,63 +1098,130 @@ class MindMap {
       levelGroups.get(level).push(box);
     }
 
-    // Sort boxes within each level by their original x position for stability
-    for (const boxes of levelGroups.values()) {
-      boxes.sort((a, b) => {
-        // Primary sort: color priority
-        const priorityDiff = this.getBoxColorPriority(a) - this.getBoxColorPriority(b);
-        if (priorityDiff !== 0) return priorityDiff;
-        // Secondary sort: original x position
-        return a.x - b.x;
-      });
+    // Compute per-level metrics for adaptive vertical spacing
+    const levelHeights = new Map();
+    for (const [level, boxes] of levelGroups) {
+      const height = Math.max(...boxes.map(getBoxHeight));
+      levelHeights.set(level, height);
     }
 
-    // Calculate positions for each level
     const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
 
-    // Calculate center X based on the widest level
-    let maxLevelWidth = 0;
-    for (const [level, boxes] of levelGroups) {
-      let totalWidth = 0;
-      for (const box of boxes) {
-        totalWidth += (box.width || 100) + HORIZONTAL_SPACING;
-      }
-      totalWidth -= HORIZONTAL_SPACING; // Remove trailing spacing
-      if (totalWidth > maxLevelWidth) maxLevelWidth = totalWidth;
-    }
+    // Place levels top-down while respecting anchors and avoiding overlaps
+    const placedPositions = new Map(); // box -> { x, y }
+    let currentY = START_Y;
+    let prevHeight = 0;
 
-    const centerX = START_X + maxLevelWidth / 2;
-
-    // Position boxes level by level
-    for (const level of sortedLevels) {
+    for (let li = 0; li < sortedLevels.length; li++) {
+      const level = sortedLevels[li];
       const boxes = levelGroups.get(level);
-      const y = START_Y + level * VERTICAL_SPACING;
+      const levelHeight = levelHeights.get(level) || 60;
 
-      // Calculate total width of this level
-      let totalWidth = 0;
-      for (const box of boxes) {
-        totalWidth += (box.width || 100) + HORIZONTAL_SPACING;
+      if (li === 0) {
+        currentY = START_Y + levelHeight / 2;
+      } else {
+        currentY += prevHeight / 2 + levelHeight / 2 + MIN_GAP_Y;
       }
-      totalWidth -= HORIZONTAL_SPACING;
+      prevHeight = levelHeight;
 
-      // Start X position to center this level
-      let x = centerX - totalWidth / 2;
-
-      // Position each box
+      // Desired X pulls: parent barycenter first, then external anchors, then original position
+      const desiredX = new Map();
       for (const box of boxes) {
-        const boxWidth = box.width || 100;
-        box.x = x + boxWidth / 2;
-        box.y = y;
-        box.targetX = box.x; // Sync target to prevent rubber-banding
+        const parentXs = (parents.get(box) || [])
+          .map(p => placedPositions.get(p)?.x)
+          .filter(Number.isFinite);
+        const parentTarget = avg(parentXs);
+        const externalTarget = externalAnchors.get(box);
+        let target = null;
+        if (Number.isFinite(parentTarget) && Number.isFinite(externalTarget)) {
+          target = parentTarget * (1 - EXTERNAL_PULL) + externalTarget * EXTERNAL_PULL;
+        } else if (Number.isFinite(parentTarget)) {
+          target = parentTarget;
+        } else if (Number.isFinite(externalTarget)) {
+          target = externalTarget;
+        }
+        if (!Number.isFinite(target) && Utils.isValidNumber(box.x)) {
+          target = box.x;
+        }
+        desiredX.set(box, target);
+      }
+
+      // Stable ordering: by desired position, then color priority, then original x
+      boxes.sort((a, b) => {
+        const da = desiredX.get(a);
+        const db = desiredX.get(b);
+        if (Number.isFinite(da) && Number.isFinite(db) && da !== db) return da - db;
+        const priorityDiff = this.getBoxColorPriority(a) - this.getBoxColorPriority(b);
+        if (priorityDiff !== 0) return priorityDiff;
+        return a.x - b.x;
+      });
+
+      // Initial compact layout using minimum gaps
+      const minTotalWidth = boxes.reduce((sum, box, idx) => sum + getBoxWidth(box) + (idx > 0 ? MIN_GAP_X : 0), 0);
+      const desiredCenter = avg(Array.from(desiredX.values())) ?? START_X + minTotalWidth / 2;
+      let sweepX = desiredCenter - minTotalWidth / 2;
+      const provisional = new Map();
+      for (const box of boxes) {
+        const w = getBoxWidth(box);
+        provisional.set(box, sweepX + w / 2);
+        sweepX += w + MIN_GAP_X;
+      }
+
+      // Relaxation: pull toward desired positions while clamping gaps
+      const iterations = Math.max(2, Math.min(5, boxes.length));
+      for (let iter = 0; iter < iterations; iter++) {
+        // Spring toward desired anchors
+        for (const box of boxes) {
+          const target = desiredX.get(box);
+          if (!Number.isFinite(target)) continue;
+          const currentX = provisional.get(box);
+          provisional.set(box, currentX + (target - currentX) * 0.35);
+        }
+
+        // Left-to-right clamp to avoid overlaps and cap huge gaps
+        for (let i = 1; i < boxes.length; i++) {
+          const prev = boxes[i - 1];
+          const curr = boxes[i];
+          const prevHalf = getBoxWidth(prev) / 2;
+          const currHalf = getBoxWidth(curr) / 2;
+          const lower = provisional.get(prev) + prevHalf + MIN_GAP_X + currHalf;
+          const upper = provisional.get(prev) + prevHalf + MAX_GAP_X + currHalf;
+          const clamped = clamp(provisional.get(curr), lower, upper);
+          provisional.set(curr, clamped);
+        }
+
+        // Right-to-left clamp to compress excessive whitespace
+        for (let i = boxes.length - 2; i >= 0; i--) {
+          const curr = boxes[i];
+          const next = boxes[i + 1];
+          const currHalf = getBoxWidth(curr) / 2;
+          const nextHalf = getBoxWidth(next) / 2;
+          const upper = provisional.get(next) - nextHalf - MIN_GAP_X - currHalf;
+          const lower = provisional.get(next) - nextHalf - MAX_GAP_X - currHalf;
+          const clamped = clamp(provisional.get(curr), lower, upper);
+          provisional.set(curr, clamped);
+        }
+      }
+
+      // Commit positions for this level
+      for (const box of boxes) {
+        const x = provisional.get(box);
+        box.x = x;
+        box.y = currentY;
+        box.targetX = box.x;
         box.targetY = box.y;
-        x += boxWidth + HORIZONTAL_SPACING;
+        placedPositions.set(box, { x: box.x, y: box.y });
       }
     }
 
     // After layout, shift group so its center matches the original (in-place layout)
     const postBounds = getBounds(boxesToLayout);
     if (preBounds && postBounds) {
-      const dx = preBounds.centerX - postBounds.centerX;
+      let targetCenterX = preBounds.centerX;
+      if (Number.isFinite(externalCenterX)) {
+        targetCenterX = preBounds.centerX * (1 - GROUP_EXTERNAL_BLEND) + externalCenterX * GROUP_EXTERNAL_BLEND;
+      }
+      const dx = targetCenterX - postBounds.centerX;
       const dy = preBounds.centerY - postBounds.centerY;
       if (Number.isFinite(dx) && Number.isFinite(dy)) {
         for (const box of boxesToLayout) {
