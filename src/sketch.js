@@ -96,6 +96,7 @@ let displayNameInput = null; // Text field for changing display name
 let keyboardOverlayContent = null;
 let keyboardOverlayVisible = false;
 let menuRightEdge = 600;
+let suppressMenuUntilMouseExit = false; // Prevent menu auto-show until cursor leaves band after blur
 
 // Presence optimization: Idle detection for cursor/selection updates
 let lastPresenceBroadcast = {
@@ -109,6 +110,71 @@ let lastPresenceBroadcast = {
 
 // Autosave state
 let autosaveTimer = null;
+
+// Utility: Attach display name input handlers so the name updates on Enter or blur
+function attachDisplayNameInputHandlers(input, options = {}) {
+  const { collaborationManager: collab, onHideMenu, requestMenuHide } = options;
+  if (!input || !input.elt) return null;
+
+  const commitDisplayNameChange = () => {
+    const newName = input.value().trim();
+    if (newName && collab && collab.setUserName) {
+      collab.setUserName(newName);
+    }
+    // Clear input and show updated name in placeholder
+    input.value('');
+    if (collab && collab.getUserName) {
+      input.attribute('placeholder', collab.getUserName());
+    }
+  };
+
+  // Stop all keyboard events from reaching the mindmap while input is focused
+  input.elt.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // Prevent mindmap from receiving key events
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitDisplayNameChange();
+      input.elt.blur(); // Remove focus after submission
+    } else if (e.key === 'Escape') {
+      // Cancel editing on Escape
+      input.value('');
+      input.elt.blur();
+    }
+  });
+
+  // Apply name on blur so clicking away saves and closes the menu
+  input.elt.addEventListener('blur', () => {
+    commitDisplayNameChange();
+    if (typeof onHideMenu === 'function') {
+      onHideMenu();
+    }
+    if (typeof requestMenuHide === 'function') {
+      requestMenuHide();
+    }
+  });
+
+  // Also stop keyup and keypress to be thorough
+  input.elt.addEventListener('keyup', (e) => e.stopPropagation());
+  input.elt.addEventListener('keypress', (e) => e.stopPropagation());
+
+  // Blur when clicking anywhere outside the input so users don't have to press Enter
+  if (typeof addTrackedEventListener === 'function' && typeof document !== 'undefined') {
+    addTrackedEventListener(document, 'pointerdown', (e) => {
+      try {
+        if (!input || !input.elt) return;
+        const target = e && e.target;
+        const isInput = target === input.elt || (input.elt.contains && input.elt.contains(target));
+        if (isInput) return;
+        if (document.activeElement === input.elt && input.elt.blur) {
+          input.elt.blur();
+        }
+      } catch (_) { /* ignore */ }
+    }, true); // capture to run before other handlers
+  }
+
+  return { commitDisplayNameChange };
+}
 
 // ============================================================================
 // CAMERA STATE
@@ -1404,35 +1470,16 @@ function setupUIButtons() {
     }
   }
 
-  // Handle Enter key to update name, and stop propagation for all keys
-  if (displayNameInput.elt) {
-    // Stop all keyboard events from reaching the mindmap while input is focused
-    displayNameInput.elt.addEventListener('keydown', (e) => {
-      e.stopPropagation(); // Prevent mindmap from receiving key events
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const newName = displayNameInput.value().trim();
-        if (newName && collaborationManager) {
-          collaborationManager.setUserName(newName);
-        }
-        // Clear input and show updated name in placeholder
-        displayNameInput.value('');
-        if (collaborationManager && collaborationManager.getUserName) {
-          displayNameInput.attribute('placeholder', collaborationManager.getUserName());
-        }
-        displayNameInput.elt.blur(); // Remove focus after submission
-      } else if (e.key === 'Escape') {
-        // Cancel editing on Escape
-        displayNameInput.value('');
-        displayNameInput.elt.blur();
-      }
-    });
-
-    // Also stop keyup and keypress to be thorough
-    displayNameInput.elt.addEventListener('keyup', (e) => e.stopPropagation());
-    displayNameInput.elt.addEventListener('keypress', (e) => e.stopPropagation());
-  }
+  attachDisplayNameInputHandlers(displayNameInput, {
+    collaborationManager,
+    onHideMenu: () => {
+      hideMenuButtons();
+      menuIsVisible = false;
+    },
+    requestMenuHide: () => {
+      suppressMenuUntilMouseExit = true;
+    },
+  });
 
   setupKeyboardControlsOverlay();
 
@@ -2077,7 +2124,16 @@ function updateMenuVisibility() {
   const inputHasFocus = displayNameInput && displayNameInput.elt &&
     document.activeElement === displayNameInput.elt;
 
-  const shouldShow = inTrigger || inButtonsBand || inputHasFocus;
+  let shouldShow = inTrigger || inButtonsBand || inputHasFocus;
+
+  // If a blur requested hiding, keep menu hidden until cursor leaves the band/trigger
+  if (suppressMenuUntilMouseExit) {
+    if (!inTrigger && !inButtonsBand) {
+      suppressMenuUntilMouseExit = false; // Reset once the cursor leaves the hover zone
+    } else {
+      shouldShow = inputHasFocus; // Allow showing only if input is refocused
+    }
+  }
 
   if (shouldShow !== menuIsVisible) {
     if (shouldShow) showMenuButtons(); else hideMenuButtons();
@@ -2496,13 +2552,23 @@ function handleAlignmentShortcut(keyChar, mindMapInstance, hasModifier, collabMa
  * Handles key press events
  */
 function keyPressed() {
-  // PRIORITY: Handle Easter egg thrust game toggle (Shift+T)
-  if (key === 'T') {
+  // Treat Cmd (meta) and Ctrl the same for shortcuts so macOS users can use Cmd+Z/C/V/etc.
+  const isCtrl =
+    keyIsDown(17) || // Ctrl (Windows/Linux)
+    (typeof CONTROL !== 'undefined' && keyIsDown(CONTROL)) ||
+    keyIsDown(91) || // Meta left (macOS)
+    keyIsDown(93) || // Meta right (some layouts)
+    keyIsDown(157) || // Alternative meta code
+    (typeof META !== 'undefined' && keyIsDown(META)) ||
+    (typeof keyEvent !== 'undefined' && keyEvent && keyEvent.metaKey);
+
+  // PRIORITY: Handle Easter egg thrust game toggle (Ctrl+T)
+  if ((key === 't' || key === 'T') && isCtrl) {
     if (typeof ThrustGame === 'undefined') {
       ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
         // Toggle the game once loaded
         if (typeof ThrustGame !== 'undefined') {
-          ThrustGame.handleInput('T', 84, mindMap);
+          ThrustGame.handleInput(key, keyCode, mindMap, { isCtrl });
         }
       });
       return false;
@@ -2511,7 +2577,7 @@ function keyPressed() {
 
   // Route to Extension Bridge (Ghost Plugin hook)
   try {
-    if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode, mindMap)) {
+    if (ExtensionBridge.handleInput && ExtensionBridge.handleInput(key, keyCode, mindMap, { isCtrl })) {
       return false; // Prevent default and stop propagation
     }
   } catch (e) {
@@ -2560,7 +2626,7 @@ function keyPressed() {
   if (mindMap) {
     try {
       // Handle CMD/CTRL modifier key
-      const isCmd = keyIsDown(91) || keyIsDown(93) || keyIsDown(17);
+      const isCmd = isCtrl;
       const isEditing = mindMap.selectedBox && mindMap.selectedBox.isEditing;
 
       // When editing text, rely on native clipboard events for C/X/V to avoid duplicates.
@@ -4745,4 +4811,11 @@ function drawSaveIndicator() {
   }
   circle(x, y, size);
   pop();
+}
+
+// Export helpers for testing in Node/Jest without impacting browser usage
+if (typeof module !== 'undefined') {
+  module.exports = {
+    attachDisplayNameInputHandlers,
+  };
 }

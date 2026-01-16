@@ -136,6 +136,7 @@ class Connection {
    * @returns {Object|null} Point with x and y coordinates, or null if invalid
    */
   getArrowHeadPosition() {
+    if (this._boxesOverlap()) return null;
     const endpoints = this._getConnectionEndpoints();
     return endpoints ? endpoints.end : null;
   }
@@ -146,6 +147,7 @@ class Connection {
    * @returns {boolean} true if mouse is over arrow head
    */
   isMouseOverArrowHead() {
+    if (this._boxesOverlap()) return false;
     const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     if (!Utils.areValidCoordinates(mx, my)) return false;
 
@@ -179,6 +181,37 @@ class Connection {
     }
   }
 
+  /**
+   * Checks whether the two endpoint boxes overlap (axis-aligned bounds).
+   * Used to suppress drawing/interaction when the connection should be hidden.
+   * @returns {boolean}
+   * @private
+   */
+  _boxesOverlap() {
+    const a = this.fromBox;
+    const b = this.toBox;
+    if (!a || !b) return false;
+
+    const valid = (box) => Utils.isValidNumber(box.x) && Utils.isValidNumber(box.y) &&
+      Utils.isValidNumber(box.width) && Utils.isValidNumber(box.height);
+    if (!valid(a) || !valid(b)) return false;
+
+    // Add a small margin so near-overlaps also hide the connection/arrow
+    const margin = 6;
+
+    const aLeft = a.x - a.width / 2 - margin;
+    const aRight = a.x + a.width / 2 + margin;
+    const aTop = a.y - a.height / 2 - margin;
+    const aBottom = a.y + a.height / 2 + margin;
+
+    const bLeft = b.x - b.width / 2 - margin;
+    const bRight = b.x + b.width / 2 + margin;
+    const bTop = b.y - b.height / 2 - margin;
+    const bBottom = b.y + b.height / 2 + margin;
+
+    return !(aRight < bLeft || aLeft > bRight || aBottom < bTop || aTop > bBottom);
+  }
+
   // ============================================================================
   // RENDERING
   // ============================================================================
@@ -189,6 +222,9 @@ class Connection {
    * Visual appearance differs based on selection state.
    */
   draw() {
+    // Hide connection entirely when endpoints overlap
+    if (this._boxesOverlap()) return;
+
     // Get validated connection endpoints
     const endpoints = this._getConnectionEndpoints();
     if (!endpoints) return;
@@ -238,6 +274,7 @@ class Connection {
    * @returns {boolean} true if mouse is over the line
    */
   isMouseOver() {
+    if (this._boxesOverlap()) return false;
     // Get validated mouse coordinates in world space
     const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     if (!Utils.areValidCoordinates(mx, my)) {

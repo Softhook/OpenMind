@@ -825,6 +825,17 @@ class CollaborationManager {
         };
     }
 
+    _boxDataEquals(a, b) {
+        // Cheap deep compare for box payloads to avoid undo entries on no-op syncs
+        if (!a && !b) return true;
+        if (!a || !b) return false;
+        try {
+            return JSON.stringify(a) === JSON.stringify(b);
+        } catch (_) {
+            return false;
+        }
+    }
+
     /**
      * Updates a single box in Yjs
      * Call this when a box is created or modified locally
@@ -861,7 +872,10 @@ class CollaborationManager {
                     if (currentBox && this.ydoc && this.undoManager) {
                         // Wrap in transaction with origin to track in undo
                         this.ydoc.transact(() => {
-                            this.yboxes.set(boxId, this._boxToYjsData(currentBox));
+                            const nextData = this._boxToYjsData(currentBox);
+                            const prevData = this.yboxes.get(boxId);
+                            if (this._boxDataEquals(prevData, nextData)) return;
+                            this.yboxes.set(boxId, nextData);
                         }, this.undoManager);
                         // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
                         // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
@@ -872,7 +886,10 @@ class CollaborationManager {
                         // be aware of when reasoning about undo boundaries.
                     } else if (currentBox) {
                         // Fallback without undo tracking
-                        this.yboxes.set(boxId, this._boxToYjsData(currentBox));
+                        const nextData = this._boxToYjsData(currentBox);
+                        const prevData = this.yboxes.get(boxId);
+                        if (this._boxDataEquals(prevData, nextData)) return;
+                        this.yboxes.set(boxId, nextData);
                     }
                 }
             }, CollaborationManager.TEXT_SYNC_DEBOUNCE);
@@ -892,18 +909,27 @@ class CollaborationManager {
         // from _wrapInTransaction, so we just sync directly without creating a new transaction
         // The sync will automatically be part of the parent transaction
         if (skipTransactionWrapper) {
-            this.yboxes.set(box.id, this._boxToYjsData(box));
+            const nextData = this._boxToYjsData(box);
+            const prevData = this.yboxes.get(box.id);
+            if (this._boxDataEquals(prevData, nextData)) return;
+            this.yboxes.set(box.id, nextData);
             return;
         }
 
         // For non-editing changes (atomic operations), sync immediately with transaction origin
         if (this.ydoc && this.undoManager) {
             this.transact(() => {
-                this.yboxes.set(box.id, this._boxToYjsData(box));
+                const nextData = this._boxToYjsData(box);
+                const prevData = this.yboxes.get(box.id);
+                if (this._boxDataEquals(prevData, nextData)) return;
+                this.yboxes.set(box.id, nextData);
             }, 'syncBoxToYjs');
         } else {
             // Fallback without undo tracking
-            this.yboxes.set(box.id, this._boxToYjsData(box));
+            const nextData = this._boxToYjsData(box);
+            const prevData = this.yboxes.get(box.id);
+            if (this._boxDataEquals(prevData, nextData)) return;
+            this.yboxes.set(box.id, nextData);
         }
     }
 

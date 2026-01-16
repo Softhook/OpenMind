@@ -26,8 +26,8 @@ You'll need two browser windows or two different computers to test multiplayer f
 ### Test Case 1: Remote Player Visibility (Issue 2)
 
 **Steps:**
-1. Open Browser A - DO NOT enter thrust mode yet (don't press Shift+T)
-2. Open Browser B - Press Shift+T to enter thrust mode
+1. Open Browser A - DO NOT enter thrust mode yet (don't press Ctrl+T)
+2. Open Browser B - Press Ctrl+T to enter thrust mode
 3. In Browser A, verify you can see Browser B's spaceship moving around
 
 **Expected Result:**
@@ -41,7 +41,7 @@ You'll need two browser windows or two different computers to test multiplayer f
 ### Test Case 2: Explosion When Shooting Remote Player (Issue 1)
 
 **Steps:**
-1. Both Browser A and Browser B enter thrust mode (Shift+T)
+1. Both Browser A and Browser B enter thrust mode (Ctrl+T)
 2. In Browser A, navigate close to Browser B's spaceship
 3. In Browser A, shoot at Browser B's spaceship (Spacebar)
 4. Watch for the explosion animation
@@ -87,7 +87,7 @@ You'll need two browser windows or two different computers to test multiplayer f
 
 ## Controls
 
-- **Shift+T**: Toggle thrust mode on/off
+- **Ctrl+T**: Toggle thrust mode on/off
 - **Arrow Keys**: Rotate and thrust
   - Left/Right: Rotate ship
   - Up: Thrust forward

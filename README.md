@@ -53,7 +53,7 @@ OpenMind supports real-time collaborative editing using WebSocket synchronizatio
 - Cmd/Ctrl+V: paste copied box(es) at the cursor location
 - Cmd/Ctrl+Z: undo last action
 - Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y: redo last undone action
-- **Shift+T: toggle Easter egg thrust game** 🎮
+- **Ctrl+T: toggle Easter egg thrust game** 🎮
 
 ### Undo/Redo Behavior
 

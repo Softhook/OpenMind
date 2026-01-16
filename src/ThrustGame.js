@@ -2,7 +2,7 @@
  * ThrustGame.js - Easter egg mini-game implementation
  * 
  * A simple thrust-based physics game where players control a ship using arrow keys
- * and fire bullets with spacebar. Designed to be toggleable with Shift+T and
+ * and fire bullets with spacebar. Designed to be toggleable with Ctrl+T and
  * support multiplayer gameplay in collaborative rooms.
  * 
  * Key Features:
@@ -271,9 +271,12 @@ class ThrustGame {
    * Static input handler
    * @returns {boolean} True if input was consumed
    */
-  static handleInput(key, keyCode, mindMap) {
-    // Toggle with Shift+T
-    if (key === 'T') {
+  static handleInput(key, keyCode, mindMap, options = {}) {
+    const isCtrl = options.isCtrl ?? ThrustGame._isCtrlPressed();
+    const isToggleKey = key === 'T' || key === 't';
+
+    // Toggle with Ctrl+T only; ignore plain capital T to avoid interfering with typing
+    if (isToggleKey && isCtrl) {
       ThrustGame.toggleInternal(mindMap);
       return true; // Consume the event
     }
@@ -281,6 +284,25 @@ class ThrustGame {
     // Zero-overhead check: If not active, don't even process key inputs
     if (ThrustGame.instance && ThrustGame.instance.active) {
       return ThrustGame.instance.handleKeyPressed(key, keyCode);
+    }
+    return false;
+  }
+
+  /**
+   * Detects Ctrl modifier for toggling the game (cross-platform).
+   */
+  static _isCtrlPressed() {
+    try {
+      const hasP5 = typeof keyIsDown === 'function';
+      const ctrlPressed = hasP5 && keyIsDown(17);
+
+      if (ctrlPressed) return true;
+
+      // Fallback for non-p5 contexts (e.g., unit tests)
+      const evt = typeof window !== 'undefined' ? window.event : null;
+      if (evt && evt.ctrlKey) return true;
+    } catch (e) {
+      // Ignore detection errors and treat as not pressed
     }
     return false;
   }
@@ -1601,7 +1623,7 @@ class ThrustGame {
     fill(ThrustGame.COLORS.UI_TEXT);
     text(`Score: ${this.score}`, 10, 10);
     text(`Deaths: ${this.deaths}`, 10, 28);
-    text('Shift+T: Exit', 10, 46);
+    text('Ctrl+T: Exit', 10, 46);
 
     // Respawn countdown
     if (!this.player.alive) {

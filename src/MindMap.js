@@ -350,19 +350,66 @@ class MindMap {
       };
     }
 
+    // Helper to skip off-screen connections when both ends are outside the viewport
+    const shouldCullConnection = (conn) => {
+      if (!useCulling || !viewportBounds || !conn) return false;
+      const fromVisible = isBoxVisibleFast(conn.fromBox);
+      const toVisible = isBoxVisibleFast(conn.toBox);
+      return !fromVisible && !toVisible;
+    };
+
+    // Helper: detect overlap between two boxes using their axis-aligned bounds
+    const boxesOverlap = (a, b) => {
+      if (!a || !b) return false;
+      if (!Utils.isValidNumber(a.x) || !Utils.isValidNumber(a.y) ||
+        !Utils.isValidNumber(a.width) || !Utils.isValidNumber(a.height) ||
+        !Utils.isValidNumber(b.x) || !Utils.isValidNumber(b.y) ||
+        !Utils.isValidNumber(b.width) || !Utils.isValidNumber(b.height)) {
+        return false;
+      }
+
+      // Add a small margin so near-overlaps also hide the connection
+      const margin = 6;
+
+      const aLeft = a.x - a.width / 2 - margin;
+      const aRight = a.x + a.width / 2 + margin;
+      const aTop = a.y - a.height / 2 - margin;
+      const aBottom = a.y + a.height / 2 + margin;
+
+      const bLeft = b.x - b.width / 2 - margin;
+      const bRight = b.x + b.width / 2 + margin;
+      const bTop = b.y - b.height / 2 - margin;
+      const bBottom = b.y + b.height / 2 + margin;
+
+      return !(aRight < bLeft || aLeft > bRight || aBottom < bTop || aTop > bBottom);
+    };
+
+    // Track the top-most box (last in render order) so its connections can render above lower boxes
+    const topBox = (this.boxes && this.boxes.length > 0) ? this.boxes[this.boxes.length - 1] : null;
+    const overlayConnections = [];
+
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
       for (let conn of this.connections) {
         if (!conn) continue;
         if (this.draggingConnection && this.draggingConnection.conn === conn) continue;
 
+        // If the connected boxes overlap, hide the connection until they separate
+        if (boxesOverlap(conn.fromBox, conn.toBox)) {
+          continue;
+        }
+
+        // Defer connections attached to the top/dragged box so they render above lower boxes
+        const touchesTopBox = topBox && (conn.fromBox === topBox || conn.toBox === topBox);
+        const hasDraggingEndpoint = (conn.fromBox && conn.fromBox.isDragging) || (conn.toBox && conn.toBox.isDragging);
+        if (touchesTopBox || hasDraggingEndpoint) {
+          overlayConnections.push(conn);
+          continue;
+        }
+
         // Skip off-screen connections for better performance
-        if (useCulling && viewportBounds) {
-          const fromVisible = isBoxVisibleFast(conn.fromBox);
-          const toVisible = isBoxVisibleFast(conn.toBox);
-          if (!fromVisible && !toVisible) {
-            continue;
-          }
+        if (shouldCullConnection(conn)) {
+          continue;
         }
 
         try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
@@ -392,6 +439,16 @@ class MindMap {
           // Pass navigation state to box for dimming effect
           box.draw(this.isArrowKeyNavigating && this.selectedBox !== box);
         } catch (e) { console.error('Error drawing box:', e); }
+      }
+    }
+
+    // Draw deferred connections for the top/dragged box above underlying boxes
+    if (overlayConnections.length > 0) {
+      for (let conn of overlayConnections) {
+        if (!conn) continue;
+        if (boxesOverlap(conn.fromBox, conn.toBox)) continue;
+        if (shouldCullConnection(conn)) continue;
+        try { conn.draw(); } catch (e) { console.error('Error drawing connection:', e); }
       }
     }
 
@@ -2314,6 +2371,11 @@ class MindMap {
                   MindMap.onBoxChange(this.selectedBox, true);
                 }
               });
+
+              // Force an explicit undo boundary for formatting commands
+              if (typeof collaborationManager !== 'undefined' && collaborationManager && collaborationManager.stopCapturing) {
+                collaborationManager.stopCapturing();
+              }
             }
           } catch (e) { console.error('Highlight toggle failed', e); }
           return;
@@ -2328,6 +2390,10 @@ class MindMap {
                   MindMap.onBoxChange(this.selectedBox, true);
                 }
               });
+
+              if (typeof collaborationManager !== 'undefined' && collaborationManager && collaborationManager.stopCapturing) {
+                collaborationManager.stopCapturing();
+              }
             }
           } catch (e) { console.error('Bold toggle failed', e); }
           return;
@@ -2342,6 +2408,10 @@ class MindMap {
                   MindMap.onBoxChange(this.selectedBox, true);
                 }
               });
+
+              if (typeof collaborationManager !== 'undefined' && collaborationManager && collaborationManager.stopCapturing) {
+                collaborationManager.stopCapturing();
+              }
             }
           } catch (e) { console.error('Italic toggle failed', e); }
           return;
