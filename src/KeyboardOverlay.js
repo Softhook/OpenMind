@@ -43,7 +43,7 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'Cmd/Ctrl + C / V', description: 'Copy or paste text or boxes' },
     { keys: 'Cmd/Ctrl + X', description: 'Cut selected text while editing' },
     { keys: 'Cmd/Ctrl + B', description: 'Bold outline selected text (no reflow)' },
-    { keys: 'Cmd/Ctrl + Shift + B', description: 'Highlight selected text' },
+    { keys: 'Cmd/Ctrl + U', description: 'Highlight selected text' },
     { keys: 'Cmd/Ctrl + I', description: 'Italic slant selected text' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },

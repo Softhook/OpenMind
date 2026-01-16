@@ -2358,8 +2358,8 @@ class MindMap {
             console.error('Clipboard paste not supported:', e);
           }
           return;
-        } else if (isShift && (key === 'b' || key === 'B')) {
-          // Highlight selected text (toggle) with Cmd/Ctrl+Shift+B
+        } else if (key === 'u' || key === 'U') {
+          // Highlight selected text (toggle) with Cmd/Ctrl+U
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
               this.pushUndo();
