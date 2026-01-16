@@ -58,7 +58,7 @@
     },
     {
       "id": "467d31b1-751e-4816-aff8-92c5da979b0b",
-      "x": -791.9867276165409,
+      "x": -791.986727616541,
       "y": 2.3186426741832165,
       "text": "",
       "imageUrl": null,
@@ -195,20 +195,6 @@
       }
     },
     {
-      "id": "21779058-9ce3-4480-a0be-80e3b9b8bd14",
-      "x": -3113.1304364522325,
-      "y": -1604.4439734069215,
-      "text": "Tax return",
-      "imageUrl": null,
-      "width": 227.1298828125,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      }
-    },
-    {
       "id": "4051f5f2-e586-42a7-ba22-7907304a6a6a",
       "x": -3139.021671803795,
       "y": -1178.7773004361059,
@@ -342,7 +328,7 @@
     },
     {
       "id": "7e91c221-a40d-4b0b-81f8-e70e56b201d6",
-      "x": -1910.5474040684906,
+      "x": -1910.5474040684908,
       "y": 286.55606077519184,
       "text": "Design the post smart city\n\nOver the past decades, the smart city has been articulated primarily through policy agendas, infrastructural programmes, and critical theory. While these approaches have been effective in diagnosing the political economy, governance arrangements, and technological imaginaries of smart urbanism, they have largely treated design as a downstream activity—a matter of implementation, optimisation, or interface. This paper argues that contestation around the smart city cannot be addressed through critique alone, but requires a rethinking of smart urbanism as a design problem.\n\nTaking “the post-smart city” not as a rejection of digital urbanism but as a problem of re-design, the paper asks what becomes visible when design is treated as an epistemic and ontological practice rather than merely a delivery mechanism. Drawing on examples from participatory design, speculative prototyping, and infrastructural interventions that foreground frictions, ambiguities, and publics, the paper shows how design opens up alternative ways of framing and enacting urban intelligence—shifting attention from data extraction and control towards situated practices, contested publics, and the material conditions through which urban knowledge is produced.\n\nBy foregrounding design, the paper contributes to geographical debates on smart urbanism by moving beyond critique towards intervention, and to design research by situating design practice within the spatial, political, and policymaking complexities of contemporary cities.",
       "imageUrl": null,
@@ -367,32 +353,56 @@
       ]
     },
     {
-      "id": "0fc19ba0-5f0e-42ca-8853-bcf81e4ba100",
-      "x": -3110.4203649490096,
-      "y": -1433.947523010486,
-      "text": "pay accountant bill",
+      "id": "27e8ac8a-4ba7-4e7d-b190-4f96d92221ac",
+      "x": -3087.9748707436474,
+      "y": -1420.2639449317408,
+      "text": "4th Feb Promotion case for ",
       "imageUrl": null,
-      "width": 150,
+      "width": 196.7509765625,
       "height": 45,
       "backgroundColor": {
         "r": 255,
         "g": 255,
         "b": 255
-      }
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 7,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     },
     {
-      "id": "14f5e789-8ac2-40f8-b913-3dc52828ccbe",
-      "x": -3110.4203649490096,
-      "y": -1519.2936552487738,
-      "text": "go through accounts ",
+      "id": "16d4736b-0ca5-4e6b-a3f2-47ed10182d37",
+      "x": -3079.7922535561474,
+      "y": -1522.2735664567736,
+      "text": "31st Jan Pay tax end of month",
       "imageUrl": null,
-      "width": 150,
-      "height": 66,
+      "width": 213.1162109375,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
-        "g": 200,
-        "b": 140
-      }
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 8,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
@@ -405,40 +415,34 @@
     {
       "fromId": "7e91c221-a40d-4b0b-81f8-e70e56b201d6",
       "toId": "55f391b5-a96e-48ff-a2ed-b9bafa477cf7",
-      "from": 21,
-      "to": 20
+      "from": 20,
+      "to": 19
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "e8720669-c177-4685-ac98-749cf3e869cb",
-      "from": 19,
-      "to": 16
+      "from": 18,
+      "to": 15
     },
     {
       "fromId": "e8720669-c177-4685-ac98-749cf3e869cb",
       "toId": "77ae8057-4b83-45e2-93fc-59f6e15a214d",
-      "from": 16,
-      "to": 17
+      "from": 15,
+      "to": 16
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "7e91c221-a40d-4b0b-81f8-e70e56b201d6",
-      "from": 19,
-      "to": 21
+      "from": 18,
+      "to": 20
     },
     {
       "fromId": "55f391b5-a96e-48ff-a2ed-b9bafa477cf7",
       "toId": "467d31b1-751e-4816-aff8-92c5da979b0b",
-      "from": 20,
+      "from": 19,
       "to": 4
-    },
-    {
-      "fromId": "14f5e789-8ac2-40f8-b913-3dc52828ccbe",
-      "toId": "0fc19ba0-5f0e-42ca-8853-bcf81e4ba100",
-      "from": 23,
-      "to": 22
     }
   ],
-  "lastModified": 1767996428828,
-  "name": "Todo.json"
+  "lastModified": 1768584120226,
+  "name": "T190.json"
 }
