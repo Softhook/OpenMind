@@ -128,8 +128,8 @@ function attachDisplayNameInputHandlers(input, options = {}) {
     }
   };
 
-  // Stop all keyboard events from reaching the mindmap while input is focused
-  input.elt.addEventListener('keydown', (e) => {
+  // Handler functions stored so they can be cleaned up
+  const keydownHandler = (e) => {
     e.stopPropagation(); // Prevent mindmap from receiving key events
 
     if (e.key === 'Enter') {
@@ -141,10 +141,9 @@ function attachDisplayNameInputHandlers(input, options = {}) {
       input.value('');
       input.elt.blur();
     }
-  });
+  };
 
-  // Apply name on blur so clicking away saves and closes the menu
-  input.elt.addEventListener('blur', () => {
+  const blurHandler = () => {
     commitDisplayNameChange();
     if (typeof onHideMenu === 'function') {
       onHideMenu();
@@ -152,11 +151,24 @@ function attachDisplayNameInputHandlers(input, options = {}) {
     if (typeof requestMenuHide === 'function') {
       requestMenuHide();
     }
-  });
+  };
 
-  // Also stop keyup and keypress to be thorough
-  input.elt.addEventListener('keyup', (e) => e.stopPropagation());
-  input.elt.addEventListener('keypress', (e) => e.stopPropagation());
+  const keyupHandler = (e) => e.stopPropagation();
+  const keypressHandler = (e) => e.stopPropagation();
+
+  // Add event listeners and track them for cleanup
+  input.elt.addEventListener('keydown', keydownHandler);
+  input.elt.addEventListener('blur', blurHandler);
+  input.elt.addEventListener('keyup', keyupHandler);
+  input.elt.addEventListener('keypress', keypressHandler);
+
+  // Track these listeners for cleanup
+  eventListeners.push(
+    { target: input.elt, event: 'keydown', handler: keydownHandler },
+    { target: input.elt, event: 'blur', handler: blurHandler },
+    { target: input.elt, event: 'keyup', handler: keyupHandler },
+    { target: input.elt, event: 'keypress', handler: keypressHandler }
+  );
 
   // Blur when clicking anywhere outside the input so users don't have to press Enter
   if (typeof addTrackedEventListener === 'function' && typeof document !== 'undefined') {
@@ -4711,20 +4723,12 @@ function cleanup() {
     }
     eventListeners = [];
 
-    // Remove overlay event listeners
-    if (keyboardOverlay && keyboardOverlay.elt && overlayClickHandler) {
+    // Clean up keyboard overlay
+    if (typeof keyboardOverlayManager !== 'undefined' && keyboardOverlayManager.cleanup) {
       try {
-        keyboardOverlay.elt.removeEventListener('click', overlayClickHandler);
+        keyboardOverlayManager.cleanup();
       } catch (e) {
-        console.warn('Failed to remove overlay click listener:', e);
-      }
-    }
-
-    if (keyboardOverlayContent && keyboardOverlayContent.elt && overlayContentClickHandler) {
-      try {
-        keyboardOverlayContent.elt.removeEventListener('click', overlayContentClickHandler);
-      } catch (e) {
-        console.warn('Failed to remove overlay content click listener:', e);
+        console.warn('Failed to cleanup keyboard overlay:', e);
       }
     }
 

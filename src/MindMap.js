@@ -1691,6 +1691,24 @@ class MindMap {
   }
 
   /**
+   * Brings a box to the front by moving it to the end of the boxes array.
+   * This ensures it's drawn last and appears on top of other boxes.
+   * @param {TextBox} box - The box to bring to front
+   */
+  bringBoxToFront(box) {
+    if (!box || !this.boxes || this.boxes.length <= 1) return;
+    
+    const currentIndex = this.boxes.indexOf(box);
+    if (currentIndex === -1) return; // Box not found
+    if (currentIndex === this.boxes.length - 1) return; // Already at front
+    
+    // Remove box from current position and add to end
+    this.boxes.splice(currentIndex, 1);
+    this.boxes.push(box);
+    this.isDirty = true;
+  }
+
+  /**
    * Initiates a connection from the provided box using the connector closest to the mouse
    * @param {TextBox} box - Source box to start the connection from
    */
@@ -1810,7 +1828,8 @@ class MindMap {
     // Color circle clicks removed - colors are now changed via keyboard shortcuts (1, 2, 3)
 
     // Check if clicking on resize handle
-    for (let box of this.boxes) {
+    for (let i = this.boxes.length - 1; i >= 0; i--) {
+      const box = this.boxes[i];
       if (box.isMouseOverResizeHandle()) {
         this.isArrowKeyNavigating = false; // Clear navigation when resizing
         this.selectedBox = box;
@@ -1819,6 +1838,8 @@ class MindMap {
         this.addBoxToSelection(box);
         this.pushUndo();
         box.startResize(mx, my);
+        // Bring this box to front when interacting with it
+        this.bringBoxToFront(box);
         return;
       }
     }
@@ -1845,12 +1866,15 @@ class MindMap {
     }
 
     // Check if clicking on a connector dot at box edge center for connection
-    for (let box of this.boxes) {
+    for (let i = this.boxes.length - 1; i >= 0; i--) {
+      const box = this.boxes[i];
       const side = box.getConnectorUnderMouse();
       if (side) {
         this.isArrowKeyNavigating = false; // Clear navigation when creating connection
         this.connectingFrom = { box, side };
         this.connectingFromInitiatedByKeyboard = false;
+        // Bring this box to front when interacting with it
+        this.bringBoxToFront(box);
         return;
       }
     }
@@ -1922,9 +1946,8 @@ class MindMap {
           }
         }
 
-        // Move this box to the end (on top)
-        this.boxes.splice(i, 1);
-        this.boxes.push(box);
+        // Bring this box to front when interacting with it
+        this.bringBoxToFront(box);
         return;
       }
     }

@@ -248,6 +248,33 @@ class KeyboardOverlayManager {
     getOverlayContent() {
         return this.overlayContent;
     }
+
+    /**
+     * Cleanup method to remove event listeners and prevent memory leaks
+     */
+    cleanup() {
+        // Remove event listeners
+        if (this.overlay && this.overlay.elt && this.overlayClickHandler) {
+            this.overlay.elt.removeEventListener('click', this.overlayClickHandler);
+            this.overlayClickHandler = null;
+        }
+        
+        if (this.overlayContent && this.overlayContent.elt && this.overlayContentClickHandler) {
+            this.overlayContent.elt.removeEventListener('click', this.overlayContentClickHandler);
+            this.overlayContentClickHandler = null;
+        }
+        
+        // Remove DOM elements
+        if (this.overlay && this.overlay.remove) {
+            this.overlay.remove();
+        }
+        
+        // Reset state
+        this.overlay = null;
+        this.overlayContent = null;
+        this.isVisible = false;
+        this.buttonRef = null;
+    }
 }
 
 const keyboardOverlayManager = new KeyboardOverlayManager();
