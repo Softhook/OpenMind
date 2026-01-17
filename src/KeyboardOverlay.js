@@ -241,6 +241,53 @@ class KeyboardOverlayManager {
         }
     }
 
+    /**
+     * Cleanup method to remove event listeners and DOM elements
+     */
+    cleanup() {
+        // Remove event listeners
+        if (this.overlay && this.overlay.elt && this.overlayClickHandler) {
+            try {
+                this.overlay.elt.removeEventListener('click', this.overlayClickHandler);
+            } catch (e) {
+                console.warn('Failed to remove overlay click listener:', e);
+            }
+        }
+
+        if (this.overlayContent && this.overlayContent.elt && this.overlayContentClickHandler) {
+            try {
+                this.overlayContent.elt.removeEventListener('click', this.overlayContentClickHandler);
+            } catch (e) {
+                console.warn('Failed to remove overlay content click listener:', e);
+            }
+        }
+
+        // Remove DOM elements
+        if (this.overlayContent) {
+            try {
+                this.overlayContent.remove();
+            } catch (e) {
+                console.warn('Failed to remove overlay content element:', e);
+            }
+        }
+
+        if (this.overlay) {
+            try {
+                this.overlay.remove();
+            } catch (e) {
+                console.warn('Failed to remove overlay element:', e);
+            }
+        }
+
+        // Clear references
+        this.overlayClickHandler = null;
+        this.overlayContentClickHandler = null;
+        this.overlay = null;
+        this.overlayContent = null;
+        this.isVisible = false;
+        this.buttonRef = null;
+    }
+
     getOverlay() {
         return this.overlay;
     }
@@ -289,6 +336,10 @@ function getKeyboardOverlayContent() {
     return keyboardOverlayManager.getOverlayContent();
 }
 
+function cleanupKeyboardOverlay() {
+    return keyboardOverlayManager.cleanup();
+}
+
 if (typeof window !== 'undefined') {
     window.KeyboardOverlay = {
         setup: setupKeyboardControlsOverlay,
@@ -300,6 +351,7 @@ if (typeof window !== 'undefined') {
         isVisible: isKeyboardOverlayVisible,
         getOverlay: getKeyboardOverlay,
         getOverlayContent: getKeyboardOverlayContent,
+        cleanup: cleanupKeyboardOverlay,
         SHORTCUTS: KEYBOARD_SHORTCUTS
     };
 }

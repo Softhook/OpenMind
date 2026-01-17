@@ -228,6 +228,35 @@ class MobileNavigationManager {
             // If globals are not declared, silently ignore
         }
     }
+
+    /**
+     * Cleanup method to remove DOM elements
+     * Event listeners are already tracked via addTrackedEventListener
+     */
+    cleanup() {
+        try {
+            // Remove DOM elements
+            if (this.upButton) {
+                this.upButton.remove();
+                this.upButton = null;
+            }
+
+            if (this.downButton) {
+                this.downButton.remove();
+                this.downButton = null;
+            }
+
+            if (this.overlay) {
+                this.overlay.remove();
+                this.overlay = null;
+            }
+
+            // Reset state
+            this.isTouchDevice = false;
+        } catch (e) {
+            console.warn('Failed to cleanup MobileNavigation:', e);
+        }
+    }
 }
 
 const mobileNavigationManager = new MobileNavigationManager();
@@ -260,6 +289,10 @@ function hideMobileNavOverlay() {
     return mobileNavigationManager.hide();
 }
 
+function cleanupMobileNavigation() {
+    return mobileNavigationManager.cleanup();
+}
+
 if (typeof window !== 'undefined') {
     window.MobileNavigation = {
         detectTouchDevice,
@@ -268,6 +301,7 @@ if (typeof window !== 'undefined') {
         setupMobileNavButtonEvents,
         updateMobileNavPosition,
         showMobileNavOverlay,
-        hideMobileNavOverlay
+        hideMobileNavOverlay,
+        cleanup: cleanupMobileNavigation
     };
 }

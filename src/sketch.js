@@ -116,6 +116,9 @@ function attachDisplayNameInputHandlers(input, options = {}) {
   const { collaborationManager: collab, onHideMenu, requestMenuHide } = options;
   if (!input || !input.elt) return null;
 
+  // Clean up any existing handlers first
+  cleanupDisplayNameInputHandlers(input);
+
   const commitDisplayNameChange = () => {
     const newName = input.value().trim();
     if (newName && collab && collab.setUserName) {
@@ -128,8 +131,8 @@ function attachDisplayNameInputHandlers(input, options = {}) {
     }
   };
 
-  // Stop all keyboard events from reaching the mindmap while input is focused
-  input.elt.addEventListener('keydown', (e) => {
+  // Create named handlers for proper cleanup
+  displayNameInputHandlers.keydown = (e) => {
     e.stopPropagation(); // Prevent mindmap from receiving key events
 
     if (e.key === 'Enter') {
@@ -141,10 +144,9 @@ function attachDisplayNameInputHandlers(input, options = {}) {
       input.value('');
       input.elt.blur();
     }
-  });
+  };
 
-  // Apply name on blur so clicking away saves and closes the menu
-  input.elt.addEventListener('blur', () => {
+  displayNameInputHandlers.blur = () => {
     commitDisplayNameChange();
     if (typeof onHideMenu === 'function') {
       onHideMenu();
@@ -152,11 +154,16 @@ function attachDisplayNameInputHandlers(input, options = {}) {
     if (typeof requestMenuHide === 'function') {
       requestMenuHide();
     }
-  });
+  };
 
-  // Also stop keyup and keypress to be thorough
-  input.elt.addEventListener('keyup', (e) => e.stopPropagation());
-  input.elt.addEventListener('keypress', (e) => e.stopPropagation());
+  displayNameInputHandlers.keyup = (e) => e.stopPropagation();
+  displayNameInputHandlers.keypress = (e) => e.stopPropagation();
+
+  // Attach the handlers
+  input.elt.addEventListener('keydown', displayNameInputHandlers.keydown);
+  input.elt.addEventListener('blur', displayNameInputHandlers.blur);
+  input.elt.addEventListener('keyup', displayNameInputHandlers.keyup);
+  input.elt.addEventListener('keypress', displayNameInputHandlers.keypress);
 
   // Blur when clicking anywhere outside the input so users don't have to press Enter
   if (typeof addTrackedEventListener === 'function' && typeof document !== 'undefined') {
@@ -174,6 +181,36 @@ function attachDisplayNameInputHandlers(input, options = {}) {
   }
 
   return { commitDisplayNameChange };
+}
+
+/**
+ * Cleans up displayNameInput event listeners
+ * @param {Object} input - p5.js input element
+ */
+function cleanupDisplayNameInputHandlers(input) {
+  if (!input || !input.elt) return;
+
+  // Remove all handlers if they exist
+  if (displayNameInputHandlers.keydown) {
+    input.elt.removeEventListener('keydown', displayNameInputHandlers.keydown);
+  }
+  if (displayNameInputHandlers.blur) {
+    input.elt.removeEventListener('blur', displayNameInputHandlers.blur);
+  }
+  if (displayNameInputHandlers.keyup) {
+    input.elt.removeEventListener('keyup', displayNameInputHandlers.keyup);
+  }
+  if (displayNameInputHandlers.keypress) {
+    input.elt.removeEventListener('keypress', displayNameInputHandlers.keypress);
+  }
+
+  // Reset the handlers object
+  displayNameInputHandlers = {
+    keydown: null,
+    blur: null,
+    keyup: null,
+    keypress: null
+  };
 }
 
 // ============================================================================
@@ -219,6 +256,14 @@ let eventListeners = [];
 // Store references to overlay event listeners for cleanup
 let overlayClickHandler = null;
 let overlayContentClickHandler = null;
+
+// Store references to displayNameInput event listeners for cleanup
+let displayNameInputHandlers = {
+  keydown: null,
+  blur: null,
+  keyup: null,
+  keypress: null
+};
 
 // Mobile navigation overlay state
 let mobileNavOverlay = null;
@@ -4701,6 +4746,20 @@ function completeMultiBoxSelection() {
  */
 function cleanup() {
   try {
+    // Clean up displayNameInput handlers
+    if (displayNameInput) {
+      cleanupDisplayNameInputHandlers(displayNameInput);
+    }
+
+    // Clean up KeyboardOverlay
+    if (typeof window !== 'undefined' && window.KeyboardOverlay && typeof window.KeyboardOverlay.cleanup === 'function') {
+      try {
+        window.KeyboardOverlay.cleanup();
+      } catch (e) {
+        console.warn('Failed to cleanup KeyboardOverlay:', e);
+      }
+    }
+
     // Remove all tracked event listeners
     for (const { target, event, handler, options } of eventListeners) {
       try {
@@ -4711,7 +4770,7 @@ function cleanup() {
     }
     eventListeners = [];
 
-    // Remove overlay event listeners
+    // Remove overlay event listeners (backup in case KeyboardOverlay cleanup didn't run)
     if (keyboardOverlay && keyboardOverlay.elt && overlayClickHandler) {
       try {
         keyboardOverlay.elt.removeEventListener('click', overlayClickHandler);
@@ -4732,6 +4791,17 @@ function cleanup() {
     if (autosaveTimer) {
       clearInterval(autosaveTimer);
       autosaveTimer = null;
+    }
+
+    // Clear sync timeouts
+    if (syncConnectionTimeout) {
+      clearTimeout(syncConnectionTimeout);
+      syncConnectionTimeout = null;
+    }
+
+    if (syncEmptyRoomTimeout) {
+      clearTimeout(syncEmptyRoomTimeout);
+      syncEmptyRoomTimeout = null;
     }
 
     // Reset key repeat state
@@ -4756,6 +4826,15 @@ function cleanup() {
         collaborationManager.destroy();
       } catch (e) {
         console.warn('Failed to disconnect collaboration manager:', e);
+      }
+    }
+
+    // Clean up MobileNavigation if it exists
+    if (typeof MobileNavigation !== 'undefined' && MobileNavigation.cleanup) {
+      try {
+        MobileNavigation.cleanup();
+      } catch (e) {
+        console.warn('Failed to cleanup MobileNavigation:', e);
       }
     }
   } catch (e) {
