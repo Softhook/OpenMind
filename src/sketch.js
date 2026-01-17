@@ -204,13 +204,11 @@ function cleanupDisplayNameInputHandlers(input) {
     input.elt.removeEventListener('keypress', displayNameInputHandlers.keypress);
   }
 
-  // Reset the handlers object
-  displayNameInputHandlers = {
-    keydown: null,
-    blur: null,
-    keyup: null,
-    keypress: null
-  };
+  // Clear the handlers object properties
+  displayNameInputHandlers.keydown = null;
+  displayNameInputHandlers.blur = null;
+  displayNameInputHandlers.keyup = null;
+  displayNameInputHandlers.keypress = null;
 }
 
 // ============================================================================
