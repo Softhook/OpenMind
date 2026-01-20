@@ -676,10 +676,7 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     if (userChoice === 'sync' && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
       Utils.Logger.collab('[Sync] Syncing local data to Yjs BEFORE connecting');
       // Initialize Yjs document (without connecting to server yet)
-      // Check if already initialized to avoid double initialization
-      if (!collaborationManager.isInitialized) {
-        await collaborationManager.initialize();
-      }
+      await collaborationManager.initialize();
       // Sync local to Yjs while still offline using public API
       collaborationManager.syncLocalToRoom();
       Utils.Logger.collab('[Sync] Local data synced to offline Yjs, ready to merge with remote');
@@ -1605,12 +1602,7 @@ function draw() {
     // Subtitle
     textSize(12);
     fill(180);
-    const roomIsEmpty = roomJoinConfirmation.roomIsEmpty;
-    if (roomIsEmpty) {
-      text('Choose how to proceed with your local changes', width / 2, height / 2 + 15);
-    } else {
-      text('The room has content. Choose how to proceed', width / 2, height / 2 + 15);
-    }
+    text('Choose how to proceed with your local changes', width / 2, height / 2 + 15);
 
     // Three buttons in a row
     const buttonWidth = 140;

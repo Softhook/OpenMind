@@ -245,7 +245,7 @@ class CollaborationManager {
      * Connects to a collaboration room via WebSocket using y-websocket.
      * Must call initialize() first.
      * Establishes the network provider so Yjs can sync and merge local and remote state.
-     * The actual synchronization/merge happens inside Yjs (e.g. on the 'synced' event)
+     * The actual synchronization/merge happens inside Yjs in the 'sync' event handler
      * and depends on what local data was pushed to the Yjs document before calling connect().
      * @param {string} roomName - Unique room identifier
      * @param {string|null} serverUrl - Optional custom server URL
@@ -394,10 +394,11 @@ class CollaborationManager {
     /**
      * Syncs local data to room using pure Yjs CRDT merge
      * This pushes local changes to Yjs and lets CRDT handle all conflicts
+     * Can be called before connecting (offline sync) or while connected
      */
     syncLocalToRoom() {
-        if (!this.yboxes || !this.mindMap) {
-            Utils.Logger.error('[Room] Cannot sync to room - not connected or no mindMap');
+        if (!this.ydoc || !this.mindMap) {
+            Utils.Logger.error('[Room] Cannot sync to room - Yjs not initialized or no mindMap');
             return;
         }
 
