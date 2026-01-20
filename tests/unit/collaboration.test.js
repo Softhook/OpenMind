@@ -384,19 +384,23 @@ describe('Local Data Management When Joining Rooms', () => {
         expect(collabCode).not.toMatch(/async connect\s*\([^)]*shouldShareLocalData/);
     });
 
-    test('sync handler should always merge via Yjs', () => {
-        // Should have simplified sync logic without conditional clearing
-        expect(collabCode).toMatch(/Room empty, syncing local data to Yjs/);
-        expect(collabCode).toMatch(/Merging local and remote data/);
-        expect(collabCode).toMatch(/Loading data from room/);
+    test('sync handler should call onRoomDataCheck when local data exists', () => {
+        // Should call callback when user has local data
+        expect(collabCode).toMatch(/onRoomDataCheck.*localHasData/);
+        expect(collabCode).toMatch(/Calling onRoomDataCheck/);
     });
 
-    test('sync handler should use Yjs for merging local and remote data', () => {
-        // When both have data, should merge via Yjs
-        expect(collabCode).toMatch(/yjsEmpty.*localHasData/);
-        expect(collabCode).toMatch(/_syncLocalToYjs/);
+    test('sync handler should auto-load from room when no local data', () => {
+        // Should automatically load when no local data
+        expect(collabCode).toMatch(/Loading data from room.*no local data/);
         expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
         expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
+    });
+
+    test('should have syncLocalToRoom and loadFromRoom methods', () => {
+        // Should have methods for user-initiated actions
+        expect(collabCode).toMatch(/syncLocalToRoom\s*\(\s*\)\s*\{/);
+        expect(collabCode).toMatch(/loadFromRoom\s*\(\s*\)\s*\{/);
     });
 });
 

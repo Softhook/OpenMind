@@ -622,22 +622,21 @@ async function initializeCollaboration(roomName) {
       syncStatus = 'incompatible';
     };
 
-    // Handle room data check - decide whether to merge or show warning
+    // Handle room data check - show dialog when joining room with local data
     collaborationManager.onRoomDataCheck = (yjsEmpty, localHasData) => {
-      if (yjsEmpty || !localHasData) {
-        // Room is empty or we have no local data - nothing to decide
+      if (!localHasData) {
+        // No local data - nothing to decide
         return;
       }
 
-      // Both room and local have data - check if we should show warning
-      // For now, always show warning when both have data
-      // TODO: Add filename/content comparison logic
-      Utils.Logger.collab('[Room] Room and local both have data, showing confirmation dialog');
+      // User has local data - always show dialog to choose merge or replace
+      Utils.Logger.collab('[Room] User has local data, showing sync options dialog');
       
       roomJoinConfirmation = {
         roomName: roomName,
         hasLocalData: true,
-        boxCount: mindMap.boxes.length
+        boxCount: mindMap.boxes.length,
+        roomIsEmpty: yjsEmpty
       };
     };
 
@@ -1518,52 +1517,75 @@ function draw() {
     textSize(11);
     text(`${appName} v${versionStr}`, width / 2, 20);
 
-    // Warning icon (⚠️)
-    fill(255, 200, 0);
+    // Info icon (ℹ️)
+    fill(100, 180, 255);
     textAlign(CENTER, CENTER);
     textSize(32);
-    text('⚠️', width / 2, height / 2 - 80);
+    text('ℹ️', width / 2, height / 2 - 90);
 
     // Main message
     fill(255);
     textSize(18);
-    text('Joining Collaboration Room', width / 2, height / 2 - 30);
+    text('Joining Collaboration Room', width / 2, height / 2 - 40);
 
-    // Warning message
+    // Info message
     textSize(13);
-    fill(255, 200, 100);
+    fill(200, 200, 200);
     const boxCount = roomJoinConfirmation.boxCount || 0;
     const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
-    text(`Your current work (${boxText}) will be cleared`, width / 2, height / 2 + 5);
+    text(`You have ${boxText} of local work`, width / 2, height / 2 - 10);
 
     // Subtitle
     textSize(12);
     fill(180);
-    text('The room\'s content will sync instead', width / 2, height / 2 + 30);
+    const roomIsEmpty = roomJoinConfirmation.roomIsEmpty;
+    if (roomIsEmpty) {
+      text('Choose how to proceed with your local changes', width / 2, height / 2 + 15);
+    } else {
+      text('The room has content. Choose how to proceed', width / 2, height / 2 + 15);
+    }
 
-    // OK Button
-    const buttonWidth = 120;
+    // Two buttons side by side
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 20;
+    const totalWidth = buttonWidth * 2 + buttonGap;
+    const mergeButtonX = width / 2 - totalWidth / 2;
+    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    // Check if mouse is over button
-    const isOverButton = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+    // Check which button mouse is over
+    const isOverMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-    // Button background
-    if (isOverButton) {
-      fill(70, 150, 220); // Hover state
+    // Merge button (green)
+    if (isOverMerge) {
+      fill(60, 180, 100); // Hover state
     } else {
-      fill(60, 130, 200); // Normal state
+      fill(50, 160, 80); // Normal state
     }
-    rect(buttonX, buttonY, buttonWidth, buttonHeight, 4);
-
-    // Button text
+    rect(mergeButtonX, buttonY, buttonWidth, buttonHeight, 4);
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(14);
-    text('OK, Join Room', width / 2, buttonY + buttonHeight / 2);
+    text('Merge Changes', mergeButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Replace button (orange)
+    if (isOverReplace) {
+      fill(220, 100, 60); // Hover state
+    } else {
+      fill(200, 80, 40); // Normal state
+    }
+    rect(replaceButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    fill(255);
+    text('Replace Local', replaceButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Helper text
+    textSize(11);
+    fill(150);
+    text('ESC to cancel', width / 2, buttonY + buttonHeight + 25);
 
     pop();
   }
@@ -1574,15 +1596,22 @@ function draw() {
    * Sets appropriate cursors for resizing, moving, editing, and other interactions.
    */
 function updateCursorForHover() {
-  // PRIORITY: Check if hovering over room join confirmation button
+  // PRIORITY: Check if hovering over room join confirmation buttons
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    const buttonWidth = 120;
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 20;
+    const totalWidth = buttonWidth * 2 + buttonGap;
+    const mergeButtonX = width / 2 - totalWidth / 2;
+    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+    const isOverMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+
+    if (isOverMerge || isOverReplace) {
       cursor('pointer');
       return;
     }
@@ -2180,24 +2209,39 @@ function mousePressed(e) {
 
   // PRIORITY: Handle room join confirmation dialog before anything else
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Check if click is on OK button
-    const buttonWidth = 120;
+    // Check if click is on either button
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 20;
+    const totalWidth = buttonWidth * 2 + buttonGap;
+    const mergeButtonX = width / 2 - totalWidth / 2;
+    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-      // User clicked OK - proceed with room join
-      Utils.Logger.state('[Room] User confirmed join - clearing state and loading room data');
+    const clickedMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const clickedReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-      const { roomName } = roomJoinConfirmation;
+    if (clickedMerge) {
+      // User chose to merge/sync local changes with room
+      Utils.Logger.state('[Room] User chose to merge local changes with room');
+
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Clear local state
-      _clearLocalState();
+      // Merge local data with room via Yjs
+      if (collaborationManager) {
+        collaborationManager.syncLocalToRoom();
+      }
+      return;
+    } else if (clickedReplace) {
+      // User chose to replace local data with room content
+      Utils.Logger.state('[Room] User chose to replace local data with room content');
 
-      // Load data from room
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // Clear local state and load from room
+      _clearLocalState();
       if (collaborationManager) {
         collaborationManager.loadFromRoom();
       }
@@ -2401,11 +2445,22 @@ function keyPressed() {
 
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Enter/Return = Confirm and join room
-    if (keyCode === ENTER || keyCode === RETURN) {
-      Utils.Logger.state('[Room] User pressed Enter - confirming join');
+    // M = Merge local changes with room
+    if (key === 'm' || key === 'M') {
+      Utils.Logger.state('[Room] User pressed M - merging local changes with room');
 
-      const { roomName } = roomJoinConfirmation;
+      roomJoinConfirmation = null;
+
+      if (collaborationManager) {
+        collaborationManager.syncLocalToRoom();
+      }
+      return false;
+    }
+
+    // R = Replace local data with room content
+    if (key === 'r' || key === 'R') {
+      Utils.Logger.state('[Room] User pressed R - replacing local data with room');
+
       roomJoinConfirmation = null;
 
       _clearLocalState();
