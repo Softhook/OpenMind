@@ -326,8 +326,13 @@ class CollaborationManager {
                             // User chose to synchronise - use pure Yjs merge
                             Utils.Logger.collab('[Sync] User chose sync - merging via Yjs CRDT');
                             // FIX CRITICAL ISSUE #3: Use pure Yjs merge instead of load-then-push
-                            // Just sync local to Yjs - Yjs CRDT handles all conflict resolution
+                            // Step 1: Sync local to Yjs - Yjs CRDT handles conflict resolution
                             this._syncLocalToYjs();
+                            
+                            // Step 2: Rebuild from Yjs to see the merged result
+                            // This ensures user sees all boxes (local + remote merged by CRDT)
+                            this._rebuildBoxesFromYjs();
+                            this._rebuildConnectionsFromYjs();
                             
                         } else if (this.userSyncChoice === 'delete') {
                             // User chose to delete local data and load from room
