@@ -117,10 +117,6 @@ class CollaborationManager {
         this.onAwarenessChange = null;
         this.onVersionMismatch = null; // Called when incompatible client detected
 
-        // User's sync choice (set before connecting to avoid race conditions)
-        // Values: 'sync', 'delete', or null (no local data)
-        this.userSyncChoice = null;
-
         // Version mismatch state
         this.versionMismatchInfo = null; // {reason, peerVersion}
 
@@ -246,9 +242,11 @@ class CollaborationManager {
     // ============================================================================
 
     /**
-     * Connects to a collaboration room via WebSocket.
+     * Connects to a collaboration room via WebSocket using y-websocket.
      * Must call initialize() first.
-     * Always syncs local and remote data via Yjs merge.
+     * Establishes the network provider so Yjs can sync and merge local and remote state.
+     * The actual synchronization/merge happens inside Yjs (e.g. on the 'synced' event)
+     * and depends on what local data was pushed to the Yjs document before calling connect().
      * @param {string} roomName - Unique room identifier
      * @param {string|null} serverUrl - Optional custom server URL
      * @returns {Promise<void>}
@@ -340,9 +338,13 @@ class CollaborationManager {
                             Utils.Logger.collab('[Sync] Empty room - local data already handled');
                             
                         } else if (!yjsEmpty && localHasData) {
-                            // Both have data - Yjs CRDT already merged automatically
-                            // Observers have applied the merged result to local
-                            Utils.Logger.collab('[Sync] Both have data - Yjs CRDT merge complete');
+                            // Both Yjs and local have data.
+                            // Yjs CRDT has merged offline/local and remote changes; ensure UI reflects
+                            // the merged document state by rebuilding from Yjs rather than relying
+                            // solely on observers that may not have fired for the merged snapshot.
+                            Utils.Logger.collab('[Sync] Both have data - rebuilding from merged Yjs state');
+                            this._rebuildBoxesFromYjs();
+                            this._rebuildConnectionsFromYjs();
                         }
                         
                     } catch (error) {
@@ -416,6 +418,9 @@ class CollaborationManager {
      * @deprecated Use syncLocalToRoom() instead - this method's load-then-push approach is flawed
      */
     mergeWithRoom() {
+        // Runtime deprecation warning for callers that still use this method.
+        // Keeping this wrapper for backwards compatibility.
+        console.warn('[Room] mergeWithRoom() is deprecated. Use syncLocalToRoom() instead.');
         this.syncLocalToRoom();
     }
 

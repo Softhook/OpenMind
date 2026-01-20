@@ -208,7 +208,7 @@ let isMapLoading = false;
 // Collaboration sync status for overlay: null, 'connecting', 'server_starting', 'syncing'
 let syncStatus = null;
 
-// Room join confirmation state: { roomName, hasLocalData, boxCount } or null
+// Room join confirmation state object, or null when no confirmation is pending
 let roomJoinConfirmation = null;
 // Timeout handles for sync overlay (module scope for proper cleanup)
 let syncConnectionTimeout = null;
@@ -558,7 +558,6 @@ async function initializeCollaboration(roomName) {
         roomName: roomName,
         hasLocalData: true,
         boxCount: mindMap.boxes.length,
-        roomIsEmpty: null, // Unknown until we connect
         pendingConnection: true // Flag that we need to connect after user chooses
       };
       
@@ -677,10 +676,19 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     if (userChoice === 'sync' && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
       Utils.Logger.collab('[Sync] Syncing local data to Yjs BEFORE connecting');
       // Initialize Yjs document (without connecting to server yet)
-      await collaborationManager.initialize();
-      // Sync local to Yjs while still offline
-      collaborationManager._syncLocalToYjs();
+      // Check if already initialized to avoid double initialization
+      if (!collaborationManager.isInitialized) {
+        await collaborationManager.initialize();
+      }
+      // Sync local to Yjs while still offline using public API
+      collaborationManager.syncLocalToRoom();
       Utils.Logger.collab('[Sync] Local data synced to offline Yjs, ready to merge with remote');
+    } else if (userChoice === 'delete') {
+      // User explicitly chose to delete local data before joining the room.
+      // Local state should already have been cleared by _clearLocalState(),
+      // so we intentionally do NOT sync anything to Yjs here and simply
+      // proceed to connect and load remote state only.
+      Utils.Logger.collab('[Sync] Local data was deleted; joining room without syncing local state');
     }
 
     const serverUrl = parseServerFromUrl();
@@ -721,16 +729,18 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
         console.error('[Room] Failed to disconnect after error:', disconnectError);
       }
     }
-  } finally {
-    // FIX ISSUE #2: Set storage key in finally block to ensure it's always set
-    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
-    // When in online mode, autosave goes to room-specific key instead of default
-    // This preserves the user's local work when they return to offline mode
-    if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      const storageKey = getRoomStorageKey(roomName);
-      mindMap.setStorageKey(storageKey);
-      Utils.Logger.state('[Storage] Set key to:', storageKey);
-    }
+    
+    // Don't set storage key on error - keep current storage location
+  }
+  
+  // Set storage key only on successful connection
+  // CRITICAL: Use room-specific storage key to prevent overwriting offline work
+  // When in online mode, autosave goes to room-specific key instead of default
+  // This preserves the user's local work when they return to offline mode
+  if (collaborationManager && collaborationManager.isConnected && mindMap && typeof mindMap.setStorageKey === 'function') {
+    const storageKey = getRoomStorageKey(roomName);
+    mindMap.setStorageKey(storageKey);
+    Utils.Logger.state('[Storage] Set key to:', storageKey);
   }
 }
 
@@ -1574,11 +1584,11 @@ function draw() {
     textSize(11);
     text(`${appName} v${versionStr}`, width / 2, 20);
 
-    // Info icon (ℹ️)
-    fill(100, 180, 255);
+    // Warning icon (⚠️) - this is a critical choice that can lead to data loss
+    fill(255, 200, 0);
     textAlign(CENTER, CENTER);
     textSize(32);
-    text('ℹ️', width / 2, height / 2 - 90);
+    text('⚠️', width / 2, height / 2 - 90);
 
     // Main message
     fill(255);
