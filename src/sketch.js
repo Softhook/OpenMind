@@ -1545,47 +1545,60 @@ function draw() {
       text('The room has content. Choose how to proceed', width / 2, height / 2 + 15);
     }
 
-    // Two buttons side by side
+    // Three buttons in a row
     const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonGap = 20;
-    const totalWidth = buttonWidth * 2 + buttonGap;
-    const mergeButtonX = width / 2 - totalWidth / 2;
-    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
     const buttonY = height / 2 + 50;
 
     // Check which button mouse is over
-    const isOverMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
+    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-    // Merge button (green)
-    if (isOverMerge) {
+    // Synchronise Data button (green)
+    if (isOverSync) {
       fill(60, 180, 100); // Hover state
     } else {
       fill(50, 160, 80); // Normal state
     }
-    rect(mergeButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    rect(syncButtonX, buttonY, buttonWidth, buttonHeight, 4);
     fill(255);
     textAlign(CENTER, CENTER);
-    textSize(14);
-    text('Merge Changes', mergeButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+    textSize(13);
+    text('Synchronise Data', syncButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
 
-    // Replace button (orange)
-    if (isOverReplace) {
-      fill(220, 100, 60); // Hover state
+    // Delete Local Data button (red)
+    if (isOverDelete) {
+      fill(220, 60, 60); // Hover state
     } else {
-      fill(200, 80, 40); // Normal state
+      fill(200, 40, 40); // Normal state
     }
-    rect(replaceButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    rect(deleteButtonX, buttonY, buttonWidth, buttonHeight, 4);
     fill(255);
-    text('Replace Local', replaceButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+    text('Delete Local Data', deleteButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Cancel button (gray)
+    if (isOverCancel) {
+      fill(100, 100, 100); // Hover state
+    } else {
+      fill(80, 80, 80); // Normal state
+    }
+    rect(cancelButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    fill(255);
+    text('Cancel', cancelButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
 
     // Helper text
     textSize(11);
     fill(150);
-    text('ESC to cancel', width / 2, buttonY + buttonHeight + 25);
+    text('S = Sync  •  D = Delete  •  ESC = Cancel', width / 2, buttonY + buttonHeight + 25);
 
     pop();
   }
@@ -1600,18 +1613,21 @@ function updateCursorForHover() {
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonGap = 20;
-    const totalWidth = buttonWidth * 2 + buttonGap;
-    const mergeButtonX = width / 2 - totalWidth / 2;
-    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
     const buttonY = height / 2 + 50;
 
-    const isOverMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
+    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-    if (isOverMerge || isOverReplace) {
+    if (isOverSync || isOverDelete || isOverCancel) {
       cursor('pointer');
       return;
     }
@@ -2209,34 +2225,37 @@ function mousePressed(e) {
 
   // PRIORITY: Handle room join confirmation dialog before anything else
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Check if click is on either button
+    // Check if click is on any of the three buttons
     const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonGap = 20;
-    const totalWidth = buttonWidth * 2 + buttonGap;
-    const mergeButtonX = width / 2 - totalWidth / 2;
-    const replaceButtonX = mergeButtonX + buttonWidth + buttonGap;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
     const buttonY = height / 2 + 50;
 
-    const clickedMerge = mouseX >= mergeButtonX && mouseX <= mergeButtonX + buttonWidth &&
+    const clickedSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const clickedReplace = mouseX >= replaceButtonX && mouseX <= replaceButtonX + buttonWidth &&
+    const clickedDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const clickedCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-    if (clickedMerge) {
-      // User chose to merge/sync local changes with room
-      Utils.Logger.state('[Room] User chose to merge local changes with room');
+    if (clickedSync) {
+      // User chose to synchronise local data with room
+      Utils.Logger.state('[Room] User chose to synchronise data with room');
 
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Merge local data with room via Yjs
+      // Sync local data with room via Yjs
       if (collaborationManager) {
         collaborationManager.syncLocalToRoom();
       }
       return;
-    } else if (clickedReplace) {
-      // User chose to replace local data with room content
-      Utils.Logger.state('[Room] User chose to replace local data with room content');
+    } else if (clickedDelete) {
+      // User chose to delete local data and load room content
+      Utils.Logger.state('[Room] User chose to delete local data');
 
       roomJoinConfirmation = null; // Clear confirmation dialog
 
@@ -2244,6 +2263,22 @@ function mousePressed(e) {
       _clearLocalState();
       if (collaborationManager) {
         collaborationManager.loadFromRoom();
+      }
+      return;
+    } else if (clickedCancel) {
+      // User chose to cancel
+      Utils.Logger.state('[Room] User cancelled joining room');
+
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // Navigate back to previous page
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        window.history.back();
+      } else {
+        // If no history, just clear the hash
+        if (typeof window !== 'undefined') {
+          window.location.hash = '';
+        }
       }
       return;
     }
@@ -2445,9 +2480,9 @@ function keyPressed() {
 
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // M = Merge local changes with room
-    if (key === 'm' || key === 'M') {
-      Utils.Logger.state('[Room] User pressed M - merging local changes with room');
+    // S = Synchronise Data
+    if (key === 's' || key === 'S') {
+      Utils.Logger.state('[Room] User pressed S - synchronising data with room');
 
       roomJoinConfirmation = null;
 
@@ -2457,9 +2492,9 @@ function keyPressed() {
       return false;
     }
 
-    // R = Replace local data with room content
-    if (key === 'r' || key === 'R') {
-      Utils.Logger.state('[Room] User pressed R - replacing local data with room');
+    // D = Delete Local Data
+    if (key === 'd' || key === 'D') {
+      Utils.Logger.state('[Room] User pressed D - deleting local data');
 
       roomJoinConfirmation = null;
 
@@ -2470,9 +2505,9 @@ function keyPressed() {
       return false;
     }
 
-    // Escape = Cancel and go back
-    if (keyCode === ESCAPE) {
-      Utils.Logger.state('[Room] User pressed Escape - cancelling join');
+    // C or Escape = Cancel and go back
+    if (key === 'c' || key === 'C' || keyCode === ESCAPE) {
+      Utils.Logger.state('[Room] User pressed Cancel - cancelling join');
       roomJoinConfirmation = null;
 
       // Navigate back to previous page
