@@ -105,7 +105,6 @@ class CollaborationManager {
         this.initializationPromise = null; // Store the initialization promise
         this.isSyncing = false; // Prevent feedback loops
         this.lastSyncedState = false; // Track previous synced state to detect transitions
-        this.shouldShareLocalData = false; // Whether to share local data with room (set when connecting)
 
         // User identity
         this.userId = this._generateUserId();
@@ -245,12 +244,12 @@ class CollaborationManager {
     /**
      * Connects to a collaboration room via WebSocket.
      * Must call initialize() first.
+     * Always syncs local and remote data via Yjs merge.
      * @param {string} roomName - Unique room identifier
      * @param {string|null} serverUrl - Optional custom server URL
-     * @param {boolean} shouldShareLocalData - If true, share local data when room is empty. If false, only receive from room. Defaults to false.
      * @returns {Promise<void>}
      */
-    async connect(roomName, serverUrl = null, shouldShareLocalData = false) {
+    async connect(roomName, serverUrl = null) {
         if (!this.isInitialized) {
             await this.initialize();
         }
@@ -262,9 +261,6 @@ class CollaborationManager {
 
         // Track connection start time for cold start detection
         this.connectionStartTime = Date.now();
-
-        // Store the sharing intent for use in sync handler
-        this.shouldShareLocalData = shouldShareLocalData;
 
         this.roomName = roomName;
         const signalingUrl = serverUrl || CollaborationManager.WEBSOCKET_SERVER;
@@ -312,23 +308,30 @@ class CollaborationManager {
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
 
-                // Handle sync transitions: rebuild from Yjs when transitioning to synced state
+                // Handle sync transitions: merge local and remote data via Yjs
                 // This handles both initial sync and resync after reconnection
                 if (isResync && this.yboxes && this.mindMap) {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    if (yjsEmpty && localHasData && this.shouldShareLocalData) {
-                        this._handleStartCollaborationWithData();
-                    } else if (yjsEmpty && localHasData && !this.shouldShareLocalData) {
-                        this._handleJoinEmptyRoom();
-                    } else if (!yjsEmpty && !this.shouldShareLocalData) {
-                        this._handleJoinRoomWithData();
-                    } else if (!yjsEmpty && this.shouldShareLocalData) {
-                        this._handleStartCollaborationRoomHasData();
-                    } else if (yjsEmpty && !localHasData) {
-                        this._handleBothEmpty();
+                    // Simple merge strategy: Yjs handles everything
+                    if (yjsEmpty && localHasData) {
+                        // Room is empty, push local data to Yjs
+                        Utils.Logger.collab('[Sync] Room empty, syncing local data to Yjs');
+                        this._syncLocalToYjs();
+                    } else if (!yjsEmpty && localHasData) {
+                        // Both have data, merge via Yjs
+                        Utils.Logger.collab('[Sync] Merging local and remote data');
+                        this._rebuildBoxesFromYjs();
+                        this._rebuildConnectionsFromYjs();
+                        this._syncLocalToYjs();
+                    } else if (!yjsEmpty && !localHasData) {
+                        // Room has data, we don't - just sync from Yjs
+                        Utils.Logger.collab('[Sync] Loading data from room');
+                        this._rebuildBoxesFromYjs();
+                        this._rebuildConnectionsFromYjs();
                     }
+                    // If both empty, nothing to do
                 }
 
                 // Start or stop consistency check based on sync state
@@ -1308,139 +1311,6 @@ class CollaborationManager {
         }
     }
 
-    /**
-     * Clears all local boxes and connections.
-     * Called when joining an existing room to avoid showing local cached data.
-     * @private
-     */
-    _clearLocalData() {
-        if (!this.mindMap) return;
-
-        try {
-            // Safely get counts before clearing
-            const boxCount = this.mindMap.boxes?.length || 0;
-            const connCount = this.mindMap.connections?.length || 0;
-
-            Utils.Logger.state('[Clear] Clearing local data -', boxCount, 'boxes,', connCount, 'connections');
-
-            // Clear all boxes and connections
-            this.mindMap.boxes = [];
-            this.mindMap.connections = [];
-
-            // Clear selections using optional chaining for safety
-            this.mindMap.selectedBox = null;
-            this.mindMap.selectedConnection = null;
-            this.mindMap.selectedBoxes?.clear();
-            this.mindMap.selectedConnections?.clear();
-
-            // Mark for redraw
-            this.mindMap.isDirty = true;
-        } catch (error) {
-            console.error('CollaborationManager: Failed to clear local data:', error);
-            // Ensure at minimum we mark for redraw even if clearing failed
-            try {
-                if (this.mindMap) this.mindMap.isDirty = true;
-            } catch (e) {
-                // Ignore nested error
-            }
-        }
-    }
-
-    /**
-     * Handles starting collaboration when we have local data to share.
-     * Room is empty, we want to seed it with our local data.
-     * @private
-     */
-    _handleStartCollaborationWithData() {
-        const connectionTime = Date.now() - (this.connectionStartTime || 0);
-        const isColdStart = connectionTime > CollaborationManager.COLD_START_THRESHOLD;
-
-        if (isColdStart) {
-            Utils.Logger.collab('[ColdStart] Detected (', Math.round(connectionTime / 1000), 's). Using extended verification');
-        }
-
-        Utils.Logger.collab('[Start] Sharing local data');
-        Utils.Logger.state('  - Local:', this.mindMap.boxes.length, '| Yjs:', this.yboxes.size);
-        Utils.Logger.state('  - Force syncing local state to Yjs...');
-
-        this.lastSyncAttemptTime = Date.now();
-        this.syncAttemptCount = 1;
-
-        // ALWAYS sync local data when explicitly starting collaboration
-        // This ensures the share button properly uploads all local work
-        this._syncLocalToYjs();
-
-        // Verify sync with exponential backoff for cold start reliability
-        this._verifySyncWithBackoff(1, CollaborationManager.MAX_SYNC_RETRIES, CollaborationManager.SYNC_VERIFICATION_DELAY);
-    }
-
-    /**
-     * Handles joining an empty room (not starting collaboration).
-     * Clear local data to show empty canvas.
-     * @private
-     */
-    _handleJoinEmptyRoom() {
-        Utils.Logger.collab('[Join] Empty room, clearing', this.mindMap.boxes.length, 'local boxes');
-        this._clearLocalData();
-    }
-
-    /**
-     * Handles joining a room that already has data.
-     * Clear local data then sync from room.
-     * @private
-     */
-    _handleJoinRoomWithData() {
-        Utils.Logger.collab('[Join] Room has data, clearing local then syncing from room');
-        this._clearLocalData();
-        this._rebuildBoxesFromYjs();
-        this._rebuildConnectionsFromYjs();
-    }
-
-    /**
-     * Handles starting collaboration when room already has data.
-     * Merge both local and room data - both are valuable.
-     * @private
-     */
-    _handleStartCollaborationRoomHasData() {
-        Utils.Logger.collab('[Start] Collaboration with existing room data');
-        Utils.Logger.state('  - Local:', this.mindMap.boxes.length, '| Yjs:', this.yboxes.size);
-
-        // First, sync from room to get existing data
-        this._rebuildBoxesFromYjs();
-        this._rebuildConnectionsFromYjs();
-
-        // Then, sync our local data to add to the room
-        // Yjs uses box IDs as keys, so same IDs will update, different IDs will be added
-        Utils.Logger.state('  - Merging local data into room...');
-        this._syncLocalToYjs();
-    }
-
-    /**
-     * Handles race condition where both room and local are empty.
-     * Retry multiple times to catch late-loading data.
-     * @private
-     */
-    _handleBothEmpty() {
-        Utils.Logger.collab('[Empty] Both empty, scheduling sync retries...');
-        let retryCount = 0;
-        const maxRetries = 5;
-        const retryInterval = 500;
-
-        const attemptSync = () => {
-            retryCount++;
-            if (this.yboxes && this.yboxes.size === 0 &&
-                this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
-                Utils.Logger.state('[Retry]', retryCount, '- seeding with local data');
-                this._syncLocalToYjs();
-            } else if (retryCount < maxRetries) {
-                this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
-            } else {
-                Utils.Logger.state('[Retry] Exhausted, room may be empty');
-            }
-        };
-
-        this.syncRetryTimer = setTimeout(attemptSync, retryInterval);
-    }
 
     // ============================================================================
     // AWARENESS / PRESENCE

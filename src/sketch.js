@@ -391,123 +391,9 @@ function worldMouseX() {
   return CameraUtils.worldX(mouseX);
 }
 
-/**
- * Parse the current window location to find a candidate JSON file path.
- * @see UrlUtils.parseFileFromLocation for implementation
- */
-function parseFileFromLocation() {
-  return typeof UrlUtils !== 'undefined'
-    ? UrlUtils.parseFileFromLocation()
-    : null;
-}
 
-/**
- * Fetch and load a JSON map from a given file path/URL.
- * Updates `lastLoadedUrlFile` so repeat navigations can be detected.
- * Compares with browser cache to load the more recent version.
- */
-async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
-  if (!fileToFetch) return false;
-  // Show loading overlay while fetching
-  isMapLoading = true;
-  try {
-    // If already loaded the same URL and not forced, skip
-    if (!force && lastLoadedUrlFile && lastLoadedUrlFile === fileToFetch) return false;
 
-    const resp = await fetch(fileToFetch, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
 
-    // Get last modified from headers as fallback
-    const lastModifiedHeader = resp.headers.get('Last-Modified');
-    const headerTime = lastModifiedHeader ? new Date(lastModifiedHeader).getTime() : 0;
-
-    const urlData = await resp.json();
-
-    // Determine appropriate storage key for this map
-    let urlName = 'unnamed-map';
-    if (urlData.name) {
-      urlName = extractMapName(urlData.name);
-    } else if (fileToFetch) {
-      urlName = extractMapName(fileToFetch);
-    }
-
-    // Create namespaced storage key: openmind_map_<normalized_name>
-    const storageKey = 'openmind_map_' + urlName;
-
-    // Set the storage key on the mindMap instance so future saves go to the right place
-    if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      mindMap.setStorageKey(storageKey);
-    }
-
-    // Check if we have a cached version for THIS SPECIFIC map
-    let shouldUseCache = false;
-    try {
-      if (mindMap && mindMap.hasLocalStorageData && mindMap.hasLocalStorageData()) {
-        // hasLocalStorageData now uses the set storageKey, so it checks the specific map's cache
-        const cachedString = localStorage.getItem(storageKey);
-
-        if (cachedString) {
-          const cachedData = JSON.parse(cachedString);
-
-          // Compare timestamps
-          const urlTimestamp = urlData.lastModified || headerTime || 0;
-          const cacheTimestamp = cachedData.lastModified || 0;
-
-          console.info('Map timestamp comparison:', {
-            mapName: urlName,
-            storageKey: storageKey,
-            urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
-            cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
-          });
-
-          if (cacheTimestamp > urlTimestamp) {
-            shouldUseCache = true;
-            console.info('Using cached version (more recent):', storageKey);
-          } else {
-            console.info('Using URL version (more recent or same):', urlName);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to compare with cache:', e);
-      // On error, default to URL version
-      shouldUseCache = false;
-    }
-
-    // Load the appropriate version
-    if (shouldUseCache) {
-      // Load from cache instead of URL
-      if (mindMap && typeof mindMap.loadFromLocalStorage === 'function') {
-        await mindMap.loadFromLocalStorage();
-        // Ensure storage key remains set after load (load might reset things potentially, though fromJSON doesn't reset key)
-        if (mindMap && typeof mindMap.setStorageKey === 'function') {
-          mindMap.setStorageKey(storageKey);
-        }
-      }
-    } else {
-      // Load from URL
-      if (mindMap && typeof mindMap.load === 'function') await mindMap.load(urlData);
-
-      // Ensure storage key is set correctly (load calls saveToLocalStorage which needs the key)
-      if (mindMap && typeof mindMap.setStorageKey === 'function') {
-        mindMap.setStorageKey(storageKey);
-      }
-    }
-
-    // Final foolproof ensure key is set (redundant but safe)
-    if (mindMap && typeof mindMap.setStorageKey === 'function') mindMap.setStorageKey(storageKey);
-
-    if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
-    try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
-    lastLoadedUrlFile = fileToFetch;
-    return true;
-  } catch (e) {
-    console.warn('Failed to load map from URL "' + fileToFetch + '":', e);
-    return false;
-  } finally {
-    isMapLoading = false;
-  }
-}
 
 /**
  * Extracts a normalized map name from a full path or name
@@ -530,7 +416,7 @@ function namesAreSimilar(name1, name2) {
 }
 
 /**
- * Handler to respond to URL changes (hash/popstate) and initial load.
+ * Handler to respond to URL changes (hash/popstate) for room management.
  */
 function handleUrlChange() {
   // Clear any pending room join confirmation when URL changes
@@ -539,7 +425,7 @@ function handleUrlChange() {
     roomJoinConfirmation = null;
   }
 
-  // Check for room changes first
+  // Check for room changes
   const roomInfo = parseRoomFromHash();
   const newRoom = roomInfo ? roomInfo.room : null;
   const currentRoom = collaborationManager ? collaborationManager.roomName : null;
@@ -551,11 +437,8 @@ function handleUrlChange() {
       collaborationManager = null;
     }
     if (newRoom && mindMap) {
-      // Use the isStarting flag from URL to determine if we should share local data
-      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
-
-      initializeCollaboration(newRoom, shouldShareLocalData);
-      return; // Don't load file when in collaboration mode
+      initializeCollaboration(newRoom);
+      return;
     } else if (!newRoom && currentRoom && mindMap) {
       // User is leaving a room (navigating away) - restore default storage key
       // This ensures autosave goes back to the offline storage location
@@ -563,14 +446,6 @@ function handleUrlChange() {
         mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
         Utils.Logger.state('[Room] Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
       }
-    }
-  }
-
-  // Handle file loading (skip if in collaboration mode)
-  if (!newRoom) {
-    const fileToFetch = parseFileFromLocation();
-    if (fileToFetch) {
-      loadMapFromUrl(fileToFetch);
     }
   }
 }
@@ -605,56 +480,14 @@ function getRoomStorageKey(roomName) {
     : CONFIG.STORAGE.ROOM_KEY_PREFIX + roomName;
 }
 
-/**
- * Clears all local mind map state (boxes, connections, selections, etc.)
- * Called when joining a collaboration room to prevent local data pollution  
- * @private
- */
-function _clearLocalState() {
-  if (!mindMap) return;
 
-  Utils.Logger.state('[Room] Clearing local state:', mindMap.boxes.length, 'boxes');
-
-  // Reset interaction flags on boxes before clearing to prevent broken UI state
-  for (const box of mindMap.boxes) {
-    if (box.isDragging) box.isDragging = false;
-    if (box.isResizing) box.isResizing = false;
-    if (box.isEditing && typeof box.stopEditing === 'function') {
-      box.stopEditing();
-    }
-  }
-
-  // Clear all local boxes and connections
-  mindMap.boxes = [];
-  mindMap.connections = [];
-
-  // Clear selections
-  mindMap.selectedBox = null;
-  mindMap.selectedConnection = null;
-  if (mindMap.selectedBoxes) mindMap.selectedBoxes.clear();
-  if (mindMap.selectedConnections) mindMap.selectedConnections.clear();
-
-  // Clear navigation and interaction state
-  mindMap.isArrowKeyNavigating = false;
-  mindMap.connectingFrom = null;
-  mindMap.draggingConnection = null;
-
-  // Clear copied state
-  mindMap.copiedBoxes = [];
-  mindMap.copiedConnections = [];
-
-  // Reset dirty flag to prevent unexpected autosave
-  mindMap.isDirty = false;
-
-  Utils.Logger.state('[Room] Local state cleared - room sync will provide authoritative state');
-}
 
 /**
  * Initializes collaboration for a given room
+ * Always syncs local data with Yjs, letting it merge changes automatically
  * @param {string} roomName 
- * @param {boolean} shouldShareLocalData - If true, share local data when starting collaboration. If false (default), only receive from room.
  */
-async function initializeCollaboration(roomName, shouldShareLocalData = false) {
+async function initializeCollaboration(roomName) {
   if (!mindMap || !roomName) return;
   if (typeof CollaborationManager === 'undefined') {
     console.warn('CollaborationManager not loaded');
@@ -662,29 +495,9 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
   }
 
   try {
-    // CRITICAL: Clear local state when JOINING a room (not when starting collaboration to share local work)
-    // This prevents users from seeing their local cached boxes that aren't synced to other participants
-    if (!shouldShareLocalData) {
-      const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
-
-      if (hasLocalData) {
-        // Show confirmation dialog - user has local work that will be cleared
-        Utils.Logger.collab('[Room] User has local boxes, showing confirmation dialog');
-        roomJoinConfirmation = {
-          roomName: roomName,
-          shouldShareLocalData: shouldShareLocalData,
-          hasLocalData: true,
-          boxCount: mindMap.boxes.length
-        };
-        return; // Wait for user confirmation
-      }
-
-      // No local data, proceed with clearing
-      Utils.Logger.collab('[Room] Joining collaboration room:', roomName, '- clearing local state (no local data)');
-      _clearLocalState();
-    } else {
-      Utils.Logger.collab('[Room] Starting collaboration room:', roomName, '- preserving local state to share');
-    }
+    // Let Yjs handle the merge between local and remote data
+    // No clearing or conditional logic - Yjs will sync both ways
+    Utils.Logger.collab('[Room] Joining collaboration room:', roomName, '- Yjs will merge local and remote data');
 
     // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
     if (!collaborationManager) {
@@ -770,58 +583,9 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
       Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
 
-    // Pass shouldShareLocalData flag to control whether we share our local work
-    await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
-    Utils.Logger.collab('[Room] Initialized:', roomName, 'shareLocal:', shouldShareLocalData);
-
-    // CRITICAL: If starting collaboration (shouldShareLocalData=true), sync local data
-    // Wait for provider to be fully synced before force-syncing to avoid race conditions
-    if (shouldShareLocalData && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
-      Utils.Logger.collab('[Sync] Starting - will sync', mindMap.boxes.length, 'local boxes to Yjs');
-
-      // Store current manager reference to detect if it changes
-      const currentManager = collaborationManager;
-
-      const doSync = () => {
-        // Verify this is still the active manager and it's connected
-        if (collaborationManager === currentManager &&
-          collaborationManager.isConnected &&
-          typeof collaborationManager._syncLocalToYjs === 'function') {
-          Utils.Logger.collab('[Sync] Provider synced - force syncing local boxes to Yjs...');
-          try {
-            collaborationManager._syncLocalToYjs();
-            Utils.Logger.collab('[Sync] ✅ Forced sync complete - boxes now in Yjs');
-          } catch (e) {
-            console.error('Failed to sync local boxes:', e);
-          }
-        } else {
-          Utils.Logger.state('[Sync] Skipping - manager changed or disconnected');
-        }
-      };
-
-      // If already synced, sync immediately; otherwise wait for synced event with timeout
-      if (collaborationManager.provider && collaborationManager.provider.synced) {
-        doSync();
-      } else {
-        Utils.Logger.collab('[Sync] Waiting for provider to sync before pushing local boxes...');
-
-        // Set 10 second timeout to prevent waiting forever
-        const timeout = setTimeout(() => {
-          console.warn('Sync wait timeout - attempting sync anyway');
-          doSync();
-        }, 10000);
-
-        // Wait for sync event, then clear timeout and sync
-        collaborationManager.provider.once('synced', () => {
-          clearTimeout(timeout);
-          doSync();
-        });
-      }
-    }
-
-    // Setup awareness listener for thrust game optimization
-    // This checks if any remote player is in thrust mode to enable lazy initialization
-    // ThrustGame handles its own awareness check inside its static loop
+    // Connect and let Yjs handle merging local and remote data
+    await collaborationManager.connect(roomName, serverUrl);
+    Utils.Logger.collab('[Room] Initialized:', roomName);
 
     // CRITICAL: Use room-specific storage key to prevent overwriting offline work
     // When in online mode, autosave goes to room-specific key instead of default
@@ -868,15 +632,13 @@ function generateShareLink() {
  */
 function shareSession() {
   if (!collaborationManager || !collaborationManager.isConnected) {
-    // Start new session - current map data will be seeded into the room
-    // Log the box count to help debug seeding behavior and track what's being shared
+    // Start new session - Yjs will merge local map data with room
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     Utils.Logger.collab('[Session] Starting with', boxCount, 'boxes from local work');
 
-    // Use URL parameter to indicate "start" mode (sharing local data)
-    // This is more robust than a global flag and survives page refresh/back button
-    window.location.hash = `room=${room}&mode=start`;
+    // Navigate to room - Yjs will handle merging
+    window.location.hash = `room=${room}`;
   } else {
     // Copy link
     const url = generateShareLink();
@@ -1241,15 +1003,7 @@ function setup() {
       // ignore
     }
 
-    // Handle initial URL-based loading and listen for future URL changes
-    // (supports ?file=, hash like #maps/Name or #maps/Name.json, and direct .json pathname)
-    // Parse synchronously to decide whether to skip localStorage fallback (avoid race).
-    const initialFile = parseFileFromLocation();
-    if (initialFile) {
-      // Start loading asynchronously; do NOT set `lastLoadedUrlFile` yet
-      // (it is set after a successful fetch inside `loadMapFromUrl`).
-      loadMapFromUrl(initialFile);
-    }
+    // Listen for URL changes to handle room navigation
     addTrackedEventListener(window, 'hashchange', handleUrlChange);
     addTrackedEventListener(window, 'popstate', handleUrlChange);
 
@@ -1257,14 +1011,10 @@ function setup() {
     const roomInfo = parseRoomFromHash();
     const roomId = roomInfo ? roomInfo.room : null;
 
-    // CRITICAL: When joining an online room, do NOT load from localStorage
-    // This prevents users from bringing their local cached data into collaborative sessions
-    // 
-    // Behavior:
-    // - ONLINE (roomId present): Skip localStorage, start with empty canvas
-    //   The room's state will sync from other users or remain empty if first to join
-    // - OFFLINE (no roomId): Load from localStorage to restore previous work
-    if (!lastLoadedUrlFile && !roomId) {
+    // When joining an online room, do NOT load from localStorage
+    // The room's state will sync from Yjs
+    // When offline (no roomId), load from localStorage to restore previous work
+    if (!roomId) {
       // Try to load from localStorage (offline mode only)
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
