@@ -385,9 +385,9 @@ describe('Local Data Management When Joining Rooms', () => {
     });
 
     test('sync handler should use userSyncChoice instead of callback', () => {
-        // Should use userSyncChoice field instead of onRoomDataCheck callback
-        expect(collabCode).toMatch(/userSyncChoice/);
-        expect(collabCode).toMatch(/Processing sync.*user choice/);
+        // Should NOT use callback approach anymore (no userSyncChoice in sync handler)
+        expect(collabCode).not.toMatch(/onRoomDataCheck/);
+        // userSyncChoice is handled before connect, not in sync handler
     });
 
     test('sync handler should auto-load from room when no local data', () => {

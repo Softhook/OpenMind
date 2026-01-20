@@ -671,9 +671,17 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       syncStatus = 'incompatible';
     };
 
-    // Store user choice for sync handler to use
-    // This is set BEFORE connecting to avoid race conditions
-    collaborationManager.userSyncChoice = userChoice;
+    // CRITICAL FIX: Sync local data to Yjs BEFORE connecting
+    // This allows Yjs CRDT to automatically merge remote + local data
+    // No blocking observers, no manual rebuild - let CRDT do its job
+    if (userChoice === 'sync' && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
+      Utils.Logger.collab('[Sync] Syncing local data to Yjs BEFORE connecting');
+      // Initialize Yjs document (without connecting to server yet)
+      await collaborationManager.initialize();
+      // Sync local to Yjs while still offline
+      collaborationManager._syncLocalToYjs();
+      Utils.Logger.collab('[Sync] Local data synced to offline Yjs, ready to merge with remote');
+    }
 
     const serverUrl = parseServerFromUrl();
     if (serverUrl) {
@@ -683,7 +691,7 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     // FIX ISSUE #3: Show progress indicator
     syncStatus = 'connecting';
 
-    // Connect to room
+    // Connect to room - Yjs will automatically merge with remote data
     await collaborationManager.connect(roomName, serverUrl);
     Utils.Logger.collab('[Room] Initialized:', roomName);
 

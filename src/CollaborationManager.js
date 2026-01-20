@@ -318,45 +318,36 @@ class CollaborationManager {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    Utils.Logger.collab('[Sync] Processing sync - room empty:', yjsEmpty, ', local data:', localHasData, ', user choice:', this.userSyncChoice);
+                    Utils.Logger.collab('[Sync] Processing sync - room empty:', yjsEmpty, ', local data:', localHasData);
 
                     // FIX CRITICAL ISSUE #2: Add error handling with recovery
                     try {
-                        if (this.userSyncChoice === 'sync' && localHasData) {
-                            // User chose to synchronise - use pure Yjs merge
-                            Utils.Logger.collab('[Sync] User chose sync - merging via Yjs CRDT');
-                            // FIX CRITICAL ISSUE #3: Use pure Yjs merge instead of load-then-push
-                            // Step 1: Sync local to Yjs - Yjs CRDT handles conflict resolution
-                            this._syncLocalToYjs();
+                        if (yjsEmpty && !localHasData) {
+                            // Both empty - nothing to do
+                            Utils.Logger.collab('[Sync] Both empty - nothing to sync');
                             
-                            // Step 2: Rebuild from Yjs to see the merged result
-                            // This ensures user sees all boxes (local + remote merged by CRDT)
-                            this._rebuildBoxesFromYjs();
-                            this._rebuildConnectionsFromYjs();
-                            
-                        } else if (this.userSyncChoice === 'delete') {
-                            // User chose to delete local data and load from room
-                            Utils.Logger.collab('[Sync] User chose delete - loading from room');
-                            if (!yjsEmpty) {
-                                this._rebuildBoxesFromYjs();
-                                this._rebuildConnectionsFromYjs();
-                            }
-                            // Local data was already cleared before connecting
-                            
-                        } else if (!localHasData && !yjsEmpty) {
+                        } else if (!yjsEmpty && !localHasData) {
                             // No local data, room has data - auto-load
                             Utils.Logger.collab('[Sync] No local data - loading from room');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
+                            
+                        } else if (yjsEmpty && localHasData) {
+                            // Empty room, have local data
+                            // If user chose 'sync', local was already synced to Yjs before connecting
+                            // If user chose 'delete', local was already cleared
+                            // Either way, let Yjs observers handle the sync
+                            Utils.Logger.collab('[Sync] Empty room - local data already handled');
+                            
+                        } else if (!yjsEmpty && localHasData) {
+                            // Both have data - Yjs CRDT already merged automatically
+                            // Observers have applied the merged result to local
+                            Utils.Logger.collab('[Sync] Both have data - Yjs CRDT merge complete');
                         }
-                        // If both empty, nothing to do
-                        // Clear the choice after processing
-                        this.userSyncChoice = null;
                         
                     } catch (error) {
                         console.error('[Sync] Error during sync operation:', error);
                         Utils.Logger.error('[Sync] Failed to synchronise data:', error.message);
-                        // Don't clear userSyncChoice - we might need to retry
                     }
                 }
 
@@ -1161,12 +1152,6 @@ class CollaborationManager {
                         const snap = isUndoRedo ? true : false;
                         this._applyBoxFromYjs(key, data, snap, isUndoRedo);
                     } else if (change.action === 'delete') {
-                        // CRITICAL FIX: Don't delete local boxes when user chose 'sync'
-                        // We want to preserve local state and push it to Yjs
-                        if (this.userSyncChoice === 'sync') {
-                            // Skip deletions - preserve local data
-                            return;
-                        }
                         this._deleteBoxFromLocal(key);
                     }
                 });
@@ -1218,14 +1203,6 @@ class CollaborationManager {
      */
     _applyBoxFromYjs(boxId, data, snapToPosition = false, forceApply = false) {
         if (!this.mindMap || !data) return;
-
-        // CRITICAL FIX: When user chose 'sync', preserve local data - don't apply Yjs to local
-        // This prevents remote data from overwriting local changes before we sync them
-        if (this.userSyncChoice === 'sync' && !forceApply) {
-            // Skip applying Yjs changes to local - we want to preserve local state
-            // and sync it TO Yjs instead of FROM Yjs
-            return;
-        }
 
         let box = this.mindMap.getBoxById(boxId);
 
