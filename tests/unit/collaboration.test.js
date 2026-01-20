@@ -384,15 +384,15 @@ describe('Local Data Management When Joining Rooms', () => {
         expect(collabCode).not.toMatch(/async connect\s*\([^)]*shouldShareLocalData/);
     });
 
-    test('sync handler should call onRoomDataCheck when local data exists', () => {
-        // Should call callback when user has local data
-        expect(collabCode).toMatch(/onRoomDataCheck.*localHasData/);
-        expect(collabCode).toMatch(/Calling onRoomDataCheck/);
+    test('sync handler should use userSyncChoice instead of callback', () => {
+        // Should use userSyncChoice field instead of onRoomDataCheck callback
+        expect(collabCode).toMatch(/userSyncChoice/);
+        expect(collabCode).toMatch(/Processing sync.*user choice/);
     });
 
     test('sync handler should auto-load from room when no local data', () => {
         // Should automatically load when no local data
-        expect(collabCode).toMatch(/Loading data from room.*no local data/);
+        expect(collabCode).toMatch(/No local data.*loading from room/);
         expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
         expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
     });
@@ -402,21 +402,32 @@ describe('Local Data Management When Joining Rooms', () => {
         expect(collabCode).toMatch(/syncLocalToRoom\s*\(\s*\)\s*\{/);
         expect(collabCode).toMatch(/loadFromRoom\s*\(\s*\)\s*\{/);
     });
+
+    test('sync handler should have error handling', () => {
+        // Should wrap sync operations in try-catch
+        expect(collabCode).toMatch(/try\s*\{[\s\S]*?sync/i);
+        expect(collabCode).toMatch(/catch.*error/i);
+    });
 });
 
 describe('Sketch.js Integration for Collaboration', () => {
     const sketchCode = fs.readFileSync(path.join(__dirname, '../../src/sketch.js'), 'utf8');
 
-    test('initializeCollaboration should not accept shouldShareLocalData parameter', () => {
-        // Should have simplified signature
-        expect(sketchCode).toMatch(/async function initializeCollaboration\s*\(\s*roomName\s*\)/);
+    test('initializeCollaboration should check for local data before connecting', () => {
+        // Should check for local data before calling connect
+        expect(sketchCode).toMatch(/hasLocalData.*boxes.*length/);
+        expect(sketchCode).toMatch(/roomJoinConfirmation/);
     });
 
-    test('initializeCollaboration should check room data and show dialog when needed', () => {
-        // Should have onRoomDataCheck callback
-        expect(sketchCode).toMatch(/onRoomDataCheck/);
-        // Should show confirmation dialog when room has data
-        expect(sketchCode).toMatch(/roomJoinConfirmation/);
+    test('initializeCollaboration should show dialog before connecting when user has local data', () => {
+        // Should show dialog immediately if user has local data
+        expect(sketchCode).toMatch(/showing sync options dialog before connecting/i);
+        expect(sketchCode).toMatch(/pendingConnection/);
+    });
+
+    test('should have _proceedWithRoomJoin function', () => {
+        // Should have helper function for proceeding after user choice
+        expect(sketchCode).toMatch(/_proceedWithRoomJoin/);
     });
 
     test('shareSession should not use mode parameter', () => {

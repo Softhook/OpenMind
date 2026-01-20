@@ -116,7 +116,10 @@ class CollaborationManager {
         this.onPeersChange = null;
         this.onAwarenessChange = null;
         this.onVersionMismatch = null; // Called when incompatible client detected
-        this.onRoomDataCheck = null; // (hasRoomData: boolean, hasLocalData: boolean) => void - called on initial sync
+
+        // User's sync choice (set before connecting to avoid race conditions)
+        // Values: 'sync', 'delete', or null (no local data)
+        this.userSyncChoice = null;
 
         // Version mismatch state
         this.versionMismatchInfo = null; // {reason, peerVersion}
@@ -309,27 +312,47 @@ class CollaborationManager {
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
 
-                // Handle sync transitions: check room state and let user decide
+                // Handle sync transitions: apply user's choice that was made BEFORE connecting
                 // This handles both initial sync and resync after reconnection
                 if (isResync && this.yboxes && this.mindMap) {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    // Always notify sketch.js about room/local data state so user can choose
-                    if (this.onRoomDataCheck && localHasData) {
-                        Utils.Logger.collab('[Sync] Calling onRoomDataCheck - room empty:', yjsEmpty, ', local data:', localHasData);
-                        this.onRoomDataCheck(yjsEmpty, localHasData);
-                    }
+                    Utils.Logger.collab('[Sync] Processing sync - room empty:', yjsEmpty, ', local data:', localHasData, ', user choice:', this.userSyncChoice);
 
-                    // Auto-load when no local data
-                    if (!localHasData && !yjsEmpty) {
-                        // Room has data, we don't - just sync from Yjs
-                        Utils.Logger.collab('[Sync] Loading data from room (no local data)');
-                        this._rebuildBoxesFromYjs();
-                        this._rebuildConnectionsFromYjs();
+                    // FIX CRITICAL ISSUE #2: Add error handling with recovery
+                    try {
+                        if (this.userSyncChoice === 'sync' && localHasData) {
+                            // User chose to synchronise - use pure Yjs merge
+                            Utils.Logger.collab('[Sync] User chose sync - merging via Yjs CRDT');
+                            // FIX CRITICAL ISSUE #3: Use pure Yjs merge instead of load-then-push
+                            // Just sync local to Yjs - Yjs CRDT handles all conflict resolution
+                            this._syncLocalToYjs();
+                            
+                        } else if (this.userSyncChoice === 'delete') {
+                            // User chose to delete local data and load from room
+                            Utils.Logger.collab('[Sync] User chose delete - loading from room');
+                            if (!yjsEmpty) {
+                                this._rebuildBoxesFromYjs();
+                                this._rebuildConnectionsFromYjs();
+                            }
+                            // Local data was already cleared before connecting
+                            
+                        } else if (!localHasData && !yjsEmpty) {
+                            // No local data, room has data - auto-load
+                            Utils.Logger.collab('[Sync] No local data - loading from room');
+                            this._rebuildBoxesFromYjs();
+                            this._rebuildConnectionsFromYjs();
+                        }
+                        // If both empty, nothing to do
+                        // Clear the choice after processing
+                        this.userSyncChoice = null;
+                        
+                    } catch (error) {
+                        console.error('[Sync] Error during sync operation:', error);
+                        Utils.Logger.error('[Sync] Failed to synchronise data:', error.message);
+                        // Don't clear userSyncChoice - we might need to retry
                     }
-                    // For all cases with local data, wait for user choice via onRoomDataCheck callback
-                    // If both empty, nothing to do
                 }
 
                 // Start or stop consistency check based on sync state
@@ -371,8 +394,8 @@ class CollaborationManager {
     }
 
     /**
-     * Syncs local data to room (for empty rooms or when user chooses to merge)
-     * This pushes local changes to Yjs
+     * Syncs local data to room using pure Yjs CRDT merge
+     * This pushes local changes to Yjs and lets CRDT handle all conflicts
      */
     syncLocalToRoom() {
         if (!this.yboxes || !this.mindMap) {
@@ -380,23 +403,21 @@ class CollaborationManager {
             return;
         }
 
-        const yjsEmpty = this.yboxes.size === 0;
-        
-        if (yjsEmpty) {
-            Utils.Logger.collab('[Room] Syncing local data to empty room');
+        try {
+            // FIX CRITICAL ISSUE #3: Use pure Yjs merge
+            // Just push local data to Yjs - CRDT handles all conflicts automatically
+            Utils.Logger.collab('[Room] Syncing local data via Yjs CRDT merge');
             this._syncLocalToYjs();
-        } else {
-            Utils.Logger.collab('[Room] Merging local and remote data via Yjs');
-            this._rebuildBoxesFromYjs();
-            this._rebuildConnectionsFromYjs();
-            this._syncLocalToYjs();
+        } catch (error) {
+            console.error('[Room] Error syncing to room:', error);
+            throw error; // Re-throw for caller to handle
         }
     }
 
     /**
      * Completes the merge by merging local and room data via Yjs
      * This syncs local changes to Yjs after loading room state
-     * @deprecated Use syncLocalToRoom() instead
+     * @deprecated Use syncLocalToRoom() instead - this method's load-then-push approach is flawed
      */
     mergeWithRoom() {
         this.syncLocalToRoom();

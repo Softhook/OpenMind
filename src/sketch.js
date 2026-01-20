@@ -527,7 +527,7 @@ function _clearLocalState() {
 
 /**
  * Initializes collaboration for a given room
- * Handles merging local and remote data based on content similarity
+ * Shows dialog BEFORE connecting if user has local data to prevent race conditions
  * @param {string} roomName 
  */
 async function initializeCollaboration(roomName) {
@@ -538,12 +538,55 @@ async function initializeCollaboration(roomName) {
   }
 
   try {
-    // Check if we have local data
+    // Check if we have local data BEFORE connecting
     const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
 
     Utils.Logger.collab('[Room] Joining collaboration room:', roomName);
 
-    // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
+    // FIX CRITICAL ISSUE #1: Show dialog BEFORE connecting if user has local data
+    // This prevents the race condition where data starts syncing before user makes a choice
+    if (hasLocalData) {
+      Utils.Logger.collab('[Room] User has local data, showing sync options dialog before connecting');
+      
+      roomJoinConfirmation = {
+        roomName: roomName,
+        hasLocalData: true,
+        boxCount: mindMap.boxes.length,
+        roomIsEmpty: null, // Unknown until we connect
+        pendingConnection: true // Flag that we need to connect after user chooses
+      };
+      
+      // Don't proceed with connection - wait for user choice
+      // The mouse/keyboard handlers will call _proceedWithRoomJoin() after user decides
+      return;
+    }
+
+    // No local data - proceed with connection immediately
+    await _proceedWithRoomJoin(roomName, null);
+    
+  } catch (error) {
+    console.error('[Room] Failed to initialize collaboration:', error);
+    syncStatus = null;
+    // Attempt to recover by disconnecting
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (disconnectError) {
+        console.error('[Room] Failed to disconnect after error:', disconnectError);
+      }
+    }
+  }
+}
+
+/**
+ * Proceeds with room connection after user makes a choice (or immediately if no local data)
+ * @param {string} roomName 
+ * @param {string|null} userChoice - 'sync', 'delete', or null (no local data)
+ * @private
+ */
+async function _proceedWithRoomJoin(roomName, userChoice) {
+  try {
+    // Create manager if it doesn't exist
     if (!collaborationManager) {
       collaborationManager = new CollaborationManager(mindMap);
       await collaborationManager.initialize();
@@ -622,30 +665,16 @@ async function initializeCollaboration(roomName) {
       syncStatus = 'incompatible';
     };
 
-    // Handle room data check - show dialog when joining room with local data
-    collaborationManager.onRoomDataCheck = (yjsEmpty, localHasData) => {
-      if (!localHasData) {
-        // No local data - nothing to decide
-        return;
-      }
-
-      // User has local data - always show dialog to choose merge or replace
-      Utils.Logger.collab('[Room] User has local data, showing sync options dialog');
-      
-      roomJoinConfirmation = {
-        roomName: roomName,
-        hasLocalData: true,
-        boxCount: mindMap.boxes.length,
-        roomIsEmpty: yjsEmpty
-      };
-    };
+    // Store user choice for sync handler to use
+    // This is set BEFORE connecting to avoid race conditions
+    collaborationManager.userSyncChoice = userChoice;
 
     const serverUrl = parseServerFromUrl();
     if (serverUrl) {
       Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
 
-    // Connect and let Yjs handle merging local and remote data
+    // Connect to room
     await collaborationManager.connect(roomName, serverUrl);
     Utils.Logger.collab('[Room] Initialized:', roomName);
 
@@ -669,11 +698,21 @@ async function initializeCollaboration(roomName) {
     }
 
   } catch (e) {
-    console.error('Failed to initialize collaboration:', e);
+    console.error('[Room] Failed to proceed with room join:', e);
     // Clear timeouts on error
     if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
     if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
     syncStatus = null;
+    
+    // FIX CRITICAL ISSUE #4: Error recovery
+    // Attempt to disconnect and clean up on error
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (disconnectError) {
+        console.error('[Room] Failed to disconnect after error:', disconnectError);
+      }
+    }
   }
 }
 
@@ -2246,39 +2285,56 @@ function mousePressed(e) {
       // User chose to synchronise local data with room
       Utils.Logger.state('[Room] User chose to synchronise data with room');
 
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Sync local data with room via Yjs
-      if (collaborationManager) {
-        collaborationManager.syncLocalToRoom();
+      // FIX CRITICAL ISSUE #1 & #2: Proceed with connection using user's choice
+      // Data is NOT cleared - it will be merged via Yjs CRDT
+      try {
+        _proceedWithRoomJoin(roomName, 'sync').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error proceeding with room join:', error);
+        syncStatus = null;
       }
       return;
+      
     } else if (clickedDelete) {
       // User chose to delete local data and load room content
       Utils.Logger.state('[Room] User chose to delete local data');
 
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Clear local state and load from room
-      _clearLocalState();
-      if (collaborationManager) {
-        collaborationManager.loadFromRoom();
+      // FIX CRITICAL ISSUE #2: Add error handling around clear operation
+      try {
+        // Clear local state before connecting
+        _clearLocalState();
+        
+        // Proceed with connection
+        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error clearing local data:', error);
+        syncStatus = null;
       }
       return;
+      
     } else if (clickedCancel) {
-      // User chose to cancel
+      // User chose to cancel - preserve local data
       Utils.Logger.state('[Room] User cancelled joining room');
 
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Navigate back to previous page
-      if (typeof window !== 'undefined' && window.history.length > 1) {
-        window.history.back();
-      } else {
-        // If no history, just clear the hash
-        if (typeof window !== 'undefined') {
-          window.location.hash = '';
-        }
+      // FIX CRITICAL ISSUE #2: Don't navigate away - just cancel the dialog
+      // This preserves local data instead of potentially losing it
+      // Just clear the hash to stay on current page with local data intact
+      if (typeof window !== 'undefined') {
+        window.location.hash = '';
       }
       return;
     }
@@ -2484,10 +2540,17 @@ function keyPressed() {
     if (key === 's' || key === 'S') {
       Utils.Logger.state('[Room] User pressed S - synchronising data with room');
 
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
 
-      if (collaborationManager) {
-        collaborationManager.syncLocalToRoom();
+      try {
+        _proceedWithRoomJoin(roomName, 'sync').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error proceeding with room join:', error);
+        syncStatus = null;
       }
       return false;
     }
@@ -2496,28 +2559,30 @@ function keyPressed() {
     if (key === 'd' || key === 'D') {
       Utils.Logger.state('[Room] User pressed D - deleting local data');
 
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
 
-      _clearLocalState();
-      if (collaborationManager) {
-        collaborationManager.loadFromRoom();
+      try {
+        _clearLocalState();
+        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error clearing local data:', error);
+        syncStatus = null;
       }
       return false;
     }
 
-    // C or Escape = Cancel and go back
+    // C or Escape = Cancel - preserve local data
     if (key === 'c' || key === 'C' || keyCode === ESCAPE) {
-      Utils.Logger.state('[Room] User pressed Cancel - cancelling join');
+      Utils.Logger.state('[Room] User pressed Cancel - preserving local data');
       roomJoinConfirmation = null;
 
-      // Navigate back to previous page
-      if (typeof window !== 'undefined' && window.history.length > 1) {
-        window.history.back();
-      } else {
-        // If no history, just clear the hash
-        if (typeof window !== 'undefined') {
-          window.location.hash = '';
-        }
+      // Just clear the hash to stay on current page
+      if (typeof window !== 'undefined') {
+        window.location.hash = '';
       }
       return false;
     }
