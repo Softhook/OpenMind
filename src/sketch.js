@@ -675,16 +675,16 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     // No blocking observers, no manual rebuild - let CRDT do its job
     if (userChoice === 'sync' && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
       Utils.Logger.collab('[Sync] Syncing local data to Yjs BEFORE connecting');
-      // Initialize Yjs document (without connecting to server yet)
-      await collaborationManager.initialize();
       // Sync local to Yjs while still offline using public API
+      // (initialize() was already called when manager was created)
       collaborationManager.syncLocalToRoom();
       Utils.Logger.collab('[Sync] Local data synced to offline Yjs, ready to merge with remote');
     } else if (userChoice === 'delete') {
       // User explicitly chose to delete local data before joining the room.
-      // Local state should already have been cleared by _clearLocalState(),
-      // so we intentionally do NOT sync anything to Yjs here and simply
-      // proceed to connect and load remote state only.
+      // _clearLocalState() was called by the delete button handler before
+      // calling _proceedWithRoomJoin(), so local state is now empty.
+      // We intentionally do NOT sync anything to Yjs and simply proceed to
+      // connect and load remote state only.
       Utils.Logger.collab('[Sync] Local data was deleted; joining room without syncing local state');
     }
 
