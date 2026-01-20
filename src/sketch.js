@@ -208,7 +208,7 @@ let isMapLoading = false;
 // Collaboration sync status for overlay: null, 'connecting', 'server_starting', 'syncing'
 let syncStatus = null;
 
-// Room join confirmation state: { roomName, shouldShareLocalData, hasLocalData } or null
+// Room join confirmation state object, or null when no confirmation is pending
 let roomJoinConfirmation = null;
 // Timeout handles for sync overlay (module scope for proper cleanup)
 let syncConnectionTimeout = null;
@@ -391,123 +391,9 @@ function worldMouseX() {
   return CameraUtils.worldX(mouseX);
 }
 
-/**
- * Parse the current window location to find a candidate JSON file path.
- * @see UrlUtils.parseFileFromLocation for implementation
- */
-function parseFileFromLocation() {
-  return typeof UrlUtils !== 'undefined'
-    ? UrlUtils.parseFileFromLocation()
-    : null;
-}
 
-/**
- * Fetch and load a JSON map from a given file path/URL.
- * Updates `lastLoadedUrlFile` so repeat navigations can be detected.
- * Compares with browser cache to load the more recent version.
- */
-async function loadMapFromUrl(fileToFetch, { force = false } = {}) {
-  if (!fileToFetch) return false;
-  // Show loading overlay while fetching
-  isMapLoading = true;
-  try {
-    // If already loaded the same URL and not forced, skip
-    if (!force && lastLoadedUrlFile && lastLoadedUrlFile === fileToFetch) return false;
 
-    const resp = await fetch(fileToFetch, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('Network response was not ok: ' + resp.status);
 
-    // Get last modified from headers as fallback
-    const lastModifiedHeader = resp.headers.get('Last-Modified');
-    const headerTime = lastModifiedHeader ? new Date(lastModifiedHeader).getTime() : 0;
-
-    const urlData = await resp.json();
-
-    // Determine appropriate storage key for this map
-    let urlName = 'unnamed-map';
-    if (urlData.name) {
-      urlName = extractMapName(urlData.name);
-    } else if (fileToFetch) {
-      urlName = extractMapName(fileToFetch);
-    }
-
-    // Create namespaced storage key: openmind_map_<normalized_name>
-    const storageKey = 'openmind_map_' + urlName;
-
-    // Set the storage key on the mindMap instance so future saves go to the right place
-    if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      mindMap.setStorageKey(storageKey);
-    }
-
-    // Check if we have a cached version for THIS SPECIFIC map
-    let shouldUseCache = false;
-    try {
-      if (mindMap && mindMap.hasLocalStorageData && mindMap.hasLocalStorageData()) {
-        // hasLocalStorageData now uses the set storageKey, so it checks the specific map's cache
-        const cachedString = localStorage.getItem(storageKey);
-
-        if (cachedString) {
-          const cachedData = JSON.parse(cachedString);
-
-          // Compare timestamps
-          const urlTimestamp = urlData.lastModified || headerTime || 0;
-          const cacheTimestamp = cachedData.lastModified || 0;
-
-          console.info('Map timestamp comparison:', {
-            mapName: urlName,
-            storageKey: storageKey,
-            urlTimestamp: (urlTimestamp !== undefined && urlTimestamp !== null) ? new Date(urlTimestamp).toISOString() : 'missing',
-            cacheTimestamp: (cacheTimestamp !== undefined && cacheTimestamp !== null) ? new Date(cacheTimestamp).toISOString() : 'missing'
-          });
-
-          if (cacheTimestamp > urlTimestamp) {
-            shouldUseCache = true;
-            console.info('Using cached version (more recent):', storageKey);
-          } else {
-            console.info('Using URL version (more recent or same):', urlName);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to compare with cache:', e);
-      // On error, default to URL version
-      shouldUseCache = false;
-    }
-
-    // Load the appropriate version
-    if (shouldUseCache) {
-      // Load from cache instead of URL
-      if (mindMap && typeof mindMap.loadFromLocalStorage === 'function') {
-        await mindMap.loadFromLocalStorage();
-        // Ensure storage key remains set after load (load might reset things potentially, though fromJSON doesn't reset key)
-        if (mindMap && typeof mindMap.setStorageKey === 'function') {
-          mindMap.setStorageKey(storageKey);
-        }
-      }
-    } else {
-      // Load from URL
-      if (mindMap && typeof mindMap.load === 'function') await mindMap.load(urlData);
-
-      // Ensure storage key is set correctly (load calls saveToLocalStorage which needs the key)
-      if (mindMap && typeof mindMap.setStorageKey === 'function') {
-        mindMap.setStorageKey(storageKey);
-      }
-    }
-
-    // Final foolproof ensure key is set (redundant but safe)
-    if (mindMap && typeof mindMap.setStorageKey === 'function') mindMap.setStorageKey(storageKey);
-
-    if (mindMap && typeof mindMap.setLastUsedFilename === 'function') mindMap.setLastUsedFilename(fileToFetch);
-    try { resetView(); } catch (e) { console.warn('resetView failed after loading URL file:', e); }
-    lastLoadedUrlFile = fileToFetch;
-    return true;
-  } catch (e) {
-    console.warn('Failed to load map from URL "' + fileToFetch + '":', e);
-    return false;
-  } finally {
-    isMapLoading = false;
-  }
-}
 
 /**
  * Extracts a normalized map name from a full path or name
@@ -530,7 +416,7 @@ function namesAreSimilar(name1, name2) {
 }
 
 /**
- * Handler to respond to URL changes (hash/popstate) and initial load.
+ * Handler to respond to URL changes (hash/popstate) for room management.
  */
 function handleUrlChange() {
   // Clear any pending room join confirmation when URL changes
@@ -539,7 +425,7 @@ function handleUrlChange() {
     roomJoinConfirmation = null;
   }
 
-  // Check for room changes first
+  // Check for room changes
   const roomInfo = parseRoomFromHash();
   const newRoom = roomInfo ? roomInfo.room : null;
   const currentRoom = collaborationManager ? collaborationManager.roomName : null;
@@ -551,11 +437,8 @@ function handleUrlChange() {
       collaborationManager = null;
     }
     if (newRoom && mindMap) {
-      // Use the isStarting flag from URL to determine if we should share local data
-      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
-
-      initializeCollaboration(newRoom, shouldShareLocalData);
-      return; // Don't load file when in collaboration mode
+      initializeCollaboration(newRoom);
+      return;
     } else if (!newRoom && currentRoom && mindMap) {
       // User is leaving a room (navigating away) - restore default storage key
       // This ensures autosave goes back to the offline storage location
@@ -563,14 +446,6 @@ function handleUrlChange() {
         mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
         Utils.Logger.state('[Room] Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
       }
-    }
-  }
-
-  // Handle file loading (skip if in collaboration mode)
-  if (!newRoom) {
-    const fileToFetch = parseFileFromLocation();
-    if (fileToFetch) {
-      loadMapFromUrl(fileToFetch);
     }
   }
 }
@@ -607,7 +482,7 @@ function getRoomStorageKey(roomName) {
 
 /**
  * Clears all local mind map state (boxes, connections, selections, etc.)
- * Called when joining a collaboration room to prevent local data pollution  
+ * Called when user confirms joining a collaboration room that will replace local data
  * @private
  */
 function _clearLocalState() {
@@ -649,12 +524,13 @@ function _clearLocalState() {
   Utils.Logger.state('[Room] Local state cleared - room sync will provide authoritative state');
 }
 
+
 /**
  * Initializes collaboration for a given room
+ * Shows dialog BEFORE connecting if user has local data to prevent race conditions
  * @param {string} roomName 
- * @param {boolean} shouldShareLocalData - If true, share local data when starting collaboration. If false (default), only receive from room.
  */
-async function initializeCollaboration(roomName, shouldShareLocalData = false) {
+async function initializeCollaboration(roomName) {
   if (!mindMap || !roomName) return;
   if (typeof CollaborationManager === 'undefined') {
     console.warn('CollaborationManager not loaded');
@@ -662,31 +538,60 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
   }
 
   try {
-    // CRITICAL: Clear local state when JOINING a room (not when starting collaboration to share local work)
-    // This prevents users from seeing their local cached boxes that aren't synced to other participants
-    if (!shouldShareLocalData) {
-      const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
+    // Validate mindMap.boxes is an array
+    const hasLocalData = mindMap.boxes && Array.isArray(mindMap.boxes) && mindMap.boxes.length > 0;
 
-      if (hasLocalData) {
-        // Show confirmation dialog - user has local work that will be cleared
-        Utils.Logger.collab('[Room] User has local boxes, showing confirmation dialog');
-        roomJoinConfirmation = {
-          roomName: roomName,
-          shouldShareLocalData: shouldShareLocalData,
-          hasLocalData: true,
-          boxCount: mindMap.boxes.length
-        };
-        return; // Wait for user confirmation
-      }
+    Utils.Logger.collab('[Room] Joining collaboration room:', roomName);
 
-      // No local data, proceed with clearing
-      Utils.Logger.collab('[Room] Joining collaboration room:', roomName, '- clearing local state (no local data)');
-      _clearLocalState();
-    } else {
-      Utils.Logger.collab('[Room] Starting collaboration room:', roomName, '- preserving local state to share');
+    // FIX ISSUE #1: Check if dialog is already showing to prevent multiple instances
+    if (roomJoinConfirmation && roomJoinConfirmation.pendingConnection) {
+      Utils.Logger.warn('[Room] Dialog already showing - ignoring duplicate call');
+      return;
     }
 
-    // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
+    // FIX CRITICAL ISSUE #1: Show dialog BEFORE connecting if user has local data
+    // This prevents the race condition where data starts syncing before user makes a choice
+    if (hasLocalData) {
+      Utils.Logger.collab('[Room] User has local data, showing sync options dialog before connecting');
+      
+      roomJoinConfirmation = {
+        roomName: roomName,
+        hasLocalData: true,
+        boxCount: mindMap.boxes.length,
+        pendingConnection: true // Flag that we need to connect after user chooses
+      };
+      
+      // Don't proceed with connection - wait for user choice
+      // The mouse/keyboard handlers will call _proceedWithRoomJoin() after user decides
+      return;
+    }
+
+    // No local data - proceed with connection immediately
+    await _proceedWithRoomJoin(roomName, null);
+    
+  } catch (error) {
+    console.error('[Room] Failed to initialize collaboration:', error);
+    syncStatus = null;
+    // Attempt to recover by disconnecting
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (disconnectError) {
+        console.error('[Room] Failed to disconnect after error:', disconnectError);
+      }
+    }
+  }
+}
+
+/**
+ * Proceeds with room connection after user makes a choice (or immediately if no local data)
+ * @param {string} roomName 
+ * @param {string|null} userChoice - 'sync', 'delete', or null (no local data)
+ * @private
+ */
+async function _proceedWithRoomJoin(roomName, userChoice) {
+  try {
+    // Create manager if it doesn't exist
     if (!collaborationManager) {
       collaborationManager = new CollaborationManager(mindMap);
       await collaborationManager.initialize();
@@ -765,72 +670,35 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
       syncStatus = 'incompatible';
     };
 
+    // CRITICAL FIX: Sync local data to Yjs BEFORE connecting
+    // This allows Yjs CRDT to automatically merge remote + local data
+    // No blocking observers, no manual rebuild - let CRDT do its job
+    if (userChoice === 'sync' && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
+      Utils.Logger.collab('[Sync] Syncing local data to Yjs BEFORE connecting');
+      // Sync local to Yjs while still offline using public API
+      // (initialize() was already called when manager was created)
+      collaborationManager.syncLocalToRoom();
+      Utils.Logger.collab('[Sync] Local data synced to offline Yjs, ready to merge with remote');
+    } else if (userChoice === 'delete') {
+      // User explicitly chose to delete local data before joining the room.
+      // _clearLocalState() was called by the delete button handler before
+      // calling _proceedWithRoomJoin(), so local state is now empty.
+      // We intentionally do NOT sync anything to Yjs and simply proceed to
+      // connect and load remote state only.
+      Utils.Logger.collab('[Sync] Local data was deleted; joining room without syncing local state');
+    }
+
     const serverUrl = parseServerFromUrl();
     if (serverUrl) {
       Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
 
-    // Pass shouldShareLocalData flag to control whether we share our local work
-    await collaborationManager.connect(roomName, serverUrl, shouldShareLocalData);
-    Utils.Logger.collab('[Room] Initialized:', roomName, 'shareLocal:', shouldShareLocalData);
+    // FIX ISSUE #3: Show progress indicator
+    syncStatus = 'connecting';
 
-    // CRITICAL: If starting collaboration (shouldShareLocalData=true), sync local data
-    // Wait for provider to be fully synced before force-syncing to avoid race conditions
-    if (shouldShareLocalData && mindMap && mindMap.boxes && mindMap.boxes.length > 0) {
-      Utils.Logger.collab('[Sync] Starting - will sync', mindMap.boxes.length, 'local boxes to Yjs');
-
-      // Store current manager reference to detect if it changes
-      const currentManager = collaborationManager;
-
-      const doSync = () => {
-        // Verify this is still the active manager and it's connected
-        if (collaborationManager === currentManager &&
-          collaborationManager.isConnected &&
-          typeof collaborationManager._syncLocalToYjs === 'function') {
-          Utils.Logger.collab('[Sync] Provider synced - force syncing local boxes to Yjs...');
-          try {
-            collaborationManager._syncLocalToYjs();
-            Utils.Logger.collab('[Sync] ✅ Forced sync complete - boxes now in Yjs');
-          } catch (e) {
-            console.error('Failed to sync local boxes:', e);
-          }
-        } else {
-          Utils.Logger.state('[Sync] Skipping - manager changed or disconnected');
-        }
-      };
-
-      // If already synced, sync immediately; otherwise wait for synced event with timeout
-      if (collaborationManager.provider && collaborationManager.provider.synced) {
-        doSync();
-      } else {
-        Utils.Logger.collab('[Sync] Waiting for provider to sync before pushing local boxes...');
-
-        // Set 10 second timeout to prevent waiting forever
-        const timeout = setTimeout(() => {
-          console.warn('Sync wait timeout - attempting sync anyway');
-          doSync();
-        }, 10000);
-
-        // Wait for sync event, then clear timeout and sync
-        collaborationManager.provider.once('synced', () => {
-          clearTimeout(timeout);
-          doSync();
-        });
-      }
-    }
-
-    // Setup awareness listener for thrust game optimization
-    // This checks if any remote player is in thrust mode to enable lazy initialization
-    // ThrustGame handles its own awareness check inside its static loop
-
-    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
-    // When in online mode, autosave goes to room-specific key instead of default
-    // This preserves the user's local work when they return to offline mode
-    if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      const storageKey = getRoomStorageKey(roomName);
-      mindMap.setStorageKey(storageKey);
-      Utils.Logger.state('[Storage] Set key to:', storageKey);
-    }
+    // Connect to room - Yjs will automatically merge with remote data
+    await collaborationManager.connect(roomName, serverUrl);
+    Utils.Logger.collab('[Room] Initialized:', roomName);
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
@@ -843,11 +711,33 @@ async function initializeCollaboration(roomName, shouldShareLocalData = false) {
     }
 
   } catch (e) {
-    console.error('Failed to initialize collaboration:', e);
+    console.error('[Room] Failed to proceed with room join:', e);
     // Clear timeouts on error
     if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
     if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
     syncStatus = null;
+    
+    // FIX CRITICAL ISSUE #4: Error recovery
+    // Attempt to disconnect and clean up on error
+    if (collaborationManager) {
+      try {
+        collaborationManager.disconnect();
+      } catch (disconnectError) {
+        console.error('[Room] Failed to disconnect after error:', disconnectError);
+      }
+    }
+    
+    // Don't set storage key on error - keep current storage location
+  }
+  
+  // Set storage key only on successful connection
+  // CRITICAL: Use room-specific storage key to prevent overwriting offline work
+  // When in online mode, autosave goes to room-specific key instead of default
+  // This preserves the user's local work when they return to offline mode
+  if (collaborationManager && collaborationManager.isConnected && mindMap && typeof mindMap.setStorageKey === 'function') {
+    const storageKey = getRoomStorageKey(roomName);
+    mindMap.setStorageKey(storageKey);
+    Utils.Logger.state('[Storage] Set key to:', storageKey);
   }
 }
 
@@ -868,15 +758,13 @@ function generateShareLink() {
  */
 function shareSession() {
   if (!collaborationManager || !collaborationManager.isConnected) {
-    // Start new session - current map data will be seeded into the room
-    // Log the box count to help debug seeding behavior and track what's being shared
+    // Start new session - Yjs will merge local map data with room
     const room = CollaborationManager.generateRoomName();
     const boxCount = mindMap && mindMap.boxes ? mindMap.boxes.length : 0;
     Utils.Logger.collab('[Session] Starting with', boxCount, 'boxes from local work');
 
-    // Use URL parameter to indicate "start" mode (sharing local data)
-    // This is more robust than a global flag and survives page refresh/back button
-    window.location.hash = `room=${room}&mode=start`;
+    // Navigate to room - Yjs will handle merging
+    window.location.hash = `room=${room}`;
   } else {
     // Copy link
     const url = generateShareLink();
@@ -1241,15 +1129,7 @@ function setup() {
       // ignore
     }
 
-    // Handle initial URL-based loading and listen for future URL changes
-    // (supports ?file=, hash like #maps/Name or #maps/Name.json, and direct .json pathname)
-    // Parse synchronously to decide whether to skip localStorage fallback (avoid race).
-    const initialFile = parseFileFromLocation();
-    if (initialFile) {
-      // Start loading asynchronously; do NOT set `lastLoadedUrlFile` yet
-      // (it is set after a successful fetch inside `loadMapFromUrl`).
-      loadMapFromUrl(initialFile);
-    }
+    // Listen for URL changes to handle room navigation
     addTrackedEventListener(window, 'hashchange', handleUrlChange);
     addTrackedEventListener(window, 'popstate', handleUrlChange);
 
@@ -1257,14 +1137,10 @@ function setup() {
     const roomInfo = parseRoomFromHash();
     const roomId = roomInfo ? roomInfo.room : null;
 
-    // CRITICAL: When joining an online room, do NOT load from localStorage
-    // This prevents users from bringing their local cached data into collaborative sessions
-    // 
-    // Behavior:
-    // - ONLINE (roomId present): Skip localStorage, start with empty canvas
-    //   The room's state will sync from other users or remain empty if first to join
-    // - OFFLINE (no roomId): Load from localStorage to restore previous work
-    if (!lastLoadedUrlFile && !roomId) {
+    // When joining an online room, do NOT load from localStorage
+    // The room's state will sync from Yjs
+    // When offline (no roomId), load from localStorage to restore previous work
+    if (!roomId) {
       // Try to load from localStorage (offline mode only)
       const hasAutosave = mindMap.hasLocalStorageData();
       if (hasAutosave) {
@@ -1705,52 +1581,83 @@ function draw() {
     textSize(11);
     text(`${appName} v${versionStr}`, width / 2, 20);
 
-    // Warning icon (⚠️)
+    // Warning icon (⚠️) - this is a critical choice that can lead to data loss
     fill(255, 200, 0);
     textAlign(CENTER, CENTER);
     textSize(32);
-    text('⚠️', width / 2, height / 2 - 80);
+    text('⚠️', width / 2, height / 2 - 90);
 
     // Main message
     fill(255);
     textSize(18);
-    text('Joining Collaboration Room', width / 2, height / 2 - 30);
+    text('Joining Collaboration Room', width / 2, height / 2 - 40);
 
-    // Warning message
+    // Info message
     textSize(13);
-    fill(255, 200, 100);
+    fill(200, 200, 200);
     const boxCount = roomJoinConfirmation.boxCount || 0;
     const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
-    text(`Your current work (${boxText}) will be cleared`, width / 2, height / 2 + 5);
+    text(`You have ${boxText} of local work`, width / 2, height / 2 - 10);
 
     // Subtitle
     textSize(12);
     fill(180);
-    text('The room\'s content will sync instead', width / 2, height / 2 + 30);
+    text('Choose how to proceed with your local changes', width / 2, height / 2 + 15);
 
-    // OK Button
-    const buttonWidth = 120;
+    // Three buttons in a row
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    // Check if mouse is over button
-    const isOverButton = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+    // Check which button mouse is over
+    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
       mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-    // Button background
-    if (isOverButton) {
-      fill(70, 150, 220); // Hover state
+    // Synchronise Data button (green)
+    if (isOverSync) {
+      fill(60, 180, 100); // Hover state
     } else {
-      fill(60, 130, 200); // Normal state
+      fill(50, 160, 80); // Normal state
     }
-    rect(buttonX, buttonY, buttonWidth, buttonHeight, 4);
-
-    // Button text
+    rect(syncButtonX, buttonY, buttonWidth, buttonHeight, 4);
     fill(255);
     textAlign(CENTER, CENTER);
-    textSize(14);
-    text('OK, Join Room', width / 2, buttonY + buttonHeight / 2);
+    textSize(13);
+    text('Synchronise Data', syncButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Delete Local Data button (red)
+    if (isOverDelete) {
+      fill(220, 60, 60); // Hover state
+    } else {
+      fill(200, 40, 40); // Normal state
+    }
+    rect(deleteButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    fill(255);
+    text('Delete Local Data', deleteButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Cancel button (gray)
+    if (isOverCancel) {
+      fill(100, 100, 100); // Hover state
+    } else {
+      fill(80, 80, 80); // Normal state
+    }
+    rect(cancelButtonX, buttonY, buttonWidth, buttonHeight, 4);
+    fill(255);
+    text('Cancel', cancelButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+    // Helper text
+    textSize(11);
+    fill(150);
+    text('S = Sync  •  D = Delete  •  ESC = Cancel', width / 2, buttonY + buttonHeight + 25);
 
     pop();
   }
@@ -1761,15 +1668,25 @@ function draw() {
    * Sets appropriate cursors for resizing, moving, editing, and other interactions.
    */
 function updateCursorForHover() {
-  // PRIORITY: Check if hovering over room join confirmation button
+  // PRIORITY: Check if hovering over room join confirmation buttons
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    const buttonWidth = 120;
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+
+    if (isOverSync || isOverDelete || isOverCancel) {
       cursor('pointer');
       return;
     }
@@ -2367,25 +2284,84 @@ function mousePressed(e) {
 
   // PRIORITY: Handle room join confirmation dialog before anything else
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Check if click is on OK button
-    const buttonWidth = 120;
+    // Check if click is on any of the three buttons
+    const buttonWidth = 140;
     const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
+    const buttonGap = 15;
+    const totalWidth = buttonWidth * 3 + buttonGap * 2;
+    const syncButtonX = width / 2 - totalWidth / 2;
+    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
+    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
+    const buttonY = height / 2 + 50;
 
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-      // User clicked OK - proceed with room join
-      Utils.Logger.state('[Room] User confirmed join - clearing state and connecting');
+    const clickedSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const clickedDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+    const clickedCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
-      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
+    if (clickedSync) {
+      // User chose to synchronise local data with room
+      Utils.Logger.state('[Room] User chose to synchronise data with room');
+
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
 
-      // Clear local state
-      _clearLocalState();
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
 
-      // Continue with room initialization
-      initializeCollaboration(roomName, shouldShareLocalData);
+      // FIX CRITICAL ISSUE #1 & #2: Proceed with connection using user's choice
+      // Data is NOT cleared - it will be merged via Yjs CRDT
+      try {
+        _proceedWithRoomJoin(roomName, 'sync').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error proceeding with room join:', error);
+        syncStatus = null;
+      }
+      return;
+      
+    } else if (clickedDelete) {
+      // User chose to delete local data and load room content
+      Utils.Logger.state('[Room] User chose to delete local data');
+
+      const { roomName } = roomJoinConfirmation;
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
+
+      // FIX CRITICAL ISSUE #2: Add error handling around clear operation
+      try {
+        // Clear local state before connecting
+        _clearLocalState();
+        
+        // Proceed with connection
+        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error clearing local data:', error);
+        syncStatus = null;
+      }
+      return;
+      
+    } else if (clickedCancel) {
+      // User chose to cancel - preserve local data
+      Utils.Logger.state('[Room] User cancelled joining room');
+
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // FIX CRITICAL ISSUE #2: Don't navigate away - just cancel the dialog
+      // This preserves local data instead of potentially losing it
+      // Just clear the hash to stay on current page with local data intact
+      if (typeof window !== 'undefined') {
+        window.location.hash = '';
+      }
       return;
     }
   }
@@ -2586,31 +2562,59 @@ function keyPressed() {
 
   // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Enter/Return = Confirm and join room
-    if (keyCode === ENTER || keyCode === RETURN) {
-      Utils.Logger.state('[Room] User pressed Enter - confirming join');
+    // S = Synchronise Data
+    if (key === 's' || key === 'S') {
+      Utils.Logger.state('[Room] User pressed S - synchronising data with room');
 
-      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
 
-      _clearLocalState();
-      initializeCollaboration(roomName, shouldShareLocalData);
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
+
+      try {
+        _proceedWithRoomJoin(roomName, 'sync').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error proceeding with room join:', error);
+        syncStatus = null;
+      }
       return false;
     }
 
-    // Escape = Cancel and go back
-    if (keyCode === ESCAPE) {
-      Utils.Logger.state('[Room] User pressed Escape - cancelling join');
+    // D = Delete Local Data
+    if (key === 'd' || key === 'D') {
+      Utils.Logger.state('[Room] User pressed D - deleting local data');
+
+      const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
 
-      // Navigate back to previous page
-      if (typeof window !== 'undefined' && window.history.length > 1) {
-        window.history.back();
-      } else {
-        // If no history, just clear the hash
-        if (typeof window !== 'undefined') {
-          window.location.hash = '';
-        }
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
+
+      try {
+        _clearLocalState();
+        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
+          console.error('[Room] Failed to join room:', error);
+          syncStatus = null;
+        });
+      } catch (error) {
+        console.error('[Room] Error clearing local data:', error);
+        syncStatus = null;
+      }
+      return false;
+    }
+
+    // C or Escape = Cancel - preserve local data
+    if (key === 'c' || key === 'C' || keyCode === ESCAPE) {
+      Utils.Logger.state('[Room] User pressed Cancel - preserving local data');
+      roomJoinConfirmation = null;
+
+      // Just clear the hash to stay on current page
+      if (typeof window !== 'undefined') {
+        window.location.hash = '';
       }
       return false;
     }
@@ -3149,10 +3153,8 @@ function handleCanvasDrop(e) {
           } else if (lower.endsWith('.pdf')) {
             createPdfBox(url, url.split('/').pop(), wx, wy);
           } else if (lower.endsWith('.json')) {
-            // Try to load JSON map
-            loadMapFromUrl(url).catch(() => {
-              createFilePathBox(filePath, wx, wy);
-            });
+            // For JSON files, create a file path box with the link
+            createFilePathBox(filePath, wx, wy);
           } else {
             // For other file types (docx, txt, etc.), create a text box with the path
             createFilePathBox(filePath, wx, wy);
