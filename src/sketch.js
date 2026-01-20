@@ -538,10 +538,16 @@ async function initializeCollaboration(roomName) {
   }
 
   try {
-    // Check if we have local data BEFORE connecting
-    const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
+    // Validate mindMap.boxes is an array
+    const hasLocalData = mindMap.boxes && Array.isArray(mindMap.boxes) && mindMap.boxes.length > 0;
 
     Utils.Logger.collab('[Room] Joining collaboration room:', roomName);
+
+    // FIX ISSUE #1: Check if dialog is already showing to prevent multiple instances
+    if (roomJoinConfirmation && roomJoinConfirmation.pendingConnection) {
+      Utils.Logger.warn('[Room] Dialog already showing - ignoring duplicate call');
+      return;
+    }
 
     // FIX CRITICAL ISSUE #1: Show dialog BEFORE connecting if user has local data
     // This prevents the race condition where data starts syncing before user makes a choice
@@ -674,18 +680,12 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
 
+    // FIX ISSUE #3: Show progress indicator
+    syncStatus = 'connecting';
+
     // Connect to room
     await collaborationManager.connect(roomName, serverUrl);
     Utils.Logger.collab('[Room] Initialized:', roomName);
-
-    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
-    // When in online mode, autosave goes to room-specific key instead of default
-    // This preserves the user's local work when they return to offline mode
-    if (mindMap && typeof mindMap.setStorageKey === 'function') {
-      const storageKey = getRoomStorageKey(roomName);
-      mindMap.setStorageKey(storageKey);
-      Utils.Logger.state('[Storage] Set key to:', storageKey);
-    }
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
@@ -712,6 +712,16 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       } catch (disconnectError) {
         console.error('[Room] Failed to disconnect after error:', disconnectError);
       }
+    }
+  } finally {
+    // FIX ISSUE #2: Set storage key in finally block to ensure it's always set
+    // CRITICAL: Use room-specific storage key to prevent overwriting offline work
+    // When in online mode, autosave goes to room-specific key instead of default
+    // This preserves the user's local work when they return to offline mode
+    if (mindMap && typeof mindMap.setStorageKey === 'function') {
+      const storageKey = getRoomStorageKey(roomName);
+      mindMap.setStorageKey(storageKey);
+      Utils.Logger.state('[Storage] Set key to:', storageKey);
     }
   }
 }
@@ -2288,6 +2298,9 @@ function mousePressed(e) {
       const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
 
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
+
       // FIX CRITICAL ISSUE #1 & #2: Proceed with connection using user's choice
       // Data is NOT cleared - it will be merged via Yjs CRDT
       try {
@@ -2307,6 +2320,9 @@ function mousePressed(e) {
 
       const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
 
       // FIX CRITICAL ISSUE #2: Add error handling around clear operation
       try {
@@ -2543,6 +2559,9 @@ function keyPressed() {
       const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
 
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
+
       try {
         _proceedWithRoomJoin(roomName, 'sync').catch(error => {
           console.error('[Room] Failed to join room:', error);
@@ -2561,6 +2580,9 @@ function keyPressed() {
 
       const { roomName } = roomJoinConfirmation;
       roomJoinConfirmation = null;
+
+      // FIX ISSUE #3: Show progress indicator immediately
+      syncStatus = 'syncing';
 
       try {
         _clearLocalState();
