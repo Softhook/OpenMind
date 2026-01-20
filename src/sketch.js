@@ -208,8 +208,8 @@ let isMapLoading = false;
 // Collaboration sync status for overlay: null, 'connecting', 'server_starting', 'syncing'
 let syncStatus = null;
 
-// Room join confirmation state: { roomName, shouldShareLocalData, hasLocalData } or null
-
+// Room join confirmation state: { roomName, hasLocalData, boxCount } or null
+let roomJoinConfirmation = null;
 // Timeout handles for sync overlay (module scope for proper cleanup)
 let syncConnectionTimeout = null;
 let syncEmptyRoomTimeout = null;
@@ -419,6 +419,12 @@ function namesAreSimilar(name1, name2) {
  * Handler to respond to URL changes (hash/popstate) for room management.
  */
 function handleUrlChange() {
+  // Clear any pending room join confirmation when URL changes
+  if (roomJoinConfirmation) {
+    Utils.Logger.state('[Room] URL changed - clearing pending room join confirmation');
+    roomJoinConfirmation = null;
+  }
+
   // Check for room changes
   const roomInfo = parseRoomFromHash();
   const newRoom = roomInfo ? roomInfo.room : null;
@@ -474,11 +480,54 @@ function getRoomStorageKey(roomName) {
     : CONFIG.STORAGE.ROOM_KEY_PREFIX + roomName;
 }
 
+/**
+ * Clears all local mind map state (boxes, connections, selections, etc.)
+ * Called when user confirms joining a collaboration room that will replace local data
+ * @private
+ */
+function _clearLocalState() {
+  if (!mindMap) return;
+
+  Utils.Logger.state('[Room] Clearing local state:', mindMap.boxes.length, 'boxes');
+
+  // Reset interaction flags on boxes before clearing to prevent broken UI state
+  for (const box of mindMap.boxes) {
+    if (box.isDragging) box.isDragging = false;
+    if (box.isResizing) box.isResizing = false;
+    if (box.isEditing && typeof box.stopEditing === 'function') {
+      box.stopEditing();
+    }
+  }
+
+  // Clear all local boxes and connections
+  mindMap.boxes = [];
+  mindMap.connections = [];
+
+  // Clear selections
+  mindMap.selectedBox = null;
+  mindMap.selectedConnection = null;
+  if (mindMap.selectedBoxes) mindMap.selectedBoxes.clear();
+  if (mindMap.selectedConnections) mindMap.selectedConnections.clear();
+
+  // Clear navigation and interaction state
+  mindMap.isArrowKeyNavigating = false;
+  mindMap.connectingFrom = null;
+  mindMap.draggingConnection = null;
+
+  // Clear copied state
+  mindMap.copiedBoxes = [];
+  mindMap.copiedConnections = [];
+
+  // Reset dirty flag to prevent unexpected autosave
+  mindMap.isDirty = false;
+
+  Utils.Logger.state('[Room] Local state cleared - room sync will provide authoritative state');
+}
 
 
 /**
  * Initializes collaboration for a given room
- * Always syncs local data with Yjs, letting it merge changes automatically
+ * Handles merging local and remote data based on content similarity
  * @param {string} roomName 
  */
 async function initializeCollaboration(roomName) {
@@ -489,9 +538,10 @@ async function initializeCollaboration(roomName) {
   }
 
   try {
-    // Let Yjs handle the merge between local and remote data
-    // No clearing or conditional logic - Yjs will sync both ways
-    Utils.Logger.collab('[Room] Joining collaboration room:', roomName, '- Yjs will merge local and remote data');
+    // Check if we have local data
+    const hasLocalData = mindMap.boxes && mindMap.boxes.length > 0;
+
+    Utils.Logger.collab('[Room] Joining collaboration room:', roomName);
 
     // Create manager if it doesn't exist (shouldn't happen normally since it's created in setup)
     if (!collaborationManager) {
@@ -570,6 +620,25 @@ async function initializeCollaboration(roomName) {
     collaborationManager.onVersionMismatch = (mismatchInfo) => {
       console.warn('Version mismatch detected:', mismatchInfo);
       syncStatus = 'incompatible';
+    };
+
+    // Handle room data check - decide whether to merge or show warning
+    collaborationManager.onRoomDataCheck = (yjsEmpty, localHasData) => {
+      if (yjsEmpty || !localHasData) {
+        // Room is empty or we have no local data - nothing to decide
+        return;
+      }
+
+      // Both room and local have data - check if we should show warning
+      // For now, always show warning when both have data
+      // TODO: Add filename/content comparison logic
+      Utils.Logger.collab('[Room] Room and local both have data, showing confirmation dialog');
+      
+      roomJoinConfirmation = {
+        roomName: roomName,
+        hasLocalData: true,
+        boxCount: mindMap.boxes.length
+      };
     };
 
     const serverUrl = parseServerFromUrl();
@@ -1430,6 +1499,74 @@ function draw() {
 
     pop();
   }
+
+  // Draw room join confirmation overlay when user is about to lose local work
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    push();
+    resetMatrix && resetMatrix();
+    noStroke();
+
+    // Semi-transparent overlay (same as sync overlay)
+    fill(40, 40, 60, 180);
+    rect(0, 0, width, height);
+
+    // App name and version at top
+    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
+    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
+    fill(120);
+    textAlign(CENTER, TOP);
+    textSize(11);
+    text(`${appName} v${versionStr}`, width / 2, 20);
+
+    // Warning icon (⚠️)
+    fill(255, 200, 0);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text('⚠️', width / 2, height / 2 - 80);
+
+    // Main message
+    fill(255);
+    textSize(18);
+    text('Joining Collaboration Room', width / 2, height / 2 - 30);
+
+    // Warning message
+    textSize(13);
+    fill(255, 200, 100);
+    const boxCount = roomJoinConfirmation.boxCount || 0;
+    const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
+    text(`Your current work (${boxText}) will be cleared`, width / 2, height / 2 + 5);
+
+    // Subtitle
+    textSize(12);
+    fill(180);
+    text('The room\'s content will sync instead', width / 2, height / 2 + 30);
+
+    // OK Button
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    // Check if mouse is over button
+    const isOverButton = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+
+    // Button background
+    if (isOverButton) {
+      fill(70, 150, 220); // Hover state
+    } else {
+      fill(60, 130, 200); // Normal state
+    }
+    rect(buttonX, buttonY, buttonWidth, buttonHeight, 4);
+
+    // Button text
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text('OK, Join Room', width / 2, buttonY + buttonHeight / 2);
+
+    pop();
+  }
 }
 
 /**
@@ -1437,6 +1574,19 @@ function draw() {
    * Sets appropriate cursors for resizing, moving, editing, and other interactions.
    */
 function updateCursorForHover() {
+  // PRIORITY: Check if hovering over room join confirmation button
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+      cursor('pointer');
+      return;
+    }
+  }
 
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
@@ -2028,6 +2178,33 @@ function mousePressed(e) {
     return;
   }
 
+  // PRIORITY: Handle room join confirmation dialog before anything else
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    // Check if click is on OK button
+    const buttonWidth = 120;
+    const buttonHeight = 40;
+    const buttonX = width / 2 - buttonWidth / 2;
+    const buttonY = height / 2 + 60;
+
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+      // User clicked OK - proceed with room join
+      Utils.Logger.state('[Room] User confirmed join - clearing state and loading room data');
+
+      const { roomName } = roomJoinConfirmation;
+      roomJoinConfirmation = null; // Clear confirmation dialog
+
+      // Clear local state
+      _clearLocalState();
+
+      // Load data from room
+      if (collaborationManager) {
+        collaborationManager.loadFromRoom();
+      }
+      return;
+    }
+  }
+
   // Don't allow interaction when sync overlay is shown
   if (syncStatus) return;
 
@@ -2220,6 +2397,40 @@ function keyPressed() {
     }
   } catch (e) {
     console.error('Error in ExtensionBridge.handleInput:', e);
+  }
+
+  // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
+  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
+    // Enter/Return = Confirm and join room
+    if (keyCode === ENTER || keyCode === RETURN) {
+      Utils.Logger.state('[Room] User pressed Enter - confirming join');
+
+      const { roomName } = roomJoinConfirmation;
+      roomJoinConfirmation = null;
+
+      _clearLocalState();
+      if (collaborationManager) {
+        collaborationManager.loadFromRoom();
+      }
+      return false;
+    }
+
+    // Escape = Cancel and go back
+    if (keyCode === ESCAPE) {
+      Utils.Logger.state('[Room] User pressed Escape - cancelling join');
+      roomJoinConfirmation = null;
+
+      // Navigate back to previous page
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        window.history.back();
+      } else {
+        // If no history, just clear the hash
+        if (typeof window !== 'undefined') {
+          window.location.hash = '';
+        }
+      }
+      return false;
+    }
   }
 
   if (keyboardOverlayVisible) {

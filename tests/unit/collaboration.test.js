@@ -408,9 +408,11 @@ describe('Sketch.js Integration for Collaboration', () => {
         expect(sketchCode).toMatch(/async function initializeCollaboration\s*\(\s*roomName\s*\)/);
     });
 
-    test('initializeCollaboration should always merge via Yjs', () => {
-        // Should log that Yjs will merge data
-        expect(sketchCode).toMatch(/Yjs will merge local and remote data/);
+    test('initializeCollaboration should check room data and show dialog when needed', () => {
+        // Should have onRoomDataCheck callback
+        expect(sketchCode).toMatch(/onRoomDataCheck/);
+        // Should show confirmation dialog when room has data
+        expect(sketchCode).toMatch(/roomJoinConfirmation/);
     });
 
     test('shareSession should not use mode parameter', () => {

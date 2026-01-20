@@ -116,6 +116,7 @@ class CollaborationManager {
         this.onPeersChange = null;
         this.onAwarenessChange = null;
         this.onVersionMismatch = null; // Called when incompatible client detected
+        this.onRoomDataCheck = null; // (hasRoomData: boolean, hasLocalData: boolean) => void - called on initial sync
 
         // Version mismatch state
         this.versionMismatchInfo = null; // {reason, peerVersion}
@@ -308,22 +309,22 @@ class CollaborationManager {
                     if (this.onConnectionChange) this.onConnectionChange('connected');
                 }
 
-                // Handle sync transitions: merge local and remote data via Yjs
+                // Handle sync transitions: check room state and decide merge strategy
                 // This handles both initial sync and resync after reconnection
                 if (isResync && this.yboxes && this.mindMap) {
                     const yjsEmpty = this.yboxes.size === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
-                    // Simple merge strategy: Yjs handles everything
+                    // Notify sketch.js about room/local data state so it can decide merge strategy
+                    if (this.onRoomDataCheck) {
+                        Utils.Logger.collab('[Sync] Calling onRoomDataCheck - room empty:', yjsEmpty, ', local data:', localHasData);
+                        this.onRoomDataCheck(yjsEmpty, localHasData);
+                    }
+
+                    // Simple merge strategy for empty room
                     if (yjsEmpty && localHasData) {
                         // Room is empty, push local data to Yjs
                         Utils.Logger.collab('[Sync] Room empty, syncing local data to Yjs');
-                        this._syncLocalToYjs();
-                    } else if (!yjsEmpty && localHasData) {
-                        // Both have data, merge via Yjs
-                        Utils.Logger.collab('[Sync] Merging local and remote data');
-                        this._rebuildBoxesFromYjs();
-                        this._rebuildConnectionsFromYjs();
                         this._syncLocalToYjs();
                     } else if (!yjsEmpty && !localHasData) {
                         // Room has data, we don't - just sync from Yjs
@@ -331,6 +332,7 @@ class CollaborationManager {
                         this._rebuildBoxesFromYjs();
                         this._rebuildConnectionsFromYjs();
                     }
+                    // For (!yjsEmpty && localHasData), wait for sketch.js to decide (via onRoomDataCheck callback)
                     // If both empty, nothing to do
                 }
 
@@ -355,6 +357,37 @@ class CollaborationManager {
             this.disconnect();
             throw error;
         }
+    }
+
+    /**
+     * Completes the merge by loading room data (called after user confirms to replace local data)
+     * This clears local data and loads from Yjs
+     */
+    loadFromRoom() {
+        if (!this.yboxes || !this.mindMap) {
+            Utils.Logger.error('[Room] Cannot load from room - not connected or no mindMap');
+            return;
+        }
+
+        Utils.Logger.collab('[Room] Loading data from room (replacing local)');
+        this._rebuildBoxesFromYjs();
+        this._rebuildConnectionsFromYjs();
+    }
+
+    /**
+     * Completes the merge by merging local and room data via Yjs
+     * This syncs local changes to Yjs after loading room state
+     */
+    mergeWithRoom() {
+        if (!this.yboxes || !this.mindMap) {
+            Utils.Logger.error('[Room] Cannot merge with room - not connected or no mindMap');
+            return;
+        }
+
+        Utils.Logger.collab('[Room] Merging local and remote data via Yjs');
+        this._rebuildBoxesFromYjs();
+        this._rebuildConnectionsFromYjs();
+        this._syncLocalToYjs();
     }
 
     /**
