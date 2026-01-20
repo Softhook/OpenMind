@@ -1156,6 +1156,12 @@ class CollaborationManager {
                         const snap = isUndoRedo ? true : false;
                         this._applyBoxFromYjs(key, data, snap, isUndoRedo);
                     } else if (change.action === 'delete') {
+                        // CRITICAL FIX: Don't delete local boxes when user chose 'sync'
+                        // We want to preserve local state and push it to Yjs
+                        if (this.userSyncChoice === 'sync') {
+                            // Skip deletions - preserve local data
+                            return;
+                        }
                         this._deleteBoxFromLocal(key);
                     }
                 });
@@ -1207,6 +1213,14 @@ class CollaborationManager {
      */
     _applyBoxFromYjs(boxId, data, snapToPosition = false, forceApply = false) {
         if (!this.mindMap || !data) return;
+
+        // CRITICAL FIX: When user chose 'sync', preserve local data - don't apply Yjs to local
+        // This prevents remote data from overwriting local changes before we sync them
+        if (this.userSyncChoice === 'sync' && !forceApply) {
+            // Skip applying Yjs changes to local - we want to preserve local state
+            // and sync it TO Yjs instead of FROM Yjs
+            return;
+        }
 
         let box = this.mindMap.getBoxById(boxId);
 
