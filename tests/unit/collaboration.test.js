@@ -377,120 +377,57 @@ describe('Periodic Consistency Check', () => {
 describe('Local Data Management When Joining Rooms', () => {
     const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
 
-    test('connect should accept shouldShareLocalData parameter', () => {
-        // Should have shouldShareLocalData parameter with default false
-        expect(collabCode).toMatch(/async connect\s*\([^)]*shouldShareLocalData\s*=\s*false/);
+    test('connect should not have shouldShareLocalData parameter', () => {
+        // Should have simplified connect signature without shouldShareLocalData
+        expect(collabCode).toMatch(/async connect\s*\([^)]*\)\s*\{/);
+        // Should not have shouldShareLocalData parameter
+        expect(collabCode).not.toMatch(/async connect\s*\([^)]*shouldShareLocalData/);
     });
 
-    test('connect should store shouldShareLocalData flag', () => {
-        // Should store the flag for use in sync handler
-        expect(collabCode).toMatch(/this\.shouldShareLocalData\s*=\s*shouldShareLocalData/);
+    test('sync handler should always merge via Yjs', () => {
+        // Should have simplified sync logic without conditional clearing
+        expect(collabCode).toMatch(/Room empty, syncing local data to Yjs/);
+        expect(collabCode).toMatch(/Merging local and remote data/);
+        expect(collabCode).toMatch(/Loading data from room/);
     });
 
-    test('constructor should initialize shouldShareLocalData to false', () => {
-        // Should initialize the flag in constructor
-        expect(collabCode).toMatch(/this\.shouldShareLocalData\s*=\s*false/);
-    });
-
-    test('should have _clearLocalData method', () => {
-        // Should have method to clear local boxes and connections
-        expect(collabCode).toMatch(/_clearLocalData\s*\(\s*\)\s*\{/);
-    });
-
-    test('_clearLocalData should clear boxes and connections', () => {
-        // Should clear both arrays
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?this\.mindMap\.boxes\s*=\s*\[\]/);
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?this\.mindMap\.connections\s*=\s*\[\]/);
-    });
-
-    test('_clearLocalData should clear selections', () => {
-        // Should clear selected box and connection
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?this\.mindMap\.selectedBox\s*=\s*null/);
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?this\.mindMap\.selectedConnection\s*=\s*null/);
-    });
-
-    test('_clearLocalData should log the operation', () => {
-        // Should log when clearing data (uses Utils.Logger after refactoring)
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?(Utils\.Logger\.state|console\.log).*Clear/);
-    });
-
-    test('_clearLocalData should have error handling', () => {
-        // Should wrap operations in try-catch
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?try\s*\{/);
-        expect(collabCode).toMatch(/_clearLocalData[\s\S]*?catch\s*\(/);
-        // Should log errors
-        expect(collabCode).toMatch(/console\.error.*Failed to clear local data/);
-    });
-
-    test('sync handler should check shouldShareLocalData flag', () => {
-        // Should check the flag when deciding to share or clear data
-        expect(collabCode).toMatch(/if\s*\([^)]*this\.shouldShareLocalData/);
-    });
-
-    test('sync handler should clear local data when joining empty room', () => {
-        // When room is empty and NOT sharing, calls _handleJoinEmptyRoom
-        expect(collabCode).toMatch(/yjsEmpty\s*&&\s*localHasData\s*&&\s*!this\.shouldShareLocalData/);
-        expect(collabCode).toMatch(/_handleJoinEmptyRoom/);
-    });
-
-    test('sync handler should clear then rebuild when joining room with data', () => {
-        // When room has data and NOT sharing, calls _handleJoinRoomWithData
-        expect(collabCode).toMatch(/!yjsEmpty\s*&&\s*!this\.shouldShareLocalData/);
-        expect(collabCode).toMatch(/_handleJoinRoomWithData/);
-    });
-
-    test('sync handler should seed room when starting collaboration', () => {
-        // When room is empty and sharing, calls _handleStartCollaborationWithData
-        expect(collabCode).toMatch(/yjsEmpty\s*&&\s*localHasData\s*&&\s*this\.shouldShareLocalData/);
-        expect(collabCode).toMatch(/_handleStartCollaborationWithData|_syncLocalToYjs/);
+    test('sync handler should use Yjs for merging local and remote data', () => {
+        // When both have data, should merge via Yjs
+        expect(collabCode).toMatch(/yjsEmpty.*localHasData/);
+        expect(collabCode).toMatch(/_syncLocalToYjs/);
+        expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
+        expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
     });
 });
 
-describe('Sketch.js Integration for Local Data Management', () => {
+describe('Sketch.js Integration for Collaboration', () => {
     const sketchCode = fs.readFileSync(path.join(__dirname, '../../src/sketch.js'), 'utf8');
 
-    test('initializeCollaboration should accept shouldShareLocalData parameter', () => {
-        // Should have parameter with default false
-        expect(sketchCode).toMatch(/async function initializeCollaboration\s*\([^)]*shouldShareLocalData\s*=\s*false/);
+    test('initializeCollaboration should not accept shouldShareLocalData parameter', () => {
+        // Should have simplified signature
+        expect(sketchCode).toMatch(/async function initializeCollaboration\s*\(\s*roomName\s*\)/);
     });
 
-    test('initializeCollaboration should pass flag to connect', () => {
-        // Should pass the flag to collaborationManager.connect
-        expect(sketchCode).toMatch(/collaborationManager\.connect\s*\([^)]*shouldShareLocalData/);
+    test('initializeCollaboration should always merge via Yjs', () => {
+        // Should log that Yjs will merge data
+        expect(sketchCode).toMatch(/Yjs will merge local and remote data/);
     });
 
-    test('initializeCollaboration should log the flag value', () => {
-        // Should log whether sharing local data (uses Utils.Logger after refactoring)
-        expect(sketchCode).toMatch(/(Utils\.Logger|console\.log).*shouldShareLocalData|shouldShareLocalData/);
+    test('shareSession should not use mode parameter', () => {
+        // Should use simple room hash without mode
+        expect(sketchCode).toMatch(/window\.location\.hash\s*=\s*`room=\$\{room\}`/);
+        // Should not use mode=start
+        expect(sketchCode).not.toMatch(/mode=start/);
     });
 
-    test('shareSession should use URL parameter for mode', () => {
-        // Should use URL parameter mode=start instead of global flag
-        expect(sketchCode).toMatch(/window\.location\.hash\s*=\s*`room=\$\{room\}&mode=start`/);
-    });
-
-    test('parseRoomFromHash should return room info object', () => {
-        // Should return object with room and isStarting properties
+    test('parseRoomFromHash should return room ID only', () => {
+        // Should return just the room ID, not mode
         expect(sketchCode).toMatch(/function parseRoomFromHash\s*\(\s*\)\s*\{/);
-        expect(sketchCode).toMatch(/room:.*isStarting/s);
     });
 
-    test('parseRoomFromHash should check mode parameter', () => {
-        // Should check if mode=start in URL (may be in UrlUtils now)
-        const urlUtilsCode = fs.readFileSync(path.join(__dirname, '../../src/UrlUtils.js'), 'utf8');
-        const hasPatternInSketch = sketchCode.match(/params\.get\s*\(\s*['"]mode['"]\s*\)\s*===\s*['"]start['"]/);
-        const hasPatternInUrlUtils = urlUtilsCode.match(/params\.get\s*\(\s*['"]mode['"]\s*\)\s*===\s*['"]start['"]/);
-        expect(hasPatternInSketch || hasPatternInUrlUtils).toBeTruthy();
-    });
-
-    test('handleUrlChange should use roomInfo.isStarting', () => {
-        // Should extract isStarting from roomInfo object
-        expect(sketchCode).toMatch(/roomInfo\s*\?\s*roomInfo\.isStarting/);
-    });
-
-    test('setup should use roomInfo.isStarting for initialization', () => {
-        // When joining from URL at startup, should use flag from URL
-        expect(sketchCode).toMatch(/roomInfo\s*\?\s*roomInfo\.isStarting/);
+    test('handleUrlChange should initialize collaboration without mode', () => {
+        // Should just pass roomName to initializeCollaboration
+        expect(sketchCode).toMatch(/initializeCollaboration\s*\(\s*newRoom\s*\)/);
     });
 });
 

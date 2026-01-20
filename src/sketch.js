@@ -209,7 +209,7 @@ let isMapLoading = false;
 let syncStatus = null;
 
 // Room join confirmation state: { roomName, shouldShareLocalData, hasLocalData } or null
-let roomJoinConfirmation = null;
+
 // Timeout handles for sync overlay (module scope for proper cleanup)
 let syncConnectionTimeout = null;
 let syncEmptyRoomTimeout = null;
@@ -419,12 +419,6 @@ function namesAreSimilar(name1, name2) {
  * Handler to respond to URL changes (hash/popstate) for room management.
  */
 function handleUrlChange() {
-  // Clear any pending room join confirmation when URL changes
-  if (roomJoinConfirmation) {
-    Utils.Logger.state('[Room] URL changed - clearing pending room join confirmation');
-    roomJoinConfirmation = null;
-  }
-
   // Check for room changes
   const roomInfo = parseRoomFromHash();
   const newRoom = roomInfo ? roomInfo.room : null;
@@ -1436,74 +1430,6 @@ function draw() {
 
     pop();
   }
-
-  // Draw room join confirmation overlay when user is about to lose local work
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    push();
-    resetMatrix && resetMatrix();
-    noStroke();
-
-    // Semi-transparent overlay (same as sync overlay)
-    fill(40, 40, 60, 180);
-    rect(0, 0, width, height);
-
-    // App name and version at top
-    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
-    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
-    fill(120);
-    textAlign(CENTER, TOP);
-    textSize(11);
-    text(`${appName} v${versionStr}`, width / 2, 20);
-
-    // Warning icon (⚠️)
-    fill(255, 200, 0);
-    textAlign(CENTER, CENTER);
-    textSize(32);
-    text('⚠️', width / 2, height / 2 - 80);
-
-    // Main message
-    fill(255);
-    textSize(18);
-    text('Joining Collaboration Room', width / 2, height / 2 - 30);
-
-    // Warning message
-    textSize(13);
-    fill(255, 200, 100);
-    const boxCount = roomJoinConfirmation.boxCount || 0;
-    const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
-    text(`Your current work (${boxText}) will be cleared`, width / 2, height / 2 + 5);
-
-    // Subtitle
-    textSize(12);
-    fill(180);
-    text('The room\'s content will sync instead', width / 2, height / 2 + 30);
-
-    // OK Button
-    const buttonWidth = 120;
-    const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
-
-    // Check if mouse is over button
-    const isOverButton = mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-
-    // Button background
-    if (isOverButton) {
-      fill(70, 150, 220); // Hover state
-    } else {
-      fill(60, 130, 200); // Normal state
-    }
-    rect(buttonX, buttonY, buttonWidth, buttonHeight, 4);
-
-    // Button text
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(14);
-    text('OK, Join Room', width / 2, buttonY + buttonHeight / 2);
-
-    pop();
-  }
 }
 
 /**
@@ -1511,19 +1437,6 @@ function draw() {
    * Sets appropriate cursors for resizing, moving, editing, and other interactions.
    */
 function updateCursorForHover() {
-  // PRIORITY: Check if hovering over room join confirmation button
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    const buttonWidth = 120;
-    const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
-
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-      cursor('pointer');
-      return;
-    }
-  }
 
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
@@ -2115,31 +2028,6 @@ function mousePressed(e) {
     return;
   }
 
-  // PRIORITY: Handle room join confirmation dialog before anything else
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Check if click is on OK button
-    const buttonWidth = 120;
-    const buttonHeight = 40;
-    const buttonX = width / 2 - buttonWidth / 2;
-    const buttonY = height / 2 + 60;
-
-    if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-      // User clicked OK - proceed with room join
-      Utils.Logger.state('[Room] User confirmed join - clearing state and connecting');
-
-      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
-      roomJoinConfirmation = null; // Clear confirmation dialog
-
-      // Clear local state
-      _clearLocalState();
-
-      // Continue with room initialization
-      initializeCollaboration(roomName, shouldShareLocalData);
-      return;
-    }
-  }
-
   // Don't allow interaction when sync overlay is shown
   if (syncStatus) return;
 
@@ -2332,38 +2220,6 @@ function keyPressed() {
     }
   } catch (e) {
     console.error('Error in ExtensionBridge.handleInput:', e);
-  }
-
-  // PRIORITY: Handle room join confirmation dialog keyboard shortcuts
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Enter/Return = Confirm and join room
-    if (keyCode === ENTER || keyCode === RETURN) {
-      Utils.Logger.state('[Room] User pressed Enter - confirming join');
-
-      const { roomName, shouldShareLocalData } = roomJoinConfirmation;
-      roomJoinConfirmation = null;
-
-      _clearLocalState();
-      initializeCollaboration(roomName, shouldShareLocalData);
-      return false;
-    }
-
-    // Escape = Cancel and go back
-    if (keyCode === ESCAPE) {
-      Utils.Logger.state('[Room] User pressed Escape - cancelling join');
-      roomJoinConfirmation = null;
-
-      // Navigate back to previous page
-      if (typeof window !== 'undefined' && window.history.length > 1) {
-        window.history.back();
-      } else {
-        // If no history, just clear the hash
-        if (typeof window !== 'undefined') {
-          window.location.hash = '';
-        }
-      }
-      return false;
-    }
   }
 
   if (keyboardOverlayVisible) {
@@ -2899,10 +2755,8 @@ function handleCanvasDrop(e) {
           } else if (lower.endsWith('.pdf')) {
             createPdfBox(url, url.split('/').pop(), wx, wy);
           } else if (lower.endsWith('.json')) {
-            // Try to load JSON map
-            loadMapFromUrl(url).catch(() => {
-              createFilePathBox(filePath, wx, wy);
-            });
+            // For JSON files, create a file path box with the link
+            createFilePathBox(filePath, wx, wy);
           } else {
             // For other file types (docx, txt, etc.), create a text box with the path
             createFilePathBox(filePath, wx, wy);
