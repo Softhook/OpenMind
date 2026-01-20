@@ -15,6 +15,20 @@
       }
     },
     {
+      "id": "84293bbe-04c9-473a-b08c-6d3c500a9cf4",
+      "x": -2281.321594279963,
+      "y": -593.0388914305817,
+      "text": "rebuild my website with AI",
+      "imageUrl": null,
+      "width": 185.8408203125,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
       "id": "11814772-a166-4ba8-99a6-e396e3da4c31",
       "x": -3084.0051709472073,
       "y": 268.3482643789783,
@@ -97,6 +111,20 @@
       ]
     },
     {
+      "id": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
+      "x": -3096.8341854552573,
+      "y": -470.2150798588325,
+      "text": "Talk to Slav about the invoice change",
+      "imageUrl": null,
+      "width": 255.150390625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
       "id": "e8720669-c177-4685-ac98-749cf3e869cb",
       "x": -2305.138371541872,
       "y": 78.17348866953046,
@@ -165,184 +193,8 @@
       ]
     },
     {
-      "id": "14f5e789-8ac2-40f8-b913-3dc52828ccbe",
-      "x": -3308.244219350303,
-      "y": -715.3800533724614,
-      "text": "31st of January have to pay tax bill ",
-      "imageUrl": null,
-      "width": 150,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 15,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "id": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
-      "x": -3096.8341854552573,
-      "y": -167.10744525372968,
-      "text": "Put in our existing paper outline into the Berlin Key Open Mind  ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "8e36f85a-7544-46f7-bec9-0f0021417afc",
-      "x": -2232.344534815128,
-      "y": -268.2764014904947,
-      "text": "Write a conversation article https://theconversation.com/should-you-pour-coffee-down-the-drain-an-environmental-scientist-explains-268236",
-      "imageUrl": null,
-      "width": 716.3369140625,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "bc9f001d-dcb2-44ff-b4e8-d473ec5bb81d",
-      "x": -2861.271823256272,
-      "y": -846.2006802141209,
-      "text": "4th Feb Promotion case ",
-      "imageUrl": null,
-      "width": 176.5234375,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 7,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "id": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
-      "x": -3096.8341854552573,
-      "y": -470.2150798588325,
-      "text": "Talk to Slav about the invoice change",
-      "imageUrl": null,
-      "width": 255.150390625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "f94713ce-2d58-4d7c-90c4-d91dceae1e98",
-      "x": -2861.271823256272,
-      "y": -928.8423747751219,
-      "text": "Sort out the 5 exemplar EMAs",
-      "imageUrl": null,
-      "width": 210.7509765625,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 140,
-        "b": 140
-      }
-    },
-    {
-      "id": "13a9e6f2-eb02-498b-baa4-8dcc00e84b59",
-      "x": -3245.668262488992,
-      "y": -818.8652109886395,
-      "text": "26th Jan Welcome to the new course which is starting it at the end of the month ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 87,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 0,
-          "end": 8,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
-      "id": "93d56473-c770-4114-9219-b0f8c4d63ed0",
-      "x": -2609.0716675280937,
-      "y": -708.1227496311133,
-      "text": "dentist + hygenist",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "1c9d9833-df18-47b4-b817-fa74ee29ee08",
-      "x": -2168.5637287324944,
-      "y": -837.7488286767237,
-      "text": "Find my almost finished disconcertment paper ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "id": "84293bbe-04c9-473a-b08c-6d3c500a9cf4",
-      "x": -2281.321594279963,
-      "y": -593.0388914305817,
-      "text": "rebuild my website with AI",
-      "imageUrl": null,
-      "width": 185.8408203125,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
       "id": "55f391b5-a96e-48ff-a2ed-b9bafa477cf7",
-      "x": -1851.7799017462198,
+      "x": -1851.77990174622,
       "y": 390.49659175152266,
       "text": "Citizen Science is Societal Test \n\nWithin Science and Technology Studies (STS), citizen science has attracted sustained attention as a site where the authority of science is negotiated and reworked. Citizen science is often framed as a hybrid of scientific research and public participation, or as a response to perceived crises in expertise, governance, or trust. Such accounts tend to evaluate citizen science in normative or discursive terms, focusing on questions of empowerment, engagement, or legitimacy. In contrast, within the natural sciences citizen science is frequently promoted as a productive force for generating data more quickly, cheaply, and at greater scale. This paper proposes an alternative framing: citizen science as a form of societal testing where citizen science is approached  as a test bed where scientific practices, publics and governance arrangements are empirically put to the test. \n\nDrawing on a longitudinal case study of participatory pollutions sensing conducted during the author’s doctoral research, alongside a public inquiry related to London City Airport, the paper traces how citizen science operated through testing practices. These included the deployment of sensors, the production and circulation of data, and engagement with regulatory and legal institutions. Empirically, the tests examined EU innovation policy, UK noise regulation, the cohesion of resident groups, and the affiliations of scientists involved. \n\nUnderstanding citizen science as a societal test has significant methodological consequences for how it should be studied. First, it requires shifting the empirical focus from abstract categories, normative claims, or single-site observations to the practices through which tests are enacted. Researchers must trace what is being tested, how tests are organised, and what material and institutional work is involved. This means attending to sensors, data protocols, infrastructures, legal documents, and procedural workflows as part of the empirical field. Second, analysis must adopt a distributed lens that attends to tracking multiple sites and actors to flollow the networks of institutions, scientific communities, regulatory bodies, and publics. Third, a longitudinal perspective is needed to see the consequences of tests appear in differnt forms and sites. This approach requires immersion and reflexivity of the researche to recognise how they are part of the test ecology, influencing the enactment of tests.\n\nSeeing citizen science as a test bed—where sociotechnical practices, protocols, and interactions are being experimentaed with, shifts it from a matter of mild interest to a site where future forms of material politics and governance are being developed in the wild.",
       "imageUrl": null,
@@ -377,6 +229,140 @@
       ]
     },
     {
+      "id": "14f5e789-8ac2-40f8-b913-3dc52828ccbe",
+      "x": -3308.244219350303,
+      "y": -715.3800533724614,
+      "text": "31st of January have to pay tax bill ",
+      "imageUrl": null,
+      "width": 150,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 15,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "1c9d9833-df18-47b4-b817-fa74ee29ee08",
+      "x": -2168.5637287324944,
+      "y": -837.7488286767237,
+      "text": "Find my almost finished disconcertment paper ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
+      "x": -3096.8341854552573,
+      "y": -167.10744525372968,
+      "text": "Put in our existing paper outline into the Berlin Key Open Mind  ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "8e36f85a-7544-46f7-bec9-0f0021417afc",
+      "x": -2232.344534815128,
+      "y": -268.2764014904947,
+      "text": "Write a conversation article https://theconversation.com/should-you-pour-coffee-down-the-drain-an-environmental-scientist-explains-268236",
+      "imageUrl": null,
+      "width": 716.3369140625,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "93d56473-c770-4114-9219-b0f8c4d63ed0",
+      "x": -2609.0716675280937,
+      "y": -708.1227496311133,
+      "text": "dentist + hygenist",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "bc9f001d-dcb2-44ff-b4e8-d473ec5bb81d",
+      "x": -2861.271823256272,
+      "y": -846.2006802141209,
+      "text": "4th Feb Promotion case ",
+      "imageUrl": null,
+      "width": 176.5234375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 7,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "13a9e6f2-eb02-498b-baa4-8dcc00e84b59",
+      "x": -3245.668262488992,
+      "y": -818.8652109886395,
+      "text": "26th Jan Welcome to the new course which is starting it at the end of the month ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 8,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
       "id": "5078f6f8-d481-4fcc-bbf5-5cc58baf8483",
       "x": -2189.8591175153297,
       "y": -1036.1048513255591,
@@ -389,58 +375,156 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "id": "cfd2297c-678c-44eb-800e-12a5c67ef7b2",
+      "x": -1567.6543155370077,
+      "y": -811.3288441352822,
+      "text": "Since Helen Verran coined the term, the concept of \"disconcertment\" has expanded beyond its origins in postcolonial critique to become a widely applied notion across diverse domains, from AI design to healthcare. This expansion invites a critical review of the concept’s properties and affordances. Adopting an approach of methodography—an ethnography of methods—this paper examines disconcertment as an inventive method in its own right. Drawing on ethnographic vignettes from an interdisciplinary research project on environmental sensing, the paper structures the analysis through three distinct stages: experiencing, utilizing, and writing disconcertment.\n\nUsing three vignettes from a case study on environmental sensing, the paper adopts a methodographical approach to trace what disconcertment \"does\" in practice. It introduces a novel distinction—the stage of utilisation—to bridge the gap between Verran’s \"ethnographer in the flesh\" and \"ethnographer in the text.\" The findings suggest that when treated as a systematized method rather than a passive reaction, disconcertment becomes a powerful tool for navigating knowledge conflicts. The paper concludes that the performative aspects of writing disconcertment offer a vital strategy for building alliances and instigating new ways of working in complex STS environments.",
+      "imageUrl": null,
+      "width": 453.1865683528447,
+      "height": 507,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "61367482-2e77-4bac-96a6-9fc0fde81f34",
+      "x": -1653.7912589186537,
+      "y": -1150.0590716933511,
+      "text": "file://Experiencing,%20Writing%20and%20Using%20Verran%E2%80%99s%20disconcertment%20to%20break%20and%20make%20alliances.DOC",
+      "imageUrl": null,
+      "width": 280,
+      "height": 108,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "05184c35-a9f4-4472-a9b0-619027da6850",
+      "x": -1230.539796276403,
+      "y": -821.1423489491074,
+      "text": "design intervention\nand reflection on process",
+      "imageUrl": null,
+      "width": 180.4267578125,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "df97e6d6-5949-49b9-ac4f-6750d236a034",
+      "x": -1181.126222057653,
+      "y": -962.0226072115354,
+      "text": "That stupid smolka paper got 54 citations",
+      "imageUrl": null,
+      "width": 279.25390625,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "48acbac5-9d04-4bb4-8e92-c084dbec6432",
+      "x": -1180.753175182653,
+      "y": -896.8324780803214,
+      "text": "verrans ethnographer is a passive observer (in numbers as well??)",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "be38f486-f355-4331-b349-ad5191daa30b",
+      "x": -1195.136475963903,
+      "y": -755.9522198178934,
+      "text": "alterative mode of design storytelling",
+      "imageUrl": null,
+      "width": 251.2333984375,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "0d149523-1caf-44b5-8918-d6922c3e6bc7",
+      "x": -1180.753175182653,
+      "y": -1027.2127363427494,
+      "text": "Could be written from a full design perspective ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
     }
   ],
   "connections": [
     {
       "fromId": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
       "toId": "41ea48be-d281-4f17-abc3-be4981cc003d",
-      "from": 14,
+      "from": 7,
       "to": 0
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "e8720669-c177-4685-ac98-749cf3e869cb",
-      "from": 9,
-      "to": 6
+      "from": 11,
+      "to": 8
     },
     {
       "fromId": "e8720669-c177-4685-ac98-749cf3e869cb",
       "toId": "77ae8057-4b83-45e2-93fc-59f6e15a214d",
-      "from": 6,
-      "to": 7
+      "from": 8,
+      "to": 9
     },
     {
       "fromId": "f2f03821-939e-43c3-844d-ce257c3b543b",
       "toId": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
-      "from": 3,
-      "to": 11
+      "from": 4,
+      "to": 15
     },
     {
       "fromId": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
       "toId": "41ea48be-d281-4f17-abc3-be4981cc003d",
-      "from": 14,
+      "from": 7,
       "to": 0
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "e8720669-c177-4685-ac98-749cf3e869cb",
-      "from": 9,
-      "to": 6
+      "from": 11,
+      "to": 8
     },
     {
       "fromId": "e8720669-c177-4685-ac98-749cf3e869cb",
       "toId": "77ae8057-4b83-45e2-93fc-59f6e15a214d",
-      "from": 6,
-      "to": 7
+      "from": 8,
+      "to": 9
     },
     {
       "fromId": "f2f03821-939e-43c3-844d-ce257c3b543b",
       "toId": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
-      "from": 3,
-      "to": 11
+      "from": 4,
+      "to": 15
     }
   ],
-  "lastModified": 1768919600693,
+  "lastModified": 1768931811862,
   "name": "Todo.json"
 }
