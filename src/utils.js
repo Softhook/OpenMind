@@ -826,6 +826,76 @@ function generateUUID() {
 }
 
 // ============================================================================
+// USER NOTIFICATION UTILITIES
+// ============================================================================
+
+/**
+ * Shows a temporary notification message to the user
+ * @param {string} message - The message to display
+ * @param {string} type - The type of notification ('info', 'warning', 'error')
+ */
+function showNotification(message, type = 'info') {
+  // Create notification element if it doesn't exist
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.style.cssText = `
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      z-index: 10000;
+      pointer-events: none;
+    `;
+    document.body.appendChild(container);
+  }
+
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  
+  // Set styles based on type
+  const colors = {
+    info: { bg: '#2196F3', text: '#fff' },
+    warning: { bg: '#FF9800', text: '#fff' },
+    error: { bg: '#f44336', text: '#fff' }
+  };
+  const color = colors[type] || colors.info;
+  
+  notification.style.cssText = `
+    background-color: ${color.bg};
+    color: ${color.text};
+    padding: 12px 20px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
+    max-width: 300px;
+  `;
+  
+  notification.textContent = message;
+  container.appendChild(notification);
+
+  // Fade in
+  setTimeout(() => {
+    notification.style.opacity = '1';
+  }, 10);
+
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 3000);
+}
+
+// ============================================================================
 // ERROR HANDLING UTILITIES
 // ============================================================================
 
@@ -926,6 +996,9 @@ if (typeof window !== 'undefined') {
 
     // UUID
     generateUUID,
+
+    // User notifications
+    showNotification,
 
     // Error handling
     safeExecute,

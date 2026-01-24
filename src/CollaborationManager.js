@@ -736,6 +736,13 @@ class CollaborationManager {
                 this.syncConnectionsToYjs(skipTransactionWrapper);
             };
         }
+
+        // Set up TextBox callback to check for remote editing
+        if (typeof TextBox !== 'undefined') {
+            TextBox.getRemoteEditingState = (boxId) => {
+                return this._getRemoteEditingState(boxId);
+            };
+        }
     }
 
     /**
@@ -747,6 +754,11 @@ class CollaborationManager {
             MindMap.onBoxChange = null;
             MindMap.onBoxDelete = null;
             MindMap.onConnectionsChange = null;
+        }
+
+        // Clear TextBox callback
+        if (typeof TextBox !== 'undefined') {
+            TextBox.getRemoteEditingState = null;
         }
     }
 
@@ -1590,6 +1602,35 @@ class CollaborationManager {
     }
 
     /**
+     * Checks if a box is being edited by a remote user
+     * @param {string} boxId - The ID of the box to check
+     * @returns {Object|null} - Remote editing state with {isEditing, userName, userColor} or null
+     * @private
+     */
+    _getRemoteEditingState(boxId) {
+        if (!this.awareness || !boxId) return null;
+
+        const states = this.awareness.getStates();
+        
+        // Check all remote users
+        for (const [clientId, state] of states) {
+            // Skip local user
+            if (clientId === this.awareness.clientID) continue;
+            
+            // Check if this remote user is editing the specified box
+            if (state.editingBoxId === boxId && state.user) {
+                return {
+                    isEditing: true,
+                    userName: state.user.name || 'Another user',
+                    userColor: state.user.color || '#888888'
+                };
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Updates cursor interpolation. Call this in the draw loop.
      * @param {number} lerpFactor - Interpolation speed (0.0 to 1.0)
      */
@@ -1929,4 +1970,10 @@ if (typeof window !== 'undefined') {
         get: function () { return window.collaborationManager; },
         configurable: true
     });
+}
+
+// Export for Node.js/Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CollaborationManager;
+    global.CollaborationManager = CollaborationManager;
 }

@@ -1346,12 +1346,23 @@ class TextBox {
    * Starts editing mode at the given mouse position
    * @param {number} mx - Mouse X in world coordinates (optional)
    * @param {number} my - Mouse Y in world coordinates (optional)
+   * @returns {boolean} - True if editing started, false if blocked
    */
   startEditing(mx = null, my = null) {
     // Do not enter text-edit mode for image boxes
     if (this.imageUrl) {
       this.isEditing = false;
-      return;
+      return false;
+    }
+
+    // Check if box is being edited by a remote user
+    if (TextBox.getRemoteEditingState && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - notify and block editing
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
     }
 
     this.isEditing = true;
@@ -1372,6 +1383,7 @@ class TextBox {
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
 
+    return true;
   }
 
   stopEditing() {
@@ -1395,6 +1407,31 @@ class TextBox {
   static _notifyChange(box, skipTransactionWrapper = false) {
     if (typeof MindMap !== 'undefined' && MindMap.onBoxChange && box) {
       MindMap.onBoxChange(box, skipTransactionWrapper);
+    }
+  }
+
+  /**
+   * Callback function to check if a box is being edited by a remote user
+   * Set by collaboration manager to provide remote editing state
+   * @type {function(string): {isEditing: boolean, userName?: string, userColor?: string} | null}
+   */
+  static getRemoteEditingState = null;
+
+  /**
+   * Shows a notification that editing is blocked by another user
+   * @param {Object} remoteState - The remote editing state
+   * @private
+   */
+  _showEditingBlockedNotification(remoteState) {
+    const userName = remoteState.userName || 'Another user';
+    const message = `${userName} is currently editing this box`;
+    
+    // Use browser notification if available
+    if (typeof Utils !== 'undefined' && Utils.showNotification) {
+      Utils.showNotification(message, 'info');
+    } else {
+      // Fallback to console
+      console.log(message);
     }
   }
 
@@ -1472,6 +1509,15 @@ class TextBox {
 
   // Start selecting text at mouse position
   startSelecting(mx, my) {
+    // Check if box is being edited by a remote user
+    if (TextBox.getRemoteEditingState && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block selecting
+        return false;
+      }
+    }
+
     this.isEditing = true;
     this.isSelecting = true;
     this.selectionAnchor = this.getCursorPositionFromMouse(mx, my);
@@ -1479,6 +1525,7 @@ class TextBox {
     this.selectionEnd = this.selectionAnchor;
     this.cursorPosition = this.selectionEnd;
     this.resetCursorBlink();
+    return true;
   }
 
   // Update selection based on current mouse position
@@ -1546,14 +1593,26 @@ class TextBox {
 
     if (isDouble) {
       // Double-click: select word under cursor
+      // Check if box is being edited by a remote user
+      if (TextBox.getRemoteEditingState && this.id) {
+        const remoteState = TextBox.getRemoteEditingState(this.id);
+        if (remoteState && remoteState.isEditing) {
+          // Box is locked by another user - notify and block
+          this._showEditingBlockedNotification(remoteState);
+          return;
+        }
+      }
       this.isEditing = true;
       this.selectWordAt(pos);
       this.cursorPosition = this.selectionEnd;
       this.resetCursorBlink();
     } else {
       // Single click: position caret and prepare for drag-selection
-      this.startEditing(mx, my);
-      this.startSelecting(mx, my);
+      // Both methods will check for remote editing and return false if blocked
+      const editStarted = this.startEditing(mx, my);
+      if (editStarted) {
+        this.startSelecting(mx, my);
+      }
     }
   }
 
