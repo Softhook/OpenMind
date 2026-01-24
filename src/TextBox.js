@@ -1356,7 +1356,7 @@ class TextBox {
     }
 
     // Check if box is being edited by a remote user
-    if (TextBox.getRemoteEditingState && this.id) {
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
       const remoteState = TextBox.getRemoteEditingState(this.id);
       if (remoteState && remoteState.isEditing) {
         // Box is locked by another user - notify and block editing
@@ -1510,7 +1510,7 @@ class TextBox {
   // Start selecting text at mouse position
   startSelecting(mx, my) {
     // Check if box is being edited by a remote user
-    if (TextBox.getRemoteEditingState && this.id) {
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
       const remoteState = TextBox.getRemoteEditingState(this.id);
       if (remoteState && remoteState.isEditing) {
         // Box is locked by another user - block selecting
@@ -1594,7 +1594,7 @@ class TextBox {
     if (isDouble) {
       // Double-click: select word under cursor
       // Check if box is being edited by a remote user
-      if (TextBox.getRemoteEditingState && this.id) {
+      if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
         const remoteState = TextBox.getRemoteEditingState(this.id);
         if (remoteState && remoteState.isEditing) {
           // Box is locked by another user - notify and block

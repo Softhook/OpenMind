@@ -1608,7 +1608,14 @@ class CollaborationManager {
      * @private
      */
     _getRemoteEditingState(boxId) {
-        if (!this.awareness || !boxId) return null;
+        if (!this.awareness) return null;
+        
+        // Validate boxId - null/undefined is expected, empty string is likely a bug
+        if (boxId === null || boxId === undefined) return null;
+        if (typeof boxId !== 'string' || boxId === '') {
+            console.warn('_getRemoteEditingState called with invalid boxId:', boxId);
+            return null;
+        }
 
         const states = this.awareness.getStates();
         

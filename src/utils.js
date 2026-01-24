@@ -833,8 +833,9 @@ function generateUUID() {
  * Shows a temporary notification message to the user
  * @param {string} message - The message to display
  * @param {string} type - The type of notification ('info', 'warning', 'error')
+ * @param {number} duration - Duration in milliseconds (default: 3000)
  */
-function showNotification(message, type = 'info') {
+function showNotification(message, type = 'info', duration = 3000) {
   // Create notification element if it doesn't exist
   let container = document.getElementById('notification-container');
   if (!container) {
@@ -884,7 +885,7 @@ function showNotification(message, type = 'info') {
     notification.style.opacity = '1';
   }, 10);
 
-  // Auto-remove after 3 seconds
+  // Auto-remove after specified duration
   setTimeout(() => {
     notification.style.opacity = '0';
     setTimeout(() => {
@@ -892,7 +893,7 @@ function showNotification(message, type = 'info') {
         notification.parentNode.removeChild(notification);
       }
     }, 300);
-  }, 3000);
+  }, duration);
 }
 
 // ============================================================================

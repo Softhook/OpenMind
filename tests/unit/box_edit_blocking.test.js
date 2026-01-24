@@ -114,8 +114,10 @@ describe('CollaborationManager Edit Blocking Support', () => {
     });
 
     test('_getRemoteEditingState should validate inputs', () => {
-        // Verify it handles null/undefined boxId
-        expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?!boxId/);
+        // Verify it handles null/undefined boxId and warns on empty string
+        expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?boxId === null/);
+        expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?boxId === ''/);
+        expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?console\.warn/);
     });
 });
 
@@ -148,6 +150,26 @@ describe('User Notification System', () => {
 });
 
 describe('Integration Tests - Runtime Behavior', () => {
+    // Helper function to set up test environment
+    function setupTestEnvironment() {
+        // Load modules
+        require('../../src/utils');
+        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
+            ? (window.OpenMindUtils || window.Utils)
+            : {};
+        
+        // Stub p5 functions
+        global.textSize = jest.fn();
+        global.textWidth = jest.fn(() => 10);
+        global.max = Math.max;
+        global.min = Math.min;
+        global.abs = Math.abs;
+        global.millis = jest.fn(() => 1000);
+        global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
+        
+        return require('../../src/TextBox');
+    }
+
     beforeEach(() => {
         // Clear any existing mocks
         jest.clearAllMocks();
@@ -160,21 +182,7 @@ describe('Integration Tests - Runtime Behavior', () => {
     });
 
     test('TextBox blocks editing when remote user is editing', () => {
-        // Load modules
-        require('../../src/utils');
-        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
-            ? (window.OpenMindUtils || window.Utils)
-            : {};
-        
-        // Stub p5 functions
-        global.textSize = jest.fn();
-        global.textWidth = jest.fn(() => 10);
-        global.max = Math.max;
-        global.min = Math.min;
-        global.millis = jest.fn(() => 1000);
-        global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
-        
-        const TextBox = require('../../src/TextBox');
+        const TextBox = setupTestEnvironment();
 
         // Mock getRemoteEditingState to indicate remote editing
         TextBox.getRemoteEditingState = jest.fn((boxId) => ({
@@ -199,22 +207,7 @@ describe('Integration Tests - Runtime Behavior', () => {
     });
 
     test('TextBox allows editing when no remote user is editing', () => {
-        // Load modules
-        require('../../src/utils');
-        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
-            ? (window.OpenMindUtils || window.Utils)
-            : {};
-        
-        // Stub p5 functions
-        global.textSize = jest.fn();
-        global.textWidth = jest.fn(() => 10);
-        global.max = Math.max;
-        global.min = Math.min;
-        global.abs = Math.abs;
-        global.millis = jest.fn(() => 1000);
-        global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
-        
-        const TextBox = require('../../src/TextBox');
+        const TextBox = setupTestEnvironment();
 
         // Mock getRemoteEditingState to indicate no remote editing
         TextBox.getRemoteEditingState = jest.fn(() => null);
@@ -231,21 +224,7 @@ describe('Integration Tests - Runtime Behavior', () => {
     });
 
     test('TextBox blocks selecting when remote user is editing', () => {
-        // Load modules
-        require('../../src/utils');
-        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
-            ? (window.OpenMindUtils || window.Utils)
-            : {};
-        
-        // Stub p5 functions
-        global.textSize = jest.fn();
-        global.textWidth = jest.fn(() => 10);
-        global.max = Math.max;
-        global.min = Math.min;
-        global.millis = jest.fn(() => 1000);
-        global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
-        
-        const TextBox = require('../../src/TextBox');
+        const TextBox = setupTestEnvironment();
 
         // Mock getRemoteEditingState to indicate remote editing
         TextBox.getRemoteEditingState = jest.fn(() => ({
@@ -329,7 +308,8 @@ describe('Integration Tests - Runtime Behavior', () => {
 });
 
 describe('Edge Cases', () => {
-    test('TextBox startEditing handles missing getRemoteEditingState callback gracefully', () => {
+    // Helper function to set up test environment
+    function setupTestEnvironment() {
         require('../../src/utils');
         global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
             ? (window.OpenMindUtils || window.Utils)
@@ -343,7 +323,11 @@ describe('Edge Cases', () => {
         global.millis = jest.fn(() => 1000);
         global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
         
-        const TextBox = require('../../src/TextBox');
+        return require('../../src/TextBox');
+    }
+
+    test('TextBox startEditing handles missing getRemoteEditingState callback gracefully', () => {
+        const TextBox = setupTestEnvironment();
 
         // Ensure callback is not set
         TextBox.getRemoteEditingState = null;
