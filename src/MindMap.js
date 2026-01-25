@@ -642,11 +642,15 @@ class MindMap {
    */
   rightAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performRightAlign(boxesToAlign);
+      this._performRightAlign(unlocked);
     });
     return true;
   }
@@ -684,11 +688,15 @@ class MindMap {
    */
   topAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performTopAlign(boxesToAlign);
+      this._performTopAlign(unlocked);
     });
     return true;
   }
@@ -726,11 +734,15 @@ class MindMap {
    */
   bottomAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performBottomAlign(boxesToAlign);
+      this._performBottomAlign(unlocked);
     });
     return true;
   }
@@ -769,11 +781,15 @@ class MindMap {
    */
   centerAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performCenterAlign(boxesToAlign);
+      this._performCenterAlign(unlocked);
     });
     return true;
   }
@@ -816,11 +832,15 @@ class MindMap {
    */
   horizontalCenterAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performHorizontalCenterAlign(boxesToAlign);
+      this._performHorizontalCenterAlign(unlocked);
     });
     return true;
   }
@@ -861,11 +881,15 @@ class MindMap {
    */
   distributeSelectedBoxesVertically() {
     const boxes = this._getSelectedBoxes();
-    if (boxes.length < 3) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxes.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performVerticalDistribute(boxes);
+      this._performVerticalDistribute(unlocked);
     });
     return true;
   }
@@ -925,11 +949,15 @@ class MindMap {
    */
   distributeSelectedBoxesHorizontally() {
     const boxes = this._getSelectedBoxes();
-    if (boxes.length < 3) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxes.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    
+    if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performHorizontalDistribute(boxes);
+      this._performHorizontalDistribute(unlocked);
     });
     return true;
   }
