@@ -1367,6 +1367,11 @@ class TextBox {
 
     this.isEditing = true;
 
+    // Immediately broadcast editing state to prevent race conditions
+    if (typeof TextBox.onEditingStateChange === 'function') {
+      TextBox.onEditingStateChange(this.id);
+    }
+
     this._ensureText();
 
     // If mouse coordinates provided, position cursor at click location
@@ -1394,6 +1399,11 @@ class TextBox {
     this.isSelecting = false;
     this.updateDimensions();
 
+    // Immediately broadcast editing state change
+    if (typeof TextBox.onEditingStateChange === 'function') {
+      TextBox.onEditingStateChange(null);
+    }
+
     // Notify collaboration system of text/dimension changes
     TextBox._notifyChange(this);
   }
@@ -1416,6 +1426,13 @@ class TextBox {
    * @type {function(string): {isEditing: boolean, userName?: string, userColor?: string} | null}
    */
   static getRemoteEditingState = null;
+
+  /**
+   * Callback function to immediately broadcast editing state changes
+   * Set by collaboration manager to immediately update awareness when editing starts/stops
+   * @type {function(string|null): void}
+   */
+  static onEditingStateChange = null;
 
   /**
    * Shows a notification that editing is blocked by another user

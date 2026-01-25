@@ -67,6 +67,23 @@ describe('TextBox Edit Blocking - Code Structure', () => {
         expect(textBoxCode).toMatch(/_showEditingBlockedNotification[^}]*\{[\s\S]*?userName/);
         expect(textBoxCode).toMatch(/_showEditingBlockedNotification[^}]*\{[\s\S]*?currently editing/i);
     });
+
+    test('TextBox should have onEditingStateChange static callback', () => {
+        // Verify the static callback exists for immediate editing state broadcasts
+        expect(textBoxCode).toMatch(/static\s+onEditingStateChange\s*=/);
+    });
+
+    test('startEditing should immediately broadcast editing state', () => {
+        // Verify startEditing calls the callback to broadcast immediately
+        expect(textBoxCode).toMatch(/startEditing[^}]*\{[\s\S]*?onEditingStateChange/);
+        expect(textBoxCode).toMatch(/startEditing[^}]*\{[\s\S]*?onEditingStateChange.*this\.id/s);
+    });
+
+    test('stopEditing should immediately broadcast editing state', () => {
+        // Verify stopEditing calls the callback to clear editing state
+        expect(textBoxCode).toMatch(/stopEditing[^}]*\{[\s\S]*?onEditingStateChange/);
+        expect(textBoxCode).toMatch(/stopEditing[^}]*\{[\s\S]*?onEditingStateChange.*null/s);
+    });
 });
 
 describe('CollaborationManager Edit Blocking Support', () => {
@@ -118,6 +135,16 @@ describe('CollaborationManager Edit Blocking Support', () => {
         expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?boxId === null/);
         expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?boxId === ''/);
         expect(collabCode).toMatch(/_getRemoteEditingState[^}]*\{[\s\S]*?console\.warn/);
+    });
+
+    test('CollaborationManager should set TextBox.onEditingStateChange callback', () => {
+        // Verify the immediate broadcast callback is set
+        expect(collabCode).toMatch(/TextBox\.onEditingStateChange\s*=/);
+    });
+
+    test('CollaborationManager should clear TextBox.onEditingStateChange on cleanup', () => {
+        // Verify the callback is cleared on disconnect
+        expect(collabCode).toMatch(/_clearMindMapCallbacks[\s\S]*?TextBox\.onEditingStateChange\s*=\s*null/);
     });
 });
 
@@ -242,6 +269,44 @@ describe('Integration Tests - Runtime Behavior', () => {
         expect(result).toBe(false);
         expect(box.isEditing).toBe(false);
         expect(box.isSelecting).toBe(false);
+    });
+
+    test('TextBox immediately broadcasts editing state when starting to edit', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock callbacks
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+        TextBox.onEditingStateChange = jest.fn();
+
+        const box = new TextBox(100, 100, 'Test Box');
+
+        // Start editing
+        box.startEditing(100, 100);
+
+        // Verify immediate broadcast was called with box ID
+        expect(TextBox.onEditingStateChange).toHaveBeenCalledWith(box.id);
+        expect(TextBox.onEditingStateChange).toHaveBeenCalledTimes(1);
+    });
+
+    test('TextBox immediately broadcasts editing state when stopping editing', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock callbacks
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+        TextBox.onEditingStateChange = jest.fn();
+
+        const box = new TextBox(100, 100, 'Test Box');
+
+        // Start editing first
+        box.startEditing(100, 100);
+        jest.clearAllMocks(); // Clear the first call
+
+        // Stop editing
+        box.stopEditing();
+
+        // Verify immediate broadcast was called with null
+        expect(TextBox.onEditingStateChange).toHaveBeenCalledWith(null);
+        expect(TextBox.onEditingStateChange).toHaveBeenCalledTimes(1);
     });
 
     test('CollaborationManager._getRemoteEditingState returns null when box not being edited', () => {

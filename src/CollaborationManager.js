@@ -742,6 +742,11 @@ class CollaborationManager {
             TextBox.getRemoteEditingState = (boxId) => {
                 return this._getRemoteEditingState(boxId);
             };
+            
+            // Set up callback for immediate editing state broadcasts
+            TextBox.onEditingStateChange = (boxId) => {
+                this.updateEditingBox(boxId);
+            };
         }
     }
 
@@ -759,6 +764,7 @@ class CollaborationManager {
         // Clear TextBox callback
         if (typeof TextBox !== 'undefined') {
             TextBox.getRemoteEditingState = null;
+            TextBox.onEditingStateChange = null;
         }
     }
 
