@@ -533,6 +533,9 @@ class MindMap {
     const tol = Math.max(0, Number.isFinite(tolerance) ? tolerance : MindMap.ALIGN_TOLERANCE);
     if (!this.boxes || this.boxes.length < 2) return;
 
+    // Filter out boxes that are locked by remote editing
+    const unlocked = this.boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+
     // Helper: cluster numerical values and return array of clusters (arrays of indices)
     const clusterValues = (values) => {
       // values: [{v:number, i:number}]
@@ -557,27 +560,27 @@ class MindMap {
       return clusters;
     };
 
-    // X alignment
-    const xVals = this.boxes.map((b, i) => ({ v: b.x, i }));
+    // X alignment (only on unlocked boxes)
+    const xVals = unlocked.map((b, i) => ({ v: b.x, i }));
     const xClusters = clusterValues(xVals);
     for (const cluster of xClusters) {
       if (cluster.length < 2) continue; // Only snap when there are at least 2
       const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
       for (const it of cluster) {
-        const box = this.boxes[it.i];
+        const box = unlocked[it.i];
         box.x = avg;
         box.targetX = avg; // Sync target to prevent rubber-banding
       }
     }
 
-    // Y alignment
-    const yVals = this.boxes.map((b, i) => ({ v: b.y, i }));
+    // Y alignment (only on unlocked boxes)
+    const yVals = unlocked.map((b, i) => ({ v: b.y, i }));
     const yClusters = clusterValues(yVals);
     for (const cluster of yClusters) {
       if (cluster.length < 2) continue;
       const avg = cluster.reduce((s, it) => s + it.v, 0) / cluster.length;
       for (const it of cluster) {
-        const box = this.boxes[it.i];
+        const box = unlocked[it.i];
         box.y = avg;
         box.targetY = avg; // Sync target to prevent rubber-banding
       }
@@ -590,11 +593,15 @@ class MindMap {
    */
   leftAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performLeftAlign(boxesToAlign);
+      this._performLeftAlign(unlocked);
     });
     return true;
   }
@@ -635,11 +642,15 @@ class MindMap {
    */
   rightAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performRightAlign(boxesToAlign);
+      this._performRightAlign(unlocked);
     });
     return true;
   }
@@ -677,11 +688,15 @@ class MindMap {
    */
   topAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performTopAlign(boxesToAlign);
+      this._performTopAlign(unlocked);
     });
     return true;
   }
@@ -719,11 +734,15 @@ class MindMap {
    */
   bottomAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performBottomAlign(boxesToAlign);
+      this._performBottomAlign(unlocked);
     });
     return true;
   }
@@ -762,11 +781,15 @@ class MindMap {
    */
   centerAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performCenterAlign(boxesToAlign);
+      this._performCenterAlign(unlocked);
     });
     return true;
   }
@@ -809,11 +832,15 @@ class MindMap {
    */
   horizontalCenterAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    if (boxesToAlign.length < 2) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performHorizontalCenterAlign(boxesToAlign);
+      this._performHorizontalCenterAlign(unlocked);
     });
     return true;
   }
@@ -854,11 +881,15 @@ class MindMap {
    */
   distributeSelectedBoxesVertically() {
     const boxes = this._getSelectedBoxes();
-    if (boxes.length < 3) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performVerticalDistribute(boxes);
+      this._performVerticalDistribute(unlocked);
     });
     return true;
   }
@@ -918,11 +949,15 @@ class MindMap {
    */
   distributeSelectedBoxesHorizontally() {
     const boxes = this._getSelectedBoxes();
-    if (boxes.length < 3) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performHorizontalDistribute(boxes);
+      this._performHorizontalDistribute(unlocked);
     });
     return true;
   }
@@ -983,11 +1018,15 @@ class MindMap {
   hierarchicalLayout() {
     // Determine which boxes to layout (selection only; otherwise do nothing)
     const boxesToLayout = this._getSelectedBoxes();
-    if (boxesToLayout.length < 1) return false;
+    
+    // Filter out boxes locked by remote editing
+    const unlocked = boxesToLayout.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
+    
+    if (unlocked.length < 1) return false;
 
     // Wrap in transaction for single undo step
     this._wrapInTransaction(() => {
-      this._performHierarchicalLayout(boxesToLayout);
+      this._performHierarchicalLayout(unlocked);
     });
     return true;
   }
