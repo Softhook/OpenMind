@@ -1368,7 +1368,7 @@ class TextBox {
     this.isEditing = true;
 
     // Immediately broadcast editing state to prevent race conditions
-    if (typeof TextBox.onEditingStateChange === 'function') {
+    if (typeof TextBox.onEditingStateChange === 'function' && this.id) {
       TextBox.onEditingStateChange(this.id);
     }
 
@@ -1536,7 +1536,18 @@ class TextBox {
     return { left, right, top, bottom };
   }
 
-  // Start selecting text at mouse position
+  /**
+   * Start selecting text at the given mouse position.
+   *
+   * Initializes selection state based on the mouse coordinates and
+   * enters editing/selecting mode, unless the box is currently locked
+   * for editing by a remote user.
+   *
+   * @param {number} mx - The x-coordinate of the mouse in canvas space
+   * @param {number} my - The y-coordinate of the mouse in canvas space
+   * @returns {boolean} - True if selection was started successfully, or
+   *   false if selection is blocked (for example, due to remote editing)
+   */
   startSelecting(mx, my) {
     // Check if box is being edited by a remote user
     if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
@@ -1632,6 +1643,12 @@ class TextBox {
         }
       }
       this.isEditing = true;
+      
+      // Immediately broadcast editing state to prevent race conditions
+      if (typeof TextBox.onEditingStateChange === 'function' && this.id) {
+        TextBox.onEditingStateChange(this.id);
+      }
+      
       this.selectWordAt(pos);
       this.cursorPosition = this.selectionEnd;
       this.resetCursorBlink();
@@ -2225,6 +2242,7 @@ class TextBox {
    * Starts dragging the box
    * @param {number} mx - Mouse X in world coordinates
    * @param {number} my - Mouse Y in world coordinates
+   * @returns {boolean} - True if dragging started, false if blocked by remote editing
    */
   startDrag(mx, my) {
     // Check if box is being edited by a remote user
@@ -2308,6 +2326,7 @@ class TextBox {
    * Starts resizing the box
    * @param {number} mx - Mouse X in world coordinates
    * @param {number} my - Mouse Y in world coordinates
+   * @returns {boolean} - True if resizing started, false if blocked by remote editing
    */
   startResize(mx, my) {
     // Check if box is being edited by a remote user

@@ -534,7 +534,7 @@ class MindMap {
     if (!this.boxes || this.boxes.length < 2) return;
 
     // Filter out boxes that are locked by remote editing
-    const unlocked = this.boxes.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = this.boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
 
     // Helper: cluster numerical values and return array of clusters (arrays of indices)
     const clusterValues = (values) => {
@@ -595,7 +595,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -644,7 +644,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -690,7 +690,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -736,7 +736,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -783,7 +783,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -834,7 +834,7 @@ class MindMap {
     const boxesToAlign = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToAlign.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 2) return false;
 
@@ -883,7 +883,7 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxes.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 3) return false;
 
@@ -951,7 +951,7 @@ class MindMap {
     const boxes = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxes.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 3) return false;
 
@@ -1020,7 +1020,7 @@ class MindMap {
     const boxesToLayout = this._getSelectedBoxes();
     
     // Filter out boxes locked by remote editing
-    const unlocked = boxesToLayout.filter(b => !b.isLockedByRemoteEdit || !b.isLockedByRemoteEdit());
+    const unlocked = boxesToLayout.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
     
     if (unlocked.length < 1) return false;
 

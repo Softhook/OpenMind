@@ -309,6 +309,42 @@ describe('Integration Tests - Runtime Behavior', () => {
         expect(TextBox.onEditingStateChange).toHaveBeenCalledTimes(1);
     });
 
+    test('TextBox immediately broadcasts editing state on double-click', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock callbacks
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+        TextBox.onEditingStateChange = jest.fn();
+        
+        // Mock keyIsDown function (needed by handleMouseDown)
+        global.keyIsDown = jest.fn(() => false);
+        
+        // Mock dist function (needed for double-click detection)
+        global.dist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+
+        const box = new TextBox(100, 100, 'Test Box');
+
+        // Simulate double-click by calling handleMouseDown twice quickly
+        const mx = 100;
+        const my = 100;
+        
+        // First click
+        box.handleMouseDown(mx, my);
+        
+        // Second click (double-click) - need to simulate within doubleClickThreshold
+        box.lastClickTime = global.millis() - 100; // Within threshold
+        box.lastClickX = mx;
+        box.lastClickY = my;
+        
+        jest.clearAllMocks(); // Clear calls from first click
+        
+        box.handleMouseDown(mx, my);
+
+        // Verify immediate broadcast was called with box ID for double-click
+        expect(TextBox.onEditingStateChange).toHaveBeenCalledWith(box.id);
+        expect(TextBox.onEditingStateChange).toHaveBeenCalled();
+    });
+
     test('CollaborationManager._getRemoteEditingState returns null when box not being edited', () => {
         // Load CollaborationManager
         require('../../src/CollaborationManager');

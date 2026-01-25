@@ -836,6 +836,10 @@ function generateUUID() {
  * @param {number} duration - Duration in milliseconds (default: 3000)
  */
 function showNotification(message, type = 'info', duration = 3000) {
+  // Validate type parameter to prevent potential security issues
+  const validTypes = ['info', 'warning', 'error'];
+  type = validTypes.includes(type) ? type : 'info';
+  
   // Create notification element if it doesn't exist
   let container = document.getElementById('notification-container');
   if (!container) {
