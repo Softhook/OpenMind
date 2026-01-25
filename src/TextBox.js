@@ -1435,6 +1435,18 @@ class TextBox {
   static onEditingStateChange = null;
 
   /**
+   * Check if this box is currently being edited by a remote user
+   * @returns {boolean} - True if box is locked by remote editing
+   */
+  isLockedByRemoteEdit() {
+    if (typeof TextBox.getRemoteEditingState !== 'function' || !this.id) {
+      return false;
+    }
+    const remoteState = TextBox.getRemoteEditingState(this.id);
+    return !!(remoteState && remoteState.isEditing);
+  }
+
+  /**
    * Shows a notification that editing is blocked by another user
    * @param {Object} remoteState - The remote editing state
    * @private
@@ -2215,12 +2227,23 @@ class TextBox {
    * @param {number} my - Mouse Y in world coordinates
    */
   startDrag(mx, my) {
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block dragging
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
+    }
+
     this.isDragging = true;
     this.dragOffsetX = this.x - mx;
     this.dragOffsetY = this.y - my;
     // Store initial position to detect if drag actually moved the box
     this._dragStartX = this.x;
     this._dragStartY = this.y;
+    return true;
   }
 
   /**
@@ -2287,6 +2310,16 @@ class TextBox {
    * @param {number} my - Mouse Y in world coordinates
    */
   startResize(mx, my) {
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block resizing
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
+    }
+
     this.isResizing = true;
     this.userResized = true; // mark that the user has manually resized the box
     this.resizeStartX = mx;
@@ -2296,6 +2329,7 @@ class TextBox {
     // Remember fixed top-left so only bottom-right corner moves
     this.resizeStartLeft = this.x - this.width / 2;
     this.resizeStartTop = this.y - this.height / 2;
+    return true;
   }
 
   /**

@@ -431,3 +431,155 @@ describe('Edge Cases', () => {
         expect(result).toBeNull();
     });
 });
+
+describe('Move, Resize, and Alignment Blocking', () => {
+    // Helper function to set up test environment
+    function setupTestEnvironment() {
+        require('../../src/utils');
+        global.Utils = (typeof window !== 'undefined' && (window.OpenMindUtils || window.Utils))
+            ? (window.OpenMindUtils || window.Utils)
+            : {};
+        
+        global.textSize = jest.fn();
+        global.textWidth = jest.fn(() => 10);
+        global.max = Math.max;
+        global.min = Math.min;
+        global.abs = Math.abs;
+        global.millis = jest.fn(() => 1000);
+        global.constrain = (val, min, max) => Math.max(min, Math.min(max, val));
+        
+        return require('../../src/TextBox');
+    }
+
+    test('TextBox should have isLockedByRemoteEdit method', () => {
+        // Verify the helper method exists
+        expect(textBoxCode).toMatch(/isLockedByRemoteEdit\s*\(\s*\)\s*\{/);
+    });
+
+    test('startDrag should check for remote editing state', () => {
+        // Verify startDrag checks remote editing before allowing drag
+        expect(textBoxCode).toMatch(/startDrag[^{]*\{[\s\S]*?getRemoteEditingState/);
+        expect(textBoxCode).toMatch(/startDrag[^{]*\{[\s\S]*?remoteState.*isEditing/);
+    });
+
+    test('startDrag should return boolean indicating success', () => {
+        // Verify startDrag returns true/false
+        expect(textBoxCode).toMatch(/startDrag[^{]*\{[\s\S]*?return\s+false/);
+        expect(textBoxCode).toMatch(/startDrag[^{]*\{[\s\S]*?return\s+true/);
+    });
+
+    test('startResize should check for remote editing state', () => {
+        // Verify startResize checks remote editing before allowing resize
+        expect(textBoxCode).toMatch(/startResize[^{]*\{[\s\S]*?getRemoteEditingState/);
+        expect(textBoxCode).toMatch(/startResize[^{]*\{[\s\S]*?remoteState.*isEditing/);
+    });
+
+    test('startResize should return boolean indicating success', () => {
+        // Verify startResize returns true/false
+        expect(textBoxCode).toMatch(/startResize[^{]*\{[\s\S]*?return\s+false/);
+        expect(textBoxCode).toMatch(/startResize[^{]*\{[\s\S]*?return\s+true/);
+    });
+
+    test('TextBox blocks dragging when remote user is editing', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock getRemoteEditingState to indicate remote editing
+        TextBox.getRemoteEditingState = jest.fn(() => ({
+            isEditing: true,
+            userName: 'Remote User',
+            userColor: '#ff0000'
+        }));
+
+        const box = new TextBox(100, 100, 'Test Box');
+        
+        // Mock the notification method
+        box._showEditingBlockedNotification = jest.fn();
+
+        // Try to start dragging
+        const result = box.startDrag(100, 100);
+
+        // Verify dragging was blocked
+        expect(result).toBe(false);
+        expect(box.isDragging).toBeFalsy(); // Should be undefined or false
+        expect(box._showEditingBlockedNotification).toHaveBeenCalled();
+    });
+
+    test('TextBox allows dragging when no remote user is editing', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock getRemoteEditingState to indicate no remote editing
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+
+        const box = new TextBox(100, 100, 'Test Box');
+
+        // Try to start dragging
+        const result = box.startDrag(100, 100);
+
+        // Verify dragging was allowed
+        expect(result).toBe(true);
+        expect(box.isDragging).toBe(true);
+    });
+
+    test('TextBox blocks resizing when remote user is editing', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock getRemoteEditingState to indicate remote editing
+        TextBox.getRemoteEditingState = jest.fn(() => ({
+            isEditing: true,
+            userName: 'Remote User',
+            userColor: '#ff0000'
+        }));
+
+        const box = new TextBox(100, 100, 'Test Box');
+        
+        // Mock the notification method
+        box._showEditingBlockedNotification = jest.fn();
+
+        // Try to start resizing
+        const result = box.startResize(100, 100);
+
+        // Verify resizing was blocked
+        expect(result).toBe(false);
+        expect(box.isResizing).toBeFalsy(); // Should be undefined or false
+        expect(box._showEditingBlockedNotification).toHaveBeenCalled();
+    });
+
+    test('TextBox allows resizing when no remote user is editing', () => {
+        const TextBox = setupTestEnvironment();
+
+        // Mock getRemoteEditingState to indicate no remote editing
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+
+        const box = new TextBox(100, 100, 'Test Box');
+
+        // Try to start resizing
+        const result = box.startResize(100, 100);
+
+        // Verify resizing was allowed
+        expect(result).toBe(true);
+        expect(box.isResizing).toBe(true);
+    });
+
+    test('isLockedByRemoteEdit returns true when box is being edited remotely', () => {
+        const TextBox = setupTestEnvironment();
+
+        TextBox.getRemoteEditingState = jest.fn(() => ({
+            isEditing: true,
+            userName: 'Remote User'
+        }));
+
+        const box = new TextBox(100, 100, 'Test Box');
+        
+        expect(box.isLockedByRemoteEdit()).toBe(true);
+    });
+
+    test('isLockedByRemoteEdit returns false when box is not being edited remotely', () => {
+        const TextBox = setupTestEnvironment();
+
+        TextBox.getRemoteEditingState = jest.fn(() => null);
+
+        const box = new TextBox(100, 100, 'Test Box');
+        
+        expect(box.isLockedByRemoteEdit()).toBe(false);
+    });
+});
