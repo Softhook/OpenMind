@@ -1,25 +1,41 @@
 {
   "boxes": [
     {
-      "x": -816.4248854546752,
-      "y": 994.933811186599,
-      "text": "From Object to Parable: Revisiting Latour’s Berlin Key to call for Reflexive Storytelling in Actor-Network Theory",
+      "id": "200296f0-8afc-443c-9d1b-f939d474eaf6",
+      "x": 2100,
+      "y": 189.5,
+      "text": "Abstract (200 words)",
       "imageUrl": null,
-      "width": 280,
-      "height": 87,
+      "width": 400,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
-        "g": 140,
+        "g": 200,
         "b": 140
       }
     },
     {
-      "x": -1543.4564462775313,
-      "y": 1863.0272012570358,
-      "text": "there is room for improvement in Latour's account of the Berlin key: \n\nfirst, at an empirical level due to the methods Latour used in the study and second, \n\nat a meta-conceptual level in its elevation of a priori arguments over situated stories. ",
+      "id": "ea3daec1-0cb2-455a-b047-3bebe21fbe9b",
+      "x": 2550,
+      "y": 189.5,
+      "text": "Introduction",
       "imageUrl": null,
-      "width": 292.5736572692923,
-      "height": 213,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "id": "82ef8ec5-556a-4e5f-9daf-dc7d7d1bba7c",
+      "x": 2550,
+      "y": 463,
+      "text": "Writing in 2026, the loss of Bruno Latour, one of the central figures of Actor-Network Theory (ANT) still reverberates. Latour shaped the discipline’s theoretical foundations and established the empirical methods and distinctive tone adopted by thousands of researchers worldwide. His passing presents an opportunity to reflect on the unique qualities of ANT, a task already begun in recent special issues in Science, Technology, & Human Values (Addison et al., 2023) and Theory, Culture and Society (Hennion, 2024). However, much of this discussion on Latour’s legacy has focused on his later work, such as Modes of Existence (Latour, 2013) and his ecological writings (Latour, 2017). There has been surprisingly little re-examination of the classic texts that shaped ANT’s origins. Yet, if we wish to establish a meaningful picture of Latour’s legacy for ANT, it is arguably these early texts that hold the key to this inheritance.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 381,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -27,11 +43,54 @@
       }
     },
     {
-      "x": -1543.4564462775313,
-      "y": 2133.052835698342,
-      "text": "Annemarie Mol and Helen Verran that foreground the author as a reflexive participant, while distinguishing between the empirical component and the narrative element, offers a way for ANT theorists to assume responsibility for their accounts. We argue that this these approaches towards storytelling point the way towards more engaged, situated, and reflexive orientation for ANT in the 21st century",
+      "id": "d7a4d6bc-a0a1-40c1-82bd-7b6fae7ac882",
+      "x": 2550,
+      "y": 894,
+      "text": "The goal of this paper is to revisit one of Latour’s key early texts The Berlin key or how to do words with things which was written in the 1980s, it was published as a chapter in English (1992) and French (1993) before appearing in the expanded English version (2000) most familiar to readers today. Ostensibly, the text describes an archaeologist struggling to open a door using a unique double-bladed key found only in Berlin. Through this episode, the text constructs a philosophical argument regarding how physical structures enact socio-material scripts that participate in and shape social relations. Latour intended the text to contribute to the long-standing STS discussion on the relationship between objects and texts. As we will show, the paper has been widely cited across multiple disciplines—including design, architecture, and geography—becoming an academic shorthand for the importance of materiality and a cultural artefact in its own right.",
       "imageUrl": null,
-      "width": 280,
+      "width": 400,
+      "height": 381,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "7c14f952-2aab-4357-9d05-8986e97854b9",
+      "x": 2550,
+      "y": 1325,
+      "text": "Our contribution in this paper is a forensic analysis of both the material object of the key and the text itself. We aim to open up the construction of the paper, examining how it was made empirically and discursively, identifying its impacts, and speculating on how it could have been written differently. In analysing the text, we identify the key elements of Latour's toolbox: empirical moments, fable-like storytelling, humour, and philosophical reflection. We argue that Latour’s paper is fundamentally a pedagogical parable intended to sensitise the reader to the agency of objects. The weakness of the text, however, is that while its argumentative style borrowed from Rudolf Bultmann's hermeneutics and exegesis successfully ‘enlivens’ the object, it simultaneously ‘betrays’ it. By withholding ‘raw’ observational or ethnographic detail, Latour makes it difficult for the reader to trace his own process of translating an object into a text (Latour, 2010:600).",
+      "imageUrl": null,
+      "width": 400,
+      "height": 381,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "54695a62-6d75-40b7-948e-35bf57911eb8",
+      "x": 2550,
+      "y": 1861,
+      "text": "We argue there is room for improvement in Latour's account of the Berlin Key: first, at an empirical level regarding the methods used to observe the key as a socio-material artefact, and second, at a meta-conceptual level regarding the elevation of a priori arguments over situated and reflective stories. We contend that Latour’s process of 'translation/reasoning' has obscured the empirical roots and genealogy of the material-semiotic analysis that underpinned early ANT. This paper revisits the debates of the 1990s—surrounding Langdon Winner’s Do Artifacts Have Politics?—which questioned what counts as storytelling in STS but reached an unsatisfactorily ambiguous conclusion. Thirty years later, the atmosphere has changed; as Marres (2023) suggests, there is now an urgency for STS researchers to take agency in shaping the world. While Winner and his critics wrestled with the morality of Marxist political critiques, the current challenge is defining responsible and engaged storytelling in an era of misinformation and climate breakdown. We seek to balance the translation of ‘things into words’ with the necessity of advocating for our texts 'in the space' of words. This tension represents the interplay between the rhetorical enlivening of objects and the fidelity to a post-ethnographic method of thick description. This matters because academics continue to reference The Berlin Key as a foundational demonstration of how ANT does empirical research (Muecke & Janicka, 2024).",
+      "imageUrl": null,
+      "width": 400,
+      "height": 591,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "935abb0c-dfb8-4348-b19f-aa7aca31bad2",
+      "x": 2550,
+      "y": 2334,
+      "text": "Ultimately, this paper argues that ANT must reconsider its classic case studies and the pedagogical methods they model. We propose drawing on the approaches of Annemarie Mol and Helen Verran, which foreground the author as a reflexive participant and distinguish between the empirical component and the narrative element. This distinction offers a way for ANT theorists to assume responsibility for their accounts and argue that these approaches to storytelling point the way toward a more engaged, situated, and reflexive orientation for ANT in the 21st century.",
+      "imageUrl": null,
+      "width": 400,
       "height": 255,
       "backgroundColor": {
         "r": 255,
@@ -40,11 +99,12 @@
       }
     },
     {
-      "x": -346.1781489818395,
-      "y": 1249.533416028857,
-      "text": "Methodology",
+      "id": "5ba9e587-999d-46c3-8861-f847e3966735",
+      "x": 3000,
+      "y": 189.5,
+      "text": "The context of the Paper",
       "imageUrl": null,
-      "width": 150,
+      "width": 400,
       "height": 45,
       "backgroundColor": {
         "r": 255,
@@ -53,38 +113,13 @@
       }
     },
     {
-      "x": 363.68250717618946,
-      "y": 1249.533416028857,
-      "text": "Discussion",
+      "id": "49d4b3bb-1553-4fa0-aa80-2b52cf60f372",
+      "x": 3000,
+      "y": 442,
+      "text": "The essay The Berlin Key or how to do words with things was originally published in French as La clef de Berlin et autres leçons d'un amateur de sciences by La Découverte in (1993). It was introduced to the Anglosphere as the opening chapter in Matter, Materiality and Modern Culture (Graves-Brown, 2000). In this version, translated by Lydia Davis, additional editing was completed, and illustrations were redrawn by Graves-Brown. The altered English title is significant; it is a deliberate wordplay on J.L. Austin's seminal linguistic text, How to Do Things With Words. This rhetorical shift signals Latour’s core theoretical move: a pivot from linguistic performativity (words doing things) to material agency (things doing work). This is how it's been treated largely as a demonstration for the work that things do in shaping the world.",
       "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 705.3756046345228,
-      "y": 1249.533416028857,
-      "text": "Conclusion How ANT should tell stories for the future",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 705.3756046345228,
-      "y": 1492.6413995112339,
-      "text": "",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
+      "width": 400,
+      "height": 339,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -92,25 +127,13 @@
       }
     },
     {
-      "x": -654.4409188453985,
-      "y": 1249.533416028857,
-      "text": "Context of the Paper",
+      "id": "e8672d6b-002b-43d3-a7d3-8e334ab36b10",
+      "x": 3001.6477143723946,
+      "y": 2367.150239420848,
+      "text": "In Archaeology: The text famously describes technology as a \"nightmare for archaeologists.\" This acknowledgment has made it a touchstone for Symmetrical Archaeology (e.g., Bjørnar Olsen), validating the discipline's struggle to interpret \"mute\" objects as active social participants.",
       "imageUrl": null,
-      "width": 152.4130859375,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": -1543.4564462775313,
-      "y": 1490.9759323744238,
-      "text": "Latour dead time to review what ANT is. Why does this matter? Because we are defining the future of ANT. ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 87,
+      "width": 400,
+      "height": 129,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -118,11 +141,26 @@
       }
     },
     {
-      "x": -1543.4564462775313,
-      "y": 1645.5015668157298,
-      "text": "Other special issues that have been created. Lots of focus on recent work\n\nBut little examinations of Latours early texts that have more to tell us about the fundmental nature of ANT",
+      "id": "04a527c9-e51a-4744-9676-474d550baaee",
+      "x": 3001.6477143723946,
+      "y": 2546.150239420848,
+      "text": "In Media & Internet Studies: The \"key\" is frequently cited as a metaphor for Digital Rights Management (DRM) and code-as-law, illustrating how software architecture physically constrains user agency just as the steel key constrained the Berlin tenants.",
       "imageUrl": null,
-      "width": 254.91469055521088,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "23697fb2-9037-4fa7-8654-ef3b2c0d812a",
+      "x": 3001.6477143723946,
+      "y": 2735.650239420848,
+      "text": "The text has found such a broad audience because it is an accessible, vivid, and detailed narrative. It has become totemic even in popular culture, where an internet search for \"Berlin Key\" points to the academic paper as much as the physical object, effectively displacing the reality it claims to describe.",
+      "imageUrl": null,
+      "width": 400,
       "height": 150,
       "backgroundColor": {
         "r": 255,
@@ -131,11 +169,348 @@
       }
     },
     {
-      "x": -1543.4564462775313,
-      "y": 1357.4502979331178,
-      "text": "Key important paper cited by man in fields beyond ANT, design archeology, became iconic for defining materility",
+      "id": "e68b1456-ec77-4cef-968b-5a613cf88598",
+      "x": 3450,
+      "y": 189.5,
+      "text": "Methodology: A Forensic & Reflexive Approach",
       "imageUrl": null,
-      "width": 228.68601791640822,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "id": "69e13a16-9f1f-4d40-b9aa-4179a734da2f",
+      "x": 3450,
+      "y": 358,
+      "text": "This paper adopts a hybrid methodology that combines actor-network tracing with a forensic visual and discourse analysis. Our goal is to rigorously engage with “The Berlin Key\" as a theoretical text, but also as a \"crime scene\" of construction—a site where empirical facts, narrative devices, and graphical evidence were assembled to produce a specific truth.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "710c8ac2-6cc1-45e7-af4c-eaa79d50affd",
+      "x": 3462.187982486834,
+      "y": 2154.584759193962,
+      "text": "To operationalise this framework, we conducted a three-strand investigation that treat the key as a physical artefact, as text and as well as literary network. In the first strand we investigated the Berlin key as a material artefact, independent of Latour's narrative. We reviewed original patent documents (Schweiger, 1927, 1933) and related manufacturing records to understand the mechanism's intended logic. Lived Experience: We explored how the key functions by engaging with individuals who still use the device daily and by consulting newspaper accounts and popular media. Goal: These sources helped us identify practical issues and user perceptions that exist outside the theoretical text. In the second strand we examined the key within Latour’s paper. We carry out Textual Analysis of Latour’s writing style, rhetorical strategies, and narrative framing. This involved detailed textual coding in, moving from loose, initial codes to refined thematic categories. We analysed the numerous diagrams to understand what aspects of the key Latour highlights—and significantly, what he chooses not to show. We examined how these diagrams are deployed in relation to specific text sections to stabilise his argument. The third strand involves intertextual analysis looking at other texts that influenced Latour such as Bultman’s work as well as other ANT literature influenced by the Berlin Key",
+      "imageUrl": null,
+      "width": 400,
+      "height": 549,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "e668d63d-2126-4e0d-bfa4-417bdeabe4e6",
+      "x": 3900,
+      "y": 189.5,
+      "text": "The key as material artefact",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "id": "882e65ba-89b9-4c5f-b8cd-d640833fd27c",
+      "x": 3900,
+      "y": 410.5,
+      "text": "The key’s origins lie in the patents of German locksmith Johan Schweiger (Schweiger, 1927, 1933). In these documents, the object is treated as a purely functional invention—specifically, a locking \"system\" for which the patent was granted. The key itself is secondary, described simply as a ‘push-through key’ (Durchsteckschlüssel) and tucked away in the margins of the diagrams. Bruno Latour’s account shifts this hierarchy. He ignores the complex lock mechanism and the ordinary single-bearded caretaker’s key to fixate on the tenant’s double-ended key. Indeed, it is this unusual object that appears seven times in his (2000) paper, rebranded from a utilitarian tool into the iconic \"Berlin key.\"",
+      "imageUrl": null,
+      "width": 400,
+      "height": 276,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "b2be0b54-591c-45fc-9953-513e12f40a11",
+      "x": 3900,
+      "y": 715.5,
+      "text": "Visually, however, Latour stays close to Schweiger’s patent aesthetic, using simple line drawings to emphasize the key’s outline. He expands on Schweiger’s work only by adding an instructional sequence on how to rotate and push the key. Yet a striking contradiction remains, while Latour’s text evokes the rich atmosphere of Berlin—heavy doors, courtyards, and social constraint—his images remain clinical and abstract. Unlike the photographic evidence provided in works like Circulating Reference (Latour, 1999) the Berlin key is presented against a blank background.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "80f1b1b8-80cb-48ad-ada3-697236b64deb",
+      "x": 3900,
+      "y": 926,
+      "text": "Why is there no photo of the key in use? Why do we not see the gates and secret courtyards? The answer is revealed, quite simply, in a footnote:",
+      "imageUrl": null,
+      "width": 400,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "8a6ea64d-7374-43d0-b095-fa26320332f7",
+      "x": 3900,
+      "y": 1084,
+      "text": "“My warmest thanks to Bernard Joerges for having presented me with this key and to Wanfred Schweizer of the Kerfin Company for having sold me a sample of his lock, real enough to guarantee him his livelihood.” (Latour, 2000, p. 21).",
+      "imageUrl": null,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "48fdd020-390d-441e-8443-0669b6ae1443",
+      "x": 3900,
+      "y": 1263,
+      "text": "In this intriguing footnote, Latour seems to be telling a very different story from the narrative of the archaeologist and their struggles in opening the door. It is only in an account by Henning Schmidgen (2015), Latour’ historian that we get the full story.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "f3d73eb4-d0a1-4846-88c5-2180e7c58982",
+      "x": 3900,
+      "y": 1442,
+      "text": "“Latour was fascinated. He showered Joerges with questions, went home with him, tried out the key, and then went to a Berlin locksmith to buy such a lock and key to take home with him. Back in Paris Latour wrote a case study” (Schmidgen, 2015, p. 98).",
+      "imageUrl": null,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "bff49df5-7966-4615-9aea-f7531fc79dc9",
+      "x": 3900,
+      "y": 1642,
+      "text": "These details fundamentally change our perception of the paper and explains why Latour presents the key without any photographs. While Latour held the objects in his hands, the lock and key were dismembered artefacts that were detached from any usage. He did not observe how tenants used it to navigate their daily lives; he wrote the paper while looking at a mechanical sample on his desk.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "99fecae0-fd22-4622-9e82-7dc3d09ff5db",
+      "x": 3900,
+      "y": 1884,
+      "text": "When we put together the pieces of this puzzle, we grinned because it felt like we had caught Latour making things up. But what had we really found? However, this scepticism drove us to verify whether the Berlin key remained in circulation thirty years later. We turned to media archives and social networks to determine if the object still occupied the public imagination. There are still many contemporary newspaper articles being written about the key, which in German is still referred to as a Durchsteckschussel.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 213,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "74b50746-5d2b-4294-b8bd-df86bcd10011",
+      "x": 3900,
+      "y": 2157.5,
+      "text": "Through conversations with residents, the key’s daily reality came into focus. Informants shared routine frustrations, such as the key continuously scraping against walls during entry—narratives that captured the object's texture in daily life. It also became evident that the key's function is not intuitive; we observed instances where even demonstrators struggled to operate the lock, and users turned to online video tutorials for guidance. Weighing as much as a mobile phone and prone to snagging on clothing, it is a cumbersome but intriguing artifact.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "3dc2499a-351b-4590-b133-40c3dbc0d759",
+      "x": 3900,
+      "y": 2504.5,
+      "text": "There is a dissonance between the device in Latour’s essay and the material key. Our findings suggest that the key’s agency is exerted not merely through the locking mechanism, but through its intrusive physical presence—weighing down pockets, damaging belongings, and generating friction in social exchanges. By reducing the key to its function in the lock, Latour presents a sanitised image of a messy obdurate object in a lived context. In practice, the Berlin key seems to operate less as a calculated tool of 'control scripts' and more as a technological relic, acting as a barrier to social relations through its unwieldy design. This status as a niche, nostalgic artifact makes it a paradoxical choice to use to model contemporary technological formations, such as internet constraints, or for serving as the primary ANT exemplar of material-social relations.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 360,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "fedb3837-55a2-4cdd-9643-6434a42cb9cf",
+      "x": 4350,
+      "y": 410.5,
+      "text": "The identity The Berlin Key text has shifted significantly through translation and republication. In its first iteration, it was titled ‘La clef de Berlin et autres leçons d'un amateur de sciences’ (The Key to Berlin and other lessons from a science lover). Later English versions adopted the title ‘The Berlin Key or How to Do Words with Things,’ a playful inversion of J.L. Austin's famous How to Do Things With Words. The Berlin Key also reappears as a small aside in one of Latour’s other papers (Latour, 1992). These revisions and reuses signal that Latour is not presenting a single case study but rather revising the text as a flexible narrative device rather than a singular object of study.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 276,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "c362555a-16a0-4fcd-979b-77b3c648b717",
+      "x": 4350,
+      "y": 631.5,
+      "text": "Figure 1. The green is the introduction, yellow diagrams, red is the parable blue, the theoretical discussion.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "71d2b747-f728-4f88-96fd-691836c71068",
+      "x": 4350,
+      "y": 1252,
+      "text": "Figure 2. 1/3 of the paper is comprised of diagrams suggesting that we need treat these images seriously as a component of the paper.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "b168a887-0771-4867-9b6b-d9f65247ecc1",
+      "x": 4350,
+      "y": 1462.5,
+      "text": "The visual composition of the text is striking: images and diagrams appear on eight of the twelve pages, occupying a full third of the paper. These images are interwoven with the text in a style reminiscent of a journalistic photo-essay, driving the narrative rather than merely illustrating data. Most significant is the introductory artwork drawn by editor Paul Graves-Brown, which was absent from Latour’s original French version. It depicts the Berlin key with the handwritten caption ‘Ceci est une Clef’ (This is a key), a direct allusion to Magritte’s surrealist painting ‘Ceci n'est pas une pipe’.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "5f8f9896-951a-450d-8a3e-cd7a2235b7c6",
+      "x": 4350,
+      "y": 1757,
+      "text": "By invoking Magritte, the text creates a visual pun parallel to its title, How to Do Words with Things (itself an inversion of J.L. Austin’s philosophical work). Yet Latour never explicitly references this image in the body of the text. Instead, the image acts as a silent instruction to the reader: this is not a material object, but a \"surrealist key\"—a phrase Latour repeats three times. This visual and textual invocation primes us to view the key as a mythic artifact rather than a mundane tool, using the diagram-based narrative as a form of visual data within a mythical, abstract mode of evidence-making.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "cf664d4f-5dca-466b-9458-1832c6519765",
+      "x": 6276.763083234229,
+      "y": 646.6932309495494,
+      "text": "From an ethnographic perspective, the limitation of Latour’s approach in The Berlin Key is his disengagement from the object's ‘aboutness’. Despite the text’s sociological framing, Latour does not appear to have observed the key in situ. As the footnotes reveal, his analysis relies not on fieldwork, but on a lock and key seen in isolation. Consequently, we never see the key functioning in its natural habitat; there are no photographs of Berlin courtyards, doors, or users. Instead, the key is presented in this abstracted form, the reversibility and weight of the key ceases to be a physical feature and transforms into a semiotic one. Much like the famous \"Janus Face\" diagram in Science in Action, the key becomes a clean, theoretical symbol rather than a dirty, material tool. Latour defines the key as a mediator—an active agent that shapes social relations—yet he provides no empirical evidence of the human actors it supposedly disciplines. He does not interview residents, postmen, repair workers, or concierges. He essentially posits a network without mapping it. This omission is particularly striking when contrasted with later explanations and use of the text, such as Yaneva (Yaneva, 2022), that do a better job at mapping a living set of actors surrounding the key, including Visitors, Thieves, Owners, Delivery People, Concierge Residents, and Cats. By omitting these voices, Latour presents a myth of control through material. However, our own research—comprising a review of mainstream literature and small-scale interviews—reveals a reality defined instead by messy complexity. Where Latour sees a technology of discipline and control, actual residents often describe the key as a mere curiosity or a quirky nuisance. The clean theoretical lines of Latour’s argument collapse when faced with the living reality of the object's use.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 696,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "b2aa7b02-e740-47d5-b618-faffc4f6704e",
+      "x": 6276.763083234229,
+      "y": 1203.6932309495494,
+      "text": "This raises a fundamental question regarding the utility of Latour’s \"parable mode\" as a method for ANT. While the parable format allows for a compelling narrative, it risks sacrificing empirical integrity for the sake of a moral lesson. Latour’s story acts as a pedagogical device, teaching the reader how to think about non-human agency, but it fails as an ethnographic demonstration of how to study it. The fluidity of the text—shifting arguments and titles across translations—suggests that for Latour, the Berlin key was never truly a case study, but a rhetorical vehicle. For the ethnographer, this creates a tension: while the text succeeds as a philosophical prompt, it offers a potentially misleading model for empirical research, prioritising the elegance of the argument over the messiness of the field.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 318,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "ae728d9f-8b36-4358-a136-cf6d3ed7ee44",
+      "x": 6726.763083234229,
+      "y": 189.5,
+      "text": "Conclusion How ANT should tell stories for the future",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "id": "7cd9498f-9d95-4ddc-87e9-b7b35b93088b",
+      "x": 6726.763083234229,
+      "y": 468.1932309495494,
+      "text": "Latour expand philosophical technique of exemplum to make this more empirical and then is attractive as a “empirical” philosopher, but was misleading is that he is still a “philosopher”, means this is still “parable ontological devise” which has a rhetorical goal to change reader rather than an empirical analysis. Then early success of ANT/Latour was giving a “humanities” a little quasi empirical analysis as a meaphors/rhetorical devises to “sell” a philosophical and theoretical claim. However this has a prize, visible in legacy of Latour, that this “parable quasi empirical devises/techniques” very often (a least in early ANT) replace both: theory and empirical analysis. On on hand in makes ANT strong as a new field “between” those, but on other is doesn’t do good any of them (theory and empirical analysis”.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 339,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "c0501455-a81d-4b08-af58-24baf5b99eca",
+      "x": 6726.763083234229,
+      "y": 783.6932309495494,
+      "text": "In some way it is a repetition of old Marxists obsession about theory and practice and how to connect them. In historical developments of Marxism very often it was resolve in superficial way by proposing enigmatic and vague term of “dialectics”. But very often without any more dense, empirical based analysis how this dialectical link between theory and practice, ideal and material is done, how is happening.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "236a8c7d-cce4-41dc-974a-d45c8a607e7c",
+      "x": 6726.763083234229,
+      "y": 983.6932309495494,
+      "text": "What was refreshing in Latourian approach in 80ties -90 ties, that he proposes outside of outdated, petrified Marxist tradition vocabulary, a way to fill this gap. Or at least he sell a promise he and his approach is able to do it.",
+      "imageUrl": null,
+      "width": 400,
       "height": 108,
       "backgroundColor": {
         "r": 255,
@@ -144,8 +519,177 @@
       }
     },
     {
-      "x": 3.1368907820952643,
-      "y": 2112.6272399956783,
+      "id": "5bde0022-b196-4b1e-a38d-e374c668d376",
+      "x": 6726.763083234229,
+      "y": 1173.1932309495494,
+      "text": "“Parable ontological devise” help to connect, atract people from  different fields and tradition. For philosophers, sociologist it was a way to ilustrate their theisis, arguments with more developed (as normally seen in their fileds) empirical exemplum, for science, STEM backround researches it helps to enrich their usual way of storytelling.[aw3.1]",
+      "imageUrl": null,
+      "width": 400,
+      "height": 171,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "ae74d4e9-61ad-4bb9-ae8e-717c04f318dd",
+      "x": 6726.763083234229,
+      "y": 1404.6932309495496,
+      "text": "This is a part of success story of ANT. What we a propose to take a close look at, is to realize how this “half backed empiricism” and “half backed philosophy” shaped a development of ANT/STS community. In both way – making a room for responsible empirical philosophy like Annemarie Mol but also making a room for quasi empirical and quasi philosophical analysis which are not doing right any of this moment.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "0091afa8-f981-49a3-ad0f-174bcbee5151",
+      "x": 6726.763083234229,
+      "y": 1583.6932309495496,
+      "text": "•\tThis paper by Latour raises a central question of how to do ANT.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "507920c7-0ee7-4bad-bb1b-9aa662660eb2",
+      "x": 6717.391754557353,
+      "y": 1683.3512765851751,
+      "text": "•\tIn this analysis, there is a conflict in this text between the ethnographer in the field and the ethnographer in text",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "3a93196b-6b37-4dfd-9f02-77d9b5d30879",
+      "x": 6717.391754557353,
+      "y": 1799.3512765851751,
+      "text": "•\tHow to be more responsible in the field and the text and tell a coherent story",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "624abdec-eeea-4cf3-952e-1a97fa533b95",
+      "x": 6717.391754557353,
+      "y": 1946.8512765851751,
+      "text": "•\tWe want to be more careful about our insights and try and tell stories more carefully to repair the key story. Annemarie Mol and Helen Verran (Verran, 2021) have taught STS to tell stories with more care. What practices would a Mol & Verranian account of the Berlin Key enable?",
+      "imageUrl": null,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "97852edf-ed3a-4f20-ad22-4ce1113389e7",
+      "x": 6717.391754557353,
+      "y": 2094.351276585175,
+      "text": "•\tVerran invites us to look at her toolbox and agree or disagree with it.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "196def5f-8140-4fe2-b264-c0d542466e0c",
+      "x": 6717.391754557353,
+      "y": 2210.351276585175,
+      "text": "•\tVerran uses disconcertment and how to guides, Mol uses the footnote. Latour uses the parable.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "2eee0941-83fd-49c9-b2b0-f34eda8fc2dc",
+      "x": 6717.391754557353,
+      "y": 2399.8512765851747,
+      "text": "•\tNaïveity wish that rhetoric tools will not dissapear. In discussing controversy about the idea of spinach being a specific health food being due to a technical error (Rekdal, 2014) argues that academic urban lends will disappear with more access to knowledge. “The digital revolution has provided us with marvelous weapons for exposing and cutting down the prevalence rates of rumors and urban legends in academia” yet this notion misses the point that social science doesn’t need debunking",
+      "imageUrl": null,
+      "width": 400,
+      "height": 213,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "177272e8-7c9b-4c43-89af-67f3102e497d",
+      "x": 6717.391754557353,
+      "y": 2578.8512765851747,
+      "text": "•",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "245372fe-8470-41e5-8e97-44a73f14bb7e",
+      "x": 6717.391754557353,
+      "y": 2694.8512765851747,
+      "text": "•\tThis paper is trying to model how ANT can function with Latour against Latour. Its kind of reproducibility with new tools",
+      "imageUrl": null,
+      "width": 400,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "c1f42bfa-cb22-403f-9d7b-20c78d660a2c",
+      "x": 6717.391754557353,
+      "y": 2831.8512765851747,
+      "text": "•\tA more reflexive orientation to the empirical and philosophical is possible and needed as a pedagogical tool for 21st century STS and design.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 87,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "94bf0527-0d0f-4cc3-a3e6-179c0feb761c",
+      "x": 5286.010583250744,
+      "y": 1604.1614680564123,
       "text": "Latour’s Counter‑Moves\nTruth = transformation through mediation  \n Myth/parable = necessary vehicle of truth\nInterpretation = condition of truth’s survival\nGoal = restore narrative as ontological operator  ",
       "imageUrl": null,
       "width": 334.65013005551873,
@@ -157,8 +701,9 @@
       }
     },
     {
-      "x": 3.1368907820952643,
-      "y": 2363.336255117131,
+      "id": "0bfdfb63-d235-44f5-9f44-19b2e0b8222f",
+      "x": 5286.010583250744,
+      "y": 1854.8704831778646,
       "text": "A. Parable as Method\nIndirect, transformative speech \nProduces metanoia (shift in stance)\nRejects “Double Click” immediacy\n\nB. Maquette / Model-in-Scale\nSmall narrative = ontological laboratory\nExample performs theory, not illustrates it\n\nReprise (Repetition-with-Difference)\nTruth renewed through retelling\nParallel to Gospel multiplicity ",
       "imageUrl": null,
       "width": 316.8888377874751,
@@ -170,34 +715,9 @@
       }
     },
     {
-      "x": 3.1368907820952643,
-      "y": 1935.4182248742259,
-      "text": "Bultmann’s Key Commitments\nTruth = existential decision (kerygma) \nMyth = historically contingent shell\nInterpretation = extraction of core message \nGoal = “demythologize” to reach pure proclamation",
-      "imageUrl": null,
-      "width": 377.00398084854567,
-      "height": 129,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
-    },
-    {
-      "x": -1543.4564462775313,
-      "y": 1249.533416028857,
-      "text": "Introduction",
-      "imageUrl": null,
-      "width": 150,
-      "height": 45,
-      "backgroundColor": {
-        "r": 255,
-        "g": 200,
-        "b": 140
-      }
-    },
-    {
-      "x": 3.1368907820952643,
-      "y": 2614.0452702385833,
+      "id": "ad2c80b6-85e4-4a75-91df-cb17d41ed3be",
+      "x": 5262.560071381143,
+      "y": 1963.410770089861,
       "text": " Mundane object → narrative displacement of agency\nKey “acts” (delegation, prescription, moralization)\nStory forces reader to experience redistributed agency\nParable = theory in miniature  ",
       "imageUrl": null,
       "width": 359.31084633907477,
@@ -209,12 +729,53 @@
       }
     },
     {
-      "x": -24.726914393046634,
-      "y": 1384.3291455608328,
-      "text": "about the physical object",
+      "id": "b9435b26-f727-47aa-9cca-a11f8994c441",
+      "x": 1650,
+      "y": 200,
+      "text": "From Object to Parable: Revisiting Latour’s Berlin Key to call for Reflexive Storytelling in Actor-Network Theory",
       "imageUrl": null,
-      "width": 178.1025390625,
-      "height": 45,
+      "width": 400,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 140,
+        "b": 140
+      }
+    },
+    {
+      "id": "1a7c5138-5795-4043-a483-b90824ae730b",
+      "x": 2100,
+      "y": 641.5,
+      "text": "This paper re-evaluates Bruno Latour’s \"The Berlin Key\" to challenge its role as a foundational template for Actor-Network Theory (ANT) storytelling. Influential across diverse disciplines such as design, architecture and human-computer interaction, the text has long served as a primary methodological guide for empirically dem+onstrating material agency and the \"scripting\" of behavior. However, our visual and discourse analysis reveals the text is less an empirical study and more a pedagogical parable. We demonstrate how Latour employs a technique of exegetical storytelling—influenced by Rudolf Bultmann—to construct \"maquettes.\" These maquettes act as ontological tools that blur the line between empirical description, theoretical analysis, and methodological prescription, allowing Latour to enact a controlled version of the social world. We argue that this \"empiric storytelling\"—a mix of philosophy, humor, and empirical glimpses—has become a dominant paradigm that obscures both the researcher's hand and the world. This mode of storytelling has been very succesful in establishing ANT and articuating its pedgogical potential but also limited its capacity to intervene in contested dynamics and support change agendas, which has long been one of the key criticisms made of ANT.  Rejecting Woolgar and Cooper’s (1999) notion of STS accounts as \"legends,\" we propose a shift in ANT practice guided by Annemarie Mol and Helen Verran. Their focus on reflexivity in storytelling offers a departure from the closed worlds of sociological maquettes, pointing toward an open ANT. This porous approach can enable genuine collaboration with generative disciplines such as design, fostering a practice that is not only engaged and accountable but capable of actively participating in the making of worlds.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 696,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 508,
+          "end": 849,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "db51f69c-55b5-4432-85c0-f05e7cbf71e9",
+      "x": 3000.510856849193,
+      "y": 1649.1853392990672,
+      "text": "In Philosophy of Technology, scholars like Peter-Paul Verbeek cite the key to argue that objects possess \"moral agency,\" mediating human decisions and ethics not through laws, but through material constraints.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 108,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -222,63 +783,666 @@
       }
     },
     {
-      "x": 7.039608153488494,
-      "y": 1249.533416028857,
-      "text": "Observations about key as object and text",
+      "id": "b8fac59b-e87c-4c00-adad-e6193ae9a89c",
+      "x": 3000,
+      "y": 1020,
+      "text": "Since its publication, the article has achieved classic status with nearly 500 citations and appearing on many reading lists across the world. It serves as the primary gateway text for scholars entering the world of ANT. Within the canon of ANT, the text holds a specific strategic position alongside its twin essay on the hydraulic door closer (Latour, 1992) or key fob. Together, these texts constitute the manifesto for the \"Missing Masses\" of sociology. Latour uses the key to demonstrate the mechanism of \"delegation\"—showing how the social role of a human concierge is displaced onto a steel mechanism. The text is demonstration that society is not merely a web of human relations, but a durable network held together by the \"cement\" of non-human actors. It establishes the baseline for \"Generalized Symmetry,\" teaching researchers to analyse a mechanical spring with the same vocabulary used for a human rule. Crucially, this text did more than provide a case study; it established the genre of object ANT case study. By focusing on a trivial pocket object, Latour legitimised the micro-analysis of the mundane. \"The Berlin Key\" taught a generation of scholars that the path to social theory lay in the forensic description of small, overlooked artifacts. It set the tone for a specific mode of storytelling: the researcher as a philosophical detective, unravelling the cosmos through a single, small mechanism (Verbeek, 2005). It can be seen as starting a lineage visible of canonical \"single object\" studies that followed, such as the Zimbabwe Bush Pump (de Laet & Mol, 2000) or the electric vehicle (Callon, 1987). Susan star phonebook - mundane infrastruce.\n\nIts actually quite a populist mode of storytelling about single objejts like cod or salt  https://www.amazon.co.uk/Cod-Biography-Fish-Changed-World/dp/0140275010",
+      "imageUrl": null,
+      "width": 400,
+      "height": 717,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 1065,
+          "end": 1434,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "986bfc74-b146-4860-90d3-3ac176194d48",
+      "x": 3001.6477143723946,
+      "y": 2188.150239420848,
+      "text": "In Architecture: Theorists like Albena Yaneva (Latour for Architects) cite the key to argue that buildings are not static objects but dynamic \"maps\" of social relations. The key demonstrates how architecture mediates the boundary between public and private space through mechanical law.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "b0a09de8-e3ba-42e2-9439-8865765140e8",
+      "x": 3000.510856849193,
+      "y": 1880.6853392990672,
+      "text": "In Design and HCI: It is the foundational text for the concept of the \"Script\" (or \"inscription\"). Scholars like Madeleine Akrich and practitioners in Interaction Design use it to demonstrate how designers \"delegate\" values into objects—creating \"forcing functions\" that coerce users into specific behaviours (e.g., the key forcing a tenant to lock the door) it connects with notions such as affordances popularised by Donald Norman.\n\n(This is single object actually what makes Latour popular with designers",
+      "imageUrl": null,
+      "width": 400,
+      "height": 255,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 435,
+          "end": 507,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "c0ae2cde-0aa8-45b7-9bab-c4153563a8d3",
+      "x": 1633.575217627856,
+      "y": 764.8599020674645,
+      "text": "Maquettes have a performative function\nshow at exhibition\npersavive they have to be changed\nthe reader is part of the story\n\n\nstudents are supposed to repeat that maquette but they cant repeat it",
       "imageUrl": null,
       "width": 280,
-      "height": 66,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "d97a0eb2-2102-41cc-97f9-c1fcfd197abe",
+      "x": 1629.2527203482045,
+      "y": 423.7461915125132,
+      "text": "the reason we use a forensic apprach is a differnt empirical take. does this work on late latour AIME?\n\nforenisic approach is symetrical on the way but it has a goal that important and tries to intervene. It needs guts to make a claim. responsibility",
+      "imageUrl": null,
+      "width": 280,
+      "height": 192,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 236,
+          "end": 250,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "bbfa6aee-93d2-4921-9227-06ddbf5a2aab",
+      "x": 3450,
+      "y": 768,
+      "text": "Our approach is shaped by our disciplinary backgrounds. The ‘we’ in this paper refers to two researchers who have been influenced by Latour and ANT, yet who approach this foundational text from distinct vantage points. Christian approaches this study from an Art and Design background. His engagement with Latour was formed during the Making Things Public era (Latour & Weibel, 2005)—a period heavily focused on articulating the connection between ANT and design. However, his perspective is informed by a frustration with the limitations of that period which highlighted the material dimension of politics yet failed to translate into material interventions. Andrzej approaches this study from a Philosophy and STS background. His interest lies in the genealogical roots of ANT’s reasoning. Drawing on the hermeneutic tradition, Andrzej focuses on the theological and exegetical underpinnings of Latour’s writing. He is particularly concerned with how ontological claims (what things are) are used to smuggle in normative claims (what things should do). He is also so dissapointed in lack of materialist empirical analysis in so called \"historical and dialectical: materialism. This positioning is critical: We approach the text as invested practitioners. We are interested in the mechanics of how theory is designed, using the Berlin Key to prototype a more transparent, reflexive form of ANT.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 549,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 660,
+          "end": 1179,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "b1f681f3-9758-499b-9d84-3a5ad8a96456",
+      "x": 3462.187982486834,
+      "y": 1513.5847591939616,
+      "text": "Our analytical framework draws inspiration from the investigative aesthetics of the Forensic Architecture lab (Weizman et al., 2010). Typically, Forensic Architecture employs architectural and media analysis to investigate contemporary political violence through 3d visualisations of bomb fragments to intervening in public discussions with urgent evidentiary claims. By treating Latour’s diagrams and descriptions as evidentiary fragments, we seek to reconstruct the chain of custody of his argument. We complement this with the historic-forensic approach of Errol Morris (2011). In his investigation of Roger Fenton’s Crimean War photography (\"The Valley of the Shadow of Death\"), Morris analysed the placement of cannonballs to determine if the scene had been staged by the photographer. Morris explicitly writes himself into the investigation, documenting his own obsession, errors, and experiments. We mirror this method by interrogating whether Latour staged his own case study and speculate on his intensions. What is interesting is that these are traditions of analysis that come outside of the history of ANT and allow us to re re-invigorated through both a visual approach and a political urgency. While forensic analysis provides tools, we turn to Annemarie Mol and Helen Verran to reconstruct a more responsible ANT storytelling. Unlike the \"God’s eye view\" often implied by forensic objectivity, Mol and Verran insist that the researcher is always part of the enactment they describe. We therefore employ a reflexive narrative strategy, acknowledging that our act of reading is also an act of constructing.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 633,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "73a93c7f-e196-4146-8ffa-9f7e5b076f04",
+      "x": 4350,
+      "y": 189.5,
+      "text": "The key as textual artefact",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 27,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "af7059d4-e184-4587-922e-bc7644f85614",
+      "x": 5246.636298158927,
+      "y": 192.26915659401456,
+      "text": "The key as literary Network",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
         "g": 200,
         "b": 140
       }
+    },
+    {
+      "id": "dae89321-cdde-4f90-9e08-0516d502c886",
+      "x": 4350,
+      "y": 936.5,
+      "text": "A structural analysis of the 2000 text reveals a distinctive three-part structure. By color-coding the twelve-page English version, a distinct ‘sandwich’ structure emerges: an introduction (green) page 1 and 2, a middle section of narrative (red), interweaved with diagrams (yellow) a theoretical conclusion (blue). The narrative red sections comprise roughly half the paper’s text, while the theoretical discussion makes up less than a third. By weighting the text heavily toward the narrative of the key, Latour signals that the narrative of the object is very important. Carrying out textual coding of the paper using an open coding approach gave us three sets of subcodes grouped into three dimensions: rhetorical (parable), philosophical (theoretical) and empirical. The text contains rhetorical dimension contains 95 coded passages, the theoretical-philosophical 34, and 11 empirical 11 passages. In his narrative Latour uses on an imagined fictional woman-archaeologist, which appears in 25 separate fragments. The most frequently recurring sub-code (33) fragments is the use of the metaphorical figure of the person as a key-user.",
+      "imageUrl": null,
+      "width": 400,
+      "height": 444,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 772,
+          "end": 1138,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "d1d18512-8439-44d3-a37f-4b5f87d91127",
+      "x": 4350,
+      "y": 2093.5,
+      "text": "This interpretation supports the findings from the coding analysis, which suggest the text is a constructed and flexible myth rather than an empirical account. The second most frequent sub-code, ‘making mystery’ (14 passages), captures Latour’s effort to \"enchant\" the world he is narrating. Similarly, the third most common code, ‘creating we with readers’ (9 passages), reveals the rhetorical devices used to manufacture a sense of connection with the reader. Ultimately, the theoretical arguments are not grounded in observation of the key in use, but rather float atop the narrative, sustained by surrealist diagrams and imaginative storytelling.\n\n<we need to make the maquette arguemnt here >",
+      "imageUrl": null,
+      "width": 400,
+      "height": 318,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 462,
+          "end": 697,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "858988a5-44b4-478c-9f9c-9523704159c4",
+      "x": 6052.154813375687,
+      "y": 192.7317736670294,
+      "text": "Discussion",
+      "imageUrl": null,
+      "width": 400,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 200,
+        "b": 140
+      }
+    },
+    {
+      "id": "e81cfbfd-94f3-4572-a3ce-567b8f988ddc",
+      "x": 5231.985506443393,
+      "y": 461.15339988403025,
+      "text": "Forenisc apprach to understand why Latour is doing this\n\nWe need to interup this text to be relective of of how re do our forensics.\nLet’s be honest: we don’t have the bloody fingerprints or muddy footprints to prove his intent. Instead, we must take a forensic approach to understand why Latour is doing this. By studying his tools—looking all the way back to his PhD and other texts —we can engage in the 'indirect unpacking' of the Berlin Key. \n We cannot simply look at an object in isolation; rather, we must build our claims, arguments, assertions, and interpretations based on the evidence at hand. We cannot know excatly what Latour had in mind but construct some of the network of associations that he floated inwhen writing this text. This is different from the ominpotent ANT author who know, tells and directs. Instead our assertians here are more fragile and offer an interpretation.",
+      "imageUrl": null,
+      "width": 387.39051771541745,
+      "height": 402,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 506,
+          "end": 896,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "82010ba3-0490-4b96-b2c1-c34cdaa90fdf",
+      "x": 5296.808018280041,
+      "y": 1462.9439030326173,
+      "text": "Bultmann’s Key Commitments\nTruth = existential decision (kerygma) \nMyth = historically contingent shell\nInterpretation = extraction of core message \nGoal = “demythologize” to reach pure proclamation",
+      "imageUrl": null,
+      "width": 377.00398084854567,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "d13bc5ca-7e6c-4b39-bd9f-91aa25a2cfe2",
+      "x": 5302.009761905352,
+      "y": 1051.73872736279,
+      "text": "latour is clearly not a classical Catholic but our claim is that there is soemthing about a religious manner of speech matters. \n1 Enchant through re-telling the key. Oral tradition the way the keeps repreating the story\n\n2 Anthrpomophics. Animate object and made up people like the archeologist telling stories. Prussian Locksmith. Classic Parabel technque. This dictates the narrator position.\n\n3 He uses the key as a teaching tool on how to do storytelling. Parables are moral performative stories for excecising the world kind of maquette, a vehicle for making a world \n\n4 Latour talks at a Domestic scale to talk about . The small to talk about the large. Oral parabel tradition. Lifeworld  Lebenswelt. Creating we with the reader\n\n5 latour is doing a very specific, unique empiricism",
+      "imageUrl": null,
+      "width": 328.36668073105193,
+      "height": 507,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 146,
+          "end": 789,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        },
+        {
+          "start": 129,
+          "end": 789,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ],
+      "boldRanges": [
+        {
+          "start": 717,
+          "end": 719
+        }
+      ]
     }
   ],
   "connections": [
     {
-      "from": 5,
-      "to": 6
+      "fromId": "200296f0-8afc-443c-9d1b-f939d474eaf6",
+      "toId": "1a7c5138-5795-4043-a483-b90824ae730b",
+      "from": 0,
+      "to": 53
     },
     {
-      "from": 14,
-      "to": 10
-    },
-    {
-      "from": 10,
-      "to": 8
-    },
-    {
-      "from": 8,
-      "to": 9
-    },
-    {
-      "from": 9,
-      "to": 1
-    },
-    {
+      "fromId": "ea3daec1-0cb2-455a-b047-3bebe21fbe9b",
+      "toId": "82ef8ec5-556a-4e5f-9daf-dc7d7d1bba7c",
       "from": 1,
       "to": 2
     },
     {
-      "from": 13,
+      "fromId": "82ef8ec5-556a-4e5f-9daf-dc7d7d1bba7c",
+      "toId": "d7a4d6bc-a0a1-40c1-82bd-7b6fae7ac882",
+      "from": 2,
+      "to": 3
+    },
+    {
+      "fromId": "d7a4d6bc-a0a1-40c1-82bd-7b6fae7ac882",
+      "toId": "7c14f952-2aab-4357-9d05-8986e97854b9",
+      "from": 3,
+      "to": 4
+    },
+    {
+      "fromId": "7c14f952-2aab-4357-9d05-8986e97854b9",
+      "toId": "54695a62-6d75-40b7-948e-35bf57911eb8",
+      "from": 4,
+      "to": 5
+    },
+    {
+      "fromId": "54695a62-6d75-40b7-948e-35bf57911eb8",
+      "toId": "935abb0c-dfb8-4348-b19f-aa7aca31bad2",
+      "from": 5,
+      "to": 6
+    },
+    {
+      "fromId": "5ba9e587-999d-46c3-8861-f847e3966735",
+      "toId": "49d4b3bb-1553-4fa0-aa80-2b52cf60f372",
+      "from": 7,
+      "to": 8
+    },
+    {
+      "fromId": "49d4b3bb-1553-4fa0-aa80-2b52cf60f372",
+      "toId": "b8fac59b-e87c-4c00-adad-e6193ae9a89c",
+      "from": 8,
+      "to": 55
+    },
+    {
+      "fromId": "b8fac59b-e87c-4c00-adad-e6193ae9a89c",
+      "toId": "db51f69c-55b5-4432-85c0-f05e7cbf71e9",
+      "from": 55,
+      "to": 54
+    },
+    {
+      "fromId": "db51f69c-55b5-4432-85c0-f05e7cbf71e9",
+      "toId": "b0a09de8-e3ba-42e2-9439-8865765140e8",
+      "from": 54,
+      "to": 57
+    },
+    {
+      "fromId": "b0a09de8-e3ba-42e2-9439-8865765140e8",
+      "toId": "986bfc74-b146-4860-90d3-3ac176194d48",
+      "from": 57,
+      "to": 56
+    },
+    {
+      "fromId": "986bfc74-b146-4860-90d3-3ac176194d48",
+      "toId": "e8672d6b-002b-43d3-a7d3-8e334ab36b10",
+      "from": 56,
+      "to": 9
+    },
+    {
+      "fromId": "e8672d6b-002b-43d3-a7d3-8e334ab36b10",
+      "toId": "04a527c9-e51a-4744-9676-474d550baaee",
+      "from": 9,
+      "to": 10
+    },
+    {
+      "fromId": "04a527c9-e51a-4744-9676-474d550baaee",
+      "toId": "23697fb2-9037-4fa7-8654-ef3b2c0d812a",
+      "from": 10,
       "to": 11
     },
     {
-      "from": 11,
-      "to": 12
-    },
-    {
+      "fromId": "e68b1456-ec77-4cef-968b-5a613cf88598",
+      "toId": "69e13a16-9f1f-4d40-b9aa-4179a734da2f",
       "from": 12,
-      "to": 15
+      "to": 13
     },
     {
-      "from": 17,
+      "fromId": "69e13a16-9f1f-4d40-b9aa-4179a734da2f",
+      "toId": "bbfa6aee-93d2-4921-9227-06ddbf5a2aab",
+      "from": 13,
+      "to": 60
+    },
+    {
+      "fromId": "bbfa6aee-93d2-4921-9227-06ddbf5a2aab",
+      "toId": "b1f681f3-9758-499b-9d84-3a5ad8a96456",
+      "from": 60,
+      "to": 61
+    },
+    {
+      "fromId": "b1f681f3-9758-499b-9d84-3a5ad8a96456",
+      "toId": "710c8ac2-6cc1-45e7-af4c-eaa79d50affd",
+      "from": 61,
+      "to": 14
+    },
+    {
+      "fromId": "e668d63d-2126-4e0d-bfa4-417bdeabe4e6",
+      "toId": "882e65ba-89b9-4c5f-b8cd-d640833fd27c",
+      "from": 15,
       "to": 16
     },
     {
+      "fromId": "882e65ba-89b9-4c5f-b8cd-d640833fd27c",
+      "toId": "b2be0b54-591c-45fc-9953-513e12f40a11",
       "from": 16,
-      "to": 13
+      "to": 17
+    },
+    {
+      "fromId": "b2be0b54-591c-45fc-9953-513e12f40a11",
+      "toId": "80f1b1b8-80cb-48ad-ada3-697236b64deb",
+      "from": 17,
+      "to": 18
+    },
+    {
+      "fromId": "80f1b1b8-80cb-48ad-ada3-697236b64deb",
+      "toId": "8a6ea64d-7374-43d0-b095-fa26320332f7",
+      "from": 18,
+      "to": 19
+    },
+    {
+      "fromId": "8a6ea64d-7374-43d0-b095-fa26320332f7",
+      "toId": "48fdd020-390d-441e-8443-0669b6ae1443",
+      "from": 19,
+      "to": 20
+    },
+    {
+      "fromId": "48fdd020-390d-441e-8443-0669b6ae1443",
+      "toId": "f3d73eb4-d0a1-4846-88c5-2180e7c58982",
+      "from": 20,
+      "to": 21
+    },
+    {
+      "fromId": "f3d73eb4-d0a1-4846-88c5-2180e7c58982",
+      "toId": "bff49df5-7966-4615-9aea-f7531fc79dc9",
+      "from": 21,
+      "to": 22
+    },
+    {
+      "fromId": "bff49df5-7966-4615-9aea-f7531fc79dc9",
+      "toId": "99fecae0-fd22-4622-9e82-7dc3d09ff5db",
+      "from": 22,
+      "to": 23
+    },
+    {
+      "fromId": "99fecae0-fd22-4622-9e82-7dc3d09ff5db",
+      "toId": "74b50746-5d2b-4294-b8bd-df86bcd10011",
+      "from": 23,
+      "to": 24
+    },
+    {
+      "fromId": "74b50746-5d2b-4294-b8bd-df86bcd10011",
+      "toId": "3dc2499a-351b-4590-b133-40c3dbc0d759",
+      "from": 24,
+      "to": 25
+    },
+    {
+      "fromId": "73a93c7f-e196-4146-8ffa-9f7e5b076f04",
+      "toId": "fedb3837-55a2-4cdd-9643-6434a42cb9cf",
+      "from": 62,
+      "to": 26
+    },
+    {
+      "fromId": "fedb3837-55a2-4cdd-9643-6434a42cb9cf",
+      "toId": "c362555a-16a0-4fcd-979b-77b3c648b717",
+      "from": 26,
+      "to": 27
+    },
+    {
+      "fromId": "c362555a-16a0-4fcd-979b-77b3c648b717",
+      "toId": "dae89321-cdde-4f90-9e08-0516d502c886",
+      "from": 27,
+      "to": 64
+    },
+    {
+      "fromId": "dae89321-cdde-4f90-9e08-0516d502c886",
+      "toId": "71d2b747-f728-4f88-96fd-691836c71068",
+      "from": 64,
+      "to": 28
+    },
+    {
+      "fromId": "71d2b747-f728-4f88-96fd-691836c71068",
+      "toId": "b168a887-0771-4867-9b6b-d9f65247ecc1",
+      "from": 28,
+      "to": 29
+    },
+    {
+      "fromId": "b168a887-0771-4867-9b6b-d9f65247ecc1",
+      "toId": "5f8f9896-951a-450d-8a3e-cd7a2235b7c6",
+      "from": 29,
+      "to": 30
+    },
+    {
+      "fromId": "5f8f9896-951a-450d-8a3e-cd7a2235b7c6",
+      "toId": "d1d18512-8439-44d3-a37f-4b5f87d91127",
+      "from": 30,
+      "to": 65
+    },
+    {
+      "fromId": "858988a5-44b4-478c-9f9c-9523704159c4",
+      "toId": "cf664d4f-5dca-466b-9458-1832c6519765",
+      "from": 66,
+      "to": 31
+    },
+    {
+      "fromId": "cf664d4f-5dca-466b-9458-1832c6519765",
+      "toId": "b2aa7b02-e740-47d5-b618-faffc4f6704e",
+      "from": 31,
+      "to": 32
+    },
+    {
+      "fromId": "ae728d9f-8b36-4358-a136-cf6d3ed7ee44",
+      "toId": "7cd9498f-9d95-4ddc-87e9-b7b35b93088b",
+      "from": 33,
+      "to": 34
+    },
+    {
+      "fromId": "7cd9498f-9d95-4ddc-87e9-b7b35b93088b",
+      "toId": "c0501455-a81d-4b08-af58-24baf5b99eca",
+      "from": 34,
+      "to": 35
+    },
+    {
+      "fromId": "c0501455-a81d-4b08-af58-24baf5b99eca",
+      "toId": "236a8c7d-cce4-41dc-974a-d45c8a607e7c",
+      "from": 35,
+      "to": 36
+    },
+    {
+      "fromId": "236a8c7d-cce4-41dc-974a-d45c8a607e7c",
+      "toId": "5bde0022-b196-4b1e-a38d-e374c668d376",
+      "from": 36,
+      "to": 37
+    },
+    {
+      "fromId": "5bde0022-b196-4b1e-a38d-e374c668d376",
+      "toId": "ae74d4e9-61ad-4bb9-ae8e-717c04f318dd",
+      "from": 37,
+      "to": 38
+    },
+    {
+      "fromId": "ae74d4e9-61ad-4bb9-ae8e-717c04f318dd",
+      "toId": "0091afa8-f981-49a3-ad0f-174bcbee5151",
+      "from": 38,
+      "to": 39
+    },
+    {
+      "fromId": "507920c7-0ee7-4bad-bb1b-9aa662660eb2",
+      "toId": "3a93196b-6b37-4dfd-9f02-77d9b5d30879",
+      "from": 40,
+      "to": 41
+    },
+    {
+      "fromId": "3a93196b-6b37-4dfd-9f02-77d9b5d30879",
+      "toId": "624abdec-eeea-4cf3-952e-1a97fa533b95",
+      "from": 41,
+      "to": 42
+    },
+    {
+      "fromId": "624abdec-eeea-4cf3-952e-1a97fa533b95",
+      "toId": "97852edf-ed3a-4f20-ad22-4ce1113389e7",
+      "from": 42,
+      "to": 43
+    },
+    {
+      "fromId": "97852edf-ed3a-4f20-ad22-4ce1113389e7",
+      "toId": "196def5f-8140-4fe2-b264-c0d542466e0c",
+      "from": 43,
+      "to": 44
+    },
+    {
+      "fromId": "196def5f-8140-4fe2-b264-c0d542466e0c",
+      "toId": "2eee0941-83fd-49c9-b2b0-f34eda8fc2dc",
+      "from": 44,
+      "to": 45
+    },
+    {
+      "fromId": "2eee0941-83fd-49c9-b2b0-f34eda8fc2dc",
+      "toId": "177272e8-7c9b-4c43-89af-67f3102e497d",
+      "from": 45,
+      "to": 46
+    },
+    {
+      "fromId": "177272e8-7c9b-4c43-89af-67f3102e497d",
+      "toId": "245372fe-8470-41e5-8e97-44a73f14bb7e",
+      "from": 46,
+      "to": 47
+    },
+    {
+      "fromId": "245372fe-8470-41e5-8e97-44a73f14bb7e",
+      "toId": "c1f42bfa-cb22-403f-9d7b-20c78d660a2c",
+      "from": 47,
+      "to": 48
+    },
+    {
+      "fromId": "82010ba3-0490-4b96-b2c1-c34cdaa90fdf",
+      "toId": "94bf0527-0d0f-4cc3-a3e6-179c0feb761c",
+      "from": 68,
+      "to": 49
+    },
+    {
+      "fromId": "94bf0527-0d0f-4cc3-a3e6-179c0feb761c",
+      "toId": "0bfdfb63-d235-44f5-9f44-19b2e0b8222f",
+      "from": 49,
+      "to": 50
+    },
+    {
+      "fromId": "0bfdfb63-d235-44f5-9f44-19b2e0b8222f",
+      "toId": "ad2c80b6-85e4-4a75-91df-cb17d41ed3be",
+      "from": 50,
+      "to": 51
     }
-  ]
+  ],
+  "lastModified": 1769169202345,
+  "name": "BerlinKey.json"
 }

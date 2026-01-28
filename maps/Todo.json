@@ -85,32 +85,6 @@
       }
     },
     {
-      "id": "8312f59b-93b0-4441-8917-3290bb3a9bf2",
-      "x": -2755.6941746662837,
-      "y": 372.5749781254605,
-      "text": "Put in abstract for EASST \n28 Feb 2026 \n\nhttps://easst.net/conference/easst2026/programme/?utm_source=conference&utm_medium=sendy&utm_campaign=EASST2026_cfp_open#18101",
-      "imageUrl": null,
-      "width": 187.3994140625,
-      "height": 213,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      },
-      "highlights": [
-        {
-          "start": 27,
-          "end": 39,
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 0,
-            "a": 180
-          }
-        }
-      ]
-    },
-    {
       "id": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
       "x": -3096.8341854552573,
       "y": -470.2150798588325,
@@ -230,7 +204,7 @@
     },
     {
       "id": "14f5e789-8ac2-40f8-b913-3dc52828ccbe",
-      "x": -3308.244219350303,
+      "x": -3348.5078441755577,
       "y": -715.3800533724614,
       "text": "31st of January have to pay tax bill ",
       "imageUrl": null,
@@ -253,20 +227,6 @@
           }
         }
       ]
-    },
-    {
-      "id": "1c9d9833-df18-47b4-b817-fa74ee29ee08",
-      "x": -2168.5637287324944,
-      "y": -837.7488286767237,
-      "text": "Find my almost finished disconcertment paper ",
-      "imageUrl": null,
-      "width": 280,
-      "height": 66,
-      "backgroundColor": {
-        "r": 255,
-        "g": 255,
-        "b": 255
-      }
     },
     {
       "id": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
@@ -298,12 +258,12 @@
     },
     {
       "id": "93d56473-c770-4114-9219-b0f8c4d63ed0",
-      "x": -2609.0716675280937,
-      "y": -708.1227496311133,
-      "text": "dentist + hygenist",
+      "x": -2610.6595947683572,
+      "y": -697.6227496311133,
+      "text": "hygenist aapontment",
       "imageUrl": null,
       "width": 150,
-      "height": 45,
+      "height": 66,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -312,8 +272,8 @@
     },
     {
       "id": "bc9f001d-dcb2-44ff-b4e8-d473ec5bb81d",
-      "x": -2861.271823256272,
-      "y": -846.2006802141209,
+      "x": -3335.2461254255577,
+      "y": -997.4210528109882,
       "text": "4th Feb Promotion case ",
       "imageUrl": null,
       "width": 176.5234375,
@@ -338,7 +298,7 @@
     },
     {
       "id": "13a9e6f2-eb02-498b-baa4-8dcc00e84b59",
-      "x": -3245.668262488992,
+      "x": -3283.5078441755577,
       "y": -818.8652109886395,
       "text": "26th Jan Welcome to the new course which is starting it at the end of the month ",
       "imageUrl": null,
@@ -370,6 +330,74 @@
       "imageUrl": null,
       "width": 280,
       "height": 234,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "fefefe44-e692-4155-8126-333dcb58698d",
+      "x": -3348.5078441755577,
+      "y": -928.495708505028,
+      "text": "6th Feb 26B EMA",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 0,
+          "end": 7,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
+    },
+    {
+      "id": "1870644f-b4d1-46d8-8a87-05b9642d6a38",
+      "x": -2961.022862152458,
+      "y": -924.6196155278172,
+      "text": "We could do is reduce the complexity of the EMA description.\n\nReduce the word Guides? What if we just said maximal 300 words  ",
+      "imageUrl": null,
+      "width": 280,
+      "height": 129,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "70f64c58-c52b-4589-bb50-015bf994c253",
+      "x": -3009.0702523424065,
+      "y": -714.6184234701335,
+      "text": "Talk to Mita Ladd \non a Thursday or Friday",
+      "imageUrl": null,
+      "width": 172.6201171875,
+      "height": 66,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      }
+    },
+    {
+      "id": "0170dd13-2deb-41a3-b626-86efa6980690",
+      "x": -2715.7440509288062,
+      "y": -867.1321572291846,
+      "text": "georgy finish project",
+      "imageUrl": null,
+      "width": 150,
+      "height": 45,
       "backgroundColor": {
         "r": 255,
         "g": 255,
@@ -473,58 +501,90 @@
         "g": 255,
         "b": 255
       }
+    },
+    {
+      "id": "8312f59b-93b0-4441-8917-3290bb3a9bf2",
+      "x": -3353.9475697606276,
+      "y": -540.0547108615975,
+      "text": "Put in abstract for EASST \n28 Feb 2026 \n\nhttps://easst.net/conference/easst2026/programme/?utm_source=conference&utm_medium=sendy&utm_campaign=EASST2026_cfp_open#18101",
+      "imageUrl": null,
+      "width": 187.3994140625,
+      "height": 213,
+      "backgroundColor": {
+        "r": 255,
+        "g": 255,
+        "b": 255
+      },
+      "highlights": [
+        {
+          "start": 27,
+          "end": 39,
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 0,
+            "a": 180
+          }
+        }
+      ]
     }
   ],
   "connections": [
     {
       "fromId": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
       "toId": "41ea48be-d281-4f17-abc3-be4981cc003d",
-      "from": 7,
+      "from": 6,
       "to": 0
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "e8720669-c177-4685-ac98-749cf3e869cb",
-      "from": 11,
-      "to": 8
+      "from": 10,
+      "to": 7
     },
     {
       "fromId": "e8720669-c177-4685-ac98-749cf3e869cb",
       "toId": "77ae8057-4b83-45e2-93fc-59f6e15a214d",
-      "from": 8,
-      "to": 9
+      "from": 7,
+      "to": 8
     },
     {
       "fromId": "f2f03821-939e-43c3-844d-ce257c3b543b",
       "toId": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
       "from": 4,
-      "to": 15
+      "to": 13
     },
     {
       "fromId": "764bdf15-3ddb-4fc6-a063-0c1e19b0b3c5",
       "toId": "41ea48be-d281-4f17-abc3-be4981cc003d",
-      "from": 7,
+      "from": 6,
       "to": 0
     },
     {
       "fromId": "eb419483-8292-4f8d-858e-a9cd64218575",
       "toId": "e8720669-c177-4685-ac98-749cf3e869cb",
-      "from": 11,
-      "to": 8
+      "from": 10,
+      "to": 7
     },
     {
       "fromId": "e8720669-c177-4685-ac98-749cf3e869cb",
       "toId": "77ae8057-4b83-45e2-93fc-59f6e15a214d",
-      "from": 8,
-      "to": 9
+      "from": 7,
+      "to": 8
     },
     {
       "fromId": "f2f03821-939e-43c3-844d-ce257c3b543b",
       "toId": "cc8776ea-d6ae-47f6-bb34-60f9fc835614",
       "from": 4,
-      "to": 15
+      "to": 13
+    },
+    {
+      "fromId": "1870644f-b4d1-46d8-8a87-05b9642d6a38",
+      "toId": "fefefe44-e692-4155-8126-333dcb58698d",
+      "from": 20,
+      "to": 19
     }
   ],
-  "lastModified": 1768931811862,
+  "lastModified": 1769267193849,
   "name": "Todo.json"
 }
