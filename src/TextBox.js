@@ -1346,15 +1346,31 @@ class TextBox {
    * Starts editing mode at the given mouse position
    * @param {number} mx - Mouse X in world coordinates (optional)
    * @param {number} my - Mouse Y in world coordinates (optional)
+   * @returns {boolean} - True if editing started, false if blocked
    */
   startEditing(mx = null, my = null) {
     // Do not enter text-edit mode for image boxes
     if (this.imageUrl) {
       this.isEditing = false;
-      return;
+      return false;
+    }
+
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - notify and block editing
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
     }
 
     this.isEditing = true;
+
+    // Immediately broadcast editing state to prevent race conditions
+    if (typeof TextBox.onEditingStateChange === 'function' && this.id) {
+      TextBox.onEditingStateChange(this.id);
+    }
 
     this._ensureText();
 
@@ -1372,6 +1388,7 @@ class TextBox {
     this.cursorBlinkTime = millis();
     this.cursorVisible = true;
 
+    return true;
   }
 
   stopEditing() {
@@ -1381,6 +1398,11 @@ class TextBox {
     this.isEditing = false;
     this.isSelecting = false;
     this.updateDimensions();
+
+    // Immediately broadcast editing state change
+    if (typeof TextBox.onEditingStateChange === 'function') {
+      TextBox.onEditingStateChange(null);
+    }
 
     // Notify collaboration system of text/dimension changes
     TextBox._notifyChange(this);
@@ -1395,6 +1417,50 @@ class TextBox {
   static _notifyChange(box, skipTransactionWrapper = false) {
     if (typeof MindMap !== 'undefined' && MindMap.onBoxChange && box) {
       MindMap.onBoxChange(box, skipTransactionWrapper);
+    }
+  }
+
+  /**
+   * Callback function to check if a box is being edited by a remote user
+   * Set by collaboration manager to provide remote editing state
+   * @type {function(string): {isEditing: boolean, userName?: string, userColor?: string} | null}
+   */
+  static getRemoteEditingState = null;
+
+  /**
+   * Callback function to immediately broadcast editing state changes
+   * Set by collaboration manager to immediately update awareness when editing starts/stops
+   * @type {function(string|null): void}
+   */
+  static onEditingStateChange = null;
+
+  /**
+   * Check if this box is currently being edited by a remote user
+   * @returns {boolean} - True if box is locked by remote editing
+   */
+  isLockedByRemoteEdit() {
+    if (typeof TextBox.getRemoteEditingState !== 'function' || !this.id) {
+      return false;
+    }
+    const remoteState = TextBox.getRemoteEditingState(this.id);
+    return !!(remoteState && remoteState.isEditing);
+  }
+
+  /**
+   * Shows a notification that editing is blocked by another user
+   * @param {Object} remoteState - The remote editing state
+   * @private
+   */
+  _showEditingBlockedNotification(remoteState) {
+    const userName = remoteState.userName || 'Another user';
+    const message = `${userName} is currently editing this box`;
+    
+    // Use browser notification if available
+    if (typeof Utils !== 'undefined' && Utils.showNotification) {
+      Utils.showNotification(message, 'info');
+    } else {
+      // Fallback to console
+      console.log(message);
     }
   }
 
@@ -1470,8 +1536,28 @@ class TextBox {
     return { left, right, top, bottom };
   }
 
-  // Start selecting text at mouse position
+  /**
+   * Start selecting text at the given mouse position.
+   *
+   * Initializes selection state based on the mouse coordinates and
+   * enters editing/selecting mode, unless the box is currently locked
+   * for editing by a remote user.
+   *
+   * @param {number} mx - The x-coordinate of the mouse in canvas space
+   * @param {number} my - The y-coordinate of the mouse in canvas space
+   * @returns {boolean} - True if selection was started successfully, or
+   *   false if selection is blocked (for example, due to remote editing)
+   */
   startSelecting(mx, my) {
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block selecting
+        return false;
+      }
+    }
+
     this.isEditing = true;
     this.isSelecting = true;
     this.selectionAnchor = this.getCursorPositionFromMouse(mx, my);
@@ -1479,6 +1565,7 @@ class TextBox {
     this.selectionEnd = this.selectionAnchor;
     this.cursorPosition = this.selectionEnd;
     this.resetCursorBlink();
+    return true;
   }
 
   // Update selection based on current mouse position
@@ -1546,14 +1633,32 @@ class TextBox {
 
     if (isDouble) {
       // Double-click: select word under cursor
+      // Check if box is being edited by a remote user
+      if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+        const remoteState = TextBox.getRemoteEditingState(this.id);
+        if (remoteState && remoteState.isEditing) {
+          // Box is locked by another user - notify and block
+          this._showEditingBlockedNotification(remoteState);
+          return;
+        }
+      }
       this.isEditing = true;
+      
+      // Immediately broadcast editing state to prevent race conditions
+      if (typeof TextBox.onEditingStateChange === 'function' && this.id) {
+        TextBox.onEditingStateChange(this.id);
+      }
+      
       this.selectWordAt(pos);
       this.cursorPosition = this.selectionEnd;
       this.resetCursorBlink();
     } else {
       // Single click: position caret and prepare for drag-selection
-      this.startEditing(mx, my);
-      this.startSelecting(mx, my);
+      // Both methods will check for remote editing and return false if blocked
+      const editStarted = this.startEditing(mx, my);
+      if (editStarted) {
+        this.startSelecting(mx, my);
+      }
     }
   }
 
@@ -2137,14 +2242,26 @@ class TextBox {
    * Starts dragging the box
    * @param {number} mx - Mouse X in world coordinates
    * @param {number} my - Mouse Y in world coordinates
+   * @returns {boolean} - True if dragging started, false if blocked by remote editing
    */
   startDrag(mx, my) {
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block dragging
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
+    }
+
     this.isDragging = true;
     this.dragOffsetX = this.x - mx;
     this.dragOffsetY = this.y - my;
     // Store initial position to detect if drag actually moved the box
     this._dragStartX = this.x;
     this._dragStartY = this.y;
+    return true;
   }
 
   /**
@@ -2209,8 +2326,19 @@ class TextBox {
    * Starts resizing the box
    * @param {number} mx - Mouse X in world coordinates
    * @param {number} my - Mouse Y in world coordinates
+   * @returns {boolean} - True if resizing started, false if blocked by remote editing
    */
   startResize(mx, my) {
+    // Check if box is being edited by a remote user
+    if (typeof TextBox.getRemoteEditingState === 'function' && this.id) {
+      const remoteState = TextBox.getRemoteEditingState(this.id);
+      if (remoteState && remoteState.isEditing) {
+        // Box is locked by another user - block resizing
+        this._showEditingBlockedNotification(remoteState);
+        return false;
+      }
+    }
+
     this.isResizing = true;
     this.userResized = true; // mark that the user has manually resized the box
     this.resizeStartX = mx;
@@ -2220,6 +2348,7 @@ class TextBox {
     // Remember fixed top-left so only bottom-right corner moves
     this.resizeStartLeft = this.x - this.width / 2;
     this.resizeStartTop = this.y - this.height / 2;
+    return true;
   }
 
   /**
