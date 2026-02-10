@@ -136,6 +136,9 @@ class CollaborationManager {
         this.isTextEditUndoGroupOpen = false; // Whether we're in a text edit undo group
         this.currentEditingBoxId = null; // Track which box is currently being edited for undo grouping
 
+        // Deferred flushes (for when flush is called during isSyncing=true)
+        this._deferredFlushes = null; // Set of boxIds that need to be flushed after observer completes
+
         // Debug flag for targeted undo/redo logging
         this._isPerformingUndoRedo = false;
 
@@ -700,18 +703,32 @@ class CollaborationManager {
                 this.textSyncTimers.delete(boxId);
                 
                 // Immediately sync the box if it still exists
-                // Use isSyncing check to prevent re-entrant calls during Yjs observer execution
-                if (!this.isSyncing && this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
+                // CRITICAL: Do NOT skip sync if isSyncing is true, as that would lose text!
+                // Instead, we must ensure the sync happens. The isSyncing flag is only meant
+                // to prevent observer feedback loops, not to prevent explicit flushes.
+                // If we're in an observer (isSyncing=true), we defer the sync but NEVER skip it.
+                if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
                     const box = this.mindMap.getBoxById(boxId);
                     if (box) {
-                        this.ydoc.transact(() => {
-                            const nextData = this._boxToYjsData(box);
-                            const prevData = this.yboxes.get(boxId);
-                            if (!this._boxDataEquals(prevData, nextData)) {
-                                this.yboxes.set(boxId, nextData);
+                        if (!this.isSyncing) {
+                            // Normal path: sync immediately
+                            this.ydoc.transact(() => {
+                                const nextData = this._boxToYjsData(box);
+                                const prevData = this.yboxes.get(boxId);
+                                if (!this._boxDataEquals(prevData, nextData)) {
+                                    this.yboxes.set(boxId, nextData);
+                                }
+                            }, this.undoManager);
+                            Utils.Logger.debug(`[Undo] Flushed pending text sync for box ${boxId}`);
+                        } else {
+                            // We're in an observer - defer sync to avoid re-entrancy but DON'T lose the text
+                            // Queue it to run after the current observer completes
+                            if (!this._deferredFlushes) {
+                                this._deferredFlushes = new Set();
                             }
-                        }, this.undoManager);
-                        Utils.Logger.debug(`[Undo] Flushed pending text sync for box ${boxId}`);
+                            this._deferredFlushes.add(boxId);
+                            Utils.Logger.debug(`[Undo] Deferred flush for box ${boxId} (isSyncing=true)`);
+                        }
                     }
                 }
             }
@@ -1228,6 +1245,31 @@ class CollaborationManager {
                 }
             } finally {
                 this.isSyncing = false;
+                
+                // CRITICAL: Process any deferred flushes that were queued during observer execution
+                // This ensures we never lose text even if flush was called during isSyncing=true
+                if (this._deferredFlushes && this._deferredFlushes.size > 0) {
+                    const deferredBoxIds = Array.from(this._deferredFlushes);
+                    this._deferredFlushes.clear();
+                    Utils.Logger.debug(`[Undo] Processing ${deferredBoxIds.length} deferred flushes`);
+                    
+                    // Now that isSyncing=false, process the deferred flushes
+                    for (const boxId of deferredBoxIds) {
+                        if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
+                            const box = this.mindMap.getBoxById(boxId);
+                            if (box) {
+                                this.ydoc.transact(() => {
+                                    const nextData = this._boxToYjsData(box);
+                                    const prevData = this.yboxes.get(boxId);
+                                    if (!this._boxDataEquals(prevData, nextData)) {
+                                        this.yboxes.set(boxId, nextData);
+                                    }
+                                }, this.undoManager);
+                                Utils.Logger.debug(`[Undo] Processed deferred flush for box ${boxId}`);
+                            }
+                        }
+                    }
+                }
             }
         });
 
