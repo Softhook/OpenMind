@@ -96,7 +96,8 @@ describe('Undo System Edge Cases - Multi-User Scenarios', () => {
             const observerCode = observerMatch[0];
 
             // Must check isSyncing to prevent feedback loops
-            expect(observerCode).toMatch(/if\s*\(\s*this\.isSyncing\s*\)/);
+            // UPDATED: Now also checks for undo/redo exception to ensure reliable undo
+            expect(observerCode).toMatch(/if\s*\(\s*this\.isSyncing/);
         });
 
         test('should set isSyncing during observer execution', () => {
