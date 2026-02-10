@@ -688,6 +688,7 @@ class CollaborationManager {
      * Flushes any pending debounced text syncs for a specific box or all boxes.
      * This ensures all text changes are committed to Yjs before undo boundaries or other operations.
      * @param {string} [boxId] - Optional specific box ID to flush. If omitted, flushes all pending syncs.
+     *                            Flush order is non-deterministic but this is safe since box syncs are independent.
      * @private
      */
     _flushPendingTextSyncs(boxId = null) {
