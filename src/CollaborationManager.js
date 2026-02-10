@@ -1256,7 +1256,7 @@ class CollaborationManager {
             // Skip if we're in a sync loop, but DO process undo/redo transactions
             // Undo/redo transactions are local but have origin === this.undoManager
             const isUndoRedo = event.transaction.origin === this.undoManager;
-            if (this.isSyncing) return;
+            if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 
             this.isSyncing = true;
