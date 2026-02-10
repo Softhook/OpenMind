@@ -668,21 +668,10 @@ class CollaborationManager {
     /**
      * Resets the timer that closes the text editing undo group.
      * Called on each text edit to extend the group while typing continues.
-     * Optimized to avoid unnecessary timer churn during rapid typing.
      * @private
      */
     _resetTextEditUndoTimer() {
-        const now = Date.now();
-        const timeSinceLastReset = now - this.textEditUndoTimerLastReset;
-        
-        // Skip timer reset if we just reset it recently (< 100ms ago)
-        // This reduces timer churn during very rapid typing while still
-        // maintaining the 1s timeout for closing the undo group
-        if (timeSinceLastReset < 100 && this.textEditUndoTimer) {
-            return;
-        }
-
-        // Clear existing timer
+        // Clear existing timer - always reset to ensure proper timeout extension
         if (this.textEditUndoTimer) {
             clearTimeout(this.textEditUndoTimer);
         }
@@ -692,7 +681,45 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }, CollaborationManager.TEXT_UNDO_GROUP_TIMEOUT);
         
-        this.textEditUndoTimerLastReset = now;
+        this.textEditUndoTimerLastReset = Date.now();
+    }
+
+    /**
+     * Flushes any pending debounced text syncs for a specific box or all boxes.
+     * This ensures all text changes are committed to Yjs before undo boundaries or other operations.
+     * @param {string} [boxId] - Optional specific box ID to flush. If omitted, flushes all pending syncs.
+     * @private
+     */
+    _flushPendingTextSyncs(boxId = null) {
+        if (boxId) {
+            // Flush specific box
+            const timer = this.textSyncTimers.get(boxId);
+            if (timer) {
+                clearTimeout(timer);
+                this.textSyncTimers.delete(boxId);
+                
+                // Immediately sync the box if it still exists
+                if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
+                    const box = this.mindMap.getBoxById(boxId);
+                    if (box) {
+                        this.ydoc.transact(() => {
+                            const nextData = this._boxToYjsData(box);
+                            const prevData = this.yboxes.get(boxId);
+                            if (!this._boxDataEquals(prevData, nextData)) {
+                                this.yboxes.set(boxId, nextData);
+                            }
+                        }, this.undoManager);
+                        Utils.Logger.debug(`[Undo] Flushed pending text sync for box ${boxId}`);
+                    }
+                }
+            }
+        } else {
+            // Flush all pending syncs
+            const boxIds = Array.from(this.textSyncTimers.keys());
+            for (const id of boxIds) {
+                this._flushPendingTextSyncs(id);
+            }
+        }
     }
 
     /**
@@ -703,6 +730,12 @@ class CollaborationManager {
      */
     _closeTextEditUndoGroup() {
         if (!this.isTextEditUndoGroupOpen) return;
+
+        // CRITICAL: Flush any pending text syncs BEFORE closing the undo group
+        // This ensures all text changes are captured within the current undo boundary
+        if (this.currentEditingBoxId) {
+            this._flushPendingTextSyncs(this.currentEditingBoxId);
+        }
 
         this.isTextEditUndoGroupOpen = false;
         this.textEditUndoTimerLastReset = 0; // Reset timestamp
@@ -937,9 +970,12 @@ class CollaborationManager {
         // Debounce text sync during active editing to reduce network traffic
         // AND group text edits for meaningful undo boundaries
         if (box.isEditing) {
-            // Start/extend text editing undo group for THIS box
-            // If switching boxes, close previous group first
+            // If switching boxes, flush pending syncs from previous box AND close its undo group
+            // This prevents mixing changes from different boxes in the same undo group
             if (this.currentEditingBoxId && this.currentEditingBoxId !== box.id) {
+                // Flush the previous box's pending sync first
+                this._flushPendingTextSyncs(this.currentEditingBoxId);
+                // Then close the undo group (which ensures proper undo boundary)
                 this._closeTextEditUndoGroup();
             }
             this.currentEditingBoxId = box.id;
@@ -955,8 +991,8 @@ class CollaborationManager {
             // Set new debounced timer
             const timer = setTimeout(() => {
                 this.textSyncTimers.delete(boxId);
-                // Verify box still exists before syncing
-                if (this.yboxes && this.mindMap) {
+                // Verify box still exists and we're still tracking this box before syncing
+                if (this.yboxes && this.mindMap && this.currentEditingBoxId === boxId) {
                     const currentBox = this.mindMap.getBoxById(boxId);
                     if (currentBox && this.ydoc && this.undoManager) {
                         // Wrap in transaction with origin to track in undo
@@ -966,13 +1002,6 @@ class CollaborationManager {
                             if (this._boxDataEquals(prevData, nextData)) return;
                             this.yboxes.set(boxId, nextData);
                         }, this.undoManager);
-                        // Don't call stopCapturing() here - we're inside a debounced text-edit undo group.
-                        // The group is intentionally kept open and will be closed by _closeTextEditUndoGroup(),
-                        // which ultimately calls stopCapturing(). Note: if a non-text operation occurs before
-                        // this debounce fires, that later operation may call stopCapturing() and close the
-                        // current text-edit group, so the text edit and that operation can end up in the
-                        // same undo item. This timing-dependent grouping is intentional but important to
-                        // be aware of when reasoning about undo boundaries.
                     } else if (currentBox) {
                         // Fallback without undo tracking
                         const nextData = this._boxToYjsData(currentBox);
