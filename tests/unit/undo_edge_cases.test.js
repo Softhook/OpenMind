@@ -91,7 +91,7 @@ describe('Undo System Edge Cases - Multi-User Scenarios', () => {
         });
 
         test('yboxes observer should check isSyncing flag with undo/redo exception', () => {
-            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
+            const observerMatch = collabCode.match(/this\.yboxes\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
             expect(observerMatch).toBeTruthy();
             const observerCode = observerMatch[0];
 
