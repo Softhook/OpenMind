@@ -1546,13 +1546,28 @@ class CollaborationManager {
 
         // Rebuild from Yjs
         const connData = this.yconnections.toArray();
+        let skippedCount = 0;
         for (const data of connData) {
             const fromBox = this.mindMap.getBoxById(data.fromId);
             const toBox = this.mindMap.getBoxById(data.toId);
 
             if (fromBox && toBox && typeof Connection !== 'undefined') {
                 this.mindMap.connections.push(new Connection(fromBox, toBox));
+            } else {
+                // Log when connections are skipped due to missing boxes
+                // This helps debug race conditions during undo/redo
+                skippedCount++;
+                if (!fromBox) {
+                    Utils.Logger.debug(`[Connections] Skipped connection: fromBox ${data.fromId} not found`);
+                }
+                if (!toBox) {
+                    Utils.Logger.debug(`[Connections] Skipped connection: toBox ${data.toId} not found`);
+                }
             }
+        }
+        
+        if (skippedCount > 0) {
+            Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
         }
     }
 
