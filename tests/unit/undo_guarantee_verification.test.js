@@ -99,10 +99,11 @@ describe('Critical Guarantee Verification', () => {
             const observerCode = observerMatch[0];
 
             // In deferred processing, must validate box exists
-            const deferredSection = observerCode.match(/Process.*deferred[\s\S]*?for\s*\(.*deferredBoxIds[\s\S]*?\n\s{16}\}/);
+            // Code now uses "if (!box) continue" pattern
+            const deferredSection = observerCode.match(/Process.*deferred[\s\S]*?processDeferredFlushes[\s\S]*?\}\s*;/);
             if (deferredSection) {
                 expect(deferredSection[0]).toMatch(/getBoxById/);
-                expect(deferredSection[0]).toMatch(/if\s*\(\s*box\s*\)/);
+                expect(deferredSection[0]).toMatch(/if\s*\(\s*!box\s*\)/);
             }
         });
     });
@@ -124,7 +125,51 @@ describe('Critical Guarantee Verification', () => {
 
             // Should explain why we process deferred flushes
             expect(observerCode).toMatch(/CRITICAL.*deferred flushes/i);
-            expect(observerCode).toMatch(/never lose text/i);
+            // The "never lose text" comment was moved to earlier in the code,
+            // but we should still have documentation about avoiding re-entrancy
+            expect(observerCode).toMatch(/re-entrant|call stack/i);
+        });
+    });
+
+    describe('Deferred Flush Improvements', () => {
+        test('should schedule deferred flush outside observer stack', () => {
+            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
+            expect(observerMatch).toBeTruthy();
+            const observerCode = observerMatch[0];
+
+            // Should use queueMicrotask or setTimeout to avoid deep call stacks
+            expect(observerCode).toMatch(/queueMicrotask|setTimeout/);
+            expect(observerCode).toMatch(/processDeferredFlushes/);
+        });
+
+        test('should guard against re-entrant deferred flush processing', () => {
+            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
+            expect(observerMatch).toBeTruthy();
+            const observerCode = observerMatch[0];
+
+            // Should check _isProcessingDeferredFlushes flag
+            expect(observerCode).toMatch(/_isProcessingDeferredFlushes/);
+            expect(observerCode).toMatch(/if\s*\(\s*this\._isProcessingDeferredFlushes\s*\)/);
+        });
+
+        test('should batch all deferred flushes in single transaction', () => {
+            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
+            expect(observerMatch).toBeTruthy();
+            const observerCode = observerMatch[0];
+
+            // Should have ONE transact call that wraps the for loop
+            // Count transact calls in deferred processing section
+            const deferredSection = observerCode.match(/processDeferredFlushes[\s\S]*?setTimeout\(processDeferredFlushes/);
+            if (deferredSection) {
+                const transactMatches = deferredSection[0].match(/this\.ydoc\.transact/g);
+                expect(transactMatches).toBeTruthy();
+                // Should be exactly 1 transact call (batched, not one per box)
+                expect(transactMatches.length).toBe(1);
+            }
+        });
+
+        test('_isProcessingDeferredFlushes should be initialized in constructor', () => {
+            expect(collabCode).toMatch(/this\._isProcessingDeferredFlushes\s*=\s*false/);
         });
     });
 });

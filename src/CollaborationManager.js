@@ -138,6 +138,7 @@ class CollaborationManager {
 
         // Deferred flushes (for when flush is called during isSyncing=true)
         this._deferredFlushes = null; // Set of boxIds that need to be flushed after observer completes
+        this._isProcessingDeferredFlushes = false; // Guard against re-entrant deferred flush processing
 
         // Debug flag for targeted undo/redo logging
         this._isPerformingUndoRedo = false;
@@ -1246,28 +1247,54 @@ class CollaborationManager {
             } finally {
                 this.isSyncing = false;
                 
-                // CRITICAL: Process any deferred flushes that were queued during observer execution
-                // This ensures we never lose text even if flush was called during isSyncing=true
+                // CRITICAL: Process any deferred flushes that were queued during observer execution.
+                // To avoid deep call stacks and re-entrant observer execution, schedule this work
+                // outside the current observer call stack using queueMicrotask or setTimeout.
+                // Additionally, batch all deferred flushes into a single transaction to prevent
+                // fragmenting undo history into multiple items.
                 if (this._deferredFlushes && this._deferredFlushes.size > 0) {
                     const deferredBoxIds = Array.from(this._deferredFlushes);
                     this._deferredFlushes.clear();
-                    Utils.Logger.debug(`[Undo] Processing ${deferredBoxIds.length} deferred flushes`);
-                    
-                    // Now that isSyncing=false, process the deferred flushes
-                    for (const boxId of deferredBoxIds) {
-                        if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
-                            const box = this.mindMap.getBoxById(boxId);
-                            if (box) {
+                    Utils.Logger.debug(`[Undo] Scheduling ${deferredBoxIds.length} deferred flushes`);
+
+                    const processDeferredFlushes = () => {
+                        // Guard against re-entrant execution of deferred flush processing
+                        if (this._isProcessingDeferredFlushes) {
+                            Utils.Logger.debug('[Undo] Skipping re-entrant deferred flush processing');
+                            return;
+                        }
+                        this._isProcessingDeferredFlushes = true;
+
+                        try {
+                            // Process all deferred flushes in a single transaction to maintain undo grouping
+                            if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
                                 this.ydoc.transact(() => {
-                                    const nextData = this._boxToYjsData(box);
-                                    const prevData = this.yboxes.get(boxId);
-                                    if (!this._boxDataEquals(prevData, nextData)) {
-                                        this.yboxes.set(boxId, nextData);
+                                    for (const boxId of deferredBoxIds) {
+                                        const box = this.mindMap.getBoxById(boxId);
+                                        if (!box) {
+                                            Utils.Logger.debug(`[Undo] Box ${boxId} no longer exists, skipping deferred flush`);
+                                            continue;
+                                        }
+
+                                        const nextData = this._boxToYjsData(box);
+                                        const prevData = this.yboxes.get(boxId);
+                                        if (!this._boxDataEquals(prevData, nextData)) {
+                                            this.yboxes.set(boxId, nextData);
+                                            Utils.Logger.debug(`[Undo] Processed deferred flush for box ${boxId}`);
+                                        }
                                     }
                                 }, this.undoManager);
-                                Utils.Logger.debug(`[Undo] Processed deferred flush for box ${boxId}`);
                             }
+                        } finally {
+                            this._isProcessingDeferredFlushes = false;
                         }
+                    };
+
+                    // Schedule deferred flush processing outside the observer call stack
+                    if (typeof queueMicrotask === 'function') {
+                        queueMicrotask(processDeferredFlushes);
+                    } else {
+                        setTimeout(processDeferredFlushes, 0);
                     }
                 }
             }
