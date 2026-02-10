@@ -55,7 +55,7 @@ All 383 tests pass.
 ## Related Code
 - `src/CollaborationManager.js` line 1344-1362: connections observer
 - `src/CollaborationManager.js` line 1254-1341: boxes observer
-- `src/CollaborationManager.js` line 1539-1555: `_rebuildConnectionsFromYjs` method
+- `src/CollaborationManager.js` line 1541-1576: `_rebuildConnectionsFromYjs` method
 - `src/CollaborationManager.js` line 1081-1146: `deleteBoxFromYjs` (ensures connections are deleted in same transaction)
 
 ## Backward Compatibility
