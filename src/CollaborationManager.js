@@ -717,7 +717,8 @@ class CollaborationManager {
             }
         } else {
             // Flush all pending syncs
-            // Capture snapshot of box IDs to avoid issues if map changes during iteration
+            // Capture snapshot of box IDs to avoid iterator invalidation if map is modified during iteration
+            // (e.g., if a flush triggers deletion or new timer creation)
             const boxIds = Array.from(this.textSyncTimers.keys());
             for (const id of boxIds) {
                 this._flushPendingTextSyncs(id);
