@@ -129,7 +129,7 @@ class CollaborationManager {
 
         // Debounce timers for text sync during editing
         this.textSyncTimers = new Map(); // boxId -> timeoutId
-        
+
         // Text editing undo grouping state
         this.textEditUndoTimer = null; // Timer to close text edit undo group
         this.textEditUndoTimerLastReset = 0; // Timestamp of last timer reset
@@ -327,20 +327,20 @@ class CollaborationManager {
                         if (yjsEmpty && !localHasData) {
                             // Both empty - nothing to do
                             Utils.Logger.collab('[Sync] Both empty - nothing to sync');
-                            
+
                         } else if (!yjsEmpty && !localHasData) {
                             // No local data, room has data - auto-load
                             Utils.Logger.collab('[Sync] No local data - loading from room');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
-                            
+
                         } else if (yjsEmpty && localHasData) {
                             // Empty room, have local data
                             // If user chose 'sync', local was already synced to Yjs before connecting
                             // If user chose 'delete', local was already cleared
                             // Either way, let Yjs observers handle the sync
                             Utils.Logger.collab('[Sync] Empty room - local data already handled');
-                            
+
                         } else if (!yjsEmpty && localHasData) {
                             // Both Yjs and local have data.
                             // Yjs CRDT has merged offline/local and remote changes; ensure UI reflects
@@ -350,7 +350,7 @@ class CollaborationManager {
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
                         }
-                        
+
                     } catch (error) {
                         console.error('[Sync] Error during sync operation:', error);
                         Utils.Logger.error('[Sync] Failed to synchronise data:', error.message);
@@ -684,7 +684,7 @@ class CollaborationManager {
         this.textEditUndoTimer = setTimeout(() => {
             this._closeTextEditUndoGroup();
         }, CollaborationManager.TEXT_UNDO_GROUP_TIMEOUT);
-        
+
         this.textEditUndoTimerLastReset = Date.now();
     }
 
@@ -702,7 +702,7 @@ class CollaborationManager {
             if (timer) {
                 clearTimeout(timer);
                 this.textSyncTimers.delete(boxId);
-                
+
                 // Immediately sync the box if it still exists
                 // CRITICAL: Do NOT skip sync if isSyncing is true, as that would lose text!
                 // Instead, we must ensure the sync happens. The isSyncing flag is only meant
@@ -797,7 +797,7 @@ class CollaborationManager {
             TextBox.getRemoteEditingState = (boxId) => {
                 return this._getRemoteEditingState(boxId);
             };
-            
+
             // Set up callback for immediate editing state broadcasts
             TextBox.onEditingStateChange = (boxId) => {
                 this.updateEditingBox(boxId);
@@ -1102,33 +1102,33 @@ class CollaborationManager {
             this.transact(() => {
                 // Delete the box
                 this.yboxes.delete(boxId);
-                
+
                 // Delete all connections involving this box
                 // Must do this in the same transaction for proper undo behavior
                 if (this.yconnections) {
                     const conns = this.yconnections.toArray();
                     const indicesToDelete = [];
-                    
+
                     // Find all connections involving this box
                     conns.forEach((c, i) => {
                         if (c && (c.fromId === boxId || c.toId === boxId)) {
                             indicesToDelete.push(i);
                         }
                     });
-                    
+
                     // Delete in descending order to avoid index shifting
                     indicesToDelete.sort((a, b) => b - a);
                     for (const index of indicesToDelete) {
                         this.yconnections.delete(index, 1);
                     }
-                    
+
                     Utils.Logger.debug(`[Undo] Deleted box ${boxId} and ${indicesToDelete.length} associated connections`);
                 }
             }, 'deleteBox');
         } else {
             // Fallback without undo tracking
             this.yboxes.delete(boxId);
-            
+
             // Also delete connections in fallback case
             if (this.yconnections) {
                 const conns = this.yconnections.toArray();
@@ -1272,6 +1272,17 @@ class CollaborationManager {
                     }
                 });
 
+                // CRITICAL: During undo/redo, rebuild connections from Yjs state immediately
+                // after processing box changes. This is necessary because Yjs observer
+                // firing order is non-deterministic (based on Map insertion order in
+                // transaction.changed). If the yconnections observer fires BEFORE this
+                // yboxes observer, _rebuildConnectionsFromYjs would fail because boxes
+                // haven't been added to mindMap.boxes yet. By rebuilding here, we
+                // guarantee connections are rebuilt AFTER boxes are available.
+                if (isUndoRedo) {
+                    this._rebuildConnectionsFromYjs();
+                }
+
                 // Redraw after changes
                 if (this.mindMap) {
                     this.mindMap.isDirty = true;
@@ -1287,7 +1298,7 @@ class CollaborationManager {
                 }
             } finally {
                 this.isSyncing = false;
-                
+
                 // CRITICAL: Process any deferred flushes that were queued during observer execution.
                 // To avoid deep call stacks and re-entrant observer execution, schedule this work
                 // outside the current observer call stack using queueMicrotask or setTimeout.
@@ -1483,7 +1494,9 @@ class CollaborationManager {
         if (index !== -1) {
             const box = this.mindMap.boxes[index];
 
-            // Remove connections involving this box
+            // Remove connections involving this box from local state.
+            // During undo/redo, the yboxes observer will call _rebuildConnectionsFromYjs()
+            // after processing all changes, which rebuilds the authoritative connection list.
             this.mindMap.connections = this.mindMap.connections.filter(
                 c => c.fromBox !== box && c.toBox !== box
             );
@@ -1566,7 +1579,7 @@ class CollaborationManager {
                 }
             }
         }
-        
+
         // Log rebuild summary (helpful for debugging undo/redo issues)
         if (skippedCount > 0) {
             Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
@@ -1793,7 +1806,7 @@ class CollaborationManager {
      */
     _getRemoteEditingState(boxId) {
         if (!this.awareness) return null;
-        
+
         // Validate boxId - null/undefined is expected, empty string is likely a bug
         if (boxId === null || boxId === undefined) return null;
         if (typeof boxId !== 'string' || boxId === '') {
@@ -1802,12 +1815,12 @@ class CollaborationManager {
         }
 
         const states = this.awareness.getStates();
-        
+
         // Check all remote users
         for (const [clientId, state] of states) {
             // Skip local user
             if (clientId === this.awareness.clientID) continue;
-            
+
             // Check if this remote user is editing the specified box
             if (state.editingBoxId === boxId && state.user) {
                 return {
@@ -1817,7 +1830,7 @@ class CollaborationManager {
                 };
             }
         }
-        
+
         return null;
     }
 
