@@ -29,8 +29,8 @@ describe('Undo Connection Restoration - Behavioral', () => {
             expect(setupMatch).toBeTruthy();
             const setupCode = setupMatch[0];
 
-            // Find the yboxes observer section (first observer)
-            const boxesObserverMatch = setupCode.match(/this\.yboxes\.observe\((event)\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            // Find the yboxes observer section (first observer) - note: arrow function without parens around 'event'
+            const boxesObserverMatch = setupCode.match(/this\.yboxes\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
             expect(boxesObserverMatch).toBeTruthy();
             const boxesObserver = boxesObserverMatch[0];
 
@@ -57,7 +57,7 @@ describe('Undo Connection Restoration - Behavioral', () => {
 
         test('yconnections observer still calls _rebuildConnectionsFromYjs', () => {
             // The connections observer should still rebuild as a fallback
-            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\((event)\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
             expect(connObserverMatch).toBeTruthy();
             const connObserver = connObserverMatch[0];
 
@@ -90,11 +90,11 @@ describe('Undo Connection Restoration - Behavioral', () => {
 
         test('comment explains the observer ordering problem', () => {
             // The comment should explain WHY this fix is needed
-            const commentMatch = collabCode.match(/CRITICAL.*undo\/redo.*rebuild.*connections[\s\S]*?observer/i);
+            const commentMatch = collabCode.match(/CRITICAL.*undo\/redo.*rebuild.*connections[\s\S]*?firing order is non-deterministic/i);
             expect(commentMatch).toBeTruthy();
 
             // Should mention non-deterministic ordering
-            expect(commentMatch[0]).toMatch(/non-deterministic|order/i);
+            expect(commentMatch[0]).toMatch(/non-deterministic/i);
         });
     });
 
