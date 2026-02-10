@@ -1566,8 +1566,11 @@ class CollaborationManager {
             }
         }
         
+        // Log rebuild summary (helpful for debugging undo/redo issues)
         if (skippedCount > 0) {
             Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
+        } else if (connData.length > 0) {
+            Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections`);
         }
     }
 
