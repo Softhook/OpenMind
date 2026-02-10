@@ -836,10 +836,11 @@ class CollaborationManager {
 
         try {
             // Import Yjs and y-websocket from ESM.sh
-            const yjsModule = await import('https://esm.sh/yjs@13.6.18');
+            // Updated to latest versions to fix deprecation warnings
+            const yjsModule = await import('https://esm.sh/yjs@13.6.29');
             this.Y = yjsModule;
 
-            const websocketModule = await import('https://esm.sh/y-websocket@1.5.0?deps=yjs@13.6.18');
+            const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?deps=yjs@13.6.29');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
             Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets)');
@@ -1344,7 +1345,9 @@ class CollaborationManager {
         this.yconnections.observe((event) => {
             // Skip if we're in a sync loop, but DO process undo/redo transactions
             const isUndoRedo = event.transaction.origin === this.undoManager;
-            if (this.isSyncing) return;
+            // CRITICAL: Don't skip during undo/redo even if isSyncing is true
+            // This allows connections to be rebuilt after boxes are restored
+            if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 
             this.isSyncing = true;
@@ -1544,13 +1547,31 @@ class CollaborationManager {
 
         // Rebuild from Yjs
         const connData = this.yconnections.toArray();
+        let skippedCount = 0;
         for (const data of connData) {
             const fromBox = this.mindMap.getBoxById(data.fromId);
             const toBox = this.mindMap.getBoxById(data.toId);
 
             if (fromBox && toBox && typeof Connection !== 'undefined') {
                 this.mindMap.connections.push(new Connection(fromBox, toBox));
+            } else {
+                // Log when connections are skipped due to missing boxes
+                // This helps debug race conditions during undo/redo
+                skippedCount++;
+                if (!fromBox) {
+                    Utils.Logger.debug(`[Connections] Skipped connection: fromBox ${data.fromId} not found`);
+                }
+                if (!toBox) {
+                    Utils.Logger.debug(`[Connections] Skipped connection: toBox ${data.toId} not found`);
+                }
             }
+        }
+        
+        // Log rebuild summary (helpful for debugging undo/redo issues)
+        if (skippedCount > 0) {
+            Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
+        } else if (connData.length > 0) {
+            Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections`);
         }
     }
 
