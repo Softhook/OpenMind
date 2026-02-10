@@ -46,10 +46,10 @@ describe('Connection Visual Restoration on Undo', () => {
         // Should define isUndoRedo
         expect(boxesObserverCode).toMatch(/const isUndoRedo\s*=\s*event\.transaction\.origin\s*===\s*this\.undoManager/);
 
-        // UPDATED: Boxes observer should now also check isSyncing with isUndoRedo exception
-        // This ensures consistency with the connections observer and prevents intermittent
-        // undo failures when isSyncing is true from another operation
-        expect(boxesObserverCode).toMatch(/if\s*\(\s*this\.isSyncing\s*&&\s*!isUndoRedo\s*\)\s*return/);
+        // Should skip if isSyncing but still process undo/redo
+        // Note: boxes observer just checks if isSyncing without the && !isUndoRedo
+        // because it runs first and sets isSyncing itself
+        expect(boxesObserverCode).toMatch(/if\s*\(\s*this\.isSyncing\s*\)\s*return/);
         expect(boxesObserverCode).toMatch(/if\s*\(\s*event\.transaction\.local\s*&&\s*!isUndoRedo\s*\)\s*return/);
     });
 
