@@ -1256,9 +1256,6 @@ class CollaborationManager {
             // Skip if we're in a sync loop, but DO process undo/redo transactions
             // Undo/redo transactions are local but have origin === this.undoManager
             const isUndoRedo = event.transaction.origin === this.undoManager;
-            // CRITICAL: Don't skip during undo/redo even if isSyncing is true
-            // This ensures undo/redo operations are processed reliably even if another
-            // operation (like deferred flush processing) has set isSyncing=true
             if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 

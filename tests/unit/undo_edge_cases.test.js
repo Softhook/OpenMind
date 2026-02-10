@@ -90,14 +90,13 @@ describe('Undo System Edge Cases - Multi-User Scenarios', () => {
             expect(collabCode).toMatch(/this\.isSyncing\s*=\s*false/);
         });
 
-        test('yboxes observer should check isSyncing flag', () => {
-            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
+        test('yboxes observer should check isSyncing flag with undo/redo exception', () => {
+            const observerMatch = collabCode.match(/this\.yboxes\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
             expect(observerMatch).toBeTruthy();
             const observerCode = observerMatch[0];
 
-            // Must check isSyncing to prevent feedback loops
-            // UPDATED: Now also checks for undo/redo exception to ensure reliable undo
-            // Verify the full guard including && !isUndoRedo and the return statement
+            // Must check isSyncing with undo/redo exception to allow undo/redo through
+            // even when isSyncing is true from other operations
             expect(observerCode).toMatch(/if\s*\(\s*this\.isSyncing\s*&&\s*!isUndoRedo\s*\)\s*return/);
         });
 
