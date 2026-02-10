@@ -1074,7 +1074,7 @@ class CollaborationManager {
     }
 
     /**
-     * Removes a box from Yjs
+     * Removes a box from Yjs (and its associated connections)
      * Call this when a box is deleted locally
      * @param {string} boxId 
      */
@@ -1094,14 +1094,54 @@ class CollaborationManager {
             this.textSyncTimers.delete(boxId);
         }
 
+        // CRITICAL: Delete box AND its connections in the same transaction
+        // This ensures undo will restore both the box and its connections together
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
             this.transact(() => {
+                // Delete the box
                 this.yboxes.delete(boxId);
+                
+                // Delete all connections involving this box
+                // Must do this in the same transaction for proper undo behavior
+                if (this.yconnections) {
+                    const conns = this.yconnections.toArray();
+                    const indicesToDelete = [];
+                    
+                    // Find all connections involving this box
+                    conns.forEach((c, i) => {
+                        if (c && (c.fromId === boxId || c.toId === boxId)) {
+                            indicesToDelete.push(i);
+                        }
+                    });
+                    
+                    // Delete in descending order to avoid index shifting
+                    indicesToDelete.sort((a, b) => b - a);
+                    for (const index of indicesToDelete) {
+                        this.yconnections.delete(index, 1);
+                    }
+                    
+                    Utils.Logger.debug(`[Undo] Deleted box ${boxId} and ${indicesToDelete.length} associated connections`);
+                }
             }, 'deleteBox');
         } else {
             // Fallback without undo tracking
             this.yboxes.delete(boxId);
+            
+            // Also delete connections in fallback case
+            if (this.yconnections) {
+                const conns = this.yconnections.toArray();
+                const indicesToDelete = [];
+                conns.forEach((c, i) => {
+                    if (c && (c.fromId === boxId || c.toId === boxId)) {
+                        indicesToDelete.push(i);
+                    }
+                });
+                indicesToDelete.sort((a, b) => b - a);
+                for (const index of indicesToDelete) {
+                    this.yconnections.delete(index, 1);
+                }
+            }
         }
     }
 
