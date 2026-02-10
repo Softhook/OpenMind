@@ -700,7 +700,8 @@ class CollaborationManager {
                 this.textSyncTimers.delete(boxId);
                 
                 // Immediately sync the box if it still exists
-                if (this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
+                // Use isSyncing check to prevent re-entrant calls during Yjs observer execution
+                if (!this.isSyncing && this.mindMap && this.yboxes && this.ydoc && this.undoManager) {
                     const box = this.mindMap.getBoxById(boxId);
                     if (box) {
                         this.ydoc.transact(() => {
@@ -716,6 +717,7 @@ class CollaborationManager {
             }
         } else {
             // Flush all pending syncs
+            // Capture snapshot of box IDs to avoid issues if map changes during iteration
             const boxIds = Array.from(this.textSyncTimers.keys());
             for (const id of boxIds) {
                 this._flushPendingTextSyncs(id);
@@ -1348,6 +1350,21 @@ class CollaborationManager {
      */
     _deleteBoxFromLocal(boxId) {
         if (!this.mindMap) return;
+
+        // CRITICAL: If this box has a pending text sync, clear it to prevent stale sync
+        const timer = this.textSyncTimers.get(boxId);
+        if (timer) {
+            clearTimeout(timer);
+            this.textSyncTimers.delete(boxId);
+            Utils.Logger.debug(`[Undo] Cleared pending sync for remotely deleted box ${boxId}`);
+        }
+
+        // If this box was being edited locally, close the undo group
+        if (this.currentEditingBoxId === boxId && this.isTextEditUndoGroupOpen) {
+            this._closeTextEditUndoGroup();
+            this.currentEditingBoxId = null;
+            Utils.Logger.debug(`[Undo] Closed undo group for remotely deleted box ${boxId}`);
+        }
 
         const index = this.mindMap.boxes.findIndex(b => b && b.id === boxId);
         if (index !== -1) {
