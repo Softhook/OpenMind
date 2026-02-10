@@ -836,10 +836,11 @@ class CollaborationManager {
 
         try {
             // Import Yjs and y-websocket from ESM.sh
-            const yjsModule = await import('https://esm.sh/yjs@13.6.18');
+            // Updated to latest versions to fix deprecation warnings
+            const yjsModule = await import('https://esm.sh/yjs@13.6.29');
             this.Y = yjsModule;
 
-            const websocketModule = await import('https://esm.sh/y-websocket@1.5.0?deps=yjs@13.6.18');
+            const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?deps=yjs@13.6.29');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
             Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets)');

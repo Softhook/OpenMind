@@ -1317,6 +1317,8 @@ function setupUIButtons() {
   // Display name input - shown when connected to a room
   // Styled to match buttons visually (green like Start Collaboration)
   displayNameInput = createInput('');
+  displayNameInput.attribute('id', 'displayName');
+  displayNameInput.attribute('name', 'displayName');
   displayNameInput.attribute('placeholder', 'Your name...');
   displayNameInput.style('width', '110px');
   displayNameInput.style('padding', '2px 8px');
@@ -4766,8 +4768,11 @@ function cleanup() {
 }
 
 // Register cleanup on page unload
+// Using pagehide instead of beforeunload for better reliability
+// pagehide fires when the page is hidden/unloaded and is more reliable
+// especially on mobile browsers
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', cleanup);
+  window.addEventListener('pagehide', cleanup);
 }
 
 // ============================================================================
