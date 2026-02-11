@@ -1286,6 +1286,15 @@ class CollaborationManager {
                 // guarantee connections are rebuilt AFTER boxes are available.
                 if (isUndoRedo) {
                     this._rebuildConnectionsFromYjs();
+                    
+                    // CRITICAL FIX: Sync connections back to Yjs so remote users see them
+                    // During undo, connections are restored locally but must be synced to Yjs
+                    // for multi-user collaboration. We bypass the isSyncing check by calling
+                    // the implementation directly (we're already in the undo transaction).
+                    const localConns = this.mindMap.connections
+                        .filter(c => c && c.fromBox && c.toBox)
+                        .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
+                    this._syncConnectionsToYjsImpl(localConns);
                 }
 
                 // Redraw after changes
