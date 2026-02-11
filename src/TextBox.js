@@ -2283,18 +2283,45 @@ class TextBox {
 
       // Shift-constrained dragging: constrain to horizontal or vertical movement
       if (typeof keyIsDown === 'function' && keyIsDown(TextBox.SHIFT_KEY_CODE)) {
+        // Initialize lock origin when Shift is first held during this drag
+        // Use current position to prevent snapping back when Shift is pressed mid-drag
+        if (this._dragLockOriginX === undefined || this._dragLockOriginY === undefined) {
+          // Check if this is the first drag update (box is still at start position)
+          const atStartPosition = (this.x === this._dragStartX && this.y === this._dragStartY);
+          
+          if (atStartPosition) {
+            // Shift held from start - lock to start position
+            this._dragLockOriginX = this._dragStartX;
+            this._dragLockOriginY = this._dragStartY;
+          } else {
+            // Shift pressed mid-drag - lock to current position
+            this._dragLockOriginX = this.x;
+            this._dragLockOriginY = this.y;
+          }
+        }
+
         // Determine primary direction based on movement from start position
         const deltaX = Math.abs(newX - this._dragStartX);
         const deltaY = Math.abs(newY - this._dragStartY);
         
-        // Lock to the axis with greater initial movement
-        if (deltaX > deltaY) {
-          // Horizontal movement - lock Y to start position
-          newY = this._dragStartY;
-        } else {
-          // Vertical movement - lock X to start position
-          newX = this._dragStartX;
+        // Decide lock axis once per drag+Shift activation to prevent axis switching
+        if (!this._dragLockAxis) {
+          this._dragLockAxis = deltaX > deltaY ? 'x' : 'y';
         }
+
+        // Lock to the axis with greater initial movement using the lock origin
+        if (this._dragLockAxis === 'x') {
+          // Horizontal movement - lock Y to lock origin
+          newY = this._dragLockOriginY;
+        } else {
+          // Vertical movement - lock X to lock origin
+          newX = this._dragLockOriginX;
+        }
+      } else {
+        // Clear lock state when Shift is not held
+        this._dragLockOriginX = undefined;
+        this._dragLockOriginY = undefined;
+        this._dragLockAxis = undefined;
       }
 
       // Move in world space - no constraints (allow infinite canvas)
@@ -2339,6 +2366,9 @@ class TextBox {
     // Clean up tracking variables
     this._dragStartX = undefined;
     this._dragStartY = undefined;
+    this._dragLockOriginX = undefined;
+    this._dragLockOriginY = undefined;
+    this._dragLockAxis = undefined;
 
     return positionChanged;
   }

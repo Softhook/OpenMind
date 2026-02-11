@@ -2166,18 +2166,35 @@ class MindMap {
    * Applies a soft snap-to-grid to all actively dragged boxes when the grid is visible.
    * Uses the primary selected box (or the first dragged box) as the anchor so groups
    * stay together instead of each box snapping independently.
+   * Respects Shift-constrained dragging by not snapping on the locked axis.
    * @param {Array<TextBox>} draggingBoxes - Boxes currently being dragged
    */
   _applyGridSnapping(draggingBoxes) {
     if (!draggingBoxes || draggingBoxes.length === 0) return;
     if (typeof isGridVisible === 'undefined' || !isGridVisible) return;
 
+    // Check if any box has an active shift-lock constraint
+    const anchorBox = (this.selectedBox && this.selectedBox.isDragging)
+      ? this.selectedBox
+      : draggingBoxes[0];
+    const lockAxis = anchorBox ? anchorBox._dragLockAxis : undefined;
+
     const snapDelta = this._computeGridSnapDelta(draggingBoxes);
     if (!snapDelta) return;
 
     for (const box of draggingBoxes) {
-      box.x += snapDelta.dx;
-      box.y += snapDelta.dy;
+      // Skip snapping on the locked axis to preserve Shift-constraint
+      if (lockAxis === 'x') {
+        // Horizontal lock active - only apply vertical snapping
+        box.y += snapDelta.dy;
+      } else if (lockAxis === 'y') {
+        // Vertical lock active - only apply horizontal snapping
+        box.x += snapDelta.dx;
+      } else {
+        // No lock - apply both axes
+        box.x += snapDelta.dx;
+        box.y += snapDelta.dy;
+      }
     }
   }
 
