@@ -1292,7 +1292,7 @@ class CollaborationManager {
                     // for multi-user collaboration. We bypass the isSyncing check by calling
                     // the implementation directly (we're already in the undo transaction).
                     const localConns = this.mindMap.connections
-                        .filter(c => c && c.fromBox && c.toBox)
+                        .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
                         .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
                     this._syncConnectionsToYjsImpl(localConns);
                 }
