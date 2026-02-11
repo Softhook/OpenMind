@@ -865,12 +865,12 @@ class CollaborationManager {
             const yjsModule = await import('https://esm.sh/yjs@13.6.29');
             this.Y = yjsModule;
 
-            // Load y-websocket with external=yjs - won't bundle its own Yjs copy
-            const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?external=yjs');
+            // Load y-websocket with deps=yjs@13.6.29 - ensures shared Yjs instance
+            const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?deps=yjs@13.6.29');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
-            // Load y-indexeddb with external=yjs - won't bundle its own Yjs copy
-            const indexeddbModule = await import('https://esm.sh/y-indexeddb@9.0.12?external=yjs');
+            // Load y-indexeddb with deps=yjs@13.6.29 - ensures shared Yjs instance
+            const indexeddbModule = await import('https://esm.sh/y-indexeddb@9.0.12?deps=yjs@13.6.29');
             this.IndexeddbPersistence = indexeddbModule.default || indexeddbModule.IndexeddbPersistence || indexeddbModule;
 
             Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (single Yjs instance with external deps)');
