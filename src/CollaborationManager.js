@@ -151,6 +151,10 @@ class CollaborationManager {
         this.consistencyCheckInterval = 30000; // Check every 30 seconds (reduced overhead)
         this.consecutiveSyncedChecks = 0; // Track consecutive checks with no mismatches
 
+        // Flag to prevent rebuilding from empty Yjs when loading from localStorage offline
+        // This is set to true after initial localStorage load completes
+        this.hasLoadedFromLocalStorage = false;
+
         // Server state tracking for cold start detection
         this.connectionStartTime = null;
         this.lastSyncAttemptTime = null;
@@ -411,6 +415,9 @@ class CollaborationManager {
             // Just push local data to Yjs - CRDT handles all conflicts automatically
             Utils.Logger.collab('[Room] Syncing local data via Yjs CRDT merge');
             this._syncLocalToYjs();
+            
+            // Mark that we've loaded from localStorage (prevents premature rebuilds)
+            this.hasLoadedFromLocalStorage = true;
         } catch (error) {
             console.error('[Room] Error syncing to room:', error);
             throw error; // Re-throw for caller to handle
@@ -1554,6 +1561,14 @@ class CollaborationManager {
      */
     _rebuildConnectionsFromYjs() {
         if (!this.mindMap || !this.yconnections) return;
+
+        // CRITICAL FIX: Don't rebuild from empty Yjs when loading from localStorage offline
+        // When working offline, localStorage is the source of truth. Only rebuild from Yjs
+        // when we're connected to a room or explicitly loading from a room.
+        if (!this.hasLoadedFromLocalStorage && !this.isConnected && this.yconnections.length === 0) {
+            Utils.Logger.debug('[Connections] Skipping rebuild from empty Yjs (waiting for localStorage sync)');
+            return;
+        }
 
         // Clear existing connections
         this.mindMap.connections = [];

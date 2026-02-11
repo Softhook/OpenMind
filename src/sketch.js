@@ -1178,6 +1178,12 @@ function setup() {
                   MindMap.onConnectionsChange();
                 }
 
+                // Mark that localStorage load is complete
+                // This prevents Yjs from rebuilding from empty state before sync completes
+                if (collaborationManager && typeof collaborationManager.syncLocalToRoom === 'function') {
+                  collaborationManager.hasLoadedFromLocalStorage = true;
+                }
+
                 // Clear undo history after loading to prevent undo from reverting the load
                 collaborationManager.clearUndoHistory();
               } catch (e) {
