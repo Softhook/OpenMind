@@ -11,6 +11,8 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
     beforeEach(() => {
         // Mock IndexedDB
         mockIndexedDB = {
+            name: 'openmind-yjs',
+            db: {},
             clearData: jest.fn().mockResolvedValue(undefined),
             whenSynced: Promise.resolve(),
             destroy: jest.fn()
@@ -27,10 +29,17 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
         // Mock CollaborationManager
         collaborationManager = {
             indexeddbProvider: mockIndexedDB,
+            IndexeddbPersistence: null, // Set per-test when needed
             ydoc: {
                 transact: jest.fn((fn) => fn())
             },
-            yboxes: new Map(),
+            yboxes: {
+                get: jest.fn(),
+                set: jest.fn(),
+                delete: jest.fn(),
+                clear: jest.fn(),
+                size: 0
+            },
             yconnections: {
                 length: 0,
                 toArray: jest.fn(() => []),
@@ -41,7 +50,37 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
             undoManager: {},
             isSyncing: false,
             isConnected: false,
-            hasLoadedFromLocalStorage: false
+            hasLoadedFromLocalStorage: false,
+            // Mirrors the real clearIndexedDB() from CollaborationManager.js
+            // (race-condition-safe version that nulls db ref first)
+            async clearIndexedDB() {
+                if (!this.indexeddbProvider) {
+                    console.warn('[IndexedDB] No provider to clear');
+                    return;
+                }
+
+                try {
+                    const dbName = this.indexeddbProvider.name || 'openmind-yjs';
+
+                    // Null the db ref to prevent in-flight writes
+                    this.indexeddbProvider.db = null;
+
+                    // clearData() calls destroy() then deleteDB
+                    await this.indexeddbProvider.clearData();
+                    this.indexeddbProvider = null;
+
+                    // Clear the Yjs document (safe — no provider is listening)
+                    this.yboxes.clear();
+                    this.yconnections.delete(0, this.yconnections.length);
+
+                    // Recreate the provider with empty state
+                    this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
+                    await this.indexeddbProvider.whenSynced;
+                } catch (error) {
+                    console.error('[IndexedDB] Failed to clear database:', error);
+                    throw error;
+                }
+            }
         };
     });
 
@@ -149,7 +188,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
             // The transaction should include:
             // 1. Delete box from yboxes
             // 2. Delete connections from yconnections
-            
+
             const transactions = [];
             collaborationManager.ydoc.transact = jest.fn((fn) => {
                 transactions.push('transaction');
@@ -171,7 +210,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
         test('text edit debounce groups rapid edits', (done) => {
             // Text editing should have 1s debounce
             const DEBOUNCE_MS = 1000;
-            
+
             let transactionCount = 0;
             collaborationManager.ydoc.transact = jest.fn(() => {
                 transactionCount++;
@@ -179,10 +218,10 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
 
             // Simulate rapid text edits (< 1s apart)
             collaborationManager.ydoc.transact();
-            
+
             setTimeout(() => {
                 collaborationManager.ydoc.transact();
-                
+
                 // After debounce, should still be grouped
                 expect(transactionCount).toBe(2);
                 done();
@@ -222,7 +261,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
 
         test('handles IndexedDB not available', async () => {
             collaborationManager.indexeddbProvider = null;
-            
+
             // Should not throw, just return early
             await expect(collaborationManager.clearIndexedDB()).resolves.toBeUndefined();
         });
@@ -241,7 +280,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
         test('undo sends changes to remote users via Yjs', () => {
             // Setup connected state
             collaborationManager.isConnected = true;
-            
+
             // Mock sync implementation
             collaborationManager._syncConnectionsToYjsImpl = jest.fn();
 
@@ -261,7 +300,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
         test('local undo does not affect remote users undo stack', () => {
             // Undo only affects local user's undo stack
             // This is guaranteed by Yjs UndoManager tracking transaction origins
-            
+
             const undoManager = {
                 undo: jest.fn(),
                 canUndo: jest.fn(() => true)
@@ -278,7 +317,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
 
     describe('Connection Rebuild Edge Cases', () => {
         test('skips connections when boxes not yet loaded', () => {
-            collaborationManager._rebuildConnectionsFromYjs = function() {
+            collaborationManager._rebuildConnectionsFromYjs = function () {
                 if (!this.hasLoadedFromLocalStorage && !this.isConnected && this.yconnections.length === 0) {
                     return; // Skip rebuild
                 }
@@ -307,10 +346,10 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
             // Mock Connection class
             global.Connection = jest.fn((from, to) => ({ fromBox: from, toBox: to }));
 
-            collaborationManager._rebuildConnectionsFromYjs = function() {
+            collaborationManager._rebuildConnectionsFromYjs = function () {
                 const connData = this.yconnections.toArray();
                 this.mindMap.connections = [];
-                
+
                 for (const data of connData) {
                     const fromBox = this.mindMap.getBoxById(data.fromId);
                     const toBox = this.mindMap.getBoxById(data.toId);

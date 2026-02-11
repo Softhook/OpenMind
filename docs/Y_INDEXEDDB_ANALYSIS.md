@@ -117,7 +117,7 @@ this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
 
 ## Implementation Details
 
-### New Method: `clearIndexedDB()`
+### New Method: `clearIndexedDB()` (Race-Condition-Safe)
 
 ```javascript
 async clearIndexedDB() {
@@ -125,36 +125,58 @@ async clearIndexedDB() {
         Utils.Logger.warn('[IndexedDB] No provider to clear');
         return;
     }
-
     try {
-        Utils.Logger.collab('[IndexedDB] Clearing database...');
-        
-        // 1. Clear the database (also destroys provider)
+        const dbName = this.indexeddbProvider.name || 'openmind-yjs';
+        // Step 1: Null db ref to prevent in-flight _storeUpdate writes
+        this.indexeddbProvider.db = null;
+        // Step 2: clearData() → destroy() (unsubscribes) + deleteDB
         await this.indexeddbProvider.clearData();
         this.indexeddbProvider = null;
-        
-        // 2. Clear Yjs document
+        // Step 3: Now safe to clear Yjs state — no provider listening
         this.yboxes.clear();
         this.yconnections.delete(0, this.yconnections.length);
-        
-        // 3. Recreate provider with empty state
-        const dbName = 'openmind-yjs';
+        // Step 4: Delay to let async deleteDB complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+        // Step 5: Recreate provider + harden against race conditions
         this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
+        this._hardenIndexedDBProvider(this.indexeddbProvider);
         await this.indexeddbProvider.whenSynced;
-        
-        Utils.Logger.collab('[IndexedDB] Database cleared and provider recreated');
-    } catch (error) {
-        console.error('[IndexedDB] Failed to clear database:', error);
-        throw error;
-    }
+    } catch (error) { ... }
 }
 ```
 
 **Key Points**:
-- Calls `clearData()` from y-indexeddb API
-- Clears Yjs document to prevent stale data
-- Recreates provider to ensure clean state
-- Async operation with proper error handling
+- **Nulls `db` ref first** — prevents in-flight `_storeUpdate` from writing to closing DB
+- Clears Yjs state **after** provider unsubscribes — prevents race condition
+- 50ms delay before recreation lets async `deleteDB` complete
+- `_hardenIndexedDBProvider()` wraps new provider's `_storeUpdate` to catch `InvalidStateError`
+
+### New Method: `_hardenIndexedDBProvider()`
+
+Wraps the y-indexeddb provider's `_storeUpdate` handler to catch the transient
+`InvalidStateError: The database connection is closing` errors. This is a known
+y-indexeddb limitation — the error is harmless because data will be persisted
+by the new provider.
+
+---
+
+### Issue #4: IndexedDB "Connection is Closing" Error ❌ → ✅ FIXED
+
+**Symptom**: Console error during collaboration:
+```
+InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase':
+The database connection is closing.
+```
+
+**Root Cause**: Race condition between y-indexeddb's `_storeUpdate` handler and
+async `db.close()`. When a Yjs update fires while the IndexedDB connection is
+mid-close, `idb.transact(this.db, ...)` throws. Triggers include:
+`clearIndexedDB()`, `destroy()`, page navigation, and tab close.
+
+**Fix Implemented** (3-layer defense):
+1. `_hardenIndexedDBProvider()` — try/catch wrapper for `_storeUpdate`
+2. `clearIndexedDB()` reordered — nulls db, then destroys, then clears Yjs
+3. `destroy()` improved — nulls `provider.db` before `provider.destroy()`
 
 ---
 

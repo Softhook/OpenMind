@@ -16,7 +16,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Verify Yjs structures exist
             expect(collabCode).toMatch(/this\.yboxes\s*=\s*this\.ydoc\.getMap\(['"]boxes['"]\)/);
             expect(collabCode).toMatch(/this\.yconnections\s*=\s*this\.ydoc\.getArray\(['"]connections['"]\)/);
-            
+
             // Verify Yjs is used for undo
             expect(collabCode).toMatch(/new\s+this\.Y\.UndoManager\(\[this\.yboxes,\s*this\.yconnections\]/);
         });
@@ -25,7 +25,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Verify localStorage is used for persistence
             expect(mindMapCode).toMatch(/localStorage\.setItem\(/);
             expect(mindMapCode).toMatch(/saveToLocalStorage/);
-            
+
             // Verify it's timer-based (30s autosave)
             expect(sketchCode).toMatch(/CONFIG\.AUTOSAVE\.INTERVAL/);
             expect(sketchCode).toMatch(/setInterval/);
@@ -35,7 +35,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Verify rebuild functions exist
             expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
             expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
-            
+
             // Verify sync functions exist
             expect(collabCode).toMatch(/syncBoxToYjs/);
             expect(collabCode).toMatch(/syncConnectionsToYjs/);
@@ -45,7 +45,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
     describe('Offline State Management', () => {
         test('should have hasLoadedFromLocalStorage flag to prevent premature Yjs rebuild', () => {
             expect(collabCode).toMatch(/this\.hasLoadedFromLocalStorage\s*=\s*false/);
-            
+
             // Should check this flag in _rebuildConnectionsFromYjs
             const rebuildMatch = collabCode.match(/_rebuildConnectionsFromYjs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
             expect(rebuildMatch).toBeTruthy();
@@ -61,17 +61,17 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
         test('should preserve Yjs state when disconnected (for undo)', () => {
             // disconnect() should NOT destroy ydoc or undoManager
             expect(collabCode).toMatch(/disconnect\s*\(\s*\)\s*\{/);
-            
+
             // Should have comment about preserving undo
             expect(collabCode).toMatch(/local undo still works|Only disconnect the WebSocket provider, NOT the Yjs doc/);
-            
+
             // Should not set ydoc or undoManager to null in disconnect()
             // The disconnect method preserves Yjs state for local undo
             expect(collabCode).toMatch(/disconnect\s*\(\)/);
-            
+
             // Verify with grep-style check - if "this.ydoc = null" appears in disconnect, fail
-            const hasYdocNull = collabCode.includes('disconnect()') && 
-                                collabCode.match(/disconnect\s*\([^)]*\)\s*\{[\s\S]{1,2000}this\.ydoc\s*=\s*null/);
+            const hasYdocNull = collabCode.includes('disconnect()') &&
+                collabCode.match(/disconnect\s*\([^)]*\)\s*\{[\s\S]{1,2000}this\.ydoc\s*=\s*null/);
             expect(hasYdocNull).toBeFalsy();
         });
     });
@@ -114,7 +114,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Instead, should load from IndexedDB when offline
             const roomCheckMatch = sketchCode.match(/if\s*\(\s*!roomId\s*\)/);
             expect(roomCheckMatch).toBeTruthy();
-            
+
             // Should mention IndexedDB or localStorage
             expect(sketchCode).toMatch(/IndexedDB|localStorage/);
         });
@@ -130,7 +130,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // disconnect() should not clear mindMap
             const disconnectMatch = collabCode.match(/disconnect\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
             expect(disconnectMatch).toBeTruthy();
-            
+
             const disconnectCode = disconnectMatch[0];
             expect(disconnectCode).not.toMatch(/this\.mindMap\s*=\s*null/);
         });
@@ -139,7 +139,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Autosave timer should not depend on isConnected
             const autosaveMatch = sketchCode.match(/autosaveTimer[\s\S]{1,200}saveToLocalStorage/);
             expect(autosaveMatch).toBeTruthy();
-            
+
             const autosaveCode = autosaveMatch[0];
             expect(autosaveCode).not.toMatch(/isConnected/);
         });
@@ -170,7 +170,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Observers should check isSyncing
             const observerMatch = collabCode.match(/yboxes\.observe|yconnections\.observe/);
             expect(observerMatch).toBeTruthy();
-            
+
             // Should use isSyncing flag
             expect(collabCode).toMatch(/this\.isSyncing\s*=\s*true/);
             expect(collabCode).toMatch(/if[\s\S]{1,50}isSyncing/);
@@ -181,16 +181,20 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Verify both methods exist
             expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
             expect(collabCode).toMatch(/_syncConnectionsToYjsImpl/);
-            
-            // Verify they're called together in undo path - look for larger block
-            const undoBlock = collabCode.match(/if\s*\(\s*isUndoRedo\s*\)\s*\{[\s\S]{1,800}\}/);
-            expect(undoBlock).toBeTruthy();
-            
-            // Both methods should be in the undo block
-            if (undoBlock) {
-                expect(undoBlock[0]).toMatch(/_rebuildConnectionsFromYjs/);
-                expect(undoBlock[0]).toMatch(/_syncConnectionsToYjsImpl/);
-            }
+
+            // Verify they're called together in an undo path block.
+            // There are multiple `if (isUndoRedo)` blocks in the code (yboxes observer
+            // and yconnections observer). We need to find the one that contains BOTH methods.
+            // Use matchAll to get all matching blocks and check each.
+            const undoBlocks = [...collabCode.matchAll(/if\s*\(\s*isUndoRedo\s*\)\s*\{[\s\S]{1,2000}\}/g)];
+            expect(undoBlocks.length).toBeGreaterThan(0);
+
+            // At least one undo block should contain both methods
+            const hasBothMethods = undoBlocks.some(match =>
+                /_rebuildConnectionsFromYjs/.test(match[0]) &&
+                /_syncConnectionsToYjsImpl/.test(match[0])
+            );
+            expect(hasBothMethods).toBe(true);
         });
     });
 
@@ -214,7 +218,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
         test('should handle storage quota exceeded gracefully', () => {
             const quotaMatch = mindMapCode.match(/QuotaExceededError/);
             expect(quotaMatch).toBeTruthy();
-            
+
             const pruneMatch = mindMapCode.match(/pruneOldestCache/);
             expect(pruneMatch).toBeTruthy();
         });
@@ -224,7 +228,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
         test('hasLoadedFromLocalStorage should prevent premature rebuilds', () => {
             // Should be false initially
             expect(collabCode).toMatch(/this\.hasLoadedFromLocalStorage\s*=\s*false/);
-            
+
             // Should be checked in rebuild logic
             const rebuildMatch = collabCode.match(/_rebuildConnectionsFromYjs[\s\S]{1,500}hasLoadedFromLocalStorage/);
             expect(rebuildMatch).toBeTruthy();
@@ -233,7 +237,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
         test('isSyncing should prevent observer feedback loops', () => {
             // Should be set to true in observers
             expect(collabCode).toMatch(/this\.isSyncing\s*=\s*true/);
-            
+
             // Should be checked at start
             expect(collabCode).toMatch(/if[\s\S]{1,100}isSyncing/);
         });
@@ -267,7 +271,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // saveToLocalStorage should be timer-based
             expect(sketchCode).toMatch(/setInterval/);
             expect(mindMapCode).toMatch(/saveToLocalStorage/);
-            
+
             // Should not be in sync path
             const syncMatch = collabCode.match(/_rebuildBoxesFromYjs[\s\S]{1,200}localStorage/);
             expect(syncMatch).toBeFalsy();
@@ -277,10 +281,10 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             // Should rebuild from Yjs after sync
             const crdtMatch = collabCode.match(/synced|CRDT/);
             expect(crdtMatch).toBeTruthy();
-            
+
             // Should use _rebuildBoxesFromYjs
             expect(collabCode).toMatch(/_rebuildBoxesFromYjs/);
-            
+
             // Should not have manual conflict resolution
             expect(collabCode).not.toMatch(/mergeConflicts/);
             expect(collabCode).not.toMatch(/resolveConflict/);
