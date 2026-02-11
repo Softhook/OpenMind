@@ -869,8 +869,8 @@ class CollaborationManager {
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
             // Import y-indexeddb for automatic Yjs persistence
-            // Note: y-indexeddb exports IndexeddbPersistence as default export
-            const indexeddbModule = await import('https://esm.sh/y-indexeddb@9.0.12?deps=yjs@13.6.29');
+            // Using skypack for better ESM compatibility and no build issues
+            const indexeddbModule = await import('https://cdn.skypack.dev/y-indexeddb@9.0.12');
             this.IndexeddbPersistence = indexeddbModule.default || indexeddbModule.IndexeddbPersistence || indexeddbModule;
 
             Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets + IndexedDB)');
