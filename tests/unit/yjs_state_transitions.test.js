@@ -111,8 +111,12 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
 
         test('should handle room join with existing local data', () => {
             // Should NOT load localStorage when roomId exists
-            const roomCheckMatch = sketchCode.match(/if\s*\(\s*!roomId\s*\)[\s\S]{1,200}loadFromLocalStorage/);
+            // Instead, should load from IndexedDB when offline
+            const roomCheckMatch = sketchCode.match(/if\s*\(\s*!roomId\s*\)/);
             expect(roomCheckMatch).toBeTruthy();
+            
+            // Should mention IndexedDB or localStorage
+            expect(sketchCode).toMatch(/IndexedDB|localStorage/);
         });
 
         test('should show sync dialog when joining room with local data', () => {

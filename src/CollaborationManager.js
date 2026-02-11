@@ -97,6 +97,9 @@ class CollaborationManager {
         this.yconnections = null; // Y.Array<{fromId, toId}>
         this.undoManager = null;  // Y.UndoManager for undo/redo
 
+        // Persistence
+        this.indexeddbProvider = null; // IndexeddbPersistence for automatic Yjs persistence
+
         // Connection state
         this.roomName = null;
         this.isConnected = false;
@@ -123,6 +126,7 @@ class CollaborationManager {
         // Yjs and y-websocket modules (loaded dynamically)
         this.Y = null;
         this.WebsocketProvider = null;
+        this.IndexeddbPersistence = null; // y-indexeddb module
 
         // Interpolation
         this.interpolatedCursors = new Map(); // userId -> { x, y, targetX, targetY, lastUpdate }
@@ -209,6 +213,16 @@ class CollaborationManager {
             // Initialize shared types
             this.yboxes = this.ydoc.getMap('boxes');
             this.yconnections = this.ydoc.getArray('connections');
+
+            // Create IndexedDB provider for automatic persistence
+            // This eliminates the need for localStorage manual syncing
+            const dbName = 'openmind-yjs';
+            this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
+            
+            // Wait for IndexedDB to load persisted state
+            await this.indexeddbProvider.whenSynced;
+            
+            Utils.Logger.collab('[Init] IndexedDB synced - Yjs loaded from persistent storage');
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
@@ -513,6 +527,12 @@ class CollaborationManager {
         if (this.undoManager) {
             this.undoManager.destroy();
             this.undoManager = null;
+        }
+
+        // Destroy IndexedDB provider
+        if (this.indexeddbProvider) {
+            this.indexeddbProvider.destroy();
+            this.indexeddbProvider = null;
         }
 
         if (this.ydoc) {
@@ -837,7 +857,7 @@ class CollaborationManager {
      * @private
      */
     async _loadDependencies() {
-        if (this.Y && this.WebsocketProvider) return;
+        if (this.Y && this.WebsocketProvider && this.IndexeddbPersistence) return;
 
         try {
             // Import Yjs and y-websocket from ESM.sh
@@ -848,7 +868,11 @@ class CollaborationManager {
             const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?deps=yjs@13.6.29');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
-            Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets)');
+            // Import y-indexeddb for automatic Yjs persistence
+            const indexeddbModule = await import('https://esm.sh/y-indexeddb@9.0.12?deps=yjs@13.6.29');
+            this.IndexeddbPersistence = indexeddbModule.IndexeddbPersistence;
+
+            Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets + IndexedDB)');
         } catch (error) {
             console.error('CollaborationManager: Failed to load dependencies', error);
             throw new Error('Failed to load collaboration dependencies. Internet connection required.');

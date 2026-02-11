@@ -1139,34 +1139,36 @@ function setup() {
 
     // When joining an online room, do NOT load from localStorage
     // The room's state will sync from Yjs
-    // When offline (no roomId), load from localStorage to restore previous work
+    // When offline (no roomId), Yjs will load from IndexedDB automatically
+    // Check for one-time migration from localStorage to IndexedDB
     if (!roomId) {
-      // Try to load from localStorage (offline mode only)
-      const hasAutosave = mindMap.hasLocalStorageData();
-      if (hasAutosave) {
-        try {
-          // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
-          const maybePromise = mindMap.loadFromLocalStorage();
-          const afterLoad = async () => {
-            try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
-            try {
-              if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
-                let fname = mindMap.getLastUsedFilename() || '';
-                fname = fname.split('/').pop().split('\\').pop();
-                fname = fname.replace(/\.json$/i, '').trim();
-                document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
-              }
-            } catch (_) { }
+      // Initialize collaboration manager first to load from IndexedDB
+      if (collaborationManager) {
+        (async () => {
+          try {
+            await collaborationManager.initialize();
+            
+            // One-time migration: if Yjs is empty but localStorage has data, migrate it
+            const hasLocalStorage = mindMap.hasLocalStorageData();
+            const yjsEmpty = collaborationManager.yboxes && collaborationManager.yboxes.size === 0;
+            
+            if (hasLocalStorage && yjsEmpty) {
+              console.log('[Migration] Migrating data from localStorage to IndexedDB...');
+              
+              // Load from localStorage
+              const maybePromise = mindMap.loadFromLocalStorage();
+              const afterLoad = async () => {
+                try { resetView(); } catch (e) { console.warn('resetView failed:', e); }
+                try {
+                  if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
+                    let fname = mindMap.getLastUsedFilename() || '';
+                    fname = fname.split('/').pop().split('\\').pop();
+                    fname = fname.replace(/\.json$/i, '').trim();
+                    document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
+                  }
+                } catch (_) { }
 
-            // Wait for collaboration manager to be initialized before clearing undo
-            // This ensures boxes are properly synced to Yjs WITH undo tracking
-            if (collaborationManager) {
-              try {
-                // Wait for initialization to complete
-                await collaborationManager.initialize();
-
-                // Re-sync all boxes to ensure they're in Yjs with proper undo tracking
-                // This fixes issue where boxes loaded before undoManager was ready
+                // Sync to Yjs (which auto-persists to IndexedDB)
                 if (mindMap && mindMap.boxes && MindMap.onBoxChange) {
                   for (const box of mindMap.boxes) {
                     if (box && box.id) {
@@ -1179,44 +1181,46 @@ function setup() {
                 }
 
                 // Mark that localStorage load is complete
-                // This prevents Yjs from rebuilding from empty state before sync completes
-                if (collaborationManager && typeof collaborationManager.syncLocalToRoom === 'function') {
-                  collaborationManager.hasLoadedFromLocalStorage = true;
-                }
+                collaborationManager.hasLoadedFromLocalStorage = true;
 
-                // Clear undo history after loading to prevent undo from reverting the load
+                // Clear undo history after migration
                 collaborationManager.clearUndoHistory();
-              } catch (e) {
-                console.warn('Failed to initialize collaboration for undo:', e);
+                
+                console.log('[Migration] Migration complete. Data now persisted in IndexedDB.');
+              };
+              
+              if (maybePromise && typeof maybePromise.then === 'function') {
+                maybePromise.then(afterLoad).catch((e) => {
+                  console.warn('Failed to load from localStorage:', e);
+                });
+              } else {
+                afterLoad();
               }
+            } else if (!yjsEmpty) {
+              // IndexedDB has data, rebuild mindMap from it
+              console.log('[Load] Loading from IndexedDB via Yjs...');
+              collaborationManager._rebuildBoxesFromYjs();
+              collaborationManager._rebuildConnectionsFromYjs();
+              collaborationManager.hasLoadedFromLocalStorage = true;
+              try { resetView(); } catch (e) { console.warn('resetView failed:', e); }
+            } else {
+              // Both empty - create initial example boxes
+              console.log('[Load] Fresh start - creating example boxes');
+              mindMap.addBox(new TextBox(300, 200, "Idea"));
+              mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+              mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+              collaborationManager.hasLoadedFromLocalStorage = true;
+              // Clear undo history so creating example boxes isn't undoable
+              setTimeout(() => {
+                if (collaborationManager && collaborationManager.isInitialized) {
+                  collaborationManager.clearUndoHistory();
+                }
+              }, 200);
             }
-          };
-          if (maybePromise && typeof maybePromise.then === 'function') {
-            maybePromise.then(afterLoad).catch((e) => {
-              console.warn('Failed to load mindMap from localStorage:', e);
-            });
-          } else {
-            afterLoad();
+          } catch (e) {
+            console.warn('Failed to initialize collaboration:', e);
           }
-        } catch (e) {
-          console.warn('Error while loading from localStorage:', e);
-        }
-      } else {
-        // Create initial boxes as examples only if no autosave exists (offline mode)
-        mindMap.addBox(new TextBox(300, 200, "Idea"));
-        mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
-        mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
-        // Initial state is unsaved, will be autosaved on first interval
-        if (mindMap) mindMap.isSaved = false;
-        // Clear undo history so creating example boxes isn't undoable
-        if (collaborationManager) {
-          // Wait for initialization then clear
-          setTimeout(() => {
-            if (collaborationManager && collaborationManager.isInitialized) {
-              collaborationManager.clearUndoHistory();
-            }
-          }, 200);
-        }
+        })();
       }
     } else if (!lastLoadedUrlFile && roomId) {
       // ONLINE MODE: Joining a collaboration room
@@ -1235,7 +1239,9 @@ function setup() {
     // Hide menu buttons initially
     hideMenuButtons();
 
-    // Start autosave timer
+    // NOTE: With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
+    // We still run autosave as a backup mechanism for localStorage export/import compatibility.
+    // This ensures users can still manually export their data even if IndexedDB fails.
     startAutosave();
 
     // Set up page visibility handling to prevent freezing when tab is hidden
@@ -4803,6 +4809,8 @@ function startAutosave() {
     clearInterval(autosaveTimer);
   }
 
+  // With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
+  // This localStorage autosave serves as a backup for export/import functionality.
   // Set up periodic autosave
   autosaveTimer = setInterval(() => {
     // Only autosave when page is visible to avoid issues with background throttling
