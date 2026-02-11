@@ -2276,9 +2276,29 @@ class TextBox {
         return;
       }
 
+      // Calculate new position
+      let newX = mx + this.dragOffsetX;
+      let newY = my + this.dragOffsetY;
+
+      // Shift-constrained dragging: constrain to horizontal or vertical movement
+      if (typeof keyIsDown === 'function' && keyIsDown(16)) { // Shift key
+        // Determine primary direction based on movement from start position
+        const deltaX = Math.abs(newX - this._dragStartX);
+        const deltaY = Math.abs(newY - this._dragStartY);
+        
+        // Lock to the axis with greater initial movement
+        if (deltaX > deltaY) {
+          // Horizontal movement - lock Y to start position
+          newY = this._dragStartY;
+        } else {
+          // Vertical movement - lock X to start position
+          newX = this._dragStartX;
+        }
+      }
+
       // Move in world space - no constraints (allow infinite canvas)
-      this.x = mx + this.dragOffsetX;
-      this.y = my + this.dragOffsetY;
+      this.x = newX;
+      this.y = newY;
 
       // DON'T sync during drag - only sync final state at stopDrag()
       // This prevents creating undo items without proper origin tracking
