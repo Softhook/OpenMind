@@ -860,20 +860,19 @@ class CollaborationManager {
         if (this.Y && this.WebsocketProvider && this.IndexeddbPersistence) return;
 
         try {
-            // Import Yjs and y-websocket from ESM.sh
-            // Updated to latest versions to fix deprecation warnings
-            const yjsModule = await import('https://esm.sh/yjs@13.6.29');
+            // Import all Yjs-related packages from Skypack to avoid duplicate Yjs imports
+            // Skypack pins dependencies ensuring y-websocket and y-indexeddb use the same Yjs instance
+            const yjsModule = await import('https://cdn.skypack.dev/yjs@13.6.29');
             this.Y = yjsModule;
 
-            const websocketModule = await import('https://esm.sh/y-websocket@3.0.0?deps=yjs@13.6.29');
+            const websocketModule = await import('https://cdn.skypack.dev/y-websocket@3.0.0');
             this.WebsocketProvider = websocketModule.WebsocketProvider;
 
-            // Import y-indexeddb for automatic Yjs persistence
-            // Using skypack for better ESM compatibility and no build issues
+            // Import y-indexeddb - uses same Yjs instance from Skypack
             const indexeddbModule = await import('https://cdn.skypack.dev/y-indexeddb@9.0.12');
             this.IndexeddbPersistence = indexeddbModule.default || indexeddbModule.IndexeddbPersistence || indexeddbModule;
 
-            Utils.Logger.collab('[Dependencies] Loaded via ESM.sh (Websockets + IndexedDB)');
+            Utils.Logger.collab('[Dependencies] Loaded via Skypack CDN (Yjs + Websockets + IndexedDB)');
         } catch (error) {
             console.error('CollaborationManager: Failed to load dependencies', error);
             throw new Error('Failed to load collaboration dependencies. Internet connection required.');
