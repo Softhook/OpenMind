@@ -1352,10 +1352,24 @@ class CollaborationManager {
                     // During undo, connections are restored locally but must be synced to Yjs
                     // for multi-user collaboration. We bypass the isSyncing check by calling
                     // the implementation directly (we're already in the undo transaction).
+                    
+                    // DEFENSIVE: Add logging to track undo connection sync
+                    const connectionCount = this.mindMap.connections.length;
+                    Utils.Logger.state('[Undo] Syncing', connectionCount, 'connections back to Yjs for remote users');
+                    
                     const localConns = this.mindMap.connections
                         .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
                         .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
+                    
+                    // DEFENSIVE: Verify all connections have valid boxes before syncing
+                    if (localConns.length !== connectionCount) {
+                        Utils.Logger.warn('[Undo] Connection count mismatch:', connectionCount, 'total,', localConns.length, 'valid');
+                    }
+                    
+                    // Sync to Yjs (bypasses isSyncing check)
                     this._syncConnectionsToYjsImpl(localConns);
+                    
+                    Utils.Logger.state('[Undo] Synced', localConns.length, 'connections to Yjs');
                 }
 
                 // Redraw after changes
