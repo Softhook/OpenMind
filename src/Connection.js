@@ -242,7 +242,8 @@ class Connection {
     }
 
     // Calculate the point where the line should end (at the base of the arrowhead)
-    // The arrowhead is this.arrowSize pixels long, so we move back from the end point
+    // this.arrowSize (12px) is the length of the arrowhead triangle
+    // We move back by this distance from the endpoint to reach the base
     const lineEndX = end.x - this.arrowSize * cos(angle);
     const lineEndY = end.y - this.arrowSize * sin(angle);
 

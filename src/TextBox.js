@@ -42,6 +42,7 @@ class TextBox {
   static DRAG_EDGE_THICKNESS = 18;          // Thickness of draggable edge regions
   static HORIZONTAL_EDGE_WIDTH = 12;        // Fixed thinner width for vertical grab areas
   static MIN_CENTER_EDIT_ZONE = 20;         // Min central area for text editing (not dragging)
+  static SHIFT_KEY_CODE = 16;               // Keycode for Shift key (used for constrained dragging)
 
   // Change detection threshold for drag/resize operations (in pixels)
   // Operations with changes smaller than this are considered "no change" for undo purposes
@@ -2281,7 +2282,7 @@ class TextBox {
       let newY = my + this.dragOffsetY;
 
       // Shift-constrained dragging: constrain to horizontal or vertical movement
-      if (typeof keyIsDown === 'function' && keyIsDown(16)) { // Shift key
+      if (typeof keyIsDown === 'function' && keyIsDown(TextBox.SHIFT_KEY_CODE)) {
         // Determine primary direction based on movement from start position
         const deltaX = Math.abs(newX - this._dragStartX);
         const deltaY = Math.abs(newY - this._dragStartY);
