@@ -9,7 +9,7 @@ function loadTextBox() {
   const sandbox = {
     Utils: {
       generateUUID: () => 'uuid-1',
-      sanitizeText: (t) => (t == null ? '' : String(t)),
+      sanitizeText: (t) => (t === null || t === undefined ? '' : String(t)),
       getClampedZoomFactor: () => 1,
       isValidNumber: (n) => typeof n === 'number' && !isNaN(n) && isFinite(n)
     },

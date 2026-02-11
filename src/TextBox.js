@@ -2285,7 +2285,7 @@ class TextBox {
       if (typeof keyIsDown === 'function' && keyIsDown(TextBox.SHIFT_KEY_CODE)) {
         // Initialize lock origin when Shift is first held during this drag
         // Use current position to prevent snapping back when Shift is pressed mid-drag
-        if (this._dragLockOriginX === undefined || this._dragLockOriginY === undefined) {
+        if (this._dragLockOriginX === undefined && this._dragLockOriginY === undefined) {
           // Check if this is the first drag update (box is still at start position)
           const atStartPosition = (this.x === this._dragStartX && this.y === this._dragStartY);
           
