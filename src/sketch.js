@@ -1137,87 +1137,124 @@ function setup() {
     const roomInfo = parseRoomFromHash();
     const roomId = roomInfo ? roomInfo.room : null;
 
-    // When joining an online room, do NOT load from localStorage
-    // The room's state will sync from Yjs
-    // When offline (no roomId), load from localStorage to restore previous work
-    if (!roomId) {
-      // Try to load from localStorage (offline mode only)
-      const hasAutosave = mindMap.hasLocalStorageData();
-      if (hasAutosave) {
+    // When joining an online room, do NOT load from localStorage directly
+    // Instead, initialize collaborationManager first to load from IndexedDB
+    // Then the room join will sync that data to the room
+    
+    // ALWAYS initialize collaborationManager to load from IndexedDB
+    // (whether joining a room or working offline)
+    if (collaborationManager) {
+      (async () => {
         try {
-          // mindMap.loadFromLocalStorage() may be synchronous or return a Promise.
-          const maybePromise = mindMap.loadFromLocalStorage();
-          const afterLoad = async () => {
-            try { resetView(); } catch (e) { console.warn('resetView failed after loading from localStorage:', e); }
-            try {
-              if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
-                let fname = mindMap.getLastUsedFilename() || '';
-                fname = fname.split('/').pop().split('\\').pop();
-                fname = fname.replace(/\.json$/i, '').trim();
-                document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
-              }
-            } catch (_) { }
-
-            // Wait for collaboration manager to be initialized before clearing undo
-            // This ensures boxes are properly synced to Yjs WITH undo tracking
-            if (collaborationManager) {
+          await collaborationManager.initialize();
+          
+          // One-time migration: if Yjs is empty but localStorage has data, migrate it
+          const hasLocalStorage = mindMap.hasLocalStorageData();
+          const yjsEmpty = collaborationManager.yboxes && collaborationManager.yboxes.size === 0;
+          
+          if (hasLocalStorage && yjsEmpty) {
+            console.log('[Migration] Migrating data from localStorage to IndexedDB...');
+            
+            // Load from localStorage
+            const maybePromise = mindMap.loadFromLocalStorage();
+            const afterLoad = async () => {
+              try { resetView(); } catch (e) { console.warn('resetView failed:', e); }
               try {
-                // Wait for initialization to complete
-                await collaborationManager.initialize();
+                if (typeof document !== 'undefined' && mindMap && typeof mindMap.getLastUsedFilename === 'function') {
+                  let fname = mindMap.getLastUsedFilename() || '';
+                  fname = fname.split('/').pop().split('\\').pop();
+                  fname = fname.replace(/\.json$/i, '').trim();
+                  document.title = fname ? (fname + ' — OpenMind') : 'OpenMind';
+                }
+              } catch (_) { }
 
-                // Re-sync all boxes to ensure they're in Yjs with proper undo tracking
-                // This fixes issue where boxes loaded before undoManager was ready
-                if (mindMap && mindMap.boxes && MindMap.onBoxChange) {
-                  for (const box of mindMap.boxes) {
-                    if (box && box.id) {
-                      MindMap.onBoxChange(box);
-                    }
+              // Sync to Yjs (which auto-persists to IndexedDB)
+              if (mindMap && mindMap.boxes && MindMap.onBoxChange) {
+                for (const box of mindMap.boxes) {
+                  if (box && box.id) {
+                    MindMap.onBoxChange(box);
                   }
                 }
-                if (mindMap && MindMap.onConnectionsChange) {
-                  MindMap.onConnectionsChange();
-                }
-
-                // Clear undo history after loading to prevent undo from reverting the load
-                collaborationManager.clearUndoHistory();
-              } catch (e) {
-                console.warn('Failed to initialize collaboration for undo:', e);
               }
+              if (mindMap && MindMap.onConnectionsChange) {
+                MindMap.onConnectionsChange();
+              }
+
+              // Mark that localStorage load is complete
+              collaborationManager.hasLoadedFromLocalStorage = true;
+
+              // Clear undo history after migration
+              collaborationManager.clearUndoHistory();
+              
+              console.log('[Migration] Migration complete. Data now persisted in IndexedDB.');
+              
+              // If joining a room, proceed with initialization
+              if (roomId) {
+                const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+                initializeCollaboration(roomId, shouldShareLocalData);
+              }
+            };
+            
+            if (maybePromise && typeof maybePromise.then === 'function') {
+              maybePromise.then(afterLoad).catch((e) => {
+                console.warn('Failed to load from localStorage:', e);
+              });
+            } else {
+              afterLoad();
             }
-          };
-          if (maybePromise && typeof maybePromise.then === 'function') {
-            maybePromise.then(afterLoad).catch((e) => {
-              console.warn('Failed to load mindMap from localStorage:', e);
-            });
+          } else if (!yjsEmpty) {
+            // IndexedDB has data, rebuild mindMap from it
+            console.log('[Load] Loading from IndexedDB via Yjs...');
+            collaborationManager._rebuildBoxesFromYjs();
+            collaborationManager._rebuildConnectionsFromYjs();
+            collaborationManager.hasLoadedFromLocalStorage = true;
+            
+            if (!roomId) {
+              // Offline mode - reset view to show all content
+              try { resetView(); } catch (e) { console.warn('resetView failed:', e); }
+            }
+            
+            // Clear undo history after load (loading old state shouldn't be undoable)
+            collaborationManager.clearUndoHistory();
+            
+            // If joining a room, proceed with initialization
+            if (roomId) {
+              const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+              initializeCollaboration(roomId, shouldShareLocalData);
+            }
           } else {
-            afterLoad();
+            // Both empty - create initial example boxes (offline only)
+            if (!roomId) {
+              console.log('[Load] Fresh start - creating example boxes');
+              mindMap.addBox(new TextBox(300, 200, "Idea"));
+              mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
+              mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
+            }
+            collaborationManager.hasLoadedFromLocalStorage = true;
+            
+            // Clear undo history so creating example boxes isn't undoable
+            setTimeout(() => {
+              if (collaborationManager && collaborationManager.isInitialized) {
+                collaborationManager.clearUndoHistory();
+              }
+            }, 200);
+            
+            // If joining a room (with no local data), proceed with initialization
+            if (roomId) {
+              const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+              initializeCollaboration(roomId, shouldShareLocalData);
+            }
           }
         } catch (e) {
-          console.warn('Error while loading from localStorage:', e);
+          console.warn('Failed to initialize collaboration:', e);
         }
-      } else {
-        // Create initial boxes as examples only if no autosave exists (offline mode)
-        mindMap.addBox(new TextBox(300, 200, "Idea"));
-        mindMap.addBox(new TextBox(500, 300, "Sub Topic"));
-        mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
-        // Initial state is unsaved, will be autosaved on first interval
-        if (mindMap) mindMap.isSaved = false;
-        // Clear undo history so creating example boxes isn't undoable
-        if (collaborationManager) {
-          // Wait for initialization then clear
-          setTimeout(() => {
-            if (collaborationManager && collaborationManager.isInitialized) {
-              collaborationManager.clearUndoHistory();
-            }
-          }, 200);
-        }
-      }
+      })();
     } else if (!lastLoadedUrlFile && roomId) {
-      // ONLINE MODE: Joining a collaboration room
-      // State clearing now happens in initializeCollaboration() to handle both:
-      // 1. Initial page load with room URL (this code path)
-      // 2. Hash navigation to room URL (handleUrlChange code path)
-      Utils.Logger.state('[Load] Detected collaboration room in URL:', roomId, '- skipping localStorage load');
+      // Fallback: collaborationManager doesn't exist but room ID does
+      // This shouldn't happen, but handle it gracefully
+      Utils.Logger.state('[Load] No collaborationManager - creating and joining room:', roomId);
+      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
+      initializeCollaboration(roomId, shouldShareLocalData);
     }
 
     // Create UI buttons
@@ -1229,7 +1266,9 @@ function setup() {
     // Hide menu buttons initially
     hideMenuButtons();
 
-    // Start autosave timer
+    // NOTE: With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
+    // We still run autosave as a backup mechanism for localStorage export/import compatibility.
+    // This ensures users can still manually export their data even if IndexedDB fails.
     startAutosave();
 
     // Set up page visibility handling to prevent freezing when tab is hidden
@@ -1251,13 +1290,9 @@ function setup() {
       console.warn('Failed to setup drag/drop handlers:', e);
     }
 
-    // Check for collaboration room in URL
-    if (roomId) {
-      // Use the isStarting flag from URL to determine behavior
-      // When joining from URL at startup, this will typically be false (not starting)
-      const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
-      initializeCollaboration(roomId, shouldShareLocalData);
-    }
+    // Note: Room joining is now handled within the collaborationManager initialization
+    // above, after IndexedDB data is loaded. This ensures local data is available
+    // before connecting to a room.
   } catch (e) {
     console.error('Setup failed:', e);
     alert('Failed to initialize application: ' + e.message);
@@ -2336,20 +2371,24 @@ function mousePressed(e) {
       // FIX ISSUE #3: Show progress indicator immediately
       syncStatus = 'syncing';
 
-      // FIX CRITICAL ISSUE #2: Add error handling around clear operation
-      try {
-        // Clear local state before connecting
-        _clearLocalState();
-        
-        // Proceed with connection
-        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
-          console.error('[Room] Failed to join room:', error);
+      // FIX CRITICAL ISSUE #2: Clear IndexedDB before proceeding
+      (async () => {
+        try {
+          // Clear local mindMap state
+          _clearLocalState();
+          
+          // Clear IndexedDB to prevent old data from reloading
+          if (collaborationManager) {
+            await collaborationManager.clearIndexedDB();
+          }
+          
+          // Now proceed to join room (will load from room, not from IndexedDB)
+          await _proceedWithRoomJoin(roomName, 'delete');
+        } catch (error) {
+          console.error('[Room] Failed to clear data and join room:', error);
           syncStatus = null;
-        });
-      } catch (error) {
-        console.error('[Room] Error clearing local data:', error);
-        syncStatus = null;
-      }
+        }
+      })();
       return;
       
     } else if (clickedCancel) {
@@ -2597,11 +2636,25 @@ function keyPressed() {
       syncStatus = 'syncing';
 
       try {
-        _clearLocalState();
-        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
-          console.error('[Room] Failed to join room:', error);
-          syncStatus = null;
-        });
+        // CRITICAL FIX: Clear IndexedDB before proceeding
+        // Otherwise old IndexedDB data will reload and sync to room
+        (async () => {
+          try {
+            // Clear local mindMap state
+            _clearLocalState();
+            
+            // Clear IndexedDB to prevent old data from reloading
+            if (collaborationManager) {
+              await collaborationManager.clearIndexedDB();
+            }
+            
+            // Now proceed to join room (will load from room, not from IndexedDB)
+            await _proceedWithRoomJoin(roomName, 'delete');
+          } catch (error) {
+            console.error('[Room] Failed to clear data and join room:', error);
+            syncStatus = null;
+          }
+        })();
       } catch (error) {
         console.error('[Room] Error clearing local data:', error);
         syncStatus = null;
@@ -4797,6 +4850,8 @@ function startAutosave() {
     clearInterval(autosaveTimer);
   }
 
+  // With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
+  // This localStorage autosave serves as a backup for export/import functionality.
   // Set up periodic autosave
   autosaveTimer = setInterval(() => {
     // Only autosave when page is visible to avoid issues with background throttling

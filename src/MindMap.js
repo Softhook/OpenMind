@@ -187,6 +187,7 @@ class MindMap {
     this._wrapInTransaction(() => {
       this.connections.push(new Connection(fromBox, toBox));
       this.isDirty = true;
+      this.isSaved = false; // Mark as unsaved for browser autosave
 
       // Notify collaboration system
       // Pass skipTransactionWrapper=true since we're already in a transaction
@@ -2032,6 +2033,7 @@ class MindMap {
             // Wrap connection reattachment in transaction for proper undo tracking
             this._wrapInTransaction(() => {
               conn.toBox = droppedOn;
+              this.isSaved = false; // Mark as unsaved for browser autosave
               // Sync connection change to collaboration
               // Pass skipTransactionWrapper=true since we're in a transaction
               if (MindMap.onConnectionsChange) {
@@ -2638,6 +2640,7 @@ class MindMap {
         // Wrap connection reverse in transaction for proper undo tracking
         this._wrapInTransaction(() => {
           this.selectedConnection.reverse();
+          this.isSaved = false; // Mark as unsaved for browser autosave
           // Sync connection change to collaboration
           // Pass skipTransactionWrapper=true since we're in a transaction
           if (MindMap.onConnectionsChange) {
@@ -2673,6 +2676,7 @@ class MindMap {
           if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
             this.selectedConnection = null;
           }
+          this.isSaved = false; // Mark as unsaved for browser autosave
           // Sync connection deletion to collaboration
           if (MindMap.onConnectionsChange) {
             MindMap.onConnectionsChange();
@@ -2689,6 +2693,7 @@ class MindMap {
           this._wrapInTransaction(() => {
             this.connections.splice(index, 1);
             this.selectedConnection = null;
+            this.isSaved = false; // Mark as unsaved for browser autosave
             // Sync connection deletion to collaboration
             if (MindMap.onConnectionsChange) {
               MindMap.onConnectionsChange();
