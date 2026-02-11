@@ -150,4 +150,41 @@ describe('Undo Connection Restoration - Behavioral', () => {
             expect(rebuildCode).toMatch(/this\.mindMap\.connections\s*=\s*\[\]/);
         });
     });
+
+    describe('Connection-only undo/redo fix', () => {
+        test('yconnections observer checks transaction.changed for box changes', () => {
+            // The yconnections observer must inspect event.transaction.changed
+            // to determine if yboxes also changed. If not, it must rebuild
+            // connections itself (since yboxes observer won't fire).
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must check event.transaction.changed.has(this.yboxes)
+            expect(connObserver).toMatch(/event\.transaction\.changed\.has\(this\.yboxes\)/);
+        });
+
+        test('yconnections observer defers to yboxes observer only when boxes changed', () => {
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must have conditional return only when hasBoxChanges is true
+            expect(connObserver).toMatch(/hasBoxChanges[\s\S]*?return/);
+        });
+
+        test('yconnections observer rebuilds connections when no box changes in undo/redo', () => {
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must call _rebuildConnectionsFromYjs (not just return) for
+            // connection-only undo/redo
+            expect(connObserver).toMatch(/_rebuildConnectionsFromYjs\(\)/);
+
+            // Must NOT unconditionally return for all isUndoRedo cases
+            // (the old bug was: if (isUndoRedo) { return; })
+            expect(connObserver).not.toMatch(/if\s*\(\s*isUndoRedo\s*\)\s*\{\s*\/\/\s*Skip[\s\S]*?return;\s*\}/);
+        });
+    });
 });

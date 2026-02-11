@@ -1555,13 +1555,22 @@ class CollaborationManager {
             if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 
-            // CRITICAL FIX: During undo/redo, skip connection rebuild here because
-            // yboxes observer already handles it in its undo/redo section. This prevents duplicate
-            // rebuilds and ensures connections rebuild AFTER boxes are available.
-            // The yboxes observer runs its undo/redo block to establish box order first.
             if (isUndoRedo) {
-                // Skip - yboxes observer will rebuild connections after boxes are ready
-                return;
+                // Check if the yboxes observer will also fire for this transaction.
+                // If boxes changed too (e.g., undoing a box deletion that included
+                // connections), the yboxes observer handles the connection rebuild
+                // AFTER restoring boxes, so we defer to it to avoid rebuilding
+                // before boxes are available.
+                const hasBoxChanges = event.transaction.changed.has(this.yboxes);
+                if (hasBoxChanges) {
+                    // Defer to yboxes observer — it will call _rebuildConnectionsFromYjs()
+                    // after boxes are restored.
+                    return;
+                }
+                // No box changes in this transaction (e.g., undoing a connection
+                // creation or deletion). The yboxes observer won't fire, so we
+                // must rebuild connections here.
+                Utils.Logger.debug('[Undo] Connection-only undo/redo — rebuilding connections directly');
             }
 
             this.isSyncing = true;
