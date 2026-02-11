@@ -131,6 +131,40 @@ class Connection {
   }
 
   /**
+   * Calculates the shortened line endpoint that terminates inside the arrowhead.
+   * Clamps the shortening distance to avoid overshooting when boxes are very close.
+   * @returns {Object|null} Object with {start, shortenedEnd} points, or null if invalid
+   * @private
+   */
+  _getShortenedLineEndpoints() {
+    const endpoints = this._getConnectionEndpoints();
+    if (!endpoints) return null;
+
+    const { start, end } = endpoints;
+
+    // Calculate segment length to avoid overshooting
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+    // If segment is too short or zero-length, don't shorten
+    if (segmentLength <= this.arrowSize || segmentLength === 0) {
+      return { start, shortenedEnd: start };
+    }
+
+    // Calculate angle and shorten by arrowSize (clamped to segment length)
+    const angle = atan2(dy, dx);
+    if (!Utils.isValidNumber(angle)) return null;
+
+    const shortenedEnd = {
+      x: end.x - this.arrowSize * cos(angle),
+      y: end.y - this.arrowSize * sin(angle)
+    };
+
+    return { start, shortenedEnd };
+  }
+
+  /**
    * Gets the world-space position of the arrow head (end point at toBox edge).
    * This is where the visual arrow tip appears.
    * @returns {Object|null} Point with x and y coordinates, or null if invalid
@@ -229,28 +263,26 @@ class Connection {
     const endpoints = this._getConnectionEndpoints();
     if (!endpoints) return;
 
-    const { start, end } = endpoints;
+    const { end } = endpoints;
+
+    // Get shortened line endpoints
+    const shortened = this._getShortenedLineEndpoints();
+    if (!shortened) return;
+
+    const { start, shortenedEnd } = shortened;
 
     push();
 
-    // Calculate arrow head angle
-    // atan2 gives us the angle from start to end point
+    // Draw the connection line to the shortened endpoint (inside arrowhead)
+    this._applySelectionStyle(true); // true = stroke
+    line(start.x, start.y, shortenedEnd.x, shortenedEnd.y);
+
+    // Calculate arrow head angle for rendering
     const angle = atan2(end.y - start.y, end.x - start.x);
     if (!Utils.isValidNumber(angle)) {
       pop();
       return;
     }
-
-    // Calculate shortened line endpoint that terminates inside the arrowhead
-    // Move back from 'end' by ARROW_SIZE along the direction from start to end
-    const shortenedEnd = {
-      x: end.x - this.arrowSize * cos(angle),
-      y: end.y - this.arrowSize * sin(angle)
-    };
-
-    // Draw the connection line to the shortened endpoint (inside arrowhead)
-    this._applySelectionStyle(true); // true = stroke
-    line(start.x, start.y, shortenedEnd.x, shortenedEnd.y);
 
     // Draw arrow head as a filled triangle
     this._applySelectionStyle(false); // false = fill
@@ -278,6 +310,7 @@ class Connection {
   /**
    * Checks if mouse is over the connection line.
    * Uses point-to-segment distance for accurate hit detection.
+   * Hit detection uses the shortened line segment (same as rendered).
    * @returns {boolean} true if mouse is over the line
    */
   isMouseOver() {
@@ -288,14 +321,14 @@ class Connection {
       return false;
     }
 
-    // Get validated connection endpoints
-    const endpoints = this._getConnectionEndpoints();
-    if (!endpoints) return false;
+    // Get shortened line endpoints (same as rendered line)
+    const shortened = this._getShortenedLineEndpoints();
+    if (!shortened) return false;
 
-    const { start, end } = endpoints;
+    const { start, shortenedEnd } = shortened;
 
-    // Calculate distance from mouse to line segment
-    const distance = this.distanceToSegment(mx, my, start.x, start.y, end.x, end.y);
+    // Calculate distance from mouse to the shortened line segment
+    const distance = this.distanceToSegment(mx, my, start.x, start.y, shortenedEnd.x, shortenedEnd.y);
     return distance < Connection.HIT_THRESHOLD;
   }
 
