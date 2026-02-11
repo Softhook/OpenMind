@@ -1367,9 +1367,9 @@ class CollaborationManager {
             if (event.transaction.local && !isUndoRedo) return;
 
             // CRITICAL FIX: During undo/redo, skip connection rebuild here because
-            // yboxes observer already handles it at line 1290. This prevents duplicate
+            // yboxes observer already handles it in its undo/redo section. This prevents duplicate
             // rebuilds and ensures connections rebuild AFTER boxes are available.
-            // The yboxes observer runs first for undo/redo to establish box order.
+            // The yboxes observer runs its undo/redo block to establish box order first.
             if (isUndoRedo) {
                 // Skip - yboxes observer will rebuild connections after boxes are ready
                 return;
