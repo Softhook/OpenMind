@@ -233,6 +233,10 @@ class Connection {
 
     push();
 
+    // Draw the connection line with appropriate styling
+    this._applySelectionStyle(true); // true = stroke
+    line(start.x, start.y, end.x, end.y);
+
     // Calculate arrow head angle
     // atan2 gives us the angle from start to end point
     const angle = atan2(end.y - start.y, end.x - start.x);
@@ -240,16 +244,6 @@ class Connection {
       pop();
       return;
     }
-
-    // Calculate the point where the line should end (at the base of the arrowhead)
-    // this.arrowSize (12px) is the length of the arrowhead triangle
-    // We move back by this distance from the endpoint to reach the base
-    const lineEndX = end.x - this.arrowSize * cos(angle);
-    const lineEndY = end.y - this.arrowSize * sin(angle);
-
-    // Draw the connection line with appropriate styling
-    this._applySelectionStyle(true); // true = stroke
-    line(start.x, start.y, lineEndX, lineEndY);
 
     // Draw arrow head as a filled triangle
     this._applySelectionStyle(false); // false = fill
