@@ -133,7 +133,7 @@ class Connection {
   /**
    * Calculates the shortened line endpoint that terminates inside the arrowhead.
    * Clamps the shortening distance to avoid overshooting when boxes are very close.
-   * @returns {Object|null} Object with {start, shortenedEnd} points, or null if invalid
+   * @returns {Object|null} Object with {start, shortenedEnd, angle} or null if invalid
    * @private
    */
   _getShortenedLineEndpoints() {
@@ -147,21 +147,21 @@ class Connection {
     const dy = end.y - start.y;
     const segmentLength = Math.sqrt(dx * dx + dy * dy);
 
-    // If segment is too short or zero-length, don't shorten
-    if (segmentLength <= this.arrowSize || segmentLength === 0) {
-      return { start, shortenedEnd: start };
-    }
-
-    // Calculate angle and shorten by arrowSize (clamped to segment length)
+    // Calculate angle (returned for reuse in draw())
     const angle = atan2(dy, dx);
     if (!Utils.isValidNumber(angle)) return null;
+
+    // If segment is too short, don't shorten (prevents line flipping)
+    if (segmentLength <= this.arrowSize) {
+      return { start, shortenedEnd: start, angle };
+    }
 
     const shortenedEnd = {
       x: end.x - this.arrowSize * cos(angle),
       y: end.y - this.arrowSize * sin(angle)
     };
 
-    return { start, shortenedEnd };
+    return { start, shortenedEnd, angle };
   }
 
   /**
@@ -265,24 +265,17 @@ class Connection {
 
     const { end } = endpoints;
 
-    // Get shortened line endpoints
+    // Get shortened line endpoints with angle
     const shortened = this._getShortenedLineEndpoints();
     if (!shortened) return;
 
-    const { start, shortenedEnd } = shortened;
+    const { start, shortenedEnd, angle } = shortened;
 
     push();
 
     // Draw the connection line to the shortened endpoint (inside arrowhead)
     this._applySelectionStyle(true); // true = stroke
     line(start.x, start.y, shortenedEnd.x, shortenedEnd.y);
-
-    // Calculate arrow head angle for rendering
-    const angle = atan2(end.y - start.y, end.x - start.x);
-    if (!Utils.isValidNumber(angle)) {
-      pop();
-      return;
-    }
 
     // Draw arrow head as a filled triangle
     this._applySelectionStyle(false); // false = fill
