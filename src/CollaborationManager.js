@@ -212,15 +212,13 @@ class CollaborationManager {
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
-            // trackedOrigins must explicitly include the origin used in transactions.
-            // Using an empty set previously prevented ANY captures, so add undoManager after creation.
-            const trackedOrigins = new Set();
+            // CRITICAL: UndoManager automatically tracks transactions with itself as origin.
+            // We use ydoc.transact with undoManager as second parameter to mark trackable operations.
+            // Empty trackedOrigins means it only tracks when origin === undoManager instance.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins
+                trackedOrigins: new Set()
             });
-            // Ensure all transactions we tag with `this.undoManager` are tracked for undo/redo
-            trackedOrigins.add(this.undoManager);
 
             // Set up observers for Yjs → local sync (including undo/redo)
             this._setupObservers();
@@ -1367,6 +1365,15 @@ class CollaborationManager {
             // This allows connections to be rebuilt after boxes are restored
             if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
+
+            // CRITICAL FIX: During undo/redo, skip connection rebuild here because
+            // yboxes observer already handles it at line 1290. This prevents duplicate
+            // rebuilds and ensures connections rebuild AFTER boxes are available.
+            // The yboxes observer runs first for undo/redo to establish box order.
+            if (isUndoRedo) {
+                // Skip - yboxes observer will rebuild connections after boxes are ready
+                return;
+            }
 
             this.isSyncing = true;
             try {
