@@ -553,6 +553,42 @@ class CollaborationManager {
     }
 
     /**
+     * Clears all data from IndexedDB.
+     * This destroys the IndexedDB provider and clears the database,
+     * then recreates a fresh provider.
+     * Used when user chooses "delete local data" before joining a room.
+     * @returns {Promise<void>}
+     */
+    async clearIndexedDB() {
+        if (!this.indexeddbProvider) {
+            Utils.Logger.warn('[IndexedDB] No provider to clear');
+            return;
+        }
+
+        try {
+            Utils.Logger.collab('[IndexedDB] Clearing database...');
+            
+            // Clear the database (this also destroys the provider)
+            await this.indexeddbProvider.clearData();
+            this.indexeddbProvider = null;
+            
+            // Also clear the Yjs document to ensure fresh state
+            this.yboxes.clear();
+            this.yconnections.delete(0, this.yconnections.length);
+            
+            // Recreate the provider with empty state
+            const dbName = 'openmind-yjs';
+            this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
+            await this.indexeddbProvider.whenSynced;
+            
+            Utils.Logger.collab('[IndexedDB] Database cleared and provider recreated');
+        } catch (error) {
+            console.error('[IndexedDB] Failed to clear database:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Undo the last local operation (collaborative-aware)
      * Only undoes YOUR changes, not other users' changes
      * @returns {boolean} true if undo was performed

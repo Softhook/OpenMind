@@ -2371,20 +2371,24 @@ function mousePressed(e) {
       // FIX ISSUE #3: Show progress indicator immediately
       syncStatus = 'syncing';
 
-      // FIX CRITICAL ISSUE #2: Add error handling around clear operation
-      try {
-        // Clear local state before connecting
-        _clearLocalState();
-        
-        // Proceed with connection
-        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
-          console.error('[Room] Failed to join room:', error);
+      // FIX CRITICAL ISSUE #2: Clear IndexedDB before proceeding
+      (async () => {
+        try {
+          // Clear local mindMap state
+          _clearLocalState();
+          
+          // Clear IndexedDB to prevent old data from reloading
+          if (collaborationManager) {
+            await collaborationManager.clearIndexedDB();
+          }
+          
+          // Now proceed to join room (will load from room, not from IndexedDB)
+          await _proceedWithRoomJoin(roomName, 'delete');
+        } catch (error) {
+          console.error('[Room] Failed to clear data and join room:', error);
           syncStatus = null;
-        });
-      } catch (error) {
-        console.error('[Room] Error clearing local data:', error);
-        syncStatus = null;
-      }
+        }
+      })();
       return;
       
     } else if (clickedCancel) {
@@ -2632,11 +2636,25 @@ function keyPressed() {
       syncStatus = 'syncing';
 
       try {
-        _clearLocalState();
-        _proceedWithRoomJoin(roomName, 'delete').catch(error => {
-          console.error('[Room] Failed to join room:', error);
-          syncStatus = null;
-        });
+        // CRITICAL FIX: Clear IndexedDB before proceeding
+        // Otherwise old IndexedDB data will reload and sync to room
+        (async () => {
+          try {
+            // Clear local mindMap state
+            _clearLocalState();
+            
+            // Clear IndexedDB to prevent old data from reloading
+            if (collaborationManager) {
+              await collaborationManager.clearIndexedDB();
+            }
+            
+            // Now proceed to join room (will load from room, not from IndexedDB)
+            await _proceedWithRoomJoin(roomName, 'delete');
+          } catch (error) {
+            console.error('[Room] Failed to clear data and join room:', error);
+            syncStatus = null;
+          }
+        })();
       } catch (error) {
         console.error('[Room] Error clearing local data:', error);
         syncStatus = null;
