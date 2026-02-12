@@ -2,20 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function loadColorPalette() {
-  const code = fs.readFileSync(path.join(__dirname, '../../src/ColorPalette.js'), 'utf8');
-  const sandbox = { module: { exports: {} } };
-  vm.createContext(sandbox);
-  vm.runInContext(code, sandbox, { filename: 'ColorPalette.js' });
-  return sandbox.module.exports;
-}
-
 function loadTextBox() {
   const code = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
 
   // Minimal sandbox to satisfy TextBox dependencies
+  // ColorPalette is loaded globally by tests/setup.js
   const sandbox = {
-    ColorPalette: loadColorPalette(),
+    ColorPalette: global.ColorPalette,
     Utils: {
       generateUUID: () => 'uuid-1',
       sanitizeText: (t) => (t == null ? '' : String(t)),
