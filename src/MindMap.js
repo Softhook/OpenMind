@@ -594,10 +594,10 @@ class MindMap {
    */
   leftAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -643,10 +643,10 @@ class MindMap {
    */
   rightAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -689,10 +689,10 @@ class MindMap {
    */
   topAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -735,10 +735,10 @@ class MindMap {
    */
   bottomAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -782,10 +782,10 @@ class MindMap {
    */
   centerAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -833,10 +833,10 @@ class MindMap {
    */
   horizontalCenterAlignSelectedBoxes() {
     const boxesToAlign = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToAlign.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 2) return false;
 
     // Wrap in transaction for single undo step
@@ -882,10 +882,10 @@ class MindMap {
    */
   distributeSelectedBoxesVertically() {
     const boxes = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
@@ -950,10 +950,10 @@ class MindMap {
    */
   distributeSelectedBoxesHorizontally() {
     const boxes = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxes.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 3) return false;
 
     // Wrap in transaction for single undo step
@@ -1019,10 +1019,10 @@ class MindMap {
   hierarchicalLayout() {
     // Determine which boxes to layout (selection only; otherwise do nothing)
     const boxesToLayout = this._getSelectedBoxes();
-    
+
     // Filter out boxes locked by remote editing
     const unlocked = boxesToLayout.filter(b => !(b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()));
-    
+
     if (unlocked.length < 1) return false;
 
     // Wrap in transaction for single undo step
@@ -2029,7 +2029,7 @@ class MindMap {
           if (droppedOn !== originalTo) {
             this.pushUndo();
             changed = true;
-            
+
             // Wrap connection reattachment in transaction for proper undo tracking
             this._wrapInTransaction(() => {
               conn.toBox = droppedOn;
@@ -2636,7 +2636,7 @@ class MindMap {
       // Space: reverse selected connection when not editing
       if (this.selectedConnection) {
         this.pushUndo();
-        
+
         // Wrap connection reverse in transaction for proper undo tracking
         this._wrapInTransaction(() => {
           this.selectedConnection.reverse();
@@ -3151,6 +3151,14 @@ class MindMap {
       }
       return false;
     }
+  }
+
+  /**
+   * Gets the current storage key
+   * @returns {string} The storage key
+   */
+  getStorageKey() {
+    return this.storageKey;
   }
 
   /**

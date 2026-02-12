@@ -148,6 +148,9 @@ class CollaborationManager {
         // Debug flag for targeted undo/redo logging
         this._isPerformingUndoRedo = false;
 
+        // State for initial room experience
+        this.hasTriggeredInitialZoom = false; // Reset so next room join will auto-zoom
+
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
 
@@ -156,8 +159,8 @@ class CollaborationManager {
         this.consistencyCheckInterval = 30000; // Check every 30 seconds (reduced overhead)
         this.consecutiveSyncedChecks = 0; // Track consecutive checks with no mismatches
 
-        // Flag to prevent rebuilding from empty Yjs when loading from localStorage offline
-        // This is set to true after initial localStorage load completes
+        // Flag to prevent rebuilding from empty Yjs when migrating from legacy localStorage
+        // This is set to true after initial migration completes
         this.hasLoadedFromLocalStorage = false;
 
         // Server state tracking for cold start detection
@@ -176,13 +179,11 @@ class CollaborationManager {
     /**
      * Initializes Yjs document and UndoManager.
      * Call this once at startup. Undo/redo works even without network connection.
+     * @param {string|null} roomName - Optional room name for isolated persistence
      * @returns {Promise<void>}
      */
-    async initialize() {
-        if (this.isInitialized) {
-            console.warn('CollaborationManager: Already initialized');
-            return;
-        }
+    async initialize(roomName = null) {
+        if (this.isInitialized) return;
 
         // If initialization is already in progress, wait for it to complete
         if (this.isInitializing) {
@@ -191,9 +192,16 @@ class CollaborationManager {
         }
 
         this.isInitializing = true;
+        this.roomName = roomName;
 
-        // Store the initialization promise so concurrent calls can await it
         this.initializationPromise = this._doInitialize();
+
+        // Final guard: check if we were destroyed while initializing
+        await this.initializationPromise;
+        if (!this.ydoc) {
+            Utils.Logger.warn('[Init] Manager was destroyed during initialization - aborting');
+            this.isInitialized = false;
+        }
 
         return this.initializationPromise;
     }
@@ -216,15 +224,15 @@ class CollaborationManager {
             this.yconnections = this.ydoc.getArray('connections');
 
             // Create IndexedDB provider for automatic persistence
-            // This eliminates the need for localStorage manual syncing
-            const dbName = 'openmind-yjs';
+            // Use room-specific database name to ensure data isolation
+            const dbName = this.roomName ? `openmind-room-${this.roomName}` : 'openmind-offline';
             this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
             this._hardenIndexedDBProvider(this.indexeddbProvider);
 
             // Wait for IndexedDB to load persisted state
             await this.indexeddbProvider.whenSynced;
 
-            Utils.Logger.collab('[Init] IndexedDB synced - Yjs loaded from persistent storage');
+            Utils.Logger.collab(`[Init] IndexedDB synced (${dbName}) - Yjs loaded from persistent storage`);
 
             // Create UndoManager - tracks LOCAL changes only
             // captureTimeout: 0 disables time-based grouping for action-based undo
@@ -280,7 +288,19 @@ class CollaborationManager {
         }
 
         if (this.isConnected) {
-            console.warn('CollaborationManager: Already connected');
+            Utils.Logger.debug('CollaborationManager: Already connected - triggering callbacks');
+
+            // Ensure we have the latest sync state from the provider
+            if (this.provider && this.provider.synced) {
+                this.lastSyncedState = true;
+            }
+
+            if (this.onConnectionChange) {
+                this.onConnectionChange(this.lastSyncedState ? 'synced' : 'connected');
+            }
+            if (this.onPeersChange) {
+                this.onPeersChange(this.getRemoteUsers());
+            }
             return;
         }
 
@@ -319,15 +339,17 @@ class CollaborationManager {
             });
 
             // Track sync state
-            this.provider.on('synced', ({ synced }) => {
-                Utils.Logger.state('[Sync] Status:', synced);
+            this.provider.on('synced', (arg) => {
+                // In y-websocket, 'synced' can pass a boolean or an object with {synced} property
+                const isSynced = (typeof arg === 'boolean') ? arg : (arg && arg.synced !== false);
+                Utils.Logger.state('[Sync] Status:', isSynced);
 
                 // Detect transition from not-synced to synced (initial sync or resync)
-                const isResync = synced && !this.lastSyncedState;
-                this.lastSyncedState = synced;
+                const isResync = isSynced && !this.lastSyncedState;
+                this.lastSyncedState = isSynced;
 
                 // FORCE connection state to true if synced (fixes split-brain issue)
-                if (synced && !this.isConnected) {
+                if (isSynced && !this.isConnected) {
                     Utils.Logger.state('[Sync] Synced implies connected - forcing state');
                     this.isConnected = true;
                     if (this.onConnectionChange) this.onConnectionChange('connected');
@@ -408,7 +430,7 @@ class CollaborationManager {
                 }
 
                 // Start or stop consistency check based on sync state
-                if (synced) {
+                if (isSynced) {
                     // Start periodic consistency check when fully synced
                     this._startConsistencyCheck();
 
@@ -426,11 +448,20 @@ class CollaborationManager {
                 }
 
                 if (this.onConnectionChange) {
-                    this.onConnectionChange(synced ? 'synced' : 'syncing');
+                    this.onConnectionChange(isSynced ? 'synced' : 'syncing');
                 }
             });
 
             Utils.Logger.collab(`[Room] Connecting to "${roomName}"...`);
+
+            // FIX RACE CONDITION: If the provider is already synced (e.g. from fast cache),
+            // the 'synced' event may have already fired.
+            if (this.provider.synced) {
+                // Manually trigger the sync logic
+                Utils.Logger.collab('[Sync] Provider already synced on creation');
+                // We emit a fake event to our own listener to ensure all logic runs
+                this.provider.emit('synced', [{ synced: true }]);
+            }
 
         } catch (error) {
             console.error('CollaborationManager: Failed to connect', error);
@@ -471,7 +502,7 @@ class CollaborationManager {
             Utils.Logger.collab('[Room] Syncing local data via Yjs CRDT merge');
             this._syncLocalToYjs();
 
-            // Mark that we've loaded from localStorage (prevents premature rebuilds)
+            // Mark that we've loaded from legacy storage (prevents premature rebuilds)
             this.hasLoadedFromLocalStorage = true;
         } catch (error) {
             console.error('[Room] Error syncing to room:', error);
@@ -647,6 +678,41 @@ class CollaborationManager {
     }
 
     /**
+     * Clears all local data for a specific room (or offline stash) without initializing a manager.
+     * This is the safest way to "Join Fresh" as it wipes the persistent cache BEFORE
+     * Yjs loads it into memory, avoiding potential sync of deletions to the server.
+     * @param {string|null} roomName - Room name, or null for offline stash
+     * @returns {Promise<void>}
+     */
+    static async clearRoomData(roomName = null) {
+        const dbName = roomName ? `openmind-room-${roomName}` : 'openmind-offline';
+        Utils.Logger.collab(`[Cleanup] Wiping persistent cache for database: ${dbName}`);
+
+        try {
+            // Use indexedDB.deleteDatabase directly for maximum reliability and safety.
+            // This ensures we wipe the persistence layer without any Yjs document logic
+            // getting in the way or attempting to sync deletions to a server.
+            return new Promise((resolve) => {
+                const request = indexedDB.deleteDatabase(dbName);
+                request.onsuccess = () => {
+                    Utils.Logger.collab(`[Cleanup] Successfully wiped database: ${dbName}`);
+                    resolve('success');
+                };
+                request.onerror = (e) => {
+                    console.error(`[Cleanup] Failed to wipe database: ${dbName}`, e);
+                    resolve('error');
+                };
+                request.onblocked = () => {
+                    Utils.Logger.warn(`[Cleanup] Wipe blocked for ${dbName} - please close other tabs using this room`);
+                    resolve('blocked');
+                };
+            });
+        } catch (e) {
+            console.error('[Cleanup] Error during room wipe:', e);
+        }
+    }
+
+    /**
      * Clears all data from IndexedDB.
      * This destroys the IndexedDB provider and clears the database,
      * then recreates a fresh provider.
@@ -668,7 +734,7 @@ class CollaborationManager {
         try {
             Utils.Logger.collab('[IndexedDB] Clearing database...');
 
-            const dbName = this.indexeddbProvider.name || 'openmind-yjs';
+            const dbName = this.indexeddbProvider.name || (this.roomName ? `openmind-room-${this.roomName}` : 'openmind-offline');
 
             // Step 1: Null the db ref to prevent any in-flight _storeUpdate calls
             // from writing to the DB while it's closing
@@ -1763,11 +1829,11 @@ class CollaborationManager {
     _rebuildConnectionsFromYjs() {
         if (!this.mindMap || !this.yconnections) return;
 
-        // CRITICAL FIX: Don't rebuild from empty Yjs when loading from localStorage offline
-        // When working offline, localStorage is the source of truth. Only rebuild from Yjs
+        // NOTE: Don't rebuild from empty Yjs when migrating from legacy localStorage.
+        // When migrating, legacy storage is the source if Yjs is empty. Only rebuild from Yjs
         // when we're connected to a room or explicitly loading from a room.
         if (!this.hasLoadedFromLocalStorage && !this.isConnected && this.yconnections.length === 0) {
-            Utils.Logger.debug('[Connections] Skipping rebuild from empty Yjs (waiting for localStorage sync)');
+            Utils.Logger.debug('[Connections] Skipping rebuild from empty Yjs (waiting for legacy storage migration)');
             return;
         }
 
