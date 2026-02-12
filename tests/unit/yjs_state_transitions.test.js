@@ -84,10 +84,10 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
         });
 
         test('should sync local changes to Yjs for remote users', () => {
-            // During undo, should sync connections back to Yjs
-            // Line 1297 in CollaborationManager.js
+            // _syncConnectionsToYjsImpl exists for normal operations (create, delete, reattach)
+            // During undo/redo, Yjs CRDT propagates changes directly — no sync-back needed
             expect(collabCode).toMatch(/_syncConnectionsToYjsImpl/);
-            expect(collabCode).toMatch(/Sync connections back to Yjs so remote users see them/);
+            expect(collabCode).toMatch(/do NOT sync connections back to Yjs/i);
         });
 
         test('should handle both-have-data scenario with CRDT merge', () => {
@@ -176,25 +176,24 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
             expect(collabCode).toMatch(/if[\s\S]{1,50}isSyncing/);
         });
 
-        test('should sync connections after boxes during undo', () => {
-            // In yboxes observer, during undo, rebuild and sync connections after boxes
-            // Verify both methods exist
+        test('should rebuild connections after boxes during undo', () => {
+            // In yboxes observer, during undo, rebuild connections after boxes
+            // are available. This is local-only — no sync-back to Yjs needed
+            // because the undo transaction already reverted yconnections.
             expect(collabCode).toMatch(/_rebuildConnectionsFromYjs/);
             expect(collabCode).toMatch(/_syncConnectionsToYjsImpl/);
 
-            // Verify they're called together in an undo path block.
-            // There are multiple `if (isUndoRedo)` blocks in the code (yboxes observer
-            // and yconnections observer). We need to find the one that contains BOTH methods.
-            // Use matchAll to get all matching blocks and check each.
+            // Find the isUndoRedo block in the yboxes observer and verify it
+            // rebuilds connections but does NOT sync back.
             const undoBlocks = [...collabCode.matchAll(/if\s*\(\s*isUndoRedo\s*\)\s*\{[\s\S]{1,2000}\}/g)];
             expect(undoBlocks.length).toBeGreaterThan(0);
 
-            // At least one undo block should contain both methods
-            const hasBothMethods = undoBlocks.some(match =>
+            // The yboxes observer's undo block should rebuild but NOT sync back
+            const hasRebuildOnly = undoBlocks.some(match =>
                 /_rebuildConnectionsFromYjs/.test(match[0]) &&
-                /_syncConnectionsToYjsImpl/.test(match[0])
+                /do NOT sync connections back to Yjs/i.test(match[0])
             );
-            expect(hasBothMethods).toBe(true);
+            expect(hasRebuildOnly).toBe(true);
         });
     });
 

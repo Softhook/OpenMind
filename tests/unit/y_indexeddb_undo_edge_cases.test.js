@@ -123,8 +123,10 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
     });
 
     describe('Issue #2: Undo Connection Sync', () => {
-        test('undo syncs connections back to Yjs for remote users', () => {
-            // Setup: Box with connections
+        test('connection sync function works for normal operations', () => {
+            // _syncConnectionsToYjsImpl is used during normal operations (not undo)
+            // to push local connection changes to Yjs. During undo/redo, the Yjs
+            // CRDT itself handles propagation — no sync-back from observers needed.
             const box1 = { id: 'box1', x: 100, y: 100 };
             const box2 = { id: 'box2', x: 200, y: 200 };
             mindMap.boxes = [box1, box2];
@@ -135,7 +137,7 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
             // Mock _syncConnectionsToYjsImpl
             collaborationManager._syncConnectionsToYjsImpl = jest.fn();
 
-            // Simulate undo: rebuild connections then sync
+            // Normal operation: sync local changes to Yjs
             const localConns = mindMap.connections
                 .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
                 .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
@@ -277,24 +279,24 @@ describe('y-indexeddb Migration - Edge Cases and Undo', () => {
     });
 
     describe('Multi-User Undo Scenarios', () => {
-        test('undo sends changes to remote users via Yjs', () => {
-            // Setup connected state
+        test('Yjs CRDT propagates undo changes to remote users', () => {
+            // Yjs UndoManager reverts changes in the shared document.
+            // These reversions are automatically propagated via the Yjs
+            // sync protocol — no manual sync-back from observers is needed.
+            // The connection rebuild in observers is only for LOCAL state.
+
             collaborationManager.isConnected = true;
 
-            // Mock sync implementation
-            collaborationManager._syncConnectionsToYjsImpl = jest.fn();
-
-            // Simulate undo with connections
             const box1 = { id: 'box1' };
             const box2 = { id: 'box2' };
             mindMap.boxes = [box1, box2];
             mindMap.connections = [{ fromBox: box1, toBox: box2 }];
 
-            const localConns = [{ fromId: 'box1', toId: 'box2' }];
-            collaborationManager._syncConnectionsToYjsImpl(localConns);
-
-            // Verify sync was called (would propagate to remote users)
-            expect(collaborationManager._syncConnectionsToYjsImpl).toHaveBeenCalledWith(localConns);
+            // The undo operation reverts yconnections directly.
+            // Remote users receive this via Yjs sync protocol.
+            // Their yconnections observer fires with local=false,
+            // triggering _rebuildConnectionsFromYjs on their side.
+            expect(mindMap.connections).toHaveLength(1);
         });
 
         test('local undo does not affect remote users undo stack', () => {

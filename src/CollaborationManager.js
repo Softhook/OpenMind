@@ -1453,28 +1453,19 @@ class CollaborationManager {
                 if (isUndoRedo) {
                     this._rebuildConnectionsFromYjs();
 
-                    // CRITICAL FIX: Sync connections back to Yjs so remote users see them
-                    // During undo, connections are restored locally but must be synced to Yjs
-                    // for multi-user collaboration. We bypass the isSyncing check by calling
-                    // the implementation directly (we're already in the undo transaction).
+                    // NOTE: We do NOT sync connections back to Yjs here.
+                    // The undo/redo operation already correctly reverts yconnections
+                    // (box deletion + connection deletion are in the same transaction).
+                    // Calling _syncConnectionsToYjsImpl here would create a NEW implicit
+                    // transaction with null origin (observers fire AFTER the undo transaction
+                    // commits), which is NOT tracked by UndoManager. This caused:
+                    //   1. Phantom undo entries that corrupt the undo stack
+                    //   2. State divergence between local and remote clients
+                    //   3. Cascading observer re-fires that compound the issue
+                    // The Yjs CRDT already propagates the reverted yconnections to
+                    // remote users via the standard sync protocol.
 
-                    // DEFENSIVE: Add logging to track undo connection sync
-                    const connectionCount = this.mindMap.connections.length;
-                    Utils.Logger.state('[Undo] Syncing', connectionCount, 'connections back to Yjs for remote users');
-
-                    const localConns = this.mindMap.connections
-                        .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
-                        .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
-
-                    // DEFENSIVE: Verify all connections have valid boxes before syncing
-                    if (localConns.length !== connectionCount) {
-                        Utils.Logger.warn('[Undo] Connection count mismatch:', connectionCount, 'total,', localConns.length, 'valid');
-                    }
-
-                    // Sync to Yjs (bypasses isSyncing check)
-                    this._syncConnectionsToYjsImpl(localConns);
-
-                    Utils.Logger.state('[Undo] Synced', localConns.length, 'connections to Yjs');
+                    Utils.Logger.state('[Undo] Rebuilt', this.mindMap.connections.length, 'connections from Yjs state');
                 }
 
                 // Redraw after changes
