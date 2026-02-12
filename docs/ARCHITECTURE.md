@@ -5,7 +5,7 @@
 OpenMind is a collaborative real-time mind mapping application built on a three-tier state management architecture with Yjs CRDT as the master state, an in-memory object model for UI representation, and IndexedDB for robust offline persistence.
 
 **Version**: 1.1.0  
-**Last Updated**: 2026-02-11  
+**Last Updated**: 2026-02-12  
 **Architecture Pattern**: CRDT-based Event Sourcing with Observer Pattern
 
 ---
