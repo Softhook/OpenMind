@@ -789,28 +789,21 @@ class TextBox {
     // Only the top-most hovered box should display hover visuals/rollovers
     const isTopHover = (typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox === this);
 
-    // Draw box
+    // Draw box with appropriate styling based on state
+    Utils.applyFill(this.backgroundColor);
+    
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
-      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.STROKES.EDITING);
-      strokeWeight(2 / zoomFactor);
+      Utils.applyStroke(TextBox.STROKES.EDITING, 2 / zoomFactor);
     } else if (this.selected && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Highlight selected boxes with a blue outline (skip when navigating via arrow keys)
-      const selColor = TextBox.COLORS.SELECTION_OUTLINE;
-      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(selColor.r, selColor.g, selColor.b);
-      strokeWeight(2.5 / zoomFactor);
+      Utils.applyStroke(TextBox.COLORS.SELECTION_OUTLINE, 2.5 / zoomFactor);
     } else if (isTopHover && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Hover state uses the box background color
       // Disabled while navigating between boxes with arrow keys (presentation mode)
-      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.STROKES.HOVER);
-      strokeWeight(2 / zoomFactor);
+      Utils.applyStroke(TextBox.STROKES.HOVER, 2 / zoomFactor);
     } else {
-      fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.STROKES.NORMAL);
-      strokeWeight(1 / zoomFactor);
+      Utils.applyStroke(TextBox.STROKES.NORMAL, 1 / zoomFactor);
     }
 
     rect(this.x - this.width / 2, this.y - this.height / 2,
@@ -868,7 +861,7 @@ class TextBox {
         push();
         noStroke();
         const shadow = TextBox.COLORS.SHADOW;
-        fill(shadow.r, shadow.g, shadow.b, shadow.a); // subtle dark dim for draggable frame
+        Utils.applyFill(shadow); // subtle dark dim for draggable frame
 
         // For image boxes, the whole interior is draggable — dim the interior
         if (this.imageUrl) {
@@ -952,7 +945,7 @@ class TextBox {
             // Set color based on whether character is in a link
             const linkColor = TextBox.COLORS.LINK_TEXT;
             if (isInLink) {
-              fill(linkColor.r, linkColor.g, linkColor.b); // Blue for links
+              Utils.applyFill(linkColor); // Blue for links
             } else {
               fill(0); // Black for regular text
             }
@@ -1001,7 +994,7 @@ class TextBox {
     // Apply dimming effect AFTER drawing box and text if not the focused box during arrow navigation
     if (shouldDim) {
       const dimColor = TextBox.COLORS.DIM_OVERLAY;
-      fill(dimColor.r, dimColor.g, dimColor.b, dimColor.a);
+      Utils.applyFill(dimColor);
       noStroke();
       rect(this.x - this.width / 2, this.y - this.height / 2,
         this.width, this.height, (this.imageUrl ? 0 : this.cornerRadius));
@@ -1024,7 +1017,7 @@ class TextBox {
 
       // Draw shadow for depth
       const shadow = TextBox.COLORS.SHADOW;
-      fill(shadow.r, shadow.g, shadow.b, shadow.a);
+      Utils.applyFill(shadow);
       noStroke();
       circle(cx + 0.5 / currentZoom, cy + 1 / currentZoom, scaledHandleSize * 1.2);
 
@@ -2925,8 +2918,7 @@ class TextBox {
     push();
     const zoomFactor = Utils.getClampedZoomFactor();
     const cursorColor = TextBox.COLORS.CURSOR;
-    stroke(cursorColor.r, cursorColor.g, cursorColor.b);
-    strokeWeight(2 / zoomFactor);
+    Utils.applyStroke(cursorColor, 2 / zoomFactor);
     line(cursorX, cursorY - lineHeight / 3, cursorX, cursorY + lineHeight / 3);
     pop();
   }
@@ -2958,7 +2950,7 @@ class TextBox {
 
     push();
     const selColor = TextBox.COLORS.SELECTION_HIGHLIGHT;
-    fill(selColor.r, selColor.g, selColor.b, selColor.a);
+    Utils.applyFill(selColor);
     noStroke();
 
     if (startInfo.lineIndex === endInfo.lineIndex) {
@@ -3021,8 +3013,7 @@ class TextBox {
       let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
       // Use hl.color if present, else default yellow
       const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
-      const alpha = (c.a != null) ? c.a : 180;
-      fill(c.r, c.g, c.b, alpha);
+      Utils.applyFill(c);
 
       if (startInfo.lineIndex === endInfo.lineIndex) {
         const lineText = wrappedLines[startInfo.lineIndex] || '';

@@ -1113,8 +1113,7 @@ function drawGrid() {
 
   push();
   const lineWeight = Math.max(0.2, 0.8 / CameraUtils.zoom);
-  stroke(GRID_CONFIG.LINE_COLOR.r, GRID_CONFIG.LINE_COLOR.g, GRID_CONFIG.LINE_COLOR.b);
-  strokeWeight(lineWeight);
+  Utils.applyStroke(GRID_CONFIG.LINE_COLOR, lineWeight);
 
   for (let x = startX; x <= endX; x += spacing) {
     line(x, top, x, bottom);
@@ -1123,8 +1122,7 @@ function drawGrid() {
     line(left, y, right, y);
   }
 
-  stroke(GRID_CONFIG.ORIGIN_COLOR.r, GRID_CONFIG.ORIGIN_COLOR.g, GRID_CONFIG.ORIGIN_COLOR.b);
-  strokeWeight(Math.max(0.2, 0.8 / CameraUtils.zoom));
+  Utils.applyStroke(GRID_CONFIG.ORIGIN_COLOR, Math.max(0.2, 0.8 / CameraUtils.zoom));
   line(0, top, 0, bottom);
   line(left, 0, right, 0);
   pop();
@@ -4686,11 +4684,9 @@ function drawSelectionRectangle() {
 
   const selColors = UI_COLORS.SELECTION_RECT;
   push();
-  // Semi-transparent fill
-  fill(selColors.fill.r, selColors.fill.g, selColors.fill.b, selColors.fill.a);
-  // Border
-  stroke(selColors.stroke.r, selColors.stroke.g, selColors.stroke.b);
-  strokeWeight(2 / CameraUtils.zoom);
+  // Semi-transparent fill and border
+  Utils.applyFill(selColors.fill);
+  Utils.applyStroke(selColors.stroke, 2 / CameraUtils.zoom);
   rect(x1, y1, x2 - x1, y2 - y1);
   pop();
 }
@@ -4991,7 +4987,7 @@ function drawSaveIndicator() {
     canvas.elt.title = statusText;
   }
 
-  fill(statusColor.r, statusColor.g, statusColor.b);
+  Utils.applyFill(statusColor);
   circle(x, y, size);
   pop();
 }

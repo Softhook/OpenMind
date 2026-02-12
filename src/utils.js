@@ -441,21 +441,29 @@ function applyStroke(color, weight = 1) {
   if (typeof color === 'number') {
     stroke(color);
   } else if (color && typeof color === 'object') {
-    stroke(color.r, color.g, color.b);
+    if (color.a !== undefined) {
+      stroke(color.r, color.g, color.b, color.a);
+    } else {
+      stroke(color.r, color.g, color.b);
+    }
   }
   strokeWeight(weight);
 }
 
 /**
  * Applies fill styling to the current p5.js context.
- * Handles both grayscale and RGB color values.
- * @param {number|Object} color - Grayscale value (0-255) or RGB object {r, g, b}
+ * Handles both grayscale and RGB/RGBA color values.
+ * @param {number|Object} color - Grayscale value (0-255) or RGB object {r, g, b} or RGBA object {r, g, b, a}
  */
 function applyFill(color) {
   if (typeof color === 'number') {
     fill(color);
   } else if (color && typeof color === 'object') {
-    fill(color.r, color.g, color.b);
+    if (color.a !== undefined) {
+      fill(color.r, color.g, color.b, color.a);
+    } else {
+      fill(color.r, color.g, color.b);
+    }
   }
 }
 
