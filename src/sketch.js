@@ -445,12 +445,9 @@ function handleUrlChange() {
       initializeCollaboration(newRoom);
       return;
     } else if (!newRoom && currentRoom && mindMap) {
-      // User is leaving a room (navigating away) - restore default storage key
-      // This ensures autosave goes back to the offline storage location
-      if (typeof mindMap.setStorageKey === 'function') {
-        mindMap.setStorageKey(CONFIG.STORAGE.DEFAULT_KEY);
-        Utils.Logger.state('[Room] Left room - restored default storage key:', CONFIG.STORAGE.DEFAULT_KEY);
-      }
+      // User is leaving a room (navigating away). 
+      // We keep the storage key as-is to preserve context for the boxes on screen.
+      Utils.Logger.state('[Room] Disconnected from room, keeping current storage context');
     }
   }
 }
@@ -560,24 +557,27 @@ async function initializeCollaboration(roomName) {
       return;
     }
 
-    // FIX CRITICAL ISSUE #1: Show dialog BEFORE connecting if user has local data
-    // This prevents the race condition where data starts syncing before user makes a choice
-    if (hasLocalData) {
-      Utils.Logger.collab('[Room] User has local data, showing sync options dialog before connecting');
+    // SMARTER CONFLICT DETECTION: 
+    // 1. If we are already connected to this room (redundant call), skip.
+    // 2. If the data on screen is already marked for this room (resuming session), skip.
+    const currentKey = (mindMap && typeof mindMap.getStorageKey === 'function') ? mindMap.getStorageKey() : null;
+    const targetKey = getRoomStorageKey(roomName);
+    const isResumingRoom = collaborationManager && collaborationManager.roomName === roomName;
+    const isRoomContextMatch = currentKey === targetKey;
+
+    if (hasLocalData && !isResumingRoom && !isRoomContextMatch) {
+      Utils.Logger.collab('[Room] User has data from another context, showing options');
 
       roomJoinConfirmation = {
         roomName: roomName,
         hasLocalData: true,
         boxCount: mindMap.boxes.length,
-        pendingConnection: true // Flag that we need to connect after user chooses
+        pendingConnection: true
       };
-
-      // Don't proceed with connection - wait for user choice
-      // The mouse/keyboard handlers will call _proceedWithRoomJoin() after user decides
       return;
     }
 
-    // No local data - proceed with connection immediately
+    // No conflict (either empty room or resuming current room) - proceed immediately
     await _proceedWithRoomJoin(roomName, null);
 
   } catch (error) {
@@ -634,18 +634,14 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       // Clear memory state
       _clearLocalState();
 
-      // Clear persistent IndexedDB cache for THIS SPECIFIC ROOM 
-      Utils.Logger.collab('[Sync] Wiping persistent cache for room:', roomName);
-      const wipeResult = await CollaborationManager.clearRoomData(roomName);
-
-      if (wipeResult === 'blocked') {
-        alert('Could not fully wipe local data because another tab has this room open. Please close other tabs and try again.');
-        syncStatus = null;
-        return;
-      }
+      // 2. We do NOT wipe the persistent IndexedDB cache here anymore.
+      // This prevents the "Total Data Loss" scenario if the server is empty.
+      // Instead, we just clear the memory state. When the new engine connects, 
+      // it will load the room's persistence normally. 
+      // If the user wants to nuke the room, they can do it while connected.
 
       if (isStale()) return;
-      Utils.Logger.collab('[Sync] Local data wiped; will recreate engine');
+      Utils.Logger.collab('[Sync] Local screen state cleared; will load room authoritative context');
     }
 
     // 3. Create/Initialize manager if it's currently null 
@@ -665,7 +661,8 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     }
 
     // 4. Attach/Update callbacks to the active manager
-    collaborationManager.onConnectionChange = (status) => {
+    const activeManager = collaborationManager;
+    activeManager.onConnectionChange = (status) => {
       Utils.Logger.collab('[Connection]', status);
       const prevStatus = syncStatus;
       if (status === 'connecting') {
@@ -679,6 +676,19 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       } else if (status === 'synced') {
         if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
         if (syncStatus !== null) Utils.Logger.state('[Sync] Sync complete - hiding overlay');
+
+        // Initial zoom to fit for the room: ensure everything is visible on join
+        if (activeManager && !activeManager.hasTriggeredInitialZoom) {
+          activeManager.hasTriggeredInitialZoom = true;
+          // Small delay to ensure mindMap boxes are fully processed and bounds are stable
+          setTimeout(() => {
+            // ONLY zoom if this manager is still the current active one (hasn't been replaced)
+            if (collaborationManager === activeManager) {
+              try { resetView(); } catch (e) { console.warn('Initial resetView failed:', e); }
+            }
+          }, 50);
+        }
+
         syncStatus = null;
       } else if (status === 'disconnected') {
         if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
@@ -695,14 +705,14 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     };
 
     let lastPeerCount = 0;
-    collaborationManager.onPeersChange = (peers) => {
+    activeManager.onPeersChange = (peers) => {
       if (peers.length !== lastPeerCount) {
         Utils.Logger.collab('[Peers] Connected:', peers.length);
         lastPeerCount = peers.length;
       }
     };
 
-    collaborationManager.onVersionMismatch = (mismatchInfo) => {
+    activeManager.onVersionMismatch = (mismatchInfo) => {
       console.warn('Version mismatch detected:', mismatchInfo);
       syncStatus = 'incompatible';
     };
@@ -1179,11 +1189,21 @@ function setup() {
     // Then the room join will sync that data to the room
 
     // ALWAYS initialize collaborationManager to load from IndexedDB
-    // (whether joining a room or working offline)
+    // Pass roomId if present in URL so we load the correct room cache immediately
     if (collaborationManager) {
+      if (roomId && mindMap && typeof mindMap.setStorageKey === 'function') {
+        const initialRoomKey = getRoomStorageKey(roomId);
+        mindMap.setStorageKey(initialRoomKey);
+        Utils.Logger.state('[Startup] Set initial room storage context:', initialRoomKey);
+
+        // FIX FLICKER: Set syncStatus immediately so the first draw() frame
+        // shows the overlay instead of stale local boxes.
+        syncStatus = 'connecting';
+      }
+
       (async () => {
         try {
-          await collaborationManager.initialize();
+          await collaborationManager.initialize(roomId);
 
           // One-time migration: if Yjs is empty but localStorage has data, migrate it
           const hasLocalStorage = mindMap.hasLocalStorageData();
@@ -1559,8 +1579,8 @@ function draw() {
     push();
     resetMatrix && resetMatrix();
     noStroke();
-    // Semi-transparent overlay
-    fill(40, 40, 60, 180);
+    // Semi-transparent overlay - Opaque enough to hide room flicker
+    fill(40, 40, 60, 245);
     rect(0, 0, width, height);
 
     // State-specific messages

@@ -148,6 +148,9 @@ class CollaborationManager {
         // Debug flag for targeted undo/redo logging
         this._isPerformingUndoRedo = false;
 
+        // State for initial room experience
+        this.hasTriggeredInitialZoom = false; // Reset so next room join will auto-zoom
+
         // Retry timer for initial sync race condition
         this.syncRetryTimer = null;
 
