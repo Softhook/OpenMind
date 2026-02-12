@@ -147,7 +147,7 @@ This creates a reactive system where changes propagate automatically.
   connections: Connection[],  // Array of connections
   isSaved: boolean,          // Triggers autosave
   isDirty: boolean,          // Needs redraw
-  storageKey: string         // localStorage key
+  storageKey: string         // localStorage key (backup/legacy)
 }
 ```
 
@@ -156,7 +156,7 @@ This creates a reactive system where changes propagate automatically.
 - `addConnection(from, to)` - Create connection, trigger callbacks
 - `toJSON()` - Serialize state for export/backup
 - `fromJSON(data)` - Deserialize from JSON
-- `saveToLocalStorage()` - Persist to localStorage (backup)
+- `saveToLocalStorage()` - Persist to localStorage (legacy backup)
 
 **State Mutations**:
 - Direct mutations to `boxes[]` and `connections[]`
@@ -303,7 +303,7 @@ mindMap {
 - User interactions
 - Temporary UI state
 
-**Persistence**: None (rebuilt from Yjs or localStorage)
+**Persistence**: None (rebuilt from Yjs, backed by IndexedDB)
 
 #### Tier 3: IndexedDB (Persistence)
 
@@ -736,7 +736,7 @@ ydoc.transact(() => {
 #### Flag-Based Guards
 
 1. **`hasLoadedFromLocalStorage`**
-   - Prevents Yjs rebuild before localStorage sync
+   - Prevents Yjs rebuild before legacy migration
    - Set after initial load completes
    - Checked in `_rebuildConnectionsFromYjs()`
 

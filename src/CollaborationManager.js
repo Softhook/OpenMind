@@ -156,8 +156,8 @@ class CollaborationManager {
         this.consistencyCheckInterval = 30000; // Check every 30 seconds (reduced overhead)
         this.consecutiveSyncedChecks = 0; // Track consecutive checks with no mismatches
 
-        // Flag to prevent rebuilding from empty Yjs when loading from localStorage offline
-        // This is set to true after initial localStorage load completes
+        // Flag to prevent rebuilding from empty Yjs when migrating from legacy localStorage
+        // This is set to true after initial migration completes
         this.hasLoadedFromLocalStorage = false;
 
         // Server state tracking for cold start detection
@@ -216,7 +216,7 @@ class CollaborationManager {
             this.yconnections = this.ydoc.getArray('connections');
 
             // Create IndexedDB provider for automatic persistence
-            // This eliminates the need for localStorage manual syncing
+            // This eliminates the need for manual syncing and provides robust offline storage
             const dbName = 'openmind-yjs';
             this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
             this._hardenIndexedDBProvider(this.indexeddbProvider);
@@ -471,7 +471,7 @@ class CollaborationManager {
             Utils.Logger.collab('[Room] Syncing local data via Yjs CRDT merge');
             this._syncLocalToYjs();
 
-            // Mark that we've loaded from localStorage (prevents premature rebuilds)
+            // Mark that we've loaded from legacy storage (prevents premature rebuilds)
             this.hasLoadedFromLocalStorage = true;
         } catch (error) {
             console.error('[Room] Error syncing to room:', error);
@@ -1763,11 +1763,11 @@ class CollaborationManager {
     _rebuildConnectionsFromYjs() {
         if (!this.mindMap || !this.yconnections) return;
 
-        // CRITICAL FIX: Don't rebuild from empty Yjs when loading from localStorage offline
-        // When working offline, localStorage is the source of truth. Only rebuild from Yjs
+        // NOTE: Don't rebuild from empty Yjs when migrating from legacy localStorage.
+        // When migrating, legacy storage is the source if Yjs is empty. Only rebuild from Yjs
         // when we're connected to a room or explicitly loading from a room.
         if (!this.hasLoadedFromLocalStorage && !this.isConnected && this.yconnections.length === 0) {
-            Utils.Logger.debug('[Connections] Skipping rebuild from empty Yjs (waiting for localStorage sync)');
+            Utils.Logger.debug('[Connections] Skipping rebuild from empty Yjs (waiting for legacy storage migration)');
             return;
         }
 

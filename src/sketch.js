@@ -553,14 +553,14 @@ async function initializeCollaboration(roomName) {
     // This prevents the race condition where data starts syncing before user makes a choice
     if (hasLocalData) {
       Utils.Logger.collab('[Room] User has local data, showing sync options dialog before connecting');
-      
+
       roomJoinConfirmation = {
         roomName: roomName,
         hasLocalData: true,
         boxCount: mindMap.boxes.length,
         pendingConnection: true // Flag that we need to connect after user chooses
       };
-      
+
       // Don't proceed with connection - wait for user choice
       // The mouse/keyboard handlers will call _proceedWithRoomJoin() after user decides
       return;
@@ -568,7 +568,7 @@ async function initializeCollaboration(roomName) {
 
     // No local data - proceed with connection immediately
     await _proceedWithRoomJoin(roomName, null);
-    
+
   } catch (error) {
     console.error('[Room] Failed to initialize collaboration:', error);
     syncStatus = null;
@@ -716,7 +716,7 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     if (syncConnectionTimeout) { clearTimeout(syncConnectionTimeout); syncConnectionTimeout = null; }
     if (syncEmptyRoomTimeout) { clearTimeout(syncEmptyRoomTimeout); syncEmptyRoomTimeout = null; }
     syncStatus = null;
-    
+
     // FIX CRITICAL ISSUE #4: Error recovery
     // Attempt to disconnect and clean up on error
     if (collaborationManager) {
@@ -726,10 +726,10 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
         console.error('[Room] Failed to disconnect after error:', disconnectError);
       }
     }
-    
+
     // Don't set storage key on error - keep current storage location
   }
-  
+
   // Set storage key only on successful connection
   // CRITICAL: Use room-specific storage key to prevent overwriting offline work
   // When in online mode, autosave goes to room-specific key instead of default
@@ -1137,24 +1137,24 @@ function setup() {
     const roomInfo = parseRoomFromHash();
     const roomId = roomInfo ? roomInfo.room : null;
 
-    // When joining an online room, do NOT load from localStorage directly
+    // When joining an online room, do NOT load from legacy storage directly
     // Instead, initialize collaborationManager first to load from IndexedDB
     // Then the room join will sync that data to the room
-    
+
     // ALWAYS initialize collaborationManager to load from IndexedDB
     // (whether joining a room or working offline)
     if (collaborationManager) {
       (async () => {
         try {
           await collaborationManager.initialize();
-          
+
           // One-time migration: if Yjs is empty but localStorage has data, migrate it
           const hasLocalStorage = mindMap.hasLocalStorageData();
           const yjsEmpty = collaborationManager.yboxes && collaborationManager.yboxes.size === 0;
-          
+
           if (hasLocalStorage && yjsEmpty) {
             console.log('[Migration] Migrating data from localStorage to IndexedDB...');
-            
+
             // Load from localStorage
             const maybePromise = mindMap.loadFromLocalStorage();
             const afterLoad = async () => {
@@ -1180,21 +1180,21 @@ function setup() {
                 MindMap.onConnectionsChange();
               }
 
-              // Mark that localStorage load is complete
+              // Mark that legacy load is complete
               collaborationManager.hasLoadedFromLocalStorage = true;
 
               // Clear undo history after migration
               collaborationManager.clearUndoHistory();
-              
+
               console.log('[Migration] Migration complete. Data now persisted in IndexedDB.');
-              
+
               // If joining a room, proceed with initialization
               if (roomId) {
                 const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
                 initializeCollaboration(roomId, shouldShareLocalData);
               }
             };
-            
+
             if (maybePromise && typeof maybePromise.then === 'function') {
               maybePromise.then(afterLoad).catch((e) => {
                 console.warn('Failed to load from localStorage:', e);
@@ -1208,15 +1208,15 @@ function setup() {
             collaborationManager._rebuildBoxesFromYjs();
             collaborationManager._rebuildConnectionsFromYjs();
             collaborationManager.hasLoadedFromLocalStorage = true;
-            
+
             if (!roomId) {
               // Offline mode - reset view to show all content
               try { resetView(); } catch (e) { console.warn('resetView failed:', e); }
             }
-            
+
             // Clear undo history after load (loading old state shouldn't be undoable)
             collaborationManager.clearUndoHistory();
-            
+
             // If joining a room, proceed with initialization
             if (roomId) {
               const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
@@ -1231,14 +1231,14 @@ function setup() {
               mindMap.addBox(new TextBox(500, 100, "Sub Topic"));
             }
             collaborationManager.hasLoadedFromLocalStorage = true;
-            
+
             // Clear undo history so creating example boxes isn't undoable
             setTimeout(() => {
               if (collaborationManager && collaborationManager.isInitialized) {
                 collaborationManager.clearUndoHistory();
               }
             }, 200);
-            
+
             // If joining a room (with no local data), proceed with initialization
             if (roomId) {
               const shouldShareLocalData = roomInfo ? roomInfo.isStarting : false;
@@ -2360,7 +2360,7 @@ function mousePressed(e) {
         syncStatus = null;
       }
       return;
-      
+
     } else if (clickedDelete) {
       // User chose to delete local data and load room content
       Utils.Logger.state('[Room] User chose to delete local data');
@@ -2376,12 +2376,12 @@ function mousePressed(e) {
         try {
           // Clear local mindMap state
           _clearLocalState();
-          
+
           // Clear IndexedDB to prevent old data from reloading
           if (collaborationManager) {
             await collaborationManager.clearIndexedDB();
           }
-          
+
           // Now proceed to join room (will load from room, not from IndexedDB)
           await _proceedWithRoomJoin(roomName, 'delete');
         } catch (error) {
@@ -2390,7 +2390,7 @@ function mousePressed(e) {
         }
       })();
       return;
-      
+
     } else if (clickedCancel) {
       // User chose to cancel - preserve local data
       Utils.Logger.state('[Room] User cancelled joining room');
@@ -2642,12 +2642,12 @@ function keyPressed() {
           try {
             // Clear local mindMap state
             _clearLocalState();
-            
+
             // Clear IndexedDB to prevent old data from reloading
             if (collaborationManager) {
               await collaborationManager.clearIndexedDB();
             }
-            
+
             // Now proceed to join room (will load from room, not from IndexedDB)
             await _proceedWithRoomJoin(roomName, 'delete');
           } catch (error) {
@@ -2996,7 +2996,7 @@ async function handleFileLoad(file) {
         }
 
         resetView();
-        
+
         // Clear undo history after loading file to prevent undo from reverting the load
         if (typeof collaborationManager !== 'undefined' && collaborationManager) {
           try {
@@ -4827,7 +4827,7 @@ function cleanup() {
 // Note: Skip cleanup if page is being cached (persisted) to avoid breaking
 // the page when user navigates back from bfcache
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', function(event) {
+  window.addEventListener('pagehide', function (event) {
     // If the page is being placed into the back/forward cache (bfcache),
     // avoid tearing down listeners and managers so the page works when restored.
     if (event && event.persisted) {
