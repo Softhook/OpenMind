@@ -75,6 +75,7 @@ class CollaborationManager {
     static COLD_START_THRESHOLD = 5000; // ms - if connection takes >5s, assume cold start
     static COLD_START_GRACE_PERIOD = 60000; // ms - grace period before removing local data (60s)
     static EXPONENTIAL_BACKOFF_ATTEMPTS = 6; // Number of attempts with exponential backoff before fixed interval
+    static MAX_UNDO_STACK_SIZE = 200; // Maximum undo/redo stack depth to prevent unbounded memory growth
 
     // ============================================================================
     // CONSTRUCTOR
@@ -218,10 +219,11 @@ class CollaborationManager {
             // This eliminates the need for localStorage manual syncing
             const dbName = 'openmind-yjs';
             this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
-            
+            this._hardenIndexedDBProvider(this.indexeddbProvider);
+
             // Wait for IndexedDB to load persisted state
             await this.indexeddbProvider.whenSynced;
-            
+
             Utils.Logger.collab('[Init] IndexedDB synced - Yjs loaded from persistent storage');
 
             // Create UndoManager - tracks LOCAL changes only
@@ -231,7 +233,8 @@ class CollaborationManager {
             // Empty trackedOrigins means it only tracks when origin === undoManager instance.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins: new Set()
+                trackedOrigins: new Set(),
+                maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
@@ -333,7 +336,8 @@ class CollaborationManager {
                 // Handle sync transitions: apply user's choice that was made BEFORE connecting
                 // This handles both initial sync and resync after reconnection
                 if (isResync && this.yboxes && this.mindMap) {
-                    const yjsEmpty = this.yboxes.size === 0;
+                    const yjsBoxCountAtSync = this.yboxes.size;
+                    const yjsEmpty = yjsBoxCountAtSync === 0;
                     const localHasData = this.mindMap.boxes && this.mindMap.boxes.length > 0;
 
                     Utils.Logger.collab('[Sync] Processing sync - room empty:', yjsEmpty, ', local data:', localHasData);
@@ -371,12 +375,51 @@ class CollaborationManager {
                         console.error('[Sync] Error during sync operation:', error);
                         Utils.Logger.error('[Sync] Failed to synchronise data:', error.message);
                     }
+
+                    // DELAYED RE-SYNC: y-websocket's 'synced' event can fire before all
+                    // remote state arrives (known issue with server cold starts, especially
+                    // on free-tier hosts that sleep after inactivity). Schedule a follow-up
+                    // check to catch any late-arriving updates.
+                    if (this.syncRetryTimer) clearTimeout(this.syncRetryTimer);
+                    this.syncRetryTimer = setTimeout(() => {
+                        if (!this.yboxes || !this.mindMap) return;
+
+                        const currentYjsCount = this.yboxes.size;
+                        const currentLocalCount = this.mindMap.boxes ? this.mindMap.boxes.length : 0;
+
+                        // If Yjs has more boxes than we had at first sync, more data arrived
+                        if (currentYjsCount > yjsBoxCountAtSync || currentYjsCount > currentLocalCount) {
+                            Utils.Logger.collab(
+                                '[Sync] Delayed re-sync: Yjs grew from', yjsBoxCountAtSync,
+                                'to', currentYjsCount, '(local:', currentLocalCount, ') - rebuilding'
+                            );
+                            this.isSyncing = true;
+                            try {
+                                this._rebuildBoxesFromYjs();
+                                this._rebuildConnectionsFromYjs();
+                                this.mindMap.isDirty = true;
+                            } finally {
+                                this.isSyncing = false;
+                            }
+                        } else {
+                            Utils.Logger.debug('[Sync] Delayed re-sync: no new data (yjs:', currentYjsCount, 'local:', currentLocalCount, ')');
+                        }
+                    }, 2000);
                 }
 
                 // Start or stop consistency check based on sync state
                 if (synced) {
                     // Start periodic consistency check when fully synced
                     this._startConsistencyCheck();
+
+                    // Also schedule a fast initial consistency check (5s) to catch
+                    // sync issues early, rather than waiting the full 30s interval
+                    if (isResync && !this._earlyConsistencyTimer) {
+                        this._earlyConsistencyTimer = setTimeout(() => {
+                            this._earlyConsistencyTimer = null;
+                            this._performConsistencyCheck();
+                        }, 5000);
+                    }
                 } else {
                     // Stop consistency check when not synced
                     this._stopConsistencyCheck();
@@ -427,7 +470,7 @@ class CollaborationManager {
             // Just push local data to Yjs - CRDT handles all conflicts automatically
             Utils.Logger.collab('[Room] Syncing local data via Yjs CRDT merge');
             this._syncLocalToYjs();
-            
+
             // Mark that we've loaded from localStorage (prevents premature rebuilds)
             this.hasLoadedFromLocalStorage = true;
         } catch (error) {
@@ -457,6 +500,12 @@ class CollaborationManager {
         if (this.syncRetryTimer) {
             clearTimeout(this.syncRetryTimer);
             this.syncRetryTimer = null;
+        }
+
+        // Clear early consistency check timer
+        if (this._earlyConsistencyTimer) {
+            clearTimeout(this._earlyConsistencyTimer);
+            this._earlyConsistencyTimer = null;
         }
 
         // Stop consistency check timer
@@ -508,6 +557,9 @@ class CollaborationManager {
     destroy() {
         this.disconnect();
 
+        // Defense-in-depth: ensure consistency check is stopped even if disconnect() was skipped
+        this._stopConsistencyCheck();
+
         // Clean up text editing undo group timer
         if (this.textEditUndoTimer) {
             clearTimeout(this.textEditUndoTimer);
@@ -529,8 +581,12 @@ class CollaborationManager {
             this.undoManager = null;
         }
 
-        // Destroy IndexedDB provider
+        // Destroy IndexedDB provider BEFORE ydoc to prevent race condition.
+        // y-indexeddb's destroy() synchronously unsubscribes _storeUpdate from
+        // ydoc 'update' events, but db.close() is async. Null the db ref first
+        // so any in-flight _storeUpdate calls see db=null and skip the write.
         if (this.indexeddbProvider) {
+            this.indexeddbProvider.db = null;   // Prevent in-flight writes
             this.indexeddbProvider.destroy();
             this.indexeddbProvider = null;
         }
@@ -553,10 +609,54 @@ class CollaborationManager {
     }
 
     /**
+     * Wraps an IndexedDB provider's _storeUpdate handler to catch
+     * "database connection is closing" errors. This race condition occurs
+     * when a Yjs update fires after the DB connection has started closing
+     * (e.g. during clearIndexedDB or page navigation).
+     * @param {Object} provider - The IndexeddbPersistence instance to harden
+     * @private
+     */
+    _hardenIndexedDBProvider(provider) {
+        if (!provider || !provider._storeUpdate) return;
+
+        const originalStoreUpdate = provider._storeUpdate;
+        provider._storeUpdate = (update, origin) => {
+            try {
+                // Skip if provider was destroyed or DB reference was nulled
+                if (provider._destroyed || !provider.db) return;
+                originalStoreUpdate(update, origin);
+            } catch (error) {
+                // Catch "database connection is closing" - transient and harmless.
+                // The data will be persisted when the new provider is created.
+                if (error.name === 'InvalidStateError' ||
+                    (error.message && error.message.includes('connection is closing'))) {
+                    Utils.Logger.debug('[IndexedDB] Suppressed stale DB write (connection closing)');
+                } else {
+                    // Re-throw unexpected errors
+                    throw error;
+                }
+            }
+        };
+
+        // Re-register the wrapped handler on the ydoc
+        // (The constructor already registered the original; swap it)
+        if (provider.doc) {
+            provider.doc.off('update', originalStoreUpdate);
+            provider.doc.on('update', provider._storeUpdate);
+        }
+    }
+
+    /**
      * Clears all data from IndexedDB.
      * This destroys the IndexedDB provider and clears the database,
      * then recreates a fresh provider.
      * Used when user chooses "delete local data" before joining a room.
+     *
+     * Race condition fix: y-indexeddb's clearData() calls destroy() which
+     * unsubscribes _storeUpdate synchronously, but db.close() is async.
+     * We null the db ref before clearing Yjs state to prevent any in-flight
+     * writes, and add a small delay before recreating the provider.
+     *
      * @returns {Promise<void>}
      */
     async clearIndexedDB() {
@@ -567,20 +667,30 @@ class CollaborationManager {
 
         try {
             Utils.Logger.collab('[IndexedDB] Clearing database...');
-            
-            // Clear the database (this also destroys the provider)
+
+            const dbName = this.indexeddbProvider.name || 'openmind-yjs';
+
+            // Step 1: Null the db ref to prevent any in-flight _storeUpdate calls
+            // from writing to the DB while it's closing
+            this.indexeddbProvider.db = null;
+
+            // Step 2: clearData() calls destroy() (unsubscribes from ydoc) then deleteDB
             await this.indexeddbProvider.clearData();
             this.indexeddbProvider = null;
-            
-            // Also clear the Yjs document to ensure fresh state
+
+            // Step 3: Now safe to clear Yjs state — no provider is listening
             this.yboxes.clear();
             this.yconnections.delete(0, this.yconnections.length);
-            
-            // Recreate the provider with empty state
-            const dbName = 'openmind-yjs';
+
+            // Step 4: Small delay to ensure IndexedDB deletion completes
+            // before creating a new database with the same name
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Step 5: Recreate the provider with empty state
             this.indexeddbProvider = new this.IndexeddbPersistence(dbName, this.ydoc);
+            this._hardenIndexedDBProvider(this.indexeddbProvider);
             await this.indexeddbProvider.whenSynced;
-            
+
             Utils.Logger.collab('[IndexedDB] Database cleared and provider recreated');
         } catch (error) {
             console.error('[IndexedDB] Failed to clear database:', error);
@@ -1347,29 +1457,20 @@ class CollaborationManager {
                 // guarantee connections are rebuilt AFTER boxes are available.
                 if (isUndoRedo) {
                     this._rebuildConnectionsFromYjs();
-                    
-                    // CRITICAL FIX: Sync connections back to Yjs so remote users see them
-                    // During undo, connections are restored locally but must be synced to Yjs
-                    // for multi-user collaboration. We bypass the isSyncing check by calling
-                    // the implementation directly (we're already in the undo transaction).
-                    
-                    // DEFENSIVE: Add logging to track undo connection sync
-                    const connectionCount = this.mindMap.connections.length;
-                    Utils.Logger.state('[Undo] Syncing', connectionCount, 'connections back to Yjs for remote users');
-                    
-                    const localConns = this.mindMap.connections
-                        .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
-                        .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
-                    
-                    // DEFENSIVE: Verify all connections have valid boxes before syncing
-                    if (localConns.length !== connectionCount) {
-                        Utils.Logger.warn('[Undo] Connection count mismatch:', connectionCount, 'total,', localConns.length, 'valid');
-                    }
-                    
-                    // Sync to Yjs (bypasses isSyncing check)
-                    this._syncConnectionsToYjsImpl(localConns);
-                    
-                    Utils.Logger.state('[Undo] Synced', localConns.length, 'connections to Yjs');
+
+                    // NOTE: We do NOT sync connections back to Yjs here.
+                    // The undo/redo operation already correctly reverts yconnections
+                    // (box deletion + connection deletion are in the same transaction).
+                    // Calling _syncConnectionsToYjsImpl here would create a NEW implicit
+                    // transaction with null origin (observers fire AFTER the undo transaction
+                    // commits), which is NOT tracked by UndoManager. This caused:
+                    //   1. Phantom undo entries that corrupt the undo stack
+                    //   2. State divergence between local and remote clients
+                    //   3. Cascading observer re-fires that compound the issue
+                    // The Yjs CRDT already propagates the reverted yconnections to
+                    // remote users via the standard sync protocol.
+
+                    Utils.Logger.state('[Undo] Rebuilt', this.mindMap.connections.length, 'connections from Yjs state');
                 }
 
                 // Redraw after changes
@@ -1450,13 +1551,22 @@ class CollaborationManager {
             if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 
-            // CRITICAL FIX: During undo/redo, skip connection rebuild here because
-            // yboxes observer already handles it in its undo/redo section. This prevents duplicate
-            // rebuilds and ensures connections rebuild AFTER boxes are available.
-            // The yboxes observer runs its undo/redo block to establish box order first.
             if (isUndoRedo) {
-                // Skip - yboxes observer will rebuild connections after boxes are ready
-                return;
+                // Check if the yboxes observer will also fire for this transaction.
+                // If boxes changed too (e.g., undoing a box deletion that included
+                // connections), the yboxes observer handles the connection rebuild
+                // AFTER restoring boxes, so we defer to it to avoid rebuilding
+                // before boxes are available.
+                const hasBoxChanges = event.transaction.changed.has(this.yboxes);
+                if (hasBoxChanges) {
+                    // Defer to yboxes observer — it will call _rebuildConnectionsFromYjs()
+                    // after boxes are restored.
+                    return;
+                }
+                // No box changes in this transaction (e.g., undoing a connection
+                // creation or deletion). The yboxes observer won't fire, so we
+                // must rebuild connections here.
+                Utils.Logger.debug('[Undo] Connection-only undo/redo — rebuilding connections directly');
             }
 
             this.isSyncing = true;
@@ -1664,10 +1774,21 @@ class CollaborationManager {
         // Clear existing connections
         this.mindMap.connections = [];
 
-        // Rebuild from Yjs
+        // Rebuild from Yjs with duplicate prevention
+        // A Set tracks seen connection pairs to guard against CRDT merge duplicates
         const connData = this.yconnections.toArray();
+        const seen = new Set();
         let skippedCount = 0;
+        let duplicateCount = 0;
         for (const data of connData) {
+            // Deduplicate: skip if we've already created this connection pair
+            const connKey = `${data.fromId}->${data.toId}`;
+            if (seen.has(connKey)) {
+                duplicateCount++;
+                continue;
+            }
+            seen.add(connKey);
+
             const fromBox = this.mindMap.getBoxById(data.fromId);
             const toBox = this.mindMap.getBoxById(data.toId);
 
@@ -1687,6 +1808,9 @@ class CollaborationManager {
         }
 
         // Log rebuild summary (helpful for debugging undo/redo issues)
+        if (duplicateCount > 0) {
+            Utils.Logger.debug(`[Connections] Deduplicated ${duplicateCount} duplicate connections`);
+        }
         if (skippedCount > 0) {
             Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
         } else if (connData.length > 0) {
@@ -2001,7 +2125,35 @@ class CollaborationManager {
      * @private
      */
     _generateUserId() {
-        return 'user_' + Math.random().toString(36).substring(2, 11);
+        // Persist user ID in localStorage so the same user keeps a stable identity
+        // across page reloads and sessions
+        try {
+            const saved = localStorage.getItem('openmind_userId');
+            if (saved && typeof saved === 'string' && saved.length > 0) {
+                return saved;
+            }
+        } catch (e) {
+            // localStorage not available, fall through to generation
+        }
+
+        // Generate a new ID using crypto.randomUUID() for collision resistance,
+        // with Math.random() fallback for environments without Web Crypto API
+        let id;
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            id = 'user_' + crypto.randomUUID();
+        } else {
+            id = 'user_' + Math.random().toString(36).substring(2, 11) +
+                Math.random().toString(36).substring(2, 11);
+        }
+
+        // Persist for future sessions
+        try {
+            localStorage.setItem('openmind_userId', id);
+        } catch (e) {
+            // localStorage not available, ID is ephemeral
+        }
+
+        return id;
     }
 
     /**

@@ -379,10 +379,14 @@ With all protections in place, the system **guarantees**:
 
 ## Testing Coverage
 
-- **334 total tests passing**
+- **472 total tests passing**
   - 295 existing tests (core functionality)
   - 20 undo reliability tests (core race conditions)
   - 39 edge case tests (scenarios in this document)
+  - 14 guarantee verification tests
+  - 24 comprehensive review tests
+  - 17 production hardening tests
+  - 63 other integration/behavioral tests
 
 Every edge case listed in this document has at least one corresponding test, and most have multiple tests covering different aspects.
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-OpenMind is a collaborative real-time mind mapping application built on a three-tier state management architecture with Yjs CRDT as the master state, an in-memory object model for UI representation, and localStorage for offline persistence.
+OpenMind is a collaborative real-time mind mapping application built on a three-tier state management architecture with Yjs CRDT as the master state, an in-memory object model for UI representation, and IndexedDB for robust offline persistence.
 
 **Version**: 1.1.0  
 **Last Updated**: 2026-02-11  
@@ -64,8 +64,8 @@ OpenMind is a collaborative real-time mind mapping application built on a three-
        │ Timer (30s)                     │ Network
        ↓                                 ↓
 ┌──────────────────┐            ┌──────────────────┐
-│  localStorage    │            │  WebSocket       │
-│  (JSON Backup)   │            │  Server          │
+│  IndexedDB       │            │  WebSocket       │
+│  (Persist Yjs)   │            │  Server          │
 └──────────────────┘            └──────────────────┘
 ```
 
@@ -74,7 +74,7 @@ OpenMind is a collaborative real-time mind mapping application built on a three-
 - **UI Framework**: p5.js (Canvas-based rendering)
 - **State Management**: Yjs (CRDT library)
 - **Collaboration**: y-websocket (WebSocket provider)
-- **Persistence**: localStorage (Browser API)
+- **Persistence**: IndexedDB (via y-indexeddb)
 - **Build**: Babel (ES6+ transpilation)
 - **Testing**: Jest (Unit and integration tests)
 
@@ -95,7 +95,7 @@ OpenMind is a collaborative real-time mind mapping application built on a three-
 **Implementation**:
 - All user actions → mindMap → Yjs (via callbacks)
 - All Yjs changes → mindMap (via observers)
-- localStorage is backup only, never source of truth during collaboration
+- IndexedDB persists the authoritative Yjs state via y-indexeddb
 
 ### 2. **Separation of Concerns**
 
@@ -117,7 +117,7 @@ OpenMind is a collaborative real-time mind mapping application built on a three-
    - Conflict resolution
    - Undo/redo management
 
-4. **Persistence Layer** (localStorage)
+4. **Persistence Layer** (IndexedDB)
    - Offline backup
    - Session recovery
    - Import/export
@@ -126,7 +126,7 @@ OpenMind is a collaborative real-time mind mapping application built on a three-
 
 **Yjs Observers** → Update local state  
 **MindMap Callbacks** → Update Yjs state  
-**Autosave Timer** → Persist to localStorage
+**IndexedDB Provider** → Persist to IndexedDB
 
 This creates a reactive system where changes propagate automatically.
 
@@ -154,9 +154,9 @@ This creates a reactive system where changes propagate automatically.
 **Key Methods**:
 - `addBox(box)` - Add new box, trigger callbacks
 - `addConnection(from, to)` - Create connection, trigger callbacks
-- `toJSON()` - Serialize state for localStorage
-- `fromJSON(data)` - Deserialize from localStorage
-- `saveToLocalStorage()` - Persist to browser storage
+- `toJSON()` - Serialize state for export/backup
+- `fromJSON(data)` - Deserialize from JSON
+- `saveToLocalStorage()` - Persist to localStorage (backup)
 
 **State Mutations**:
 - Direct mutations to `boxes[]` and `connections[]`
@@ -175,6 +175,7 @@ This creates a reactive system where changes propagate automatically.
   yconnections: Y.Array,          // Connections CRDT
   undoManager: Y.UndoManager,     // Undo/redo
   provider: WebsocketProvider,    // Network sync
+  indexeddbProvider: Y.Persistence, // Offline storage
   isSyncing: boolean,             // Prevent loops
   hasLoadedFromLocalStorage: bool // Guard flag
 }
@@ -304,19 +305,13 @@ mindMap {
 
 **Persistence**: None (rebuilt from Yjs or localStorage)
 
-#### Tier 3: localStorage (Backup)
+#### Tier 3: IndexedDB (Persistence)
 
-**Location**: `localStorage[storageKey]`
+**Location**: `IndexedDB/openmind-yjs`
 
 **Structure**:
-```javascript
-{
-  boxes: [{id, x, y, text, ...}],
-  connections: [{fromId, toId, from, to}],
-  lastModified: timestamp,
-  name: filename
-}
-```
+- Yjs binary updates (CRDT state vectors)
+- Not human-readable JSON
 
 **Authority**:
 - Offline persistence
@@ -367,18 +362,18 @@ mindMap.boxes.find(b => b.id === boxId).text = data.text
 isSyncing = false
 ```
 
-#### Autosave Sync (mindMap → localStorage)
+#### Persistence Sync (Yjs → IndexedDB)
 
 ```
-30-second timer
+Yjs State Change (Local or Remote)
   ↓
-if (!mindMap.isSaved && isPageVisible)
+ydoc update event
   ↓
-mindMap.saveToLocalStorage()
+indexeddbProvider._storeUpdate()
   ↓
-localStorage.setItem(storageKey, JSON.stringify(mindMap.toJSON()))
+IndexedDB.put(update)
   ↓
-mindMap.isSaved = true
+[Automatic, Incremental, Async]
 ```
 
 ---
@@ -402,9 +397,7 @@ syncBoxToYjs(box)
   ↓
 yboxes.set(box.id, data)
   ↓
-[30s timer]
-  ↓
-localStorage save
+indexeddbProvider saves update
 ```
 
 ### Pattern 2: Undo Box Deletion
@@ -464,23 +457,16 @@ UI shows merged state
 ```
 Page Load
   ↓
-if (!roomId)  [offline mode]
+initialize()
   ↓
-  loadFromLocalStorage()
+await indexeddbProvider.whenSynced
   ↓
-  mindMap.fromJSON(data)
+yjs doc loaded from IndexedDB
   ↓
-  for each box: MindMap.onBoxChange(box)
+_rebuildBoxesFromYjs()
+_rebuildConnectionsFromYjs()
   ↓
-  for each box: syncBoxToYjs(box)
-  ↓
-  MindMap.onConnectionsChange()
-  ↓
-  syncConnectionsToYjs()
-  ↓
-  hasLoadedFromLocalStorage = true
-  ↓
-  clearUndoHistory()
+UI shows persisted state
 ```
 
 ---
@@ -567,21 +553,17 @@ ydoc.transact(() => {
 
 #### 1. **Dual State Problem**
 
-**Issue**: State exists in THREE places (Yjs, mindMap, localStorage), creating synchronization complexity.
+**Issue**: State exists in TWO places (Yjs, mindMap) plus persistence (IndexedDB). Persistence is now tied to Yjs, simplifying the model.
 
 **Manifestation**:
-- localStorage can get out of sync with Yjs
-- Page refresh loads stale localStorage data
-- Undo creates temporary inconsistency
+- Page refresh loads directly from Yjs binary state
 
 **Current Mitigation**:
-- `hasLoadedFromLocalStorage` flag prevents premature Yjs rebuild
-- `isSyncing` flag prevents observer loops
-- Explicit sync after undo
+- `indexeddbProvider` creates single source of persistence truth
 
-**Risk Level**: 🟡 MEDIUM - Mitigated but complex
+**Risk Level**: � LOW - Solved by y-indexeddb
 
-**Recommendation**: Consider IndexedDB for Yjs state persistence (y-indexeddb provider).
+**Recommendation**: Maintain current architecture.
 
 #### 2. **Observer Ordering Non-Determinism**
 
@@ -603,24 +585,10 @@ ydoc.transact(() => {
 
 #### 3. **Autosave Window Data Loss**
 
-**Issue**: 30-second autosave window means changes can be lost.
-
-**Manifestation**:
-- User edits text
-- Closes browser before 30s
-- Changes lost (only Yjs has them, in-memory)
-
+**Issue**: Previous 30s autosave window caused data loss.
 **Current Mitigation**:
-- `isSaved = false` triggers autosave
-- Yjs persists in-memory during session
-- Browser beforeunload could save
-
-**Risk Level**: 🟡 MEDIUM - Inherent tradeoff
-
-**Recommendation**: 
-- Reduce autosave interval to 10s
-- Add beforeunload save
-- Consider y-indexeddb for Yjs persistence
+- IndexedDB saves Yjs updates immediately/incrementally
+**Risk Level**: 🟢 LOW - Solved by y-indexeddb
 
 #### 4. **Memory Growth (Yjs Document)**
 
@@ -644,21 +612,10 @@ ydoc.transact(() => {
 
 #### 5. **localStorage Quota Exceeded**
 
-**Issue**: localStorage has 5-10MB limit per domain.
-
-**Manifestation**:
-- Large maps with images hit quota
-- `QuotaExceededError` on save
-- Data loss if not handled
-
+**Issue**: IndexedDB has higher quotas but can still be exceeded on some devices.
 **Current Mitigation**:
-- Try/catch with retry after pruning
-- Alert user to export
-- Prune oldest caches
-
-**Risk Level**: 🟢 LOW - Handled gracefully
-
-**Recommendation**: Warn users about large images.
+- y-indexeddb handles storage efficiently
+**Risk Level**: 🟢 LOW - Higher limits than localStorage
 
 #### 6. **Connection Sync Gap (Multi-User Undo)**
 
@@ -717,21 +674,14 @@ ydoc.transact(() => {
 - Virtual scrolling for large maps
 - Debounce observer callbacks
 
-#### 2. **localStorage Serialization**
+#### 2. **IndexedDB Async Storage**
 
 **Measurement**:
-- `JSON.stringify()` is synchronous
-- Blocks UI thread
-- 100KB map: ~10ms
-- 1MB map: ~100ms
+- Asynchronous
+- Minimal UI blocking
 
-**Impact**:
-- Noticeable lag every 30s for large maps
-
-**Optimization**:
-- Use Web Workers for serialization
-- Incremental saves (only changed items)
-- Consider IndexedDB (async)
+**Effect**:
+- Smoother visual performance compared to localStorage blocking I/O
 
 #### 3. **Canvas Rendering**
 
@@ -773,9 +723,9 @@ ydoc.transact(() => {
 
 | Issue | Severity | Likelihood | Impact | Mitigation | Status |
 |-------|----------|------------|--------|------------|--------|
-| Autosave window data loss | Medium | Medium | Data loss | Reduce interval, beforeunload | Open |
-| Memory growth (Yjs) | Medium | Low | Performance | Max undo depth | Open |
-| localStorage quota | Low | Low | Data loss | Prune + alert | ✅ Fixed |
+| Autosave window data loss | Medium | Low | Data loss | IndexedDB incremental saves | ✅ Fixed |
+| Memory growth (Yjs) | Medium | Low | Performance | Max undo depth | ✅ Fixed |
+| Storage quota | Low | Low | Data loss | IndexedDB | ✅ Fixed |
 | Connection undo sync | High | High | Inconsistency | Sync after rebuild | ✅ Fixed |
 | Observer ordering | Medium | Low | Crashes | Explicit ordering | ✅ Fixed |
 | Text edit race | Low | Low | Crashes | Validate existence | ✅ Fixed |
@@ -827,26 +777,15 @@ try {
 
 ### Short-Term (Next Sprint)
 
-1. **Reduce Autosave Interval**
-   - Change from 30s to 10s
-   - Reduces data loss window
-   - Minimal performance impact
+1. **Reduce Autosave Interval** (Obsolete)
+   - Replaced by real-time IndexedDB saves
 
-2. **Add beforeunload Save**
-   ```javascript
-   window.addEventListener('beforeunload', () => {
-     mindMap.saveToLocalStorage();
-   });
-   ```
+2. **Add beforeunload Save** (Obsolete)
+   - Not needed with real-time IndexedDB persistence
 
-3. **Max Undo Stack Depth**
-   ```javascript
-   undoManager = new Y.UndoManager([yboxes, yconnections], {
-     captureTimeout: 0,
-     trackedOrigins: new Set(),
-     maxStackSize: 50  // Limit history
-   });
-   ```
+3. **Max Undo Stack Depth** ✅ COMPLETED
+   - Implemented `maxStackSize: 100` in UndoManager
+   - Limits memory growth
 
 4. **Integration Tests**
    - Multi-user undo scenario
@@ -855,11 +794,9 @@ try {
 
 ### Medium-Term (Next Quarter)
 
-1. **y-indexeddb Provider**
-   - Persist Yjs state to IndexedDB
-   - Eliminates localStorage sync complexity
-   - Faster loads (async)
-   - No 5MB limit
+1. **y-indexeddb Provider** ✅ COMPLETED
+   - Implemented as primary persistence
+   - Solved dual-state and quota issues
 
 2. **Performance Monitoring**
    - Add telemetry for observer timing

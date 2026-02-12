@@ -150,4 +150,79 @@ describe('Undo Connection Restoration - Behavioral', () => {
             expect(rebuildCode).toMatch(/this\.mindMap\.connections\s*=\s*\[\]/);
         });
     });
+
+    describe('No sync-back during undo/redo (critical fix)', () => {
+        test('yboxes observer does NOT call _syncConnectionsToYjsImpl during undo/redo', () => {
+            // CRITICAL: The yboxes observer must NOT sync connections back to Yjs
+            // during undo/redo. Observers fire AFTER the undo transaction commits,
+            // so any mutations to shared types create new implicit transactions
+            // with null origin that are NOT tracked by UndoManager.
+            const setupMatch = collabCode.match(/_setupObservers\s*\(\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_applyBoxFromYjs)/);
+            expect(setupMatch).toBeTruthy();
+            const setupCode = setupMatch[0];
+
+            // Find the yboxes observer section
+            const boxesObserverMatch = setupCode.match(/this\.yboxes\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(boxesObserverMatch).toBeTruthy();
+            const boxesObserver = boxesObserverMatch[0];
+
+            // Extract the isUndoRedo block inside the yboxes observer
+            const undoRedoBlock = boxesObserver.match(/if\s*\(\s*isUndoRedo\s*\)\s*\{[\s\S]*?\n\s{16}\}/);
+            expect(undoRedoBlock).toBeTruthy();
+
+            // Must NOT contain actual calls to _syncConnectionsToYjsImpl
+            // (Note: comments may reference the name when explaining why it's not called)
+            expect(undoRedoBlock[0]).not.toMatch(/this\._syncConnectionsToYjsImpl\s*\(/);
+
+            // Must still contain _rebuildConnectionsFromYjs (local rebuild is fine)
+            expect(undoRedoBlock[0]).toMatch(/_rebuildConnectionsFromYjs/);
+        });
+
+        test('yboxes observer has comment explaining why no sync-back', () => {
+            const setupMatch = collabCode.match(/_setupObservers\s*\(\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_applyBoxFromYjs)/);
+            expect(setupMatch).toBeTruthy();
+            const setupCode = setupMatch[0];
+
+            // Must explain that syncing back from observer creates out-of-band transactions
+            expect(setupCode).toMatch(/do NOT sync connections back to Yjs/i);
+            expect(setupCode).toMatch(/null origin|NOT tracked by UndoManager/i);
+        });
+    });
+
+    describe('Connection-only undo/redo fix', () => {
+        test('yconnections observer checks transaction.changed for box changes', () => {
+            // The yconnections observer must inspect event.transaction.changed
+            // to determine if yboxes also changed. If not, it must rebuild
+            // connections itself (since yboxes observer won't fire).
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must check event.transaction.changed.has(this.yboxes)
+            expect(connObserver).toMatch(/event\.transaction\.changed\.has\(this\.yboxes\)/);
+        });
+
+        test('yconnections observer defers to yboxes observer only when boxes changed', () => {
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must have conditional return only when hasBoxChanges is true
+            expect(connObserver).toMatch(/hasBoxChanges[\s\S]*?return/);
+        });
+
+        test('yconnections observer rebuilds connections when no box changes in undo/redo', () => {
+            const connObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(?event\)?\s*=>\s*\{[\s\S]*?\n\s{8}\}\);/);
+            expect(connObserverMatch).toBeTruthy();
+            const connObserver = connObserverMatch[0];
+
+            // Must call _rebuildConnectionsFromYjs (not just return) for
+            // connection-only undo/redo
+            expect(connObserver).toMatch(/_rebuildConnectionsFromYjs\(\)/);
+
+            // Must NOT unconditionally return for all isUndoRedo cases
+            // (the old bug was: if (isUndoRedo) { return; })
+            expect(connObserver).not.toMatch(/if\s*\(\s*isUndoRedo\s*\)\s*\{\s*\/\/\s*Skip[\s\S]*?return;\s*\}/);
+        });
+    });
 });
