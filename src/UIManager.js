@@ -297,9 +297,9 @@ class UIManager {
     if (typeof mouseX !== 'number' || !isFinite(mouseX)) mouseX = 0;
     if (typeof mouseY !== 'number' || !isFinite(mouseY)) mouseY = 0;
     
-    const MENU_TRIGGER_X = this.config.UI.MENU_TRIGGER_X || 50;
-    const MENU_TRIGGER_Y = this.config.UI.MENU_TRIGGER_Y || 50;
-    const BUTTONS_BAND_HEIGHT = this.config.UI.BUTTONS_BAND_HEIGHT || 50;
+    const MENU_TRIGGER_X = this.config?.UI?.MENU_TRIGGER_X || 50;
+    const MENU_TRIGGER_Y = this.config?.UI?.MENU_TRIGGER_Y || 50;
+    const BUTTONS_BAND_HEIGHT = this.config?.UI?.BUTTONS_BAND_HEIGHT || 50;
     
     const inTriggerZone = mouseX < MENU_TRIGGER_X && mouseY < MENU_TRIGGER_Y;
     const inButtonsBand = mouseY < BUTTONS_BAND_HEIGHT;
@@ -375,9 +375,15 @@ class UIManager {
    * Layout and position all menu buttons
    */
   layoutButtons() {
-    const startX = this.config.UI.BUTTON_START_X || 40;
-    const buttonY = this.config.UI.BUTTON_Y || 10;
-    const buttonGap = this.config.UI.BUTTON_GAP || 5;
+    // Guard against uninitialized state
+    if (!this.loadButton || !this.saveButton) {
+      console.warn('layoutButtons called before initialization complete');
+      return;
+    }
+
+    const startX = this.config?.UI?.BUTTON_START_X || 40;
+    const buttonY = this.config?.UI?.BUTTON_Y || 10;
+    const buttonGap = this.config?.UI?.BUTTON_GAP || 5;
     
     let x = startX;
     
@@ -528,32 +534,46 @@ class UIManager {
     // Clear any pending timers
     clearTimeout(this.displayNameDebounceTimer);
     
-    // Remove event listeners
+    // Remove event listeners safely
     this.eventListenerRefs.forEach(({ element, event, handler }) => {
       try {
-        element.removeEventListener(event, handler);
+        // Check if element still exists and has removeEventListener
+        if (element && typeof element.removeEventListener === 'function') {
+          element.removeEventListener(event, handler);
+        }
       } catch (e) {
         console.warn('Error removing event listener:', e);
       }
     });
     this.eventListenerRefs = [];
     
+    // Helper to safely remove p5 elements
+    const removeIfExists = (btn) => {
+      try {
+        if (btn && typeof btn.remove === 'function') {
+          btn.remove();
+        }
+      } catch (e) {
+        console.warn('Error removing button:', e);
+      }
+    };
+
     // Remove all buttons
-    if (this.loadButton) this.loadButton.remove();
-    if (this.saveButton) this.saveButton.remove();
-    if (this.importTextButton) this.importTextButton.remove();
-    if (this.exportPNGButton) this.exportPNGButton.remove();
-    if (this.exportPDFButton) this.exportPDFButton.remove();
-    if (this.exportTextButton) this.exportTextButton.remove();
-    if (this.keyboardControlsButton) this.keyboardControlsButton.remove();
-    if (this.inviteButton) this.inviteButton.remove();
-    if (this.displayNameInput) this.displayNameInput.remove();
-    if (this.fileInput) this.fileInput.remove();
-    if (this.importTextFileInput) this.importTextFileInput.remove();
+    removeIfExists(this.loadButton);
+    removeIfExists(this.saveButton);
+    removeIfExists(this.importTextButton);
+    removeIfExists(this.exportPNGButton);
+    removeIfExists(this.exportPDFButton);
+    removeIfExists(this.exportTextButton);
+    removeIfExists(this.keyboardControlsButton);
+    removeIfExists(this.inviteButton);
+    removeIfExists(this.displayNameInput);
+    removeIfExists(this.fileInput);
+    removeIfExists(this.importTextFileInput);
     
     // Clean up keyboard overlay
-    if (this.keyboardOverlay && this.keyboardOverlay.remove) {
-      this.keyboardOverlay.remove();
+    if (this.keyboardOverlay) {
+      removeIfExists(this.keyboardOverlay);
     }
   }
 }

@@ -18,6 +18,7 @@ class ExportManager {
     this.p5Instance = null;
     this.mindMap = null;
     this.config = null;
+    this._initialized = false;
   }
 
   /**
@@ -30,6 +31,7 @@ class ExportManager {
     this.p5Instance = p5Instance;
     this.mindMap = mindMap;
     this.config = config || {};
+    this._initialized = true;
   }
 
   // ==========================================================================
@@ -41,6 +43,20 @@ class ExportManager {
    * Creates an offscreen graphics buffer, renders all content, and downloads as PNG
    */
   exportPNG() {
+    // Check initialization
+    if (!this._initialized) {
+      console.error('ExportManager not initialized');
+      alert('Export system not ready. Please refresh the page.');
+      return;
+    }
+
+    // Validate ColorPalette dependency
+    if (typeof ColorPalette === 'undefined') {
+      console.error('ColorPalette not available');
+      alert('Export failed: Color system not initialized');
+      return;
+    }
+
     if (!this.mindMap) {
       console.error('MindMap not initialized');
       return;
@@ -65,6 +81,9 @@ class ExportManager {
 
     // Create offscreen graphics buffer
     const pg = this.p5Instance.createGraphics(width, height);
+
+    // Set up blob timeout
+    let blobTimeout;
 
     try {
       // Set background
@@ -197,6 +216,7 @@ class ExportManager {
 
       // Convert to data URL and download
       pg.canvas.toBlob(blob => {
+        clearTimeout(blobTimeout);
         if (!blob) {
           console.error('Failed to create PNG blob');
           alert('Failed to export PNG. Please try again.');
@@ -212,7 +232,14 @@ class ExportManager {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       });
+
+      // Add timeout fallback
+      blobTimeout = setTimeout(() => {
+        console.error('PNG blob creation timeout');
+        alert('Export timeout. The image may be too large.');
+      }, 30000); // 30 second timeout
     } catch (e) {
+      clearTimeout(blobTimeout);
       console.error('PNG export failed:', e);
       alert('Failed to export PNG: ' + e.message);
     } finally {
@@ -342,11 +369,26 @@ class ExportManager {
       for (const box of this.mindMap.boxes) {
         if (box && box.imageUrl && box.img) {
           try {
+            // Validate image dimensions
+            const imgWidth = Math.max(1, Math.min(4096, box.img.width || 100));
+            const imgHeight = Math.max(1, Math.min(4096, box.img.height || 100));
+            
+            if (!isFinite(imgWidth) || !isFinite(imgHeight)) {
+              console.warn('Invalid image dimensions for box:', box.id);
+              continue;
+            }
+
             // Convert image to data URL for PDF
             const canvas = document.createElement('canvas');
-            canvas.width = box.img.width;
-            canvas.height = box.img.height;
+            canvas.width = imgWidth;
+            canvas.height = imgHeight;
             const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              console.warn('Failed to get 2D context for image export');
+              continue;
+            }
+            
             ctx.drawImage(box.img, 0, 0);
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             imageCache.set(box.id, dataUrl);
@@ -484,16 +526,21 @@ class ExportManager {
     // Create text content
     const textContent = hierarchy;
 
-    // Create blob and download
+    // Create blob and download with proper cleanup
     const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mindmap.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mindmap.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      // Always revoke URL to prevent memory leak
+      URL.revokeObjectURL(url);
+    }
   }
 
   /**
@@ -516,6 +563,13 @@ class ExportManager {
         const fromId = conn.fromBox.id;
         const toId = conn.toBox.id;
 
+        // Validate IDs exist
+        if (fromId === undefined || fromId === null || 
+            toId === undefined || toId === null) {
+          console.warn('Connection with missing ID:', conn);
+          return;
+        }
+
         if (!children.has(fromId)) {
           children.set(fromId, []);
         }
@@ -537,14 +591,21 @@ class ExportManager {
     let result = '';
 
     const dfs = (boxId, depth) => {
+      // Add depth limit protection
+      if (depth > 1000) {
+        console.warn('Max hierarchy depth reached:', depth);
+        result += '  '.repeat(Math.min(depth, 100)) + '- [Max depth reached]\n';
+        return;
+      }
+
       if (visited.has(boxId)) return;
       visited.add(boxId);
 
       const box = this.mindMap.boxes.find(b => b && b.id === boxId);
       if (!box) return;
 
-      const indent = '  '.repeat(depth);
-      const text = box.text.replace(/\n/g, ' ').trim();
+      const indent = '  '.repeat(Math.min(depth, 100)); // Cap indent rendering
+      const text = (box.text || '').replace(/\n/g, ' ').trim();
       result += indent + '- ' + text + '\n';
 
       const childIds = children.get(boxId) || [];
