@@ -3542,6 +3542,12 @@ function exportText() {
   } else {
     console.error('ExportManager not initialized');
   }
+}
+
+/**
+ * Draws the multi-box selection rectangle
+ */
+function drawSelectionRectangle() {
   const x1 = min(selectionStartX, selectionCurrentX);
   const y1 = min(selectionStartY, selectionCurrentY);
   const x2 = max(selectionStartX, selectionCurrentX);

@@ -111,14 +111,14 @@ class UIManager {
     this.exportTextButton.mousePressed(() => this.handleExportTextClick());
     
     // Keyboard controls button
-    this.keyboardControlsButton = p5.createButton('⌨️');
+    this.keyboardControlsButton = p5.createButton('Keyboard Controls');
     this.keyboardControlsButton.position(600, 10);
     this.keyboardControlsButton.mousePressed(() => this.toggleKeyboardOverlay());
     this.keyboardControlsButton.attribute('aria-label', 'Toggle keyboard controls');
     this.keyboardControlsButton.attribute('aria-expanded', 'false');
     
     // Invite/Share button
-    this.inviteButton = p5.createButton('Invite');
+    this.inviteButton = p5.createButton('Start Collaboration');
     this.inviteButton.position(650, 10);
     this.inviteButton.style('background-color', '#4caf50');
     this.inviteButton.style('color', '#fff');
@@ -206,7 +206,7 @@ class UIManager {
    */
   setupKeyboardOverlay() {
     if (typeof KeyboardOverlay !== 'undefined' && KeyboardOverlay.setup) {
-      const result = KeyboardOverlay.setup();
+      const result = KeyboardOverlay.setup({ keyboardControlsButton: this.keyboardControlsButton });
       this.keyboardOverlay = result.overlay;
       this.keyboardOverlayContent = result.overlayContent;
     }
@@ -217,7 +217,7 @@ class UIManager {
    */
   toggleKeyboardOverlay() {
     if (typeof KeyboardOverlay !== 'undefined' && KeyboardOverlay.toggle) {
-      KeyboardOverlay.toggle();
+      KeyboardOverlay.toggle(this.keyboardControlsButton);
       this.keyboardOverlayVisible = !this.keyboardOverlayVisible;
       
       if (this.keyboardControlsButton) {
