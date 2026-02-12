@@ -194,20 +194,20 @@ describe('Connection Edge Cases', () => {
 
 describe('Unified Undo System (Yjs UndoManager)', () => {
 
-    test('MindMap.undo should be deprecated', () => {
-        // Verify undo shows deprecation warning
-        expect(mindMapCode).toMatch(/undo\s*\(\)\s*\{[^}]*deprecated/si);
+    test('MindMap should not have deprecated undo method', () => {
+        // Verify deprecated undo method has been removed
+        expect(mindMapCode).not.toMatch(/\bundo\s*\(\)\s*\{[^}]*deprecated/si);
     });
 
-    test('MindMap.pushUndo should be a no-op', () => {
-        // Verify pushUndo is now a no-op (Yjs handles undo tracking)
-        expect(mindMapCode).toMatch(/pushUndo\s*\(\)\s*\{[^}]*No-op/s);
+    test('MindMap should not have deprecated pushUndo method', () => {
+        // Verify deprecated pushUndo method has been removed
+        expect(mindMapCode).not.toMatch(/\bpushUndo\s*\(\)\s*\{/);
     });
 
     test('CollaborationManager should have initialize method', () => {
         // Verify initialize method exists for unified undo system
         const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
-        expect(collabCode).toMatch(/async initialize\s*\(\)/);
+        expect(collabCode).toMatch(/async initialize\s*\(/);
     });
 });
 
@@ -342,7 +342,7 @@ describe('Periodic Consistency Check', () => {
 
     test('should start consistency check when synced', () => {
         // Should call _startConsistencyCheck when synced
-        expect(collabCode).toMatch(/if\s*\(\s*synced\s*\)\s*\{[^}]*_startConsistencyCheck/s);
+        expect(collabCode).toMatch(/if\s*\(\s*isSynced\s*\)\s*\{[^}]*_startConsistencyCheck/s);
     });
 
     test('should stop consistency check when not synced', () => {
@@ -420,9 +420,9 @@ describe('Sketch.js Integration for Collaboration', () => {
     });
 
     test('initializeCollaboration should show dialog before connecting when user has local data', () => {
-        // Should show dialog immediately if user has local data
-        expect(sketchCode).toMatch(/showing sync options dialog before connecting/i);
-        expect(sketchCode).toMatch(/pendingConnection/);
+        // Should show dialog immediately if user has local data from another context
+        expect(sketchCode).toMatch(/User has data from another context.*showing options/i);
+        expect(sketchCode).toMatch(/pendingConnection.*true/);
     });
 
     test('should have _proceedWithRoomJoin function', () => {
