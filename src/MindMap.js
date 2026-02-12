@@ -198,25 +198,6 @@ class MindMap {
   }
 
   /**
-   * DEPRECATED: Pushes current state to undo stack.
-   * This is now a no-op. Undo is handled by Yjs UndoManager via CollaborationManager.
-   * Kept for backwards compatibility with existing code that calls pushUndo().
-   */
-  pushUndo() {
-    // No-op: Yjs UndoManager tracks changes automatically
-    // Mark as unsaved since we're about to make a change
-    this.isSaved = false;
-  }
-
-  /**
-   * DEPRECATED: Use collaborationManager.undo() instead.
-   * This method is kept for backwards compatibility but should not be called.
-   */
-  undo() {
-    console.warn('MindMap.undo() is deprecated. Use collaborationManager.undo() instead.');
-  }
-
-  /**
    * Gets the color priority for a box (lower number = higher priority)
    * Red: priority 1, Orange: priority 2, White/other: priority 999
    * @param {TextBox} box - The box to check
@@ -1857,7 +1838,6 @@ class MindMap {
         // Single select this box when resizing
         if (!shiftDown) this.clearBoxSelection();
         this.addBoxToSelection(box);
-        this.pushUndo();
         box.startResize(mx, my);
         return;
       }
@@ -1908,7 +1888,6 @@ class MindMap {
 
         if (onEdge) {
           // Edge click: start drag. If multiple boxes are selected, drag all of them together.
-          this.pushUndo();
 
           // If this box is already in selection and we have multiple selected, drag all
           const hasMultipleSelected = this.selectedBoxes && this.selectedBoxes.size > 1;
@@ -2027,7 +2006,6 @@ class MindMap {
         const duplicate = this.connections.some(c => c !== conn && c.fromBox === conn.fromBox && c.toBox === droppedOn);
         if (!duplicate) {
           if (droppedOn !== originalTo) {
-            this.pushUndo();
             changed = true;
 
             // Wrap connection reattachment in transaction for proper undo tracking
@@ -2379,7 +2357,6 @@ class MindMap {
           }
           // Delete selection regardless of clipboard outcome
           // Wrap in transaction to make cut a discrete operation, not grouped with typing
-          this.pushUndo();
           if (this.selectedBox.selectionStart !== -1 && this.selectedBox.selectionEnd !== -1) {
             this._wrapInTransaction(() => {
               this.selectedBox.deleteSelection();
@@ -2397,7 +2374,6 @@ class MindMap {
             if (navigator.clipboard && navigator.clipboard.readText) {
               navigator.clipboard.readText().then(text => {
                 if (text && this.selectedBox) {
-                  this.pushUndo();
                   // Wrap in transaction to make paste a discrete operation
                   this._wrapInTransaction(() => {
                     this.selectedBox.pasteText(text);
@@ -2420,8 +2396,6 @@ class MindMap {
           // Highlight selected text (toggle) with Cmd/Ctrl+U
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleHighlightOnSelection === 'function') {
-              this.pushUndo();
-
               this._wrapInTransaction(() => {
                 this.selectedBox.toggleHighlightOnSelection();
                 // Pass skipTransactionWrapper=true since we're already in a transaction
@@ -2441,7 +2415,6 @@ class MindMap {
           // Faux bold via outline stroke
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleBoldOutlineOnSelection === 'function') {
-              this.pushUndo();
               this._wrapInTransaction(() => {
                 this.selectedBox.toggleBoldOutlineOnSelection();
                 if (MindMap.onBoxChange) {
@@ -2459,7 +2432,6 @@ class MindMap {
           // Faux italic via shear transform
           try {
             if (this.selectedBox && typeof this.selectedBox.toggleItalicSlantOnSelection === 'function') {
-              this.pushUndo();
               this._wrapInTransaction(() => {
                 this.selectedBox.toggleItalicSlantOnSelection();
                 if (MindMap.onBoxChange) {
@@ -2486,7 +2458,7 @@ class MindMap {
       } else if (keyCode === DOWN_ARROW) {
         this.selectedBox.moveCursorDown();
       } else if (keyCode === BACKSPACE) {
-        if (!isRepeat) this.pushUndo();
+        if (!isRepeat) this.isSaved = false; // Mark as unsaved
         // Modifier variants for deletion
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to start of line
           this.selectedBox.deleteToLineStart();
@@ -2496,7 +2468,7 @@ class MindMap {
           this.selectedBox.removeChar();
         }
       } else if (keyCode === DELETE) {
-        if (!isRepeat) this.pushUndo();
+        if (!isRepeat) this.isSaved = false; // Mark as unsaved
         // Forward delete and modifier variants
         if (keyIsDown(91) || keyIsDown(93)) { // CMD -> delete to end of line
           this.selectedBox.deleteToLineEnd();
@@ -2506,10 +2478,10 @@ class MindMap {
           this.selectedBox.removeForwardChar();
         }
       } else if (keyCode === ENTER) {
-        this.pushUndo();
+        this.isSaved = false; // Mark as unsaved
         this.selectedBox.addChar('\n');
       } else if (key && key.length === 1) {
-        this.pushUndo();
+        this.isSaved = false; // Mark as unsaved
         this.selectedBox.addChar(key);
       }
     } else if (keyCode === UP_ARROW || keyCode === DOWN_ARROW || keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
@@ -2593,7 +2565,6 @@ class MindMap {
       } else if (key === 'v' || key === 'V') {
         // Paste copied box(es) and their connections at cursor position
         if (this.copiedBoxes && this.copiedBoxes.length > 0) {
-          this.pushUndo();
           const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
 
           // Calculate offset from first copied box to paste location
@@ -2635,8 +2606,6 @@ class MindMap {
     } else if ((key === ' ' || keyCode === 32)) {
       // Space: reverse selected connection when not editing
       if (this.selectedConnection) {
-        this.pushUndo();
-
         // Wrap connection reverse in transaction for proper undo tracking
         this._wrapInTransaction(() => {
           this.selectedConnection.reverse();
@@ -2653,7 +2622,6 @@ class MindMap {
       // Delete selected boxes or connection(s)
       if (this.selectedBoxes && this.selectedBoxes.size > 0) {
         // Delete all selected boxes - wrap in transaction for single undo step
-        this.pushUndo();
         const boxesToDelete = Array.from(this.selectedBoxes);
 
         this._wrapInTransaction(() => {
@@ -2668,8 +2636,6 @@ class MindMap {
         }
       } else if (this.selectedConnections && this.selectedConnections.size > 0) {
         // Delete all selected connections (multi-selection)
-        this.pushUndo();
-
         this._wrapInTransaction(() => {
           this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
           this.clearConnectionSelection();
@@ -2687,7 +2653,6 @@ class MindMap {
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
         // Delete selected connection only
-        this.pushUndo();
         let index = this.connections.indexOf(this.selectedConnection);
         if (index > -1) {
           this._wrapInTransaction(() => {
@@ -2709,7 +2674,6 @@ class MindMap {
       const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18) || keyIsDown(16);
       if (!hasModifier) {
         if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-          this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
 
           this._wrapInTransaction(() => {
@@ -2723,7 +2687,6 @@ class MindMap {
             this._notifyBoxesChanged(changedBoxes, true);
           });
         } else if (this.selectedBox && !this.selectedBox.isEditing) {
-          this.pushUndo();
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
             // Wrap for consistency with multi-box color change above.

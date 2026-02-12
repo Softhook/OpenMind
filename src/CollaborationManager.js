@@ -511,18 +511,6 @@ class CollaborationManager {
     }
 
     /**
-     * Completes the merge by merging local and room data via Yjs
-     * This syncs local changes to Yjs after loading room state
-     * @deprecated Use syncLocalToRoom() instead - this method's load-then-push approach is flawed
-     */
-    mergeWithRoom() {
-        // Runtime deprecation warning for callers that still use this method.
-        // Keeping this wrapper for backwards compatibility.
-        console.warn('[Room] mergeWithRoom() is deprecated. Use syncLocalToRoom() instead.');
-        this.syncLocalToRoom();
-    }
-
-    /**
      * Disconnects from the current room but preserves local Yjs state.
      * Undo/redo continues to work after disconnecting.
      */

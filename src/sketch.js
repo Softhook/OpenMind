@@ -1979,8 +1979,7 @@ function handleNativePaste(e) {
     let data = e && e.clipboardData ? e.clipboardData.getData('text/plain') : null;
     const doPaste = (text) => {
       if (!text) return;
-      if (typeof mindMap.pushUndo !== 'function') return;
-      mindMap.pushUndo();
+      mindMap.isSaved = false; // Mark as unsaved
       // If a stray 'v' character was inserted just before paste, remove it deterministically
       try {
         const box = mindMap.selectedBox;
@@ -2049,7 +2048,7 @@ function handleNativeCut(e) {
     if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
       e.clipboardData.setData('text/plain', text);
       if (typeof e.preventDefault === 'function') e.preventDefault();
-      if (typeof mindMap.pushUndo === 'function') mindMap.pushUndo();
+      mindMap.isSaved = false; // Mark as unsaved
       if (typeof mindMap.selectedBox.deleteSelection === 'function') mindMap.selectedBox.deleteSelection();
     }
   } catch (_) { }

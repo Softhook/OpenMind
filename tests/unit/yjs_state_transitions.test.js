@@ -54,7 +54,7 @@ describe('Yjs State Transitions - Comprehensive Testing', () => {
 
         test('should mark localStorage load complete after syncing to Yjs', () => {
             // In sketch.js, after loading from localStorage and syncing to Yjs
-            expect(sketchCode).toMatch(/Mark that localStorage load is complete/);
+            expect(sketchCode).toMatch(/Mark that legacy load is complete/);
             expect(sketchCode).toMatch(/hasLoadedFromLocalStorage\s*=\s*true/);
         });
 

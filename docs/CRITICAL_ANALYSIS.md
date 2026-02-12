@@ -6,6 +6,13 @@ This document provides a critical analysis of the Yjs-based state management app
 
 **Risk Assessment**: 🟡 MEDIUM - System is stable but has known complexity that could cause issues at scale or in edge cases.
 
+**Status Update (2026-02-12)**: 
+- ✅ **Migrated to y-indexeddb** - IndexedDB persistence now primary, localStorage is legacy migration path
+- ✅ **Undo system hardened** - Race conditions fixed, comprehensive test coverage added
+- ✅ **Observer ordering** - Handled with proper sequencing and force-apply modes
+- ⚠️ **Dual-state still exists** - MindMap objects remain as UI layer, Yjs is source of truth
+- 📝 See `docs/archive/` for detailed fix documentation
+
 ---
 
 ## Critical Issues Analysis
