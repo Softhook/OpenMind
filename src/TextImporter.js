@@ -140,9 +140,6 @@ class TextImporter {
       mindMap.selectedBox = null;
     }
 
-    // Create all boxes and track them for undo
-    mindMap.pushUndo();
-
     const allNewBoxes = [];
     let currentX = IMPORT_LAYOUT.START_X;
 
