@@ -5,7 +5,11 @@
  * All color definitions are centralized here to ensure consistency and make it easy
  * to maintain and update the visual theme.
  * 
- * Color Format: { r, g, b } or { r, g, b, a } where values are 0-255
+ * Color Formats:
+ * - RGB/RGBA objects: { r, g, b } or { r, g, b, a } where values are 0-255 (for p5.js fill/stroke)
+ * - CSS rgba strings: 'rgba(r, g, b, a)' (for p5.element.style())
+ * - Hex strings: '#RRGGBB' (for collaboration UI)
+ * - Grayscale numbers: 0-255 (for simple gray values)
  */
 
 class ColorPalette {
@@ -37,7 +41,13 @@ class ColorPalette {
     SHADOW: { r: 0, g: 0, b: 0, a: 20 }  // Subtle shadow/dim effect
   };
   
-  // Stroke weights for different TextBox states
+  // ============================================================================
+  // TEXTBOX STROKE WEIGHTS
+  // ============================================================================
+  // Note: These are stroke weights (line thickness), not colors.
+  // Kept in ColorPalette for convenience since they're used alongside colors.
+  // Consider moving to a separate StyleConstants module in future refactoring.
+  
   static TEXTBOX_STROKES = {
     HOVER: 100,
     EDITING: 120,
@@ -127,6 +137,10 @@ class ColorPalette {
    * @returns {string} Hex color string
    */
   static pickRandomUserColor() {
+    if (!Array.isArray(ColorPalette.USER_COLORS) || ColorPalette.USER_COLORS.length === 0) {
+      console.warn('USER_COLORS is invalid or empty, using fallback');
+      return '#888888'; // Fallback gray color
+    }
     const colors = ColorPalette.USER_COLORS;
     return colors[Math.floor(Math.random() * colors.length)];
   }

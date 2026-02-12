@@ -438,13 +438,20 @@ const Logger = {
  * @param {number} weight - Stroke weight in pixels
  */
 function applyStroke(color, weight = 1) {
+  if (color == null) {
+    return; // Silently skip if no color provided
+  }
+  
   if (typeof color === 'number') {
-    stroke(color);
-  } else if (color && typeof color === 'object') {
-    if (color.a !== undefined) {
-      stroke(color.r, color.g, color.b, color.a);
+    if (Number.isFinite(color)) {
+      stroke(color);
+    }
+  } else if (typeof color === 'object') {
+    const validated = validateColor(color);
+    if (validated.a !== undefined) {
+      stroke(validated.r, validated.g, validated.b, validated.a);
     } else {
-      stroke(color.r, color.g, color.b);
+      stroke(validated.r, validated.g, validated.b);
     }
   }
   strokeWeight(weight);
@@ -453,16 +460,24 @@ function applyStroke(color, weight = 1) {
 /**
  * Applies fill styling to the current p5.js context.
  * Handles both grayscale and RGB/RGBA color values.
+ * Uses validateColor internally to ensure all color values are valid and clamped to 0-255.
  * @param {number|Object} color - Grayscale value (0-255) or RGB object {r, g, b} or RGBA object {r, g, b, a}
  */
 function applyFill(color) {
+  if (color == null) {
+    return; // Silently skip if no color provided
+  }
+  
   if (typeof color === 'number') {
-    fill(color);
-  } else if (color && typeof color === 'object') {
-    if (color.a !== undefined) {
-      fill(color.r, color.g, color.b, color.a);
+    if (Number.isFinite(color)) {
+      fill(color);
+    }
+  } else if (typeof color === 'object') {
+    const validated = validateColor(color);
+    if (validated.a !== undefined) {
+      fill(validated.r, validated.g, validated.b, validated.a);
     } else {
-      fill(color.r, color.g, color.b);
+      fill(validated.r, validated.g, validated.b);
     }
   }
 }

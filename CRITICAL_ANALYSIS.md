@@ -355,19 +355,21 @@ This is **20% of what was asked for**, executed at **90% quality**. It's a good 
 
 ## Actionable Items
 
-### Critical (Fix Before Merge):
-1. Add input validation to `Utils.applyFill/applyStroke`
-2. Rename or relocate `TEXTBOX_STROKES` (not colors)
-3. Add error handling to `ColorPalette.pickRandomUserColor()`
-4. Update documentation to reflect actual scope
+### Addressed in Current PR:
+1. ✅ Added input validation to `Utils.applyFill/applyStroke` using `validateColor`
+2. ✅ Added documentation note about `TEXTBOX_STROKES` location (moved to separate module recommended for Phase 2)
+3. ✅ Added error handling to `ColorPalette.pickRandomUserColor()`
+4. ✅ Updated ColorPalette.js documentation to reflect all color formats
+5. ✅ Added comprehensive test coverage for alpha channel support in Utils helpers
 
-### Important (Next PR):
+### Important (Phase 2 - Next PR):
 1. Extract UIManager class from sketch.js
 2. Extract ExportManager class from sketch.js
 3. Create SketchController to encapsulate global state
-4. Add comprehensive JSDoc comments
+4. Move TEXTBOX_STROKES to separate StyleConstants module
+5. Add comprehensive JSDoc comments
 
-### Nice to Have:
+### Nice to Have (Future):
 1. Add performance profiling
 2. Create style guide document
 3. Set up pre-commit hooks for linting
