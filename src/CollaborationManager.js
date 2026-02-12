@@ -53,11 +53,7 @@ class CollaborationManager {
         return CollaborationManager.PRODUCTION_SERVER;
     })();
 
-    static DEFAULT_USER_COLORS = [
-        '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
-        '#2196f3', '#00bcd4', '#009688', '#4caf50',
-        '#8bc34a', '#ff9800', '#ff5722', '#795548'
-    ];
+    static DEFAULT_USER_COLORS = ColorPalette.USER_COLORS;
 
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
@@ -2239,8 +2235,7 @@ class CollaborationManager {
      * @private
      */
     _pickRandomColor() {
-        const colors = CollaborationManager.DEFAULT_USER_COLORS;
-        return colors[Math.floor(Math.random() * colors.length)];
+        return ColorPalette.pickRandomUserColor();
     }
 
     /**

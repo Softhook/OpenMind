@@ -6,7 +6,9 @@ function loadTextBox() {
   const code = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
 
   // Minimal sandbox to satisfy TextBox dependencies
+  // ColorPalette is loaded globally by tests/setup.js
   const sandbox = {
+    ColorPalette: global.ColorPalette,
     Utils: {
       generateUUID: () => 'uuid-1',
       sanitizeText: (t) => (t === null || t === undefined ? '' : String(t)),

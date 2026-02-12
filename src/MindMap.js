@@ -48,10 +48,10 @@ class MindMap {
     START_Y: 100              // Initial Y position for layout
   };
 
-  // Color constants for connection preview lines
+  // Color constants - using centralized ColorPalette
   static COLORS = {
-    CONNECTING_LINE: { r: 100, g: 100, b: 255 },  // Blue line when creating connection
-    CONNECTOR_DOT: { r: 100, g: 150, b: 255 }     // Blue dot at connection endpoints
+    CONNECTING_LINE: ColorPalette.CONNECTION.PREVIEW_LINE,
+    CONNECTOR_DOT: ColorPalette.CONNECTION.CONNECTOR_DOT
   };
 
   // Stroke weight for connection preview (in pixels)
@@ -463,11 +463,10 @@ class MindMap {
         const lineColor = MindMap.COLORS.CONNECTING_LINE;
         const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
-        stroke(lineColor.r, lineColor.g, lineColor.b);
-        strokeWeight(MindMap.STROKE_WEIGHT_PREVIEW);
+        Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
         line(start.x, start.y, worldMouseX(), worldMouseY());
         noStroke();
-        fill(dotColor.r, dotColor.g, dotColor.b);
+        Utils.applyFill(dotColor);
         circle(start.x, start.y, 10);
         circle(worldMouseX(), worldMouseY(), 8);
         pop();
@@ -484,12 +483,11 @@ class MindMap {
         const lineColor = MindMap.COLORS.CONNECTING_LINE;
         const dotColor = MindMap.COLORS.CONNECTOR_DOT;
         push();
-        stroke(lineColor.r, lineColor.g, lineColor.b);
-        strokeWeight(MindMap.STROKE_WEIGHT_PREVIEW);
+        Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
         line(from.x, from.y, mx, my);
         // Arrow head at mouse
         const angle = atan2(my - from.y, mx - from.x);
-        fill(dotColor.r, dotColor.g, dotColor.b);
+        Utils.applyFill(dotColor);
         noStroke();
         push();
         translate(mx, my);

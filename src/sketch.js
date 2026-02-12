@@ -58,23 +58,14 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
 };
 
 // UI Colors for consistent styling throughout the application
-const UI_COLORS = {
-  BACKGROUND: 240,
-  SELECTION_RECT: { fill: { r: 100, g: 150, b: 255, a: 50 }, stroke: { r: 100, g: 150, b: 255 } },
-  SAVE_INDICATOR: {
-    saved: { r: 76, g: 175, b: 80 },
-    unsaved: { r: 244, g: 67, b: 54 },
-    syncing: { r: 255, g: 193, b: 7 }
-  },
-  LOADING_OVERLAY: { bg: { r: 0, g: 0, b: 0, a: 160 }, text: 255, spinner: 255 },
-  CONNECTION: { normal: 80, selected: { r: 100, g: 150, b: 255 } }
-};
+// UI color constants - using centralized ColorPalette
+const UI_COLORS = ColorPalette.UI;
 
-// Grid rendering options (local-only overlay)
+// Grid rendering options (local-only overlay) - using centralized ColorPalette
 const GRID_CONFIG = {
   SPACING: 100,
-  LINE_COLOR: { r: 210, g: 210, b: 210 },
-  ORIGIN_COLOR: { r: 220, g: 60, b: 60 }
+  LINE_COLOR: ColorPalette.GRID.LINE,
+  ORIGIN_COLOR: ColorPalette.GRID.ORIGIN
 };
 
 // ============================================================================
@@ -1122,8 +1113,7 @@ function drawGrid() {
 
   push();
   const lineWeight = Math.max(0.2, 0.8 / CameraUtils.zoom);
-  stroke(GRID_CONFIG.LINE_COLOR.r, GRID_CONFIG.LINE_COLOR.g, GRID_CONFIG.LINE_COLOR.b);
-  strokeWeight(lineWeight);
+  Utils.applyStroke(GRID_CONFIG.LINE_COLOR, lineWeight);
 
   for (let x = startX; x <= endX; x += spacing) {
     line(x, top, x, bottom);
@@ -1132,8 +1122,7 @@ function drawGrid() {
     line(left, y, right, y);
   }
 
-  stroke(GRID_CONFIG.ORIGIN_COLOR.r, GRID_CONFIG.ORIGIN_COLOR.g, GRID_CONFIG.ORIGIN_COLOR.b);
-  strokeWeight(Math.max(0.2, 0.8 / CameraUtils.zoom));
+  Utils.applyStroke(GRID_CONFIG.ORIGIN_COLOR, Math.max(0.2, 0.8 / CameraUtils.zoom));
   line(0, top, 0, bottom);
   line(left, 0, right, 0);
   pop();
@@ -4695,11 +4684,9 @@ function drawSelectionRectangle() {
 
   const selColors = UI_COLORS.SELECTION_RECT;
   push();
-  // Semi-transparent fill
-  fill(selColors.fill.r, selColors.fill.g, selColors.fill.b, selColors.fill.a);
-  // Border
-  stroke(selColors.stroke.r, selColors.stroke.g, selColors.stroke.b);
-  strokeWeight(2 / CameraUtils.zoom);
+  // Semi-transparent fill and border
+  Utils.applyFill(selColors.fill);
+  Utils.applyStroke(selColors.stroke, 2 / CameraUtils.zoom);
   rect(x1, y1, x2 - x1, y2 - y1);
   pop();
 }
@@ -5000,7 +4987,7 @@ function drawSaveIndicator() {
     canvas.elt.title = statusText;
   }
 
-  fill(statusColor.r, statusColor.g, statusColor.b);
+  Utils.applyFill(statusColor);
   circle(x, y, size);
   pop();
 }

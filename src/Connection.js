@@ -22,10 +22,10 @@ class Connection {
   static STROKE_WEIGHT_NORMAL = 2;     // Line thickness when not selected
   static STROKE_WEIGHT_SELECTED = 3;   // Line thickness when selected
 
-  // Color constants for consistent styling
+  // Color constants - using centralized ColorPalette
   static COLORS = {
-    NORMAL: 80,                        // Gray for normal state
-    SELECTED: { r: 100, g: 150, b: 255 } // Blue for selected state
+    NORMAL: ColorPalette.CONNECTION.NORMAL,
+    SELECTED: ColorPalette.CONNECTION.SELECTED
   };
 
   // ============================================================================
