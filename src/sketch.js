@@ -75,23 +75,7 @@ const GRID_CONFIG = {
 
 let mindMap;
 let collaborationManager = null; // CollaborationManager for real-time sync
-let saveButton;
-let importTextButton;
-let loadButton;
-let fileInput;
-let importTextFileInput;
-let exportPNGButton;
-let exportPDFButton;
-let exportTextButton;
-let menuIsVisible = false;
-let keyboardControlsButton;
-let keyboardOverlay = null;
-let inviteButton = null; // Share button for collaboration
-let displayNameInput = null; // Text field for changing display name
-let keyboardOverlayContent = null;
-let keyboardOverlayVisible = false;
-let menuRightEdge = 600;
-let suppressMenuUntilMouseExit = false; // Prevent menu auto-show until cursor leaves band after blur
+let uiManager = null; // UIManager for all UI elements and interactions
 
 // Presence optimization: Idle detection for cursor/selection updates
 let lastPresenceBroadcast = {
@@ -692,7 +676,7 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
       if (prevStatus !== syncStatus) Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
 
-      try { layoutMenuButtons(); } catch (e) { }
+      try { if (uiManager) uiManager.layoutButtons(); } catch (e) { }
     };
 
     let lastPeerCount = 0;
@@ -1303,14 +1287,16 @@ function setup() {
       initializeCollaboration(roomId, shouldShareLocalData);
     }
 
-    // Create UI buttons
-    setupUIButtons();
-
-    // Lay out buttons neatly
-    layoutMenuButtons();
-
-    // Hide menu buttons initially
-    hideMenuButtons();
+    // Initialize UI Manager
+    uiManager = new UIManager();
+    uiManager.initialize(CONFIG, window, mindMap, collaborationManager, {
+      onLoadFile: handleFileLoad,
+      onImportText: handleTextImport,
+      onExportPNG: exportPNG,
+      onExportPDF: exportPDF,
+      onExportText: exportText,
+      onShareSession: shareSession
+    });
 
     // NOTE: With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
     // We still run autosave as a backup mechanism for localStorage export/import compatibility.
@@ -1352,121 +1338,14 @@ function setup() {
 /**
  * Creates all UI buttons and file input
  */
-function setupUIButtons() {
-  loadButton = createButton('Load');
-  loadButton.position(100, 10);
-  loadButton.mousePressed(triggerFileLoad);
-
-  saveButton = createButton('Save');
-  saveButton.position(160, 10);
-  saveButton.mousePressed(() => {
-    // If in a collaborative room, use room name as suggested filename
-    if (collaborationManager && collaborationManager.roomName) {
-      const roomFilename = collaborationManager.roomName + '.json';
-      mindMap.setLastUsedFilename(roomFilename);
-    }
-    mindMap.save();
-  });
-
-  importTextButton = createButton('Import Text');
-  importTextButton.position(260, 10);
-  importTextButton.mousePressed(() => TextImporter.triggerImport(importTextFileInput));
-
-  exportPNGButton = createButton('Export PNG');
-  exportPNGButton.position(320, 10);
-  exportPNGButton.mousePressed(exportPNG);
-
-  exportPDFButton = createButton('Export PDF');
-  exportPDFButton.position(430, 10);
-  exportPDFButton.mousePressed(exportPDF);
-
-  exportTextButton = createButton('Export Text');
-  exportTextButton.position(530, 10);
-  exportTextButton.mousePressed(exportText);
-
-  keyboardControlsButton = createButton('Keyboard Controls');
-  keyboardControlsButton.position(630, 10);
-  keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
-  keyboardControlsButton.attribute('aria-expanded', 'false');
-
-  inviteButton = createButton('Start Collaboration');
-  inviteButton.position(780, 10);
-  inviteButton.mousePressed(shareSession);
-  inviteButton.style('background-color', '#4caf50');
-  inviteButton.style('color', 'white');
-
-  // Display name input - shown when connected to a room
-  // Styled to match buttons visually (green like Start Collaboration)
-  displayNameInput = createInput('');
-  displayNameInput.attribute('id', 'displayName');
-  displayNameInput.attribute('name', 'displayName');
-  displayNameInput.attribute('placeholder', 'Your name...');
-  displayNameInput.style('width', '110px');
-  displayNameInput.style('padding', '2px 8px');
-  displayNameInput.style('border', 'none');
-  displayNameInput.style('border-radius', '3px');
-  displayNameInput.style('background', '#4caf50');
-  displayNameInput.style('color', '#fff');
-  displayNameInput.style('font-size', '13px');
-  displayNameInput.style('font-family', 'inherit');
-  displayNameInput.style('display', 'none');
-  displayNameInput.style('box-sizing', 'border-box');
-  displayNameInput.style('outline', 'none');
-  displayNameInput.position(800, 10);
-
-  // Style placeholder text to be semi-transparent white
-  if (displayNameInput.elt) {
-    displayNameInput.elt.style.setProperty('--placeholder-color', 'rgba(255,255,255,0.7)');
-    // Add inline style for placeholder (works in most browsers)
-    const styleId = 'displayNameInputStyles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        input::placeholder { color: rgba(255,255,255,0.7); }
-      `;
-      document.head.appendChild(style);
-    }
-  }
-
-  attachDisplayNameInputHandlers(displayNameInput, {
-    collaborationManager,
-    onHideMenu: () => {
-      hideMenuButtons();
-      menuIsVisible = false;
-    },
-    requestMenuHide: () => {
-      suppressMenuUntilMouseExit = true;
-    },
-  });
-
-  setupKeyboardControlsOverlay();
-
-  // Ensure overlay sizing updates when the window resizes
-  addTrackedEventListener(window, 'resize', () => {
-    try { updateKeyboardOverlaySize(); } catch (_) { }
-  });
-  // Set initial size based on current viewport
-  try { updateKeyboardOverlaySize(); } catch (_) { }
-
-  // Create hidden file input for loading
-  fileInput = createFileInput(handleFileLoad);
-  fileInput.position(-200, -200);
-  fileInput.style('display', 'none');
-
-  // Create hidden file input for importing text
-  importTextFileInput = createFileInput((file) => TextImporter.handleFileImport(file, importTextFileInput));
-  importTextFileInput.position(-200, -200);
-  importTextFileInput.style('display', 'none');
-  importTextFileInput.attribute('accept', '.txt,.md,.text');
-}
-
 /**
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
   background(UI_COLORS.BACKGROUND);
-  updateMenuVisibility();
+  if (uiManager) {
+    uiManager.updateMenuVisibility(mouseX, mouseY);
+  }
 
   if (mindMap) {
     try {
@@ -2129,236 +2008,6 @@ function handlePageBecameVisible() {
   }
 }
 
-/**
- * Updates menu visibility based on mouse position.
- * Shows menu when cursor is in trigger area or buttons band.
- */
-function updateMenuVisibility() {
-  const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
-  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 &&
-    mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
-
-  // Menu band extends full width of screen
-  const inButtonsBand = validMouse && mouseY >= 0 &&
-    mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0;
-
-  // Keep menu visible if the display name input has focus
-  const inputHasFocus = displayNameInput && displayNameInput.elt &&
-    document.activeElement === displayNameInput.elt;
-
-  let shouldShow = inTrigger || inButtonsBand || inputHasFocus;
-
-  // If a blur requested hiding, keep menu hidden until cursor leaves the band/trigger
-  if (suppressMenuUntilMouseExit) {
-    if (!inTrigger && !inButtonsBand) {
-      suppressMenuUntilMouseExit = false; // Reset once the cursor leaves the hover zone
-    } else {
-      shouldShow = inputHasFocus; // Allow showing only if input is refocused
-    }
-  }
-
-  if (shouldShow !== menuIsVisible) {
-    if (shouldShow) showMenuButtons(); else hideMenuButtons();
-    menuIsVisible = shouldShow;
-  }
-}
-
-/**
- * Shows all menu buttons by setting display style to inline-block
- */
-function showMenuButtons() {
-  // Guard if setup failed and buttons are not yet created
-  if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
-  if (importTextButton && importTextButton.style) importTextButton.style('display', 'inline-block');
-  if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
-  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
-  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
-  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
-  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
-  if (inviteButton && inviteButton.style) inviteButton.style('display', 'inline-block');
-  // Show display name input only when connected
-  if (collaborationManager && collaborationManager.isConnected) {
-    if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'inline-block');
-  }
-}
-
-/**
- * Hides all menu buttons by setting display style to none
- */
-function hideMenuButtons() {
-  if (saveButton && saveButton.style) saveButton.style('display', 'none');
-  if (importTextButton && importTextButton.style) importTextButton.style('display', 'none');
-  if (loadButton && loadButton.style) loadButton.style('display', 'none');
-  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
-  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
-  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
-  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
-  if (inviteButton && inviteButton.style) inviteButton.style('display', 'none');
-  if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'none');
-}
-
-/**
- * Positions all menu buttons horizontally with proper spacing.
- * Order: Load, Save, Import Text, Export PNG, Export PDF, Export Text, Keyboard Controls
- */
-function layoutMenuButtons() {
-  const startX = CONFIG.UI.BUTTON_START_X;
-  const y = CONFIG.UI.BUTTON_Y;
-  const gap = CONFIG.UI.BUTTON_GAP;
-
-  // Ensure buttons are displayed to get proper widths
-  loadButton.style('display', 'inline-block');
-  saveButton.style('display', 'inline-block');
-  importTextButton.style('display', 'inline-block');
-  exportPNGButton.style('display', 'inline-block');
-  exportPDFButton.style('display', 'inline-block');
-  exportTextButton.style('display', 'inline-block');
-  keyboardControlsButton.style('display', 'inline-block');
-
-  const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
-
-  let x = startX;
-  loadButton.position(x, y); x += w(loadButton) + gap;
-  saveButton.position(x, y); x += w(saveButton) + gap;
-  importTextButton.position(x, y); x += w(importTextButton) + gap;
-  exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
-  exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
-  exportTextButton.position(x, y); x += w(exportTextButton) + gap;
-  keyboardControlsButton.position(x, y); x += w(keyboardControlsButton) + gap;
-
-  if (inviteButton) {
-    // Check if collaboration is active to update text/style
-    if (collaborationManager && collaborationManager.isConnected) {
-      inviteButton.html('Share Link');
-      inviteButton.style('background-color', '#2196f3');
-    } else {
-      inviteButton.html('Start Collaboration');
-      inviteButton.style('background-color', '#4caf50');
-    }
-    inviteButton.style('display', 'inline-block');
-    inviteButton.position(x, y); x += w(inviteButton) + gap;
-  }
-
-  // Display name input - only show and position when connected
-  if (displayNameInput && collaborationManager && collaborationManager.isConnected) {
-    displayNameInput.style('display', 'inline-block');
-    // Ensure the input visually matches the buttons: height, vertical alignment and spacing
-    const refBtn = keyboardControlsButton && keyboardControlsButton.elt ? keyboardControlsButton.elt : null;
-    const btnHeight = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : 28;
-    // Make input match button height and center text vertically
-    displayNameInput.style('height', btnHeight + 'px');
-    displayNameInput.style('line-height', btnHeight + 'px');
-    displayNameInput.style('padding', '0 8px');
-
-    // Set placeholder to current name if input is empty
-    if (!displayNameInput.value() && collaborationManager.getUserName) {
-      displayNameInput.attribute('placeholder', collaborationManager.getUserName() || 'Your name...');
-    }
-
-    // Ensure a reliable left gap from the previous button (some browsers report 0 width briefly)
-    const leftGap = Math.max(8, gap);
-
-    // Determine input width (fall back to configured style or 110px)
-    let inputWidth = 120;
-    try {
-      if (displayNameInput.elt) {
-        // Prefer explicit styled width, then measured offsetWidth
-        const styled = displayNameInput.elt.style && displayNameInput.elt.style.width;
-        if (styled && styled.match(/\d+/)) {
-          inputWidth = parseInt(styled, 10);
-        } else if (displayNameInput.elt.offsetWidth) {
-          inputWidth = displayNameInput.elt.offsetWidth;
-        }
-      }
-    } catch (_) { }
-
-    // Vertical nudge to better align the input with button baseline
-    const btnOffsetH = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : btnHeight;
-    const inputOffsetH = (displayNameInput.elt && displayNameInput.elt.offsetHeight) ? displayNameInput.elt.offsetHeight : btnOffsetH;
-    const yNudge = Math.round((btnOffsetH - inputOffsetH) / 2);
-
-    // Position the input with an explicit gap and vertical nudge
-    displayNameInput.position(x + leftGap, y + yNudge);
-    x += leftGap + inputWidth;
-  } else if (displayNameInput) {
-    displayNameInput.style('display', 'none');
-  }
-
-  // Update the hover band to cover to the right of the last button
-  menuRightEdge = x + 10;
-}
-
-// ============================================================================
-// KEYBOARD CONTROLS OVERLAY (delegated to KeyboardOverlay.js module)
-// ============================================================================
-
-/**
- * Sets up the keyboard controls overlay.
- * @see KeyboardOverlay.setup for implementation
- */
-function setupKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    const refs = KeyboardOverlay.setup({ keyboardControlsButton });
-    if (refs) {
-      keyboardOverlay = refs.overlay;
-      keyboardOverlayContent = refs.overlayContent;
-    }
-  }
-}
-
-/**
- * Populates the keyboard controls overlay with shortcuts.
- * @see KeyboardOverlay.populate for implementation
- */
-function populateKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.populate();
-  }
-}
-
-/**
- * Shows the keyboard controls overlay.
- * @see KeyboardOverlay.show for implementation
- */
-function showKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.show(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
-/**
- * Hides the keyboard controls overlay.
- * @see KeyboardOverlay.hide for implementation
- */
-function hideKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.hide(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
-/**
- * Updates overlay content size to fit viewport.
- * @see KeyboardOverlay.updateSize for implementation
- */
-function updateKeyboardOverlaySize() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.updateSize();
-  }
-}
-
-/**
- * Toggles the keyboard controls overlay visibility.
- * @see KeyboardOverlay.toggle for implementation
- */
-function toggleKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.toggle(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
 // ============================================================================
 // MOBILE NAVIGATION (delegated to MobileNavigation.js module)
 // ============================================================================
@@ -2379,7 +2028,7 @@ function toggleKeyboardControlsOverlay() {
  * Handles mouse press events
  */
 function mousePressed(e) {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   // Ignore clicks on UI elements (buttons, inputs, etc.)
   // Only handle clicks directly on the canvas
@@ -2522,7 +2171,7 @@ function mousePressed(e) {
  * Handles mouse release events
  */
 function mouseReleased() {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   if (CameraUtils.isPanning) {
     // If we were panning with right mouse, suppress the subsequent right-click action if it moved
@@ -2557,7 +2206,7 @@ function mouseReleased() {
  * Handles mouse drag events
  */
 function mouseDragged() {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   if (CameraUtils.isPanning) {
     // Screen-space pan with soft limits
@@ -2750,10 +2399,10 @@ function keyPressed() {
     }
   }
 
-  if (keyboardOverlayVisible) {
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) {
     const escapeCode = (typeof ESCAPE !== 'undefined') ? ESCAPE : 27;
     if (keyCode === escapeCode || key === 'Escape') {
-      hideKeyboardControlsOverlay();
+      uiManager.hideKeyboardOverlay();
     }
     return false;
   }
@@ -3574,7 +3223,7 @@ function windowResized() {
  * @returns {boolean} false to prevent default browser behavior
  */
 function mouseWheel(event) {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
   // Only when over the canvas area
   const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
   if (!overCanvas) return;
