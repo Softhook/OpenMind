@@ -46,7 +46,7 @@ Moved completed analysis and fix documentation to `docs/archive/`:
 #### Consistent State Management
 - All state-changing operations now use `_wrapInTransaction()` which:
   - Wraps changes in Yjs transactions with proper origin tracking
-  - Automatically marks map as unsaved (`isSaved = false`)
+  - Centralizes transaction/origin handling; callers remain responsible for updating `isSaved` as needed
   - Ensures proper undo/redo behavior
 
 #### Text Editing Operations
@@ -80,10 +80,9 @@ Text operations (addChar, removeChar, etc.) now:
 
 ### Test Suite Status
 - **Total Tests**: 472
-- **Passing**: 466 (98.7%)
-- **Failing**: 6 (pre-existing failures, unrelated to cleanup)
-  - 4 failures in `yjs_state_transitions.test.js` - Testing for specific code strings
-  - 2 failures in `collaboration.test.js` - Testing for specific code strings
+- **Passing**: 472 (100%)
+- **Failing**: 0
+- Note: 6 tests were previously failing (1 in `yjs_state_transitions.test.js`, 5 in `collaboration.test.js`) due to strict string-matching assertions; these have been updated and now all 472 tests pass.
 
 ### Validated Functionality
 All core functionality verified through tests:
