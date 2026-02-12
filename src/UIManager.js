@@ -37,6 +37,12 @@ class UIManager {
     this.keyboardOverlayContent = null;
     this.keyboardOverlayVisible = false;
     
+    // Debounce timers
+    this.displayNameDebounceTimer = null;
+    
+    // Event listener tracking for cleanup
+    this.eventListenerRefs = [];
+    
     // Configuration (will be injected)
     this.config = null;
     this.p5Instance = null;
@@ -172,13 +178,18 @@ class UIManager {
     const input = this.displayNameInput.elt;
     
     // Focus handler
-    input.addEventListener('focus', () => {
+    const focusHandler = () => {
       this.displayNameInput.style('border-color', '#2196f3');
-    });
+    };
+    input.addEventListener('focus', focusHandler);
+    this.eventListenerRefs.push({ element: input, event: 'focus', handler: focusHandler });
     
     // Blur handler
-    input.addEventListener('blur', () => {
+    const blurHandler = () => {
       this.displayNameInput.style('border-color', '#4caf50');
+      
+      // Clear any pending debounced update
+      clearTimeout(this.displayNameDebounceTimer);
       
       // Update display name in collaboration manager (use setUserName)
       if (this.collaborationManager && this.collaborationManager.isConnected) {
@@ -190,17 +201,25 @@ class UIManager {
       
       // Request menu hide after blur
       this.suppressMenuUntilMouseExit = true;
-    });
+    };
+    input.addEventListener('blur', blurHandler);
+    this.eventListenerRefs.push({ element: input, event: 'blur', handler: blurHandler });
     
-    // Input handler for real-time updates
-    input.addEventListener('input', () => {
+    // Input handler for real-time updates (debounced)
+    const inputHandler = () => {
       if (this.collaborationManager && this.collaborationManager.isConnected) {
-        const displayName = this.displayNameInput.value().trim();
-        if (displayName && typeof this.collaborationManager.setUserName === 'function') {
-          this.collaborationManager.setUserName(displayName);
-        }
+        // Debounce to avoid spamming network on rapid typing
+        clearTimeout(this.displayNameDebounceTimer);
+        this.displayNameDebounceTimer = setTimeout(() => {
+          const displayName = this.displayNameInput.value().trim();
+          if (displayName && typeof this.collaborationManager.setUserName === 'function') {
+            this.collaborationManager.setUserName(displayName);
+          }
+        }, 300); // 300ms debounce
       }
-    });
+    };
+    input.addEventListener('input', inputHandler);
+    this.eventListenerRefs.push({ element: input, event: 'input', handler: inputHandler });
   }
   
   /**
@@ -274,6 +293,10 @@ class UIManager {
    * @param {number} mouseY - Current mouse Y position
    */
   updateMenuVisibility(mouseX, mouseY) {
+    // Validate mouse coordinates
+    if (typeof mouseX !== 'number' || !isFinite(mouseX)) mouseX = 0;
+    if (typeof mouseY !== 'number' || !isFinite(mouseY)) mouseY = 0;
+    
     const MENU_TRIGGER_X = this.config.UI.MENU_TRIGGER_X || 50;
     const MENU_TRIGGER_Y = this.config.UI.MENU_TRIGGER_Y || 50;
     const BUTTONS_BAND_HEIGHT = this.config.UI.BUTTONS_BAND_HEIGHT || 50;
@@ -502,6 +525,19 @@ class UIManager {
    * Clean up all UI elements
    */
   cleanup() {
+    // Clear any pending timers
+    clearTimeout(this.displayNameDebounceTimer);
+    
+    // Remove event listeners
+    this.eventListenerRefs.forEach(({ element, event, handler }) => {
+      try {
+        element.removeEventListener(event, handler);
+      } catch (e) {
+        console.warn('Error removing event listener:', e);
+      }
+    });
+    this.eventListenerRefs = [];
+    
     // Remove all buttons
     if (this.loadButton) this.loadButton.remove();
     if (this.saveButton) this.saveButton.remove();

@@ -53,18 +53,28 @@ class ExportManager {
     }
 
     const padding = this.config.EXPORT?.PADDING || 50;
-    const width = bounds.maxX - bounds.minX + 2 * padding;
-    const height = bounds.maxY - bounds.minY + 2 * padding;
+    const width = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + 2 * padding));
+    const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding));
+
+    // Validate dimensions are finite
+    if (!isFinite(width) || !isFinite(height)) {
+      console.error('Invalid canvas dimensions for PNG export');
+      alert('Failed to export PNG: Invalid content dimensions');
+      return;
+    }
 
     // Create offscreen graphics buffer
     const pg = this.p5Instance.createGraphics(width, height);
 
-    // Set background
-    pg.background(ColorPalette.UI.BACKGROUND);
+    try {
+      // Set background
+      pg.background(ColorPalette.UI.BACKGROUND);
 
-    // Translate to account for padding and content offset
-    pg.push();
-    pg.translate(padding - bounds.minX, padding - bounds.minY);
+      // Translate to account for padding and content offset
+      pg.push();
+      
+      try {
+        pg.translate(padding - bounds.minX, padding - bounds.minY);
 
     // Draw connections first (behind boxes)
     if (this.mindMap.connections) {
@@ -180,27 +190,35 @@ class ExportManager {
       });
     }
 
-    pg.pop();
-
-    // Convert to data URL and download
-    pg.canvas.toBlob(blob => {
-      if (!blob) {
-        console.error('Failed to create PNG blob');
-        return;
+      } finally {
+        // Always restore graphics state
+        pg.pop();
       }
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'mindmap.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
+      // Convert to data URL and download
+      pg.canvas.toBlob(blob => {
+        if (!blob) {
+          console.error('Failed to create PNG blob');
+          alert('Failed to export PNG. Please try again.');
+          return;
+        }
 
-    // Clean up graphics buffer
-    pg.remove();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mindmap.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    } catch (e) {
+      console.error('PNG export failed:', e);
+      alert('Failed to export PNG: ' + e.message);
+    } finally {
+      // Clean up graphics buffer
+      pg.remove();
+    }
   }
 
   /**
@@ -342,7 +360,8 @@ class ExportManager {
     // Create a single graphics buffer for text measurement (reused)
     const measureGraphics = this.p5Instance.createGraphics(100, 100);
 
-    // Draw connections
+    try {
+      // Draw connections
     if (this.mindMap.connections) {
       this.mindMap.connections.forEach(conn => {
         if (!conn || !conn.fromBox || !conn.toBox) return;
@@ -437,8 +456,10 @@ class ExportManager {
       }
     }
 
-    // Clean up the measurement graphics buffer
-    measureGraphics.remove();
+    } finally {
+      // Always clean up the measurement graphics buffer
+      measureGraphics.remove();
+    }
 
     // Save PDF
     pdf.save('mindmap.pdf');
@@ -582,6 +603,12 @@ class ExportManager {
 
     this.mindMap.boxes.forEach(box => {
       if (!box) return;
+      
+      // Validate all required properties exist and are finite numbers
+      if (typeof box.x !== 'number' || !isFinite(box.x)) return;
+      if (typeof box.width !== 'number' || !isFinite(box.width)) return;
+      if (typeof box.height !== 'number' || !isFinite(box.height)) return;
+      if (typeof box.y !== 'number' || !isFinite(box.y)) return;
 
       const left = box.x - box.width / 2;
       const right = box.x + box.width / 2;
