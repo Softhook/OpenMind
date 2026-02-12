@@ -75,6 +75,7 @@ class CollaborationManager {
     static COLD_START_THRESHOLD = 5000; // ms - if connection takes >5s, assume cold start
     static COLD_START_GRACE_PERIOD = 60000; // ms - grace period before removing local data (60s)
     static EXPONENTIAL_BACKOFF_ATTEMPTS = 6; // Number of attempts with exponential backoff before fixed interval
+    static MAX_UNDO_STACK_SIZE = 200; // Maximum undo/redo stack depth to prevent unbounded memory growth
 
     // ============================================================================
     // CONSTRUCTOR
@@ -232,7 +233,8 @@ class CollaborationManager {
             // Empty trackedOrigins means it only tracks when origin === undoManager instance.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins: new Set()
+                trackedOrigins: new Set(),
+                maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE
             });
 
             // Set up observers for Yjs → local sync (including undo/redo)
@@ -554,6 +556,9 @@ class CollaborationManager {
      */
     destroy() {
         this.disconnect();
+
+        // Defense-in-depth: ensure consistency check is stopped even if disconnect() was skipped
+        this._stopConsistencyCheck();
 
         // Clean up text editing undo group timer
         if (this.textEditUndoTimer) {
@@ -1769,10 +1774,21 @@ class CollaborationManager {
         // Clear existing connections
         this.mindMap.connections = [];
 
-        // Rebuild from Yjs
+        // Rebuild from Yjs with duplicate prevention
+        // A Set tracks seen connection pairs to guard against CRDT merge duplicates
         const connData = this.yconnections.toArray();
+        const seen = new Set();
         let skippedCount = 0;
+        let duplicateCount = 0;
         for (const data of connData) {
+            // Deduplicate: skip if we've already created this connection pair
+            const connKey = `${data.fromId}->${data.toId}`;
+            if (seen.has(connKey)) {
+                duplicateCount++;
+                continue;
+            }
+            seen.add(connKey);
+
             const fromBox = this.mindMap.getBoxById(data.fromId);
             const toBox = this.mindMap.getBoxById(data.toId);
 
@@ -1792,6 +1808,9 @@ class CollaborationManager {
         }
 
         // Log rebuild summary (helpful for debugging undo/redo issues)
+        if (duplicateCount > 0) {
+            Utils.Logger.debug(`[Connections] Deduplicated ${duplicateCount} duplicate connections`);
+        }
         if (skippedCount > 0) {
             Utils.Logger.debug(`[Connections] Rebuilt ${this.mindMap.connections.length} connections, skipped ${skippedCount}`);
         } else if (connData.length > 0) {
@@ -2106,7 +2125,35 @@ class CollaborationManager {
      * @private
      */
     _generateUserId() {
-        return 'user_' + Math.random().toString(36).substring(2, 11);
+        // Persist user ID in localStorage so the same user keeps a stable identity
+        // across page reloads and sessions
+        try {
+            const saved = localStorage.getItem('openmind_userId');
+            if (saved && typeof saved === 'string' && saved.length > 0) {
+                return saved;
+            }
+        } catch (e) {
+            // localStorage not available, fall through to generation
+        }
+
+        // Generate a new ID using crypto.randomUUID() for collision resistance,
+        // with Math.random() fallback for environments without Web Crypto API
+        let id;
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            id = 'user_' + crypto.randomUUID();
+        } else {
+            id = 'user_' + Math.random().toString(36).substring(2, 11) +
+                Math.random().toString(36).substring(2, 11);
+        }
+
+        // Persist for future sessions
+        try {
+            localStorage.setItem('openmind_userId', id);
+        } catch (e) {
+            // localStorage not available, ID is ephemeral
+        }
+
+        return id;
     }
 
     /**

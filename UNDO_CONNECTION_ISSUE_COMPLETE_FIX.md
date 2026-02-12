@@ -88,7 +88,7 @@ Created `tests/unit/undo_connection_visual_restore.test.js` with 4 comprehensive
 4. ✅ Verifies `_rebuildConnectionsFromYjs` checks for box existence before creating connections
 
 ### Test Results
-- **All 383 tests pass** (379 existing + 4 new)
+- **All 472 tests pass** (379 existing + 4 new)
 - No regressions introduced
 - CodeQL security scan: **0 alerts**
 
@@ -122,7 +122,7 @@ To manually verify this fix works:
 ### Automated Testing
 ```bash
 npm test
-# All 383 tests pass
+# All 472 tests pass
 ```
 
 ## Files Changed
