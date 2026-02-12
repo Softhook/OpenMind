@@ -146,6 +146,7 @@ class UIManager {
       }
     });
     this.fileInput.position(-200, -200);
+    this.fileInput.style('display', 'none');
     this.fileInput.attribute('accept', '.json');
     
     // Create hidden file input for importing text
@@ -155,6 +156,7 @@ class UIManager {
       }
     });
     this.importTextFileInput.position(-200, -200);
+    this.importTextFileInput.style('display', 'none');
     this.importTextFileInput.attribute('accept', '.txt,.md');
     
     // Initially hide all buttons
@@ -178,11 +180,11 @@ class UIManager {
     input.addEventListener('blur', () => {
       this.displayNameInput.style('border-color', '#4caf50');
       
-      // Update display name in collaboration manager
+      // Update display name in collaboration manager (use setUserName)
       if (this.collaborationManager && this.collaborationManager.isConnected) {
         const displayName = this.displayNameInput.value().trim();
-        if (displayName && this.collaborationManager.setDisplayName) {
-          this.collaborationManager.setDisplayName(displayName);
+        if (displayName && typeof this.collaborationManager.setUserName === 'function') {
+          this.collaborationManager.setUserName(displayName);
         }
       }
       
@@ -194,8 +196,8 @@ class UIManager {
     input.addEventListener('input', () => {
       if (this.collaborationManager && this.collaborationManager.isConnected) {
         const displayName = this.displayNameInput.value().trim();
-        if (displayName && this.collaborationManager.setDisplayName) {
-          this.collaborationManager.setDisplayName(displayName);
+        if (displayName && typeof this.collaborationManager.setUserName === 'function') {
+          this.collaborationManager.setUserName(displayName);
         }
       }
     });
@@ -218,7 +220,8 @@ class UIManager {
   toggleKeyboardOverlay() {
     if (typeof KeyboardOverlay !== 'undefined' && KeyboardOverlay.toggle) {
       KeyboardOverlay.toggle(this.keyboardControlsButton);
-      this.keyboardOverlayVisible = !this.keyboardOverlayVisible;
+      // Sync state from KeyboardOverlay
+      this.keyboardOverlayVisible = KeyboardOverlay.isVisible ? KeyboardOverlay.isVisible() : !this.keyboardOverlayVisible;
       
       if (this.keyboardControlsButton) {
         this.keyboardControlsButton.attribute('aria-expanded', 
@@ -231,9 +234,18 @@ class UIManager {
    * Show keyboard controls overlay
    */
   showKeyboardOverlay() {
-    if (this.keyboardOverlay && this.keyboardOverlay.style) {
-      this.keyboardOverlay.style.display = 'block';
-      this.keyboardOverlayVisible = true;
+    // Prefer using KeyboardOverlay helper if available
+    if (typeof KeyboardOverlay !== 'undefined' && KeyboardOverlay.show) {
+      KeyboardOverlay.show(this.keyboardControlsButton);
+    } else if (this.keyboardOverlay && typeof this.keyboardOverlay.style === 'function') {
+      // Fallback to directly styling the p5.Element
+      this.keyboardOverlay.style('display', 'block');
+    }
+
+    this.keyboardOverlayVisible = true;
+
+    if (this.keyboardControlsButton) {
+      this.keyboardControlsButton.attribute('aria-expanded', 'true');
     }
   }
   
@@ -241,9 +253,18 @@ class UIManager {
    * Hide keyboard controls overlay
    */
   hideKeyboardOverlay() {
-    if (this.keyboardOverlay && this.keyboardOverlay.style) {
-      this.keyboardOverlay.style.display = 'none';
-      this.keyboardOverlayVisible = false;
+    // Prefer using KeyboardOverlay helper if available
+    if (typeof KeyboardOverlay !== 'undefined' && KeyboardOverlay.hide) {
+      KeyboardOverlay.hide(this.keyboardControlsButton);
+    } else if (this.keyboardOverlay && typeof this.keyboardOverlay.style === 'function') {
+      // Fallback to directly styling the p5.Element
+      this.keyboardOverlay.style('display', 'none');
+    }
+
+    this.keyboardOverlayVisible = false;
+
+    if (this.keyboardControlsButton) {
+      this.keyboardControlsButton.attribute('aria-expanded', 'false');
     }
   }
   
@@ -264,21 +285,30 @@ class UIManager {
     const inputHasFocus = this.displayNameInput && 
       document.activeElement === this.displayNameInput.elt;
     
-    if (inTriggerZone || inButtonsBand || inputHasFocus) {
-      if (this.suppressMenuUntilMouseExit) {
-        // Don't auto-show menu until cursor exits the band
-        if (!inButtonsBand) {
-          this.suppressMenuUntilMouseExit = false;
-        }
-      } else {
+    if (this.suppressMenuUntilMouseExit) {
+      // While suppressed, keep menu hidden unless the input has focus
+      if (inputHasFocus) {
         this.showButtons();
+      } else {
+        this.hideButtons();
+      }
+      
+      // Only clear suppression once the cursor leaves both trigger and band
+      if (!inTriggerZone && !inButtonsBand) {
+        this.suppressMenuUntilMouseExit = false;
       }
     } else {
-      this.hideButtons();
-      this.suppressMenuUntilMouseExit = false;
+      if (inTriggerZone || inButtonsBand || inputHasFocus) {
+        this.showButtons();
+      } else {
+        this.hideButtons();
+      }
     }
   }
   
+  /**
+   * Show all menu buttons
+   */
   /**
    * Show all menu buttons
    */
@@ -402,12 +432,16 @@ class UIManager {
   
   handleSaveButtonClick() {
     if (this.mindMap && this.mindMap.save) {
-      // Get current room name if in collaboration mode
+      // Get current room name if in collaboration mode (use roomName property)
       let filename = 'mindmap.json';
-      if (this.collaborationManager && this.collaborationManager.currentRoomName) {
-        filename = `mindmap_${this.collaborationManager.currentRoomName}.json`;
+      if (this.collaborationManager && this.collaborationManager.roomName) {
+        filename = `mindmap_${this.collaborationManager.roomName}.json`;
       }
-      this.mindMap.save(filename);
+      // Set filename before saving
+      if (typeof this.mindMap.setLastUsedFilename === 'function') {
+        this.mindMap.setLastUsedFilename(filename);
+      }
+      this.mindMap.save();
     }
   }
   

@@ -77,6 +77,7 @@ let mindMap;
 let collaborationManager = null; // CollaborationManager for real-time sync
 let uiManager = null; // UIManager for all UI elements and interactions
 let exportManager = null; // ExportManager for PNG/PDF/Text exports
+let menuIsVisible = false; // Derived menu visibility flag (synced from uiManager)
 
 // Presence optimization: Idle detection for cursor/selection updates
 let lastPresenceBroadcast = {
@@ -1350,6 +1351,8 @@ function draw() {
   background(UI_COLORS.BACKGROUND);
   if (uiManager) {
     uiManager.updateMenuVisibility(mouseX, mouseY);
+    // Sync menuIsVisible with uiManager state
+    menuIsVisible = uiManager.isMenuVisible();
   }
 
   if (mindMap) {

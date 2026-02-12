@@ -74,16 +74,24 @@ class ExportManager {
         const from = conn.fromBox;
         const to = conn.toBox;
 
+        // Get proper connection points from box edges
+        const start = (typeof from.getConnectionPoint === 'function') 
+          ? from.getConnectionPoint(to) 
+          : { x: from.x, y: from.y };
+        const end = (typeof to.getConnectionPoint === 'function') 
+          ? to.getConnectionPoint(from) 
+          : { x: to.x, y: to.y };
+
         // Connection line
         pg.stroke(ColorPalette.CONNECTION.NORMAL);
         pg.strokeWeight(2);
-        pg.line(from.x, from.y, to.x, to.y);
+        pg.line(start.x, start.y, end.x, end.y);
 
         // Arrow at target
-        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
         const arrowSize = 10;
-        const arrowX = to.x - Math.cos(angle) * (to.w / 2 + 5);
-        const arrowY = to.y - Math.sin(angle) * (to.h / 2 + 5);
+        const arrowX = end.x - Math.cos(angle) * 5;
+        const arrowY = end.y - Math.sin(angle) * 5;
 
         pg.push();
         pg.translate(arrowX, arrowY);
@@ -100,25 +108,24 @@ class ExportManager {
       this.mindMap.boxes.forEach(box => {
         if (!box) return;
 
-        // Box background
-        const bgColor = box.bgColor || ColorPalette.TEXTBOX.DEFAULT_BACKGROUND || { r: 255, g: 255, b: 255 };
+        // Box background - use backgroundColor property
+        const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
         pg.fill(bgColor.r, bgColor.g, bgColor.b);
         pg.stroke(100);
         pg.strokeWeight(1);
-        pg.rect(box.x - box.w / 2, box.y - box.h / 2, box.w, box.h);
+        pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height);
 
-        // Draw embedded image if present
-        if (box.embeddedImage && box.embeddedImage.image) {
+        // Draw image if present (using imageUrl/img properties)
+        if (box.imageUrl && box.img) {
           try {
-            const imgData = box.embeddedImage;
-            const imgW = imgData.width || box.w - 20;
-            const imgH = imgData.height || 100;
+            const imgW = box.width - 20;
+            const imgH = box.height - 20;
             const imgX = box.x - imgW / 2;
-            const imgY = box.y - box.h / 2 + 10;
+            const imgY = box.y - box.height / 2 + 10;
 
-            // Draw image placeholder or actual image
-            if (imgData.image.width && imgData.image.height) {
-              pg.image(imgData.image, imgX, imgY, imgW, imgH);
+            // Draw the loaded image
+            if (box.img.width && box.img.height) {
+              pg.image(box.img, imgX, imgY, imgW, imgH);
             } else {
               // Fallback: draw placeholder
               pg.fill(200);
@@ -126,12 +133,13 @@ class ExportManager {
               pg.rect(imgX, imgY, imgW, imgH);
             }
           } catch (e) {
-            console.warn('Error drawing embedded image:', e);
+            console.warn('Error drawing image in PNG export:', e);
           }
         }
 
-        // Draw text with wrapping and highlights
-        const lines = this.getWrappedLines(pg, box.text, box.w - 20, 16);
+        // Draw text with wrapping and highlights (skip if image box)
+        if (!box.imageUrl) {
+          const lines = this.getWrappedLines(pg, box.text || '', box.width - 20, 16);
         const lineHeight = 18;
         const textStartY = box.y - (lines.length * lineHeight) / 2;
 
@@ -154,20 +162,21 @@ class ExportManager {
                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.a || 180);
                 pg.noStroke();
                 const charWidth = pg.textWidth(char);
-                pg.rect(box.x - box.w / 2 + 10 + charX, yPos - 14, charWidth, lineHeight);
-              }
+                  pg.rect(box.x - box.width / 2 + 10 + charX, yPos - 14, charWidth, lineHeight);
+                }
 
-              charX += pg.textWidth(char);
-            });
-          }
+                charX += pg.textWidth(char);
+              });
+            }
 
-          // Draw text
-          pg.fill(0);
-          pg.noStroke();
-          pg.textAlign(pg.LEFT, pg.TOP);
-          pg.textSize(16);
-          pg.text(line, box.x - box.w / 2 + 10, yPos);
-        });
+            // Draw text
+            pg.fill(0);
+            pg.noStroke();
+            pg.textAlign(pg.LEFT, pg.TOP);
+            pg.textSize(16);
+            pg.text(line, box.x - box.width / 2 + 10, yPos);
+          });
+        }
       });
     }
 
@@ -309,13 +318,19 @@ class ExportManager {
     const offsetX = margin - bounds.minX * scale + padding * scale;
     const offsetY = margin - bounds.minY * scale + padding * scale;
 
-    // Preload images for PDF
+    // Preload images for PDF (use imageUrl property)
     const imageCache = new Map();
     if (this.mindMap.boxes) {
       for (const box of this.mindMap.boxes) {
-        if (box && box.embeddedImage && box.embeddedImage.dataUrl) {
+        if (box && box.imageUrl && box.img) {
           try {
-            const dataUrl = box.embeddedImage.dataUrl;
+            // Convert image to data URL for PDF
+            const canvas = document.createElement('canvas');
+            canvas.width = box.img.width;
+            canvas.height = box.img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(box.img, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             imageCache.set(box.id, dataUrl);
           } catch (e) {
             console.warn('Error preloading image for PDF:', e);
@@ -323,6 +338,9 @@ class ExportManager {
         }
       }
     }
+
+    // Create a single graphics buffer for text measurement (reused)
+    const measureGraphics = this.p5Instance.createGraphics(100, 100);
 
     // Draw connections
     if (this.mindMap.connections) {
@@ -332,10 +350,18 @@ class ExportManager {
         const from = conn.fromBox;
         const to = conn.toBox;
 
-        const x1 = from.x * scale + offsetX;
-        const y1 = from.y * scale + offsetY;
-        const x2 = to.x * scale + offsetX;
-        const y2 = to.y * scale + offsetY;
+        // Get proper connection points
+        const start = (typeof from.getConnectionPoint === 'function') 
+          ? from.getConnectionPoint(to) 
+          : { x: from.x, y: from.y };
+        const end = (typeof to.getConnectionPoint === 'function') 
+          ? to.getConnectionPoint(from) 
+          : { x: to.x, y: to.y };
+
+        const x1 = start.x * scale + offsetX;
+        const y1 = start.y * scale + offsetY;
+        const x2 = end.x * scale + offsetX;
+        const y2 = end.y * scale + offsetY;
 
         pdf.setDrawColor(80);
         pdf.setLineWidth(1.5 * scale);
@@ -344,8 +370,8 @@ class ExportManager {
         // Arrow
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const arrowSize = 10 * scale;
-        const arrowX = x2 - Math.cos(angle) * (to.w / 2 * scale + 5);
-        const arrowY = y2 - Math.sin(angle) * (to.h / 2 * scale + 5);
+        const arrowX = x2 - Math.cos(angle) * 5;
+        const arrowY = y2 - Math.sin(angle) * 5;
 
         pdf.setFillColor(80);
         const arrowPoints = [
@@ -364,26 +390,26 @@ class ExportManager {
       for (const box of this.mindMap.boxes) {
         if (!box) continue;
 
-        const bx = (box.x - box.w / 2) * scale + offsetX;
-        const by = (box.y - box.h / 2) * scale + offsetY;
-        const bw = box.w * scale;
-        const bh = box.h * scale;
+        const bx = (box.x - box.width / 2) * scale + offsetX;
+        const by = (box.y - box.height / 2) * scale + offsetY;
+        const bw = box.width * scale;
+        const bh = box.height * scale;
 
-        // Box background
-        const bgColor = box.bgColor || { r: 255, g: 255, b: 255 };
+        // Box background - use backgroundColor property
+        const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
         pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
         pdf.setDrawColor(100);
         pdf.setLineWidth(0.5);
         pdf.rect(bx, by, bw, bh, 'FD');
 
-        // Embedded image
-        if (box.embeddedImage && imageCache.has(box.id)) {
+        // Image (using imageUrl property)
+        if (box.imageUrl && imageCache.has(box.id)) {
           try {
             const dataUrl = imageCache.get(box.id);
-            const imgW = (box.embeddedImage.width || box.w - 20) * scale;
-            const imgH = (box.embeddedImage.height || 100) * scale;
-            const imgX = (box.x - (box.embeddedImage.width || box.w - 20) / 2) * scale + offsetX;
-            const imgY = (box.y - box.h / 2 + 10) * scale + offsetY;
+            const imgW = (box.width - 20) * scale;
+            const imgH = (box.height - 20) * scale;
+            const imgX = (box.x - (box.width - 20) / 2) * scale + offsetX;
+            const imgY = (box.y - box.height / 2 + 10) * scale + offsetY;
 
             pdf.addImage(dataUrl, 'JPEG', imgX, imgY, imgW, imgH);
           } catch (e) {
@@ -391,23 +417,28 @@ class ExportManager {
           }
         }
 
-        // Text
-        const fontSize = 12 * scale;
-        pdf.setFontSize(fontSize);
-        pdf.setTextColor(0);
+        // Text (skip if image box)
+        if (!box.imageUrl) {
+          const fontSize = 12 * scale;
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(0);
 
-        const lines = this.getWrappedLines(this.p5Instance.createGraphics(100, 100), 
-                                          box.text, box.w - 20, 16);
-        const lineHeight = 14 * scale;
-        const textX = bx + 8 * scale;
-        let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
+          const lines = this.getWrappedLines(measureGraphics, 
+                                            box.text || '', box.width - 20, 16);
+          const lineHeight = 14 * scale;
+          const textX = bx + 8 * scale;
+          let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
 
-        lines.forEach(line => {
-          pdf.text(line, textX, textY);
-          textY += lineHeight;
-        });
+          lines.forEach(line => {
+            pdf.text(line, textX, textY);
+            textY += lineHeight;
+          });
+        }
       }
     }
+
+    // Clean up the measurement graphics buffer
+    measureGraphics.remove();
 
     // Save PDF
     pdf.save('mindmap.pdf');
@@ -513,13 +544,20 @@ class ExportManager {
       });
     }
 
-    // Add disconnected boxes
+    // Add disconnected boxes (collect first, then emit as single section)
+    const disconnectedLines = [];
     this.mindMap.boxes.forEach(box => {
       if (box && box.id && !visited.has(box.id)) {
-        const text = box.text.replace(/\n/g, ' ').trim();
-        result += '\nDisconnected:\n- ' + text + '\n';
+        const text = (box.text || '').replace(/\n/g, ' ').trim();
+        if (text) {
+          disconnectedLines.push('- ' + text);
+        }
       }
     });
+
+    if (disconnectedLines.length > 0) {
+      result += '\nDisconnected:\n' + disconnectedLines.join('\n') + '\n';
+    }
 
     return result;
   }
@@ -545,10 +583,10 @@ class ExportManager {
     this.mindMap.boxes.forEach(box => {
       if (!box) return;
 
-      const left = box.x - box.w / 2;
-      const right = box.x + box.w / 2;
-      const top = box.y - box.h / 2;
-      const bottom = box.y + box.h / 2;
+      const left = box.x - box.width / 2;
+      const right = box.x + box.width / 2;
+      const top = box.y - box.height / 2;
+      const bottom = box.y + box.height / 2;
 
       minX = Math.min(minX, left);
       maxX = Math.max(maxX, right);
