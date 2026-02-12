@@ -52,19 +52,9 @@ class TextBox {
   static CONNECTOR_RADIUS = 7;              // Radius of connection dots
   static CONNECTOR_RADIUS_ACTIVE = 7;       // Radius when actively connecting
 
-  // Color constants for consistent styling
-  static COLORS = {
-    SELECTION_OUTLINE: { r: 60, g: 120, b: 255 },
-    HOVER_STROKE: 100,
-    EDITING_STROKE: 120,
-    NORMAL_STROKE: 100,
-    LINK_TEXT: { r: 0, g: 100, b: 220 },
-    CURSOR: { r: 0, g: 0, b: 255 },
-    SELECTION_HIGHLIGHT: { r: 255, g: 100, b: 100, a: 100 },
-    DIM_OVERLAY: { r: 255, g: 255, b: 255, a: 150 },
-    DEFAULT_HIGHLIGHT: { r: 255, g: 255, b: 0, a: 180 },
-    SHADOW: { r: 0, g: 0, b: 0, a: 20 }  // Subtle shadow/dim effect
-  };
+  // Color constants - using centralized ColorPalette
+  static COLORS = ColorPalette.TEXTBOX;
+  static STROKES = ColorPalette.TEXTBOX_STROKES;
 
   // Regex pattern to detect URLs (http, https, file://, and local paths)
   // Matches: https://..., http://..., file:///path/to/file, ./relative, ../parent, /absolute
@@ -154,7 +144,7 @@ class TextBox {
     // Visual state
     this.selected = false;
     this.backgroundColor = { r: 255, g: 255, b: 255 };
-    this.colorPalette = TextBox.getColorPalette();
+    this.colorPalette = ColorPalette.getBoxBackgroundPalette();
 
     // Text features
     this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
@@ -317,11 +307,7 @@ class TextBox {
    * @returns {Array<Object>} Array of color palette entries with key and color
    */
   static getColorPalette() {
-    return [
-      { key: 'white', color: { r: 255, g: 255, b: 255 } },
-      { key: 'orange', color: { r: 255, g: 200, b: 140 } },
-      { key: 'red', color: { r: 255, g: 140, b: 140 } }
-    ];
+    return ColorPalette.getBoxBackgroundPalette();
   }
 
   // ============================================================================
@@ -807,7 +793,7 @@ class TextBox {
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.COLORS.EDITING_STROKE);
+      stroke(TextBox.STROKES.EDITING);
       strokeWeight(2 / zoomFactor);
     } else if (this.selected && !(typeof mindMap !== 'undefined' && mindMap.isArrowKeyNavigating)) {
       // Highlight selected boxes with a blue outline (skip when navigating via arrow keys)
@@ -819,11 +805,11 @@ class TextBox {
       // Hover state uses the box background color
       // Disabled while navigating between boxes with arrow keys (presentation mode)
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.COLORS.HOVER_STROKE);
+      stroke(TextBox.STROKES.HOVER);
       strokeWeight(2 / zoomFactor);
     } else {
       fill(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b);
-      stroke(TextBox.COLORS.NORMAL_STROKE);
+      stroke(TextBox.STROKES.NORMAL);
       strokeWeight(1 / zoomFactor);
     }
 

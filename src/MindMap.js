@@ -48,10 +48,10 @@ class MindMap {
     START_Y: 100              // Initial Y position for layout
   };
 
-  // Color constants for connection preview lines
+  // Color constants - using centralized ColorPalette
   static COLORS = {
-    CONNECTING_LINE: { r: 100, g: 100, b: 255 },  // Blue line when creating connection
-    CONNECTOR_DOT: { r: 100, g: 150, b: 255 }     // Blue dot at connection endpoints
+    CONNECTING_LINE: ColorPalette.CONNECTION.PREVIEW_LINE,
+    CONNECTOR_DOT: ColorPalette.CONNECTION.CONNECTOR_DOT
   };
 
   // Stroke weight for connection preview (in pixels)
