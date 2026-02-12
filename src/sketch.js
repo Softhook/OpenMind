@@ -61,7 +61,11 @@ const CONFIG = (typeof AppConfig !== 'undefined') ? AppConfig : {
 const UI_COLORS = {
   BACKGROUND: 240,
   SELECTION_RECT: { fill: { r: 100, g: 150, b: 255, a: 50 }, stroke: { r: 100, g: 150, b: 255 } },
-  SAVE_INDICATOR: { saved: { r: 76, g: 175, b: 80 }, unsaved: { r: 244, g: 67, b: 54 } },
+  SAVE_INDICATOR: {
+    saved: { r: 76, g: 175, b: 80 },
+    unsaved: { r: 244, g: 67, b: 54 },
+    syncing: { r: 255, g: 193, b: 7 }
+  },
   LOADING_OVERLAY: { bg: { r: 0, g: 0, b: 0, a: 160 }, text: 255, spinner: 255 },
   CONNECTION: { normal: 80, selected: { r: 100, g: 150, b: 255 } }
 };
@@ -4873,13 +4877,47 @@ function drawSaveIndicator() {
   push();
   // Draw circle
   noStroke();
-  if (mindMap.isSaved) {
-    // Green when saved
-    fill(colors.saved.r, colors.saved.g, colors.saved.b);
+
+  let statusColor;
+  let statusText = '';
+
+  if (collaborationManager) {
+    // Collaboration Mode
+    if (!collaborationManager.isConnected) {
+      // CRITICAL: Prevent "False Green" - if we should be collaborating but are disconnected, show RED
+      statusColor = colors.unsaved; // Red
+      statusText = 'Offline (Reconnecting...)';
+    } else {
+      // Connected Logic:
+      if (syncStatus === null) {
+        statusColor = colors.saved; // Green
+        statusText = 'All changes saved & synced';
+      } else if (syncStatus === 'incompatible' || syncStatus === 'error') {
+        statusColor = colors.unsaved; // Red
+        statusText = 'Sync Error / Incompatible Version';
+      } else {
+        // connecting, server_starting, syncing
+        statusColor = colors.syncing; // Yellow
+        statusText = syncStatus === 'server_starting' ? 'Waking up server...' : 'Syncing...';
+      }
+    }
   } else {
-    // Red when unsaved
-    fill(colors.unsaved.r, colors.unsaved.g, colors.unsaved.b);
+    // Local Mode Logic
+    if (mindMap.isSaved) {
+      statusColor = colors.saved; // Green
+      statusText = 'Saved locally';
+    } else {
+      statusColor = colors.syncing; // Yellow for unsaved changes
+      statusText = 'Unsaved changes...';
+    }
   }
+
+  // Update canvas title for tooltip accessibility
+  if (canvas && canvas.elt && canvas.elt.title !== statusText) {
+    canvas.elt.title = statusText;
+  }
+
+  fill(statusColor.r, statusColor.g, statusColor.b);
   circle(x, y, size);
   pop();
 }
