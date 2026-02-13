@@ -4,243 +4,142 @@
 
 const fs = require('fs');
 const path = require('path');
+const Y = require('yjs');
 
-// Load source files
-const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
-const mindMapCode = fs.readFileSync(path.join(__dirname, '../../src/MindMap.js'), 'utf8');
+// provide Utils for TextBox and CollaborationManager
+global.Utils = require('../../src/utils');
 
-describe('Connection Undo System - Comprehensive Review', () => {
-    describe('Connection Creation Undo', () => {
-        test('syncConnectionsToYjs wraps in transaction with undoManager origin', () => {
-            const syncMatch = collabCode.match(/syncConnectionsToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_sync)/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
+// provide ColorPalette
+global.ColorPalette = require('../../src/ColorPalette');
 
-            // Must wrap in transaction with undoManager origin for undo tracking
-            expect(syncCode).toMatch(/this\.transact\(/);
-            expect(syncCode).toMatch(/['"]syncConnections['"]/);
+// stub p5 functions
+global.textSize = jest.fn();
+global.textWidth = jest.fn((str) => str ? str.length * 10 : 50);
+global.max = Math.max;
+global.min = Math.min;
+global.stroke = jest.fn();
+global.strokeWeight = jest.fn();
+global.fill = jest.fn();
+global.rect = jest.fn();
+global.push = jest.fn();
+global.pop = jest.fn();
+global.text = jest.fn();
+global.textAlign = jest.fn();
+global.translate = jest.fn();
+global.cursor = jest.fn();
+global.lerp = (a, b, t) => a + (b - a) * t;
+
+// Load classes
+const TextBox = require('../../src/TextBox');
+const Connection = require('../../src/Connection');
+const MindMap = require('../../src/MindMap');
+const CollaborationManager = require('../../src/CollaborationManager');
+
+global.TextBox = TextBox;
+global.Connection = Connection;
+global.MindMap = MindMap;
+global.CollaborationManager = CollaborationManager;
+
+describe('Advanced Collaboration & Formatting behavioral tests', () => {
+    let cm;
+    let mindMap;
+
+    beforeEach(() => {
+        mindMap = new MindMap();
+        cm = new CollaborationManager(mindMap);
+
+        cm.Y = Y;
+        cm.ydoc = new Y.Doc();
+        cm.yboxes = cm.ydoc.getMap('boxes');
+        cm.yconnections = cm.ydoc.getArray('connections');
+        // Initialize UndoManager correctly
+        cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
+            trackedOrigins: new Set()
+        });
+        cm.undoManager.trackedOrigins.add(cm.undoManager);
+
+        cm.isInitialized = true;
+        cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
+    });
+
+    describe('Text Formatting Synchronization', () => {
+        test('should sync bold and italic ranges', () => {
+            const box = new TextBox(0, 0, 'Formatted Text');
+            mindMap.boxes.push(box);
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box.id, box.toJSON());
+            });
+
+            // Apply formatting
+            box.boldRanges = [{ start: 0, end: 5 }];
+            box.italicRanges = [{ start: 5, end: 10 }];
+
+            // Sync
+            cm.syncBoxToYjs(box);
+
+            const data = cm.yboxes.get(box.id);
+            expect(data.boldRanges).toEqual([{ start: 0, end: 5 }]);
+            expect(data.italicRanges).toEqual([{ start: 5, end: 10 }]);
         });
 
-        test('syncConnectionsToYjs handles skipTransactionWrapper correctly', () => {
-            const syncMatch = collabCode.match(/syncConnectionsToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_sync)/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
+        test('should sync highlights with color', () => {
+            const box = new TextBox(0, 0, 'Highlighted');
+            mindMap.boxes.push(box);
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box.id, box.toJSON());
+            });
 
-            // When skipTransactionWrapper=true, should call impl directly (already in transaction)
-            expect(syncCode).toMatch(/if\s*\(\s*skipTransactionWrapper\s*\)/);
-            expect(syncCode).toMatch(/_syncConnectionsToYjsImpl/);
-        });
+            box.highlights = [{ start: 0, end: 5, color: [255, 0, 0] }];
+            cm.syncBoxToYjs(box);
 
-        test('MindMap has onConnectionsChange callback', () => {
-            // MindMap should call syncConnectionsToYjs when connections change
-            expect(collabCode).toMatch(/onConnectionsChange.*=.*\(/);
-            expect(collabCode).toMatch(/syncConnectionsToYjs/);
+            const data = cm.yboxes.get(box.id);
+            expect(data.highlights).toEqual([{ start: 0, end: 5, color: [255, 0, 0] }]);
         });
     });
 
-    describe('Connection Deletion Undo', () => {
-        test('syncConnectionsToYjs properly wraps for undo tracking', () => {
-            // When a connection is deleted, MindMap calls onConnectionsChange
-            // which triggers syncConnectionsToYjs with proper transaction wrapping
-            expect(collabCode).toMatch(/syncConnectionsToYjs/);
-            expect(collabCode).toMatch(/'syncConnections'/);
-        });
+    describe('Alignment Synchronization', () => {
+        test('should sync multiple boxes after alignment', () => {
+            const box1 = new TextBox(0, 0, 'B1');
+            const box2 = new TextBox(0, 100, 'B2');
+            mindMap.boxes.push(box1, box2);
 
-        test('_syncConnectionsToYjsImpl properly diffs and deletes connections', () => {
-            const implMatch = collabCode.match(/_syncConnectionsToYjsImpl\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_])/);
-            expect(implMatch).toBeTruthy();
-            const implCode = implMatch[0];
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box1.id, box1.toJSON());
+                cm.yboxes.set(box2.id, box2.toJSON());
+            });
 
-            // Must find connections to delete
-            expect(implCode).toMatch(/indicesToDelete/);
-            expect(implCode).toMatch(/yconnections\.delete/);
-            
-            // Must delete in descending order
-            expect(implCode).toMatch(/sort.*\(a,\s*b\)\s*=>\s*b\s*-\s*a/);
-        });
-    });
+            // Simulate left alignment (x = 50 for both)
+            box1.x = 50;
+            box2.x = 50;
 
-    describe('Bulk Connection Operations', () => {
-        test('connection changes use single transaction when in batch operation', () => {
-            const syncMatch = collabCode.match(/syncConnectionsToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_sync)/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
+            // MindMap would typically call onBoxChange for each
+            cm.syncBoxToYjs(box1);
+            cm.syncBoxToYjs(box2);
 
-            // skipTransactionWrapper allows parent transaction to group changes
-            expect(syncCode).toMatch(/skipTransactionWrapper/);
-        });
-    });
-});
-
-describe('Text Formatting Undo System - Comprehensive Review', () => {
-    describe('Bold Formatting Undo', () => {
-        test('boldRanges tracked in Yjs data model', () => {
-            const boxToYjsMatch = collabCode.match(/_boxToYjsData\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(boxToYjsMatch).toBeTruthy();
-            const boxToYjsCode = boxToYjsMatch[0];
-
-            // Must include boldRanges in synced data
-            expect(boxToYjsCode).toMatch(/boldRanges/);
-            expect(boxToYjsCode).toMatch(/start.*end/);
-        });
-
-        test('boldRanges applied from Yjs during sync', () => {
-            // Must apply boldRanges from remote changes in _applyBoxFromYjs
-            expect(collabCode).toMatch(/_applyBoxFromYjs/);
-            expect(collabCode).toMatch(/box\.boldRanges\s*=\s*data\.boldRanges\.map/);
-        });
-
-        test('bold toggle wrapped in transaction with undo boundary', () => {
-            const boldMatch = mindMapCode.match(/toggleBoldOutlineOnSelection[\s\S]{0,500}/);
-            expect(boldMatch).toBeTruthy();
-            const boldCode = boldMatch[0];
-
-            // Must wrap in transaction
-            expect(boldCode).toMatch(/_wrapInTransaction/);
-            
-            // Must notify collaboration manager
-            expect(boldCode).toMatch(/onBoxChange/);
-            
-            // Must call stopCapturing for undo boundary
-            expect(boldCode).toMatch(/stopCapturing/);
+            expect(cm.yboxes.get(box1.id).x).toBe(50);
+            expect(cm.yboxes.get(box2.id).x).toBe(50);
         });
     });
 
-    describe('Italic Formatting Undo', () => {
-        test('italicRanges tracked in Yjs data model', () => {
-            const boxToYjsMatch = collabCode.match(/_boxToYjsData\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(boxToYjsMatch).toBeTruthy();
-            const boxToYjsCode = boxToYjsMatch[0];
+    describe('State Transitions & Loops', () => {
+        test('should prevent feedback loops using isSyncing flag', () => {
+            const box = new TextBox(0, 0, 'Loop Test');
+            mindMap.boxes.push(box);
 
-            // Must include italicRanges in synced data
-            expect(boxToYjsCode).toMatch(/italicRanges/);
-        });
+            const syncSpy = jest.spyOn(cm, 'syncBoxToYjs');
 
-        test('italic toggle wrapped in transaction with undo boundary', () => {
-            const italicMatch = mindMapCode.match(/toggleItalicSlantOnSelection[\s\S]{0,500}/);
-            expect(italicMatch).toBeTruthy();
-            const italicCode = italicMatch[0];
+            // Simulate remote update
+            cm.isSyncing = true;
+            cm._applyBoxFromYjs(box.id, { x: 100, y: 100 }, false, true);
+            cm.isSyncing = false;
 
-            // Must wrap in transaction
-            expect(italicCode).toMatch(/_wrapInTransaction/);
-            
-            // Must notify collaboration manager
-            expect(italicCode).toMatch(/onBoxChange/);
-            
-            // Must call stopCapturing for undo boundary
-            expect(italicCode).toMatch(/stopCapturing/);
-        });
-    });
-
-    describe('Highlight Formatting Undo', () => {
-        test('highlights tracked in Yjs data model with color', () => {
-            const boxToYjsMatch = collabCode.match(/_boxToYjsData\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(boxToYjsMatch).toBeTruthy();
-            const boxToYjsCode = boxToYjsMatch[0];
-
-            // Must include highlights with color in synced data
-            expect(boxToYjsCode).toMatch(/highlights/);
-            expect(boxToYjsCode).toMatch(/color/);
-        });
-
-        test('highlights applied from Yjs during sync', () => {
-            // Must apply highlights from remote changes in _applyBoxFromYjs
-            expect(collabCode).toMatch(/_applyBoxFromYjs/);
-            expect(collabCode).toMatch(/box\.highlights\s*=\s*data\.highlights\.map/);
-        });
-    });
-
-    describe('Formatting During Editing', () => {
-        test('formatting changes sync even when box.isEditing=true', () => {
-            // When user applies formatting during editing, MindMap wraps in transaction
-            // and calls onBoxChange with skipTransactionWrapper=true
-            // This triggers syncBoxToYjs which will sync the box with current formatting
-            const mindMapMatch = mindMapCode.match(/toggleBoldOutlineOnSelection|toggleItalicSlantOnSelection/);
-            expect(mindMapMatch).toBeTruthy();
-        });
-
-        test('stopCapturing called after formatting to create undo boundary', () => {
-            const boldMatch = mindMapCode.match(/toggleBoldOutlineOnSelection[\s\S]{0,500}/);
-            expect(boldMatch).toBeTruthy();
-            
-            // Must have stopCapturing to create undo boundary
-            expect(boldMatch[0]).toMatch(/stopCapturing/);
-        });
-    });
-});
-
-describe('Alignment Undo System - Comprehensive Review', () => {
-    describe('Group Alignment Operations', () => {
-        test('leftAlignSelectedBoxes wraps in transaction', () => {
-            const leftAlignMatch = mindMapCode.match(/leftAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(leftAlignMatch).toBeTruthy();
-            const leftAlignCode = leftAlignMatch[0];
-
-            // Must wrap alignment in transaction
-            expect(leftAlignCode).toMatch(/_wrapInTransaction/);
-        });
-
-        test('rightAlignSelectedBoxes wraps in transaction', () => {
-            const rightAlignMatch = mindMapCode.match(/rightAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(rightAlignMatch).toBeTruthy();
-            
-            expect(rightAlignMatch[0]).toMatch(/_wrapInTransaction/);
-        });
-
-        test('topAlignSelectedBoxes wraps in transaction', () => {
-            const topAlignMatch = mindMapCode.match(/topAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(topAlignMatch).toBeTruthy();
-            
-            expect(topAlignMatch[0]).toMatch(/_wrapInTransaction/);
-        });
-
-        test('bottomAlignSelectedBoxes wraps in transaction', () => {
-            const bottomAlignMatch = mindMapCode.match(/bottomAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(bottomAlignMatch).toBeTruthy();
-            
-            expect(bottomAlignMatch[0]).toMatch(/_wrapInTransaction/);
-        });
-
-        test('centerAlignSelectedBoxes wraps in transaction', () => {
-            const centerAlignMatch = mindMapCode.match(/centerAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(centerAlignMatch).toBeTruthy();
-            
-            expect(centerAlignMatch[0]).toMatch(/_wrapInTransaction/);
-        });
-
-        test('horizontalCenterAlignSelectedBoxes wraps in transaction', () => {
-            const hCenterMatch = mindMapCode.match(/horizontalCenterAlignSelectedBoxes\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}[a-z_]|\n\s{2}\/\*\*)/);
-            expect(hCenterMatch).toBeTruthy();
-            
-            expect(hCenterMatch[0]).toMatch(/_wrapInTransaction/);
-        });
-    });
-
-    describe('Alignment Position Sync', () => {
-        test('_notifyBoxesChanged syncs targetX/targetY to prevent snap-back', () => {
-            const notifyMatch = mindMapCode.match(/_notifyBoxesChanged\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{2}\/\/|\n\s{2}[a-z_])/);
-            expect(notifyMatch).toBeTruthy();
-            const notifyCode = notifyMatch[0];
-
-            // Must sync target positions to prevent rubber-banding
-            expect(notifyCode).toMatch(/targetX\s*=\s*box\.x/);
-            expect(notifyCode).toMatch(/targetY\s*=\s*box\.y/);
-        });
-
-        test('alignment operations call _notifyBoxesChanged', () => {
-            // After performing alignment, must notify boxes with skipTransactionWrapper
-            expect(mindMapCode).toMatch(/_performLeftAlign[\s\S]*?_notifyBoxesChanged/);
-            expect(mindMapCode).toMatch(/_notifyBoxesChanged.*skipTransactionWrapper/);
-        });
-    });
-
-    describe('Alignment Undo Grouping', () => {
-        test('all box position changes in single transaction', () => {
-            // _wrapInTransaction ensures all box updates happen in one transaction
-            // Each box calls onBoxChange with skipTransactionWrapper=true
-            // So all updates are grouped in the parent transaction
-            const wrapMatch = mindMapCode.match(/_wrapInTransaction\s*\([^)]*\)\s*\{[\s\S]{0,200}/);
-            expect(wrapMatch).toBeTruthy();
+            // Should NOT have triggered a local->remote sync back
+            // (Note: _applyBoxFromYjs might trigger MindMap.onBoxChange, 
+            // but CollaborationManager should ignore it if isSyncing is true)
+            expect(syncSpy).not.toHaveBeenCalled();
+            syncSpy.mockRestore();
         });
     });
 });

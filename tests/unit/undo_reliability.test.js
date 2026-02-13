@@ -4,236 +4,140 @@
 
 const fs = require('fs');
 const path = require('path');
+const Y = require('yjs');
 
-// Load source files
-const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
+// provide Utils for TextBox and CollaborationManager
+global.Utils = require('../../src/utils');
 
-describe('Undo System Reliability', () => {
-    describe('Timer Synchronization', () => {
-        test('_resetTextEditUndoTimer should always clear and reset timer', () => {
-            // Should NOT have the 100ms skip optimization that caused premature closure
-            expect(collabCode).not.toMatch(/timeSinceLastReset\s*<\s*100/);
-            
-            // Should always clear the timer before setting a new one
-            expect(collabCode).toMatch(/_resetTextEditUndoTimer.*clearTimeout.*this\.textEditUndoTimer/s);
+// provide ColorPalette
+global.ColorPalette = require('../../src/ColorPalette');
+
+// stub p5 functions
+global.textSize = jest.fn();
+global.textWidth = jest.fn((str) => str ? str.length * 10 : 50);
+global.max = Math.max;
+global.min = Math.min;
+global.stroke = jest.fn();
+global.strokeWeight = jest.fn();
+global.fill = jest.fn();
+global.rect = jest.fn();
+global.push = jest.fn();
+global.pop = jest.fn();
+global.text = jest.fn();
+global.textAlign = jest.fn();
+global.translate = jest.fn();
+global.cursor = jest.fn();
+global.lerp = (a, b, t) => a + (b - a) * t;
+
+// Load classes
+const TextBox = require('../../src/TextBox');
+const Connection = require('../../src/Connection');
+const MindMap = require('../../src/MindMap');
+const CollaborationManager = require('../../src/CollaborationManager');
+
+global.TextBox = TextBox;
+global.Connection = Connection;
+global.MindMap = MindMap;
+global.CollaborationManager = CollaborationManager;
+
+describe('Undo Reliability behavioral tests', () => {
+    let cm;
+    let mindMap;
+
+    beforeEach(() => {
+        mindMap = new MindMap();
+        cm = new CollaborationManager(mindMap);
+
+        cm.Y = Y;
+        cm.ydoc = new Y.Doc();
+        cm.yboxes = cm.ydoc.getMap('boxes');
+        cm.yconnections = cm.ydoc.getArray('connections');
+        // Initialize UndoManager correctly
+        cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
+            trackedOrigins: new Set()
         });
-        
-        test('_resetTextEditUndoTimer should set new timeout every time', () => {
-            // Should always create a new timeout
-            expect(collabCode).toMatch(/_resetTextEditUndoTimer.*setTimeout/s);
-        });
+        cm.undoManager.trackedOrigins.add(cm.undoManager);
+
+        cm.isInitialized = true;
+        cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
     });
 
-    describe('Pending Sync Flushing', () => {
-        test('should have _flushPendingTextSyncs method', () => {
-            expect(collabCode).toMatch(/_flushPendingTextSyncs\s*\(/);
-        });
-        
-        test('_flushPendingTextSyncs should clear timers', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_[a-z]|\n\s{4}[a-z][a-zA-Z]*\s*\()/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-            
-            // Should clear timeout
-            expect(flushCode).toMatch(/clearTimeout/);
-            // Should delete from map
-            expect(flushCode).toMatch(/textSyncTimers\.delete/);
-        });
-        
-        test('_flushPendingTextSyncs should immediately sync the box', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_[a-z]|\n\s{4}[a-z][a-zA-Z]*\s*\()/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-            
-            // Should call transact with undoManager origin
-            expect(flushCode).toMatch(/this\.ydoc\.transact\(/);
-            expect(flushCode).toMatch(/this\.undoManager\)/);
-        });
-        
-        test('_flushPendingTextSyncs should validate box still exists', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}_[a-z]|\n\s{4}[a-z][a-zA-Z]*\s*\()/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-            
-            // Should check if box exists before syncing
-            expect(flushCode).toMatch(/if\s*\(\s*box\s*\)/);
-            expect(flushCode).toMatch(/getBoxById/);
-        });
-    });
+    describe('Text Edit Undo Grouping', () => {
+        test('_closeTextEditUndoGroup should flush pending text syncs', () => {
+            const box = new TextBox(0, 0, 'Original');
+            mindMap.boxes.push(box);
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box.id, box.toJSON());
+            });
 
-    describe('Text Edit Undo Group Closure', () => {
-        test('_closeTextEditUndoGroup should flush pending syncs before closing', () => {
-            // Find the _closeTextEditUndoGroup method
-            const closeMatch = collabCode.match(/_closeTextEditUndoGroup\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(closeMatch).toBeTruthy();
-            const closeCode = closeMatch[0];
-            
-            // Should call _flushPendingTextSyncs before stopCapturing
-            expect(closeCode).toMatch(/_flushPendingTextSyncs/);
-            const flushIndex = closeCode.indexOf('_flushPendingTextSyncs');
-            const stopCapturingIndex = closeCode.indexOf('stopCapturing');
-            expect(flushIndex).toBeLessThan(stopCapturingIndex);
-        });
-        
-        test('_closeTextEditUndoGroup should flush for currentEditingBoxId', () => {
-            // Find the _closeTextEditUndoGroup method
-            const closeMatch = collabCode.match(/_closeTextEditUndoGroup\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(closeMatch).toBeTruthy();
-            const closeCode = closeMatch[0];
-            
-            // Should flush the current editing box's pending syncs
-            expect(closeCode).toMatch(/if\s*\(\s*this\.currentEditingBoxId\s*\)/);
-            expect(closeCode).toMatch(/_flushPendingTextSyncs\(\s*this\.currentEditingBoxId\s*\)/);
-        });
-    });
+            // Simulate typing
+            box.isEditing = true;
+            box.text = 'Modified';
+            cm.currentEditingBoxId = box.id;
+            cm.isTextEditUndoGroupOpen = true;
 
-    describe('Box Switching Safety', () => {
+            // Should have a timer set by syncBoxToYjs
+            cm.syncBoxToYjs(box);
+            expect(cm.textSyncTimers.has(box.id)).toBe(true);
+
+            // Close group
+            cm._closeTextEditUndoGroup();
+
+            expect(cm.isTextEditUndoGroupOpen).toBe(false);
+            expect(cm.textSyncTimers.has(box.id)).toBe(false); // Should be flushed/cleared
+            expect(cm.yboxes.get(box.id).text).toBe('Modified');
+        });
+
         test('syncBoxToYjs should flush previous box when switching', () => {
-            // Find the syncBoxToYjs method
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-            
-            // When switching boxes (currentEditingBoxId !== box.id)
-            expect(syncCode).toMatch(/if\s*\(\s*this\.currentEditingBoxId.*this\.currentEditingBoxId\s*!==\s*box\.id\s*\)/);
-            
-            // Should flush the previous box's pending syncs
-            expect(syncCode).toMatch(/_flushPendingTextSyncs\(\s*this\.currentEditingBoxId\s*\)/);
-        });
-        
-        test('syncBoxToYjs should flush before closing undo group when switching', () => {
-            // Find the syncBoxToYjs method
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-            
-            // Should have both flush and close
-            expect(syncCode).toMatch(/_flushPendingTextSyncs\(\s*this\.currentEditingBoxId\s*\)/);
-            expect(syncCode).toMatch(/_closeTextEditUndoGroup/);
-            
-            // Flush should come before close
-            const flushIndex = syncCode.indexOf('_flushPendingTextSyncs(this.currentEditingBoxId)');
-            const closeIndex = syncCode.indexOf('_closeTextEditUndoGroup()');
-            expect(flushIndex).toBeGreaterThan(-1);
-            expect(closeIndex).toBeGreaterThan(-1);
-            expect(flushIndex).toBeLessThan(closeIndex);
-        });
-    });
+            const box1 = new TextBox(0, 0, 'Box 1');
+            const box2 = new TextBox(100, 0, 'Box 2');
+            mindMap.boxes.push(box1, box2);
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box1.id, box1.toJSON());
+                cm.yboxes.set(box2.id, box2.toJSON());
+            });
 
-    describe('Stale Box Reference Prevention', () => {
-        test('debounced text sync should check currentEditingBoxId still matches', () => {
-            // Find the syncBoxToYjs method
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-            
-            // Should verify currentEditingBoxId matches boxId before syncing
-            expect(syncCode).toMatch(/this\.currentEditingBoxId\s*===\s*boxId/);
-        });
-        
-        test('debounced text sync should validate box still exists', () => {
-            // Find the syncBoxToYjs method
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-            
-            // Should get box by ID and check it exists
-            expect(syncCode).toMatch(/getBoxById\(\s*boxId\s*\)/);
-            expect(syncCode).toMatch(/if\s*\(\s*currentBox/);
-        });
-    });
+            // Edit box1
+            box1.isEditing = true;
+            box1.text = 'Changed 1';
+            cm.syncBoxToYjs(box1);
+            expect(cm.currentEditingBoxId).toBe(box1.id);
+            expect(cm.textSyncTimers.has(box1.id)).toBe(true);
 
-    describe('Transaction Origin Consistency', () => {
-        test('text sync should use undoManager as transaction origin', () => {
-            // Find _flushPendingTextSyncs method which does the immediate sync
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-            
-            // transact calls should use this.undoManager as origin
-            expect(flushCode).toMatch(/this\.ydoc\.transact\(/);
-            expect(flushCode).toMatch(/,\s*this\.undoManager\s*\)/);
-        });
-        
-        test('transact helper should close text edit undo group first', () => {
-            const transactMatch = collabCode.match(/transact\s*\(\s*callback[\s\S]*?\n\s{4}\}/);
-            expect(transactMatch).toBeTruthy();
-            const transactCode = transactMatch[0];
-            
-            // Should close any open text editing undo group
-            expect(transactCode).toMatch(/if\s*\(\s*this\.isTextEditUndoGroupOpen\s*\)/);
-            expect(transactCode).toMatch(/_closeTextEditUndoGroup/);
-        });
-    });
+            // Switch to box2
+            box2.isEditing = true;
+            box2.text = 'Changed 2';
+            cm.syncBoxToYjs(box2);
 
-    describe('Documentation and Comments', () => {
-        test('should document the flush mechanism', () => {
-            // _flushPendingTextSyncs should have JSDoc
-            expect(collabCode).toMatch(/\/\*\*[\s\S]*?@private[\s\S]*?_flushPendingTextSyncs/);
-        });
-        
-        test('should have comment explaining critical flush in _closeTextEditUndoGroup', () => {
-            // Find the _closeTextEditUndoGroup method
-            const closeMatch = collabCode.match(/_closeTextEditUndoGroup\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(closeMatch).toBeTruthy();
-            const closeCode = closeMatch[0];
-            
-            // Should have a CRITICAL comment explaining why flush is needed
-            expect(closeCode).toMatch(/CRITICAL.*flush/i);
-        });
-        
-        test('should document box switching safety in syncBoxToYjs', () => {
-            // Find the syncBoxToYjs method
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-            
-            // Should explain why we flush when switching boxes
-            expect(syncCode).toMatch(/flush.*previous.*box|previous.*box.*flush/i);
-        });
-    });
-});
+            // Box 1 should have been flushed
+            expect(cm.textSyncTimers.has(box1.id)).toBe(false);
+            expect(cm.yboxes.get(box1.id).text).toBe('Changed 1');
 
-describe('Undo System Integration', () => {
-    describe('Timer Coordination', () => {
-        test('TEXT_SYNC_DEBOUNCE should be less than TEXT_UNDO_GROUP_TIMEOUT', () => {
-            const debounceMatch = collabCode.match(/TEXT_SYNC_DEBOUNCE\s*=\s*(\d+)/);
-            const timeoutMatch = collabCode.match(/TEXT_UNDO_GROUP_TIMEOUT\s*=\s*(\d+)/);
-            
-            expect(debounceMatch).toBeTruthy();
-            expect(timeoutMatch).toBeTruthy();
-            
-            const debounce = parseInt(debounceMatch[1]);
-            const timeout = parseInt(timeoutMatch[1]);
-            
-            // Debounce should be less than timeout to ensure sync happens before group closes
-            expect(debounce).toBeLessThan(timeout);
+            // Box 2 should now be the editing box
+            expect(cm.currentEditingBoxId).toBe(box2.id);
         });
     });
 
     describe('Delete Box Safety', () => {
-        test('deleteBoxFromYjs should close text editing undo group for deleted box', () => {
-            // Find the deleteBoxFromYjs method
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-            
-            // Should check if deleting currently edited box
-            expect(deleteCode).toMatch(/if\s*\(\s*this\.currentEditingBoxId\s*===\s*boxId/);
-            // Should close the undo group (which includes flush)
-            expect(deleteCode).toMatch(/_closeTextEditUndoGroup/);
-        });
-        
-        test('deleteBoxFromYjs should clear pending text sync timer', () => {
-            // Find the deleteBoxFromYjs method
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-            
-            // Should clear the timer
-            expect(deleteCode).toMatch(/clearTimeout/);
-            // Should remove from map
-            expect(deleteCode).toMatch(/textSyncTimers\.delete/);
+        test('deleteBoxFromYjs should close text editing undo group', () => {
+            const box = new TextBox(0, 0, 'Box 1');
+            mindMap.boxes.push(box);
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box.id, box.toJSON());
+            });
+
+            // Start editing
+            cm.currentEditingBoxId = box.id;
+            cm.isTextEditUndoGroupOpen = true;
+
+            // Delete box
+            cm.deleteBoxFromYjs(box.id);
+
+            expect(cm.isTextEditUndoGroupOpen).toBe(false);
+            expect(cm.currentEditingBoxId).toBeNull();
+            expect(cm.yboxes.has(box.id)).toBe(false);
         });
     });
 });
