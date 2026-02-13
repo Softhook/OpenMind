@@ -364,12 +364,15 @@ class UIManager {
     if (this.exportTextButton) this.exportTextButton.style('display', 'inline-block');
     if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'inline-block');
     
-    // Show invite button only when NOT connected
+    // Always show invite button (text changes based on connection state)
     if (this.inviteButton) {
+      this.inviteButton.style('display', 'inline-block');
       if (isConnected) {
-        this.inviteButton.style('display', 'none');
+        this.inviteButton.style('background-color', '#2196F3'); // Blue for share
+        this.inviteButton.html('Copy Room Link');
       } else {
-        this.inviteButton.style('display', 'inline-block');
+        this.inviteButton.style('background-color', '#4caf50'); // Green for start
+        this.inviteButton.html('Start Collaboration');
       }
     }
     
@@ -377,8 +380,10 @@ class UIManager {
     if (this.displayNameInput) {
       if (isConnected) {
         this.displayNameInput.style('display', 'inline-block');
+        this.displayNameInput.style('visibility', 'visible');
       } else {
         this.displayNameInput.style('display', 'none');
+        this.displayNameInput.style('visibility', 'hidden');
       }
     }
   }
@@ -430,13 +435,9 @@ class UIManager {
       this.exportPNGButton,
       this.exportPDFButton,
       this.exportTextButton,
-      this.keyboardControlsButton
+      this.keyboardControlsButton,
+      this.inviteButton // Always include invite button (text/color change based on state)
     ];
-    
-    // Add invite button to layout only if NOT connected (it should be hidden when connected)
-    if (!isConnected) {
-      buttonsToLayout.push(this.inviteButton);
-    }
     
     // Make visible for measurement with correct p5.js API
     buttonsToLayout.forEach(btn => {
@@ -470,9 +471,11 @@ class UIManager {
     
     // Handle invite button and display name input based on connection state
     if (isConnected) {
-      // When connected: hide invite button, show display name input
+      // When connected: change button to "Copy Room Link" and show display name input
       if (this.inviteButton) {
-        this.inviteButton.style('display', 'none');
+        this.inviteButton.style('background-color', '#2196F3'); // Blue for share action
+        this.inviteButton.html('Copy Room Link');
+        positionButton(this.inviteButton);
       }
       
       if (this.displayNameInput) {
@@ -480,6 +483,7 @@ class UIManager {
         
         this.displayNameInput.style('width', `${inputWidth}px`);
         this.displayNameInput.style('display', 'inline-block');
+        this.displayNameInput.style('visibility', 'visible'); // Ensure visible
         
         // Get button height for vertical centering
         let buttonHeight = 30;
@@ -504,15 +508,16 @@ class UIManager {
         }
       }
     } else {
-      // When not connected: show invite button, hide display name input
+      // When not connected: show "Start Collaboration" button, hide display name input
       if (this.inviteButton) {
-        this.inviteButton.style('background-color', '#4caf50');
+        this.inviteButton.style('background-color', '#4caf50'); // Green for start action
         this.inviteButton.html('Start Collaboration');
         positionButton(this.inviteButton);
       }
       
       if (this.displayNameInput) {
         this.displayNameInput.style('display', 'none');
+        this.displayNameInput.style('visibility', 'hidden');
       }
     }
     

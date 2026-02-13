@@ -678,7 +678,15 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
       if (prevStatus !== syncStatus) Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
 
-      try { if (uiManager) uiManager.layoutButtons(); } catch (e) { }
+      // Update UI to reflect connection state
+      try { 
+        if (uiManager) {
+          Utils.Logger.state('[UI] Updating collaboration state, isConnected:', activeManager.isConnected);
+          uiManager.layoutButtons(); 
+        }
+      } catch (e) { 
+        console.error('[UI] Error updating collaboration state:', e);
+      }
     };
 
     let lastPeerCount = 0;
