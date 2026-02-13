@@ -294,14 +294,22 @@ class UIManager {
   }
   
   /**
-   * Update menu visibility based on mouse position
+   * Update menu visibility based on mouse position and overlay state
    * @param {number} mouseX - Current mouse X position
    * @param {number} mouseY - Current mouse Y position
+   * @param {Object} options - Additional options
+   * @param {boolean} options.forceHide - Force hide buttons (for overlays)
    */
-  updateMenuVisibility(mouseX, mouseY) {
+  updateMenuVisibility(mouseX, mouseY, options = {}) {
     // Validate mouse coordinates
     if (typeof mouseX !== 'number' || !isFinite(mouseX)) mouseX = 0;
     if (typeof mouseY !== 'number' || !isFinite(mouseY)) mouseY = 0;
+    
+    // Force hide buttons when overlays are showing (room confirmation, sync status, etc.)
+    if (options.forceHide) {
+      this.hideButtons();
+      return;
+    }
     
     const MENU_TRIGGER_X = this.config?.UI?.MENU_TRIGGER_X || 50;
     const MENU_TRIGGER_Y = this.config?.UI?.MENU_TRIGGER_Y || 50;

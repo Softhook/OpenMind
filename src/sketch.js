@@ -1355,7 +1355,9 @@ function setup() {
 function draw() {
   background(UI_COLORS.BACKGROUND);
   if (uiManager) {
-    uiManager.updateMenuVisibility(mouseX, mouseY);
+    // Hide menu buttons when overlays are showing to prevent blocking clicks
+    const hasOverlay = roomJoinConfirmation || syncStatus || isMapLoading;
+    uiManager.updateMenuVisibility(mouseX, mouseY, { forceHide: hasOverlay });
     // Sync menuIsVisible with uiManager state
     menuIsVisible = uiManager.isMenuVisible();
   }
