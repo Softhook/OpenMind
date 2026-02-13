@@ -104,6 +104,6 @@ The undo system has comprehensive test coverage:
 ## References
 
 For historical context on fixes and improvements, see:
-- `docs/archive/UNDO_SYSTEM_FIX_SUMMARY.md` - Race condition fixes
-- `docs/archive/UNDO_EDGE_CASES.md` - Detailed edge case analysis
-- `docs/archive/COMPREHENSIVE_UNDO_REVIEW.md` - System verification tests
+- [UNDO_SYSTEM_FIX_SUMMARY.md](./archive/UNDO_SYSTEM_FIX_SUMMARY.md) - Race condition fixes
+- [UNDO_EDGE_CASES.md](./archive/UNDO_EDGE_CASES.md) - Detailed edge case analysis
+- [COMPREHENSIVE_UNDO_REVIEW.md](./archive/COMPREHENSIVE_UNDO_REVIEW.md) - System verification tests

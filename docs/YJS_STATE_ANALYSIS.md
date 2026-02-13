@@ -11,7 +11,7 @@ This document provides a critical analysis of the Yjs-based state management app
 - ✅ **Undo system hardened** - Race conditions fixed, comprehensive test coverage added
 - ✅ **Observer ordering** - Handled with proper sequencing and force-apply modes
 - ⚠️ **Dual-state still exists** - MindMap objects remain as UI layer, Yjs is source of truth
-- 📝 See `docs/archive/` for detailed fix documentation
+- 📝 See [archive](./archive/) for detailed fix documentation
 
 ---
 
@@ -768,4 +768,4 @@ The Yjs-based architecture is **functionally sound** but carries **inherent comp
 
 ---
 
-*This document should be reviewed alongside ARCHITECTURE.md for complete system understanding.*
+*This document should be reviewed alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for complete system understanding.*

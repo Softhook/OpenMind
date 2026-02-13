@@ -564,105 +564,7 @@ ydoc.transact(() => {
 
 ### Identified Issues
 
-#### 1. **Dual State Problem**
-
-**Issue**: State exists in TWO places (Yjs, mindMap) plus persistence (IndexedDB). Persistence is now tied to Yjs, simplifying the model.
-
-**Manifestation**:
-- Page refresh loads directly from Yjs binary state
-
-**Current Mitigation**:
-- `indexeddbProvider` creates single source of persistence truth
-
-**Risk Level**: � LOW - Solved by y-indexeddb
-
-**Recommendation**: Maintain current architecture.
-
-#### 2. **Observer Ordering Non-Determinism**
-
-**Issue**: Yjs observer firing order is non-deterministic based on Map insertion order.
-
-**Manifestation**:
-- `yconnections.observe` might fire before `yboxes.observe`
-- Connection rebuild fails if boxes don't exist yet
-- Undo path had this bug (now fixed)
-
-**Current Mitigation**:
-- yboxes observer rebuilds connections during undo
-- yconnections observer skips during undo
-- Explicit ordering in undo path
-
-**Risk Level**: 🟢 LOW - Fixed in latest code
-
-**Recommendation**: Document this extensively for future maintainers.
-
-#### 3. **Autosave Window Data Loss**
-
-**Issue**: Previous 30s autosave window caused data loss.
-**Current Mitigation**:
-- IndexedDB saves Yjs updates immediately/incrementally
-**Risk Level**: 🟢 LOW - Solved by y-indexeddb
-
-#### 4. **Memory Growth (Yjs Document)**
-
-**Issue**: Yjs document stores entire operation history for undo.
-
-**Manifestation**:
-- Long editing sessions accumulate operations
-- Memory usage grows unbounded
-- No garbage collection of undo history
-
-**Current Mitigation**:
-- `clearUndoHistory()` called after load
-- Limited to session duration
-
-**Risk Level**: 🟡 MEDIUM - Long sessions at risk
-
-**Recommendation**: 
-- Implement max undo stack depth
-- Periodic history compaction
-- Monitor memory in production
-
-#### 5. **localStorage Quota Exceeded**
-
-**Issue**: IndexedDB has higher quotas but can still be exceeded on some devices.
-**Current Mitigation**:
-- y-indexeddb handles storage efficiently
-**Risk Level**: 🟢 LOW - Higher limits than localStorage
-
-#### 6. **Connection Sync Gap (Multi-User Undo)**
-
-**Issue**: Connections weren't syncing back to Yjs during undo.
-
-**Manifestation**:
-- User A undoes box deletion
-- User A sees box + connections
-- User B only sees box (no connections)
-
-**Current Mitigation**:
-- Fixed in commit 86a117b
-- `_syncConnectionsToYjsImpl()` called after undo rebuild
-
-**Risk Level**: 🟢 LOW - Fixed
-
-**Recommendation**: Add integration test for multi-user undo.
-
-#### 7. **Text Editing Race Condition**
-
-**Issue**: Text edits are debounced (1s), creating potential race with deletion.
-
-**Manifestation**:
-- User types text
-- Before 1s expires, user deletes box
-- Debounced sync tries to sync deleted box
-
-**Current Mitigation**:
-- Text sync cleared on box deletion
-- Box existence validated before sync
-
-**Risk Level**: 🟢 LOW - Handled
-
-#### 8. **Split World: Global Scope Tension**
+#### 1. **Split World: Global Scope Tension**
 
 **Issue**: The application mixes legacy p5.js "Global Mode" (relying on `window` variables) with modern Class-based encapsulation.
 
@@ -805,44 +707,15 @@ try {
 
 ## Recommendations
 
-### Short-Term (Next Sprint)
+### Short Term (Stability)
+1.  **Explicit Globals**: Continue to explicitly export critical classes to `window` to prevent reference errors.
+2.  **Defensive Initialization**: Ensure `sketch.js`'s `setup()` verifies dependencies exist (`if (typeof ExportManager === 'undefined') ...`) before crashing.
+3.  **Direct Querying**: Remove synced flags like `menuIsVisible` in `sketch.js` favor of direct calls `uiManager.isMenuVisible()`.
 
-1. **Reduce Autosave Interval** (Obsolete)
-   - Replaced by real-time IndexedDB saves
-
-2. **Add beforeunload Save** (Obsolete)
-   - Not needed with real-time IndexedDB persistence
-
-3. **Max Undo Stack Depth** ✅ COMPLETED
-   - Implemented `maxStackSize: 100` in UndoManager
-   - Limits memory growth
-
-4. **Integration Tests**
-   - Multi-user undo scenario
-   - Offline→Online merge
-   - Rapid connect/disconnect
-
-### Medium-Term (Next Quarter)
-
-1. **y-indexeddb Provider** ✅ COMPLETED
-   - Implemented as primary persistence
-   - Solved dual-state and quota issues
-
-2. **Performance Monitoring**
-   - Add telemetry for observer timing
-   - Track autosave duration
-   - Monitor memory growth
-   - Alert on slow operations
-
-3. **Differential Updates**
-   - Only sync changed properties
-   - Reduces network traffic
-   - Improves large map performance
-
-4. **Spatial Indexing**
-   - Quadtree for box lookup
-   - Faster connection rendering
-   - Viewport culling
+### Long Term (Modernization)
+1.  **ES Modules**: Switch `index.html` to use `<script type="module">`. This forces explicit imports/exports and eliminates global scope leakage/fragility.
+    *   *Challenge*: p5.js "global mode" (auto-detecting `setup`/`draw`) breaks with modules. Requires switching to p5.js "instance mode".
+2.  **Instance Mode Migration**: Rewrite `sketch.js` to wrap the sketch in a closure `new p5(p => { ... })`. This would allow proper module imports without polluting `window`.
 
 ### Long-Term (Next Year)
 
@@ -916,3 +789,5 @@ try {
 ---
 
 *This architecture document should be updated with each major change to the system.*
+
+For a detailed analysis of the Yjs state management, see [YJS_STATE_ANALYSIS.md](./YJS_STATE_ANALYSIS.md).
