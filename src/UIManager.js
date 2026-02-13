@@ -198,10 +198,12 @@ class UIManager {
       clearTimeout(this.displayNameDebounceTimer);
       
       // Update display name in collaboration manager (use setUserName)
-      if (this.collaborationManager && this.collaborationManager.isConnected) {
+      // Use global collaborationManager as it can be recreated when switching rooms
+      const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+      if (activeManager && activeManager.isConnected) {
         const displayName = this.displayNameInput.value().trim();
-        if (displayName && typeof this.collaborationManager.setUserName === 'function') {
-          this.collaborationManager.setUserName(displayName);
+        if (displayName && typeof activeManager.setUserName === 'function') {
+          activeManager.setUserName(displayName);
         }
       }
       
@@ -213,13 +215,15 @@ class UIManager {
     
     // Input handler for real-time updates (debounced)
     const inputHandler = () => {
-      if (this.collaborationManager && this.collaborationManager.isConnected) {
+      // Use global collaborationManager as it can be recreated when switching rooms
+      const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+      if (activeManager && activeManager.isConnected) {
         // Debounce to avoid spamming network on rapid typing
         clearTimeout(this.displayNameDebounceTimer);
         this.displayNameDebounceTimer = setTimeout(() => {
           const displayName = this.displayNameInput.value().trim();
-          if (displayName && typeof this.collaborationManager.setUserName === 'function') {
-            this.collaborationManager.setUserName(displayName);
+          if (displayName && typeof activeManager.setUserName === 'function') {
+            activeManager.setUserName(displayName);
           }
         }, 300); // 300ms debounce
       }
@@ -352,11 +356,13 @@ class UIManager {
   showButtons() {
     this.menuIsVisible = true;
     
-    // Check connection state
-    const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    // Check connection state from global collaborationManager (not cached reference)
+    // This is important because collaborationManager can be recreated when switching rooms
+    const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+    const isConnected = activeManager && activeManager.isConnected;
     
     // Log state for debugging
-    console.log('[UIManager] showButtons() - isConnected:', isConnected);
+    console.log('[UIManager] showButtons() - isConnected:', isConnected, 'manager:', activeManager ? 'active' : 'none');
     
     // Always show these buttons
     if (this.loadButton) this.loadButton.style('display', 'inline-block');
@@ -429,10 +435,12 @@ class UIManager {
     let x = startX;
     
     // Check if we're connected to collaboration
-    const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    // Use global collaborationManager (not cached reference) as it can be recreated when switching rooms
+    const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+    const isConnected = activeManager && activeManager.isConnected;
     
     // Log state for debugging
-    console.log('[UIManager] layoutButtons() - isConnected:', isConnected);
+    console.log('[UIManager] layoutButtons() - isConnected:', isConnected, 'manager:', activeManager ? 'active' : 'none');
     
     // Store original display states to restore after measurement
     const originalStates = new Map();
@@ -509,9 +517,11 @@ class UIManager {
         x += inputWidth + buttonGap;
         
         // Pre-populate with current username if available
-        if (this.collaborationManager && 
-            typeof this.collaborationManager.getUserName === 'function') {
-          const currentName = this.collaborationManager.getUserName();
+        // Use global collaborationManager as it can be recreated when switching rooms
+        const managerForUsername = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+        if (managerForUsername && 
+            typeof managerForUsername.getUserName === 'function') {
+          const currentName = managerForUsername.getUserName();
           if (currentName && this.displayNameInput.value() !== currentName) {
             this.displayNameInput.value(currentName);
           }
