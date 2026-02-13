@@ -214,14 +214,26 @@ class UIManager {
     input.addEventListener('blur', blurHandler);
     this.eventListenerRefs.push({ element: input, event: 'blur', handler: blurHandler });
 
-    // Enter key handler - blur input and hide menu
+    // Stop all keyboard events from reaching the mindmap while input is focused
     const keydownHandler = (e) => {
+      e.stopPropagation(); // Prevent mindmap from receiving key events
       if (e.key === 'Enter') {
         input.blur(); // Blur will trigger the blur handler which hides menu
+      } else if (e.key === 'Escape') {
+        // Cancel editing on Escape
+        this.displayNameInput.value('');
+        input.blur();
       }
     };
     input.addEventListener('keydown', keydownHandler);
     this.eventListenerRefs.push({ element: input, event: 'keydown', handler: keydownHandler });
+
+    // Also stop keyup and keypress to be thorough
+    const stopProp = (e) => e.stopPropagation();
+    input.addEventListener('keyup', stopProp);
+    this.eventListenerRefs.push({ element: input, event: 'keyup', handler: stopProp });
+    input.addEventListener('keypress', stopProp);
+    this.eventListenerRefs.push({ element: input, event: 'keypress', handler: stopProp });
 
     // Input handler for real-time updates (debounced)
     const inputHandler = () => {
