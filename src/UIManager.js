@@ -352,6 +352,10 @@ class UIManager {
   showButtons() {
     this.menuIsVisible = true;
     
+    // Check connection state
+    const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    
+    // Always show these buttons
     if (this.loadButton) this.loadButton.style('display', 'inline-block');
     if (this.saveButton) this.saveButton.style('display', 'inline-block');
     if (this.importTextButton) this.importTextButton.style('display', 'inline-block');
@@ -359,12 +363,23 @@ class UIManager {
     if (this.exportPDFButton) this.exportPDFButton.style('display', 'inline-block');
     if (this.exportTextButton) this.exportTextButton.style('display', 'inline-block');
     if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'inline-block');
-    if (this.inviteButton) this.inviteButton.style('display', 'inline-block');
     
-    // Show display name input only if connected to collaboration
-    if (this.displayNameInput && this.collaborationManager && 
-        this.collaborationManager.isConnected) {
-      this.displayNameInput.style('display', 'inline-block');
+    // Show invite button only when NOT connected
+    if (this.inviteButton) {
+      if (isConnected) {
+        this.inviteButton.style('display', 'none');
+      } else {
+        this.inviteButton.style('display', 'inline-block');
+      }
+    }
+    
+    // Show display name input only when connected
+    if (this.displayNameInput) {
+      if (isConnected) {
+        this.displayNameInput.style('display', 'inline-block');
+      } else {
+        this.displayNameInput.style('display', 'none');
+      }
     }
   }
   
@@ -401,7 +416,13 @@ class UIManager {
     
     let x = startX;
     
-    // Temporarily show buttons to get accurate measurements
+    // Check if we're connected to collaboration
+    const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    
+    // Store original display states to restore after measurement
+    const originalStates = new Map();
+    
+    // Temporarily show buttons for measurement (but keep them hidden visually)
     const buttonsToLayout = [
       this.loadButton,
       this.saveButton,
@@ -409,13 +430,24 @@ class UIManager {
       this.exportPNGButton,
       this.exportPDFButton,
       this.exportTextButton,
-      this.keyboardControlsButton,
-      this.inviteButton
+      this.keyboardControlsButton
     ];
     
-    // Make visible for measurement
+    // Add invite button to layout only if NOT connected (it should be hidden when connected)
+    if (!isConnected) {
+      buttonsToLayout.push(this.inviteButton);
+    }
+    
+    // Make visible for measurement with correct p5.js API
     buttonsToLayout.forEach(btn => {
-      if (btn) btn.style('visibility', 'hidden', 'display', 'inline-block');
+      if (btn && btn.elt) {
+        originalStates.set(btn, {
+          display: btn.elt.style.display,
+          visibility: btn.elt.style.visibility
+        });
+        btn.style('visibility', 'hidden');
+        btn.style('display', 'inline-block');
+      }
     });
     
     // Helper to position a button and advance x
@@ -436,47 +468,63 @@ class UIManager {
     positionButton(this.exportTextButton);
     positionButton(this.keyboardControlsButton);
     
-    // Style and position invite button
-    if (this.inviteButton) {
-      const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    // Handle invite button and display name input based on connection state
+    if (isConnected) {
+      // When connected: hide invite button, show display name input
+      if (this.inviteButton) {
+        this.inviteButton.style('display', 'none');
+      }
       
-      if (isConnected) {
-        this.inviteButton.style('background-color', '#2196f3');
-        this.inviteButton.html('Share Link');
-      } else {
+      if (this.displayNameInput) {
+        const inputWidth = 120;
+        
+        this.displayNameInput.style('width', `${inputWidth}px`);
+        this.displayNameInput.style('display', 'inline-block');
+        
+        // Get button height for vertical centering
+        let buttonHeight = 30;
+        if (this.loadButton && this.loadButton.elt) {
+          buttonHeight = this.loadButton.elt.offsetHeight;
+        }
+        
+        const inputHeight = this.displayNameInput.elt ? 
+          this.displayNameInput.elt.offsetHeight : 30;
+        const yNudge = Math.floor((buttonHeight - inputHeight) / 2);
+        
+        this.displayNameInput.position(x, buttonY + yNudge);
+        x += inputWidth + buttonGap;
+        
+        // Pre-populate with current username if available
+        if (this.collaborationManager && 
+            typeof this.collaborationManager.getUserName === 'function') {
+          const currentName = this.collaborationManager.getUserName();
+          if (currentName && this.displayNameInput.value() !== currentName) {
+            this.displayNameInput.value(currentName);
+          }
+        }
+      }
+    } else {
+      // When not connected: show invite button, hide display name input
+      if (this.inviteButton) {
         this.inviteButton.style('background-color', '#4caf50');
         this.inviteButton.html('Start Collaboration');
+        positionButton(this.inviteButton);
       }
       
-      positionButton(this.inviteButton);
-    }
-    
-    // Position display name input (only when collaboration is active)
-    if (this.displayNameInput && this.collaborationManager && 
-        this.collaborationManager.isConnected) {
-      const inputWidth = 120;
-      const leftGap = buttonGap * 2;
-      
-      this.displayNameInput.style('width', `${inputWidth}px`);
-      this.displayNameInput.style('display', 'inline-block');
-      
-      // Get button height for vertical centering
-      let buttonHeight = 30;
-      if (this.inviteButton && this.inviteButton.elt) {
-        buttonHeight = this.inviteButton.elt.offsetHeight;
+      if (this.displayNameInput) {
+        this.displayNameInput.style('display', 'none');
       }
-      
-      const inputHeight = this.displayNameInput.elt ? 
-        this.displayNameInput.elt.offsetHeight : 30;
-      const yNudge = Math.floor((buttonHeight - inputHeight) / 2);
-      
-      this.displayNameInput.position(x + leftGap, buttonY + yNudge);
-      x += inputWidth + leftGap + buttonGap;
     }
     
-    // Restore visibility based on current menu state
+    // Restore visibility - show if menu is visible, hide if not
     buttonsToLayout.forEach(btn => {
-      if (btn) btn.style('visibility', 'visible');
+      if (btn && btn.elt) {
+        btn.style('visibility', 'visible');
+        // Restore display state based on whether menu should be shown
+        if (!this.menuIsVisible) {
+          btn.style('display', 'none');
+        }
+      }
     });
     
     // Update menu right edge for hover detection
