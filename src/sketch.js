@@ -729,6 +729,11 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
+    
+    // Update UI buttons to reflect collaboration state
+    if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+      uiManager.updateCollaborationState();
+    }
 
     // EXTENSION BRIDGE: Notify ThrustGame of new dependencies
     // If the game is loaded (even if dormant), we must poke it so it can
@@ -2137,6 +2142,11 @@ function mousePressed(e) {
       syncStatus = null;
       // Also clear the hash to prevent auto-reconnect
       if (typeof window !== 'undefined') window.location.hash = '';
+      
+      // Update UI buttons after disconnection
+      if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+        uiManager.updateCollaborationState();
+      }
       return;
     }
     return;
@@ -3239,6 +3249,11 @@ function windowResized() {
   if (now - lastResizeTime > debounceMs) {
     resizeCanvas(windowWidth, windowHeight);
     lastResizeTime = now;
+    
+    // Reposition UI buttons after resize
+    if (uiManager && typeof uiManager.handleResize === 'function') {
+      uiManager.handleResize();
+    }
   }
 }
 

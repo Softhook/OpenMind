@@ -78,6 +78,12 @@ class UIManager {
     
     this.setupButtons();
     this.setupKeyboardOverlay();
+    
+    // Layout buttons after creation to prevent overlap
+    // Use setTimeout to ensure DOM elements are fully created
+    setTimeout(() => {
+      this.layoutButtons();
+    }, 0);
   }
   
   /**
@@ -526,6 +532,24 @@ class UIManager {
   // ==========================================================================
   // Cleanup
   // ==========================================================================
+  
+  /**
+   * Handle window resize - reposition buttons
+   */
+  handleResize() {
+    // Reposition buttons when window is resized
+    if (this.loadButton && this.saveButton) {
+      this.layoutButtons();
+    }
+  }
+  
+  /**
+   * Update button state based on collaboration status
+   * Should be called when collaboration connection state changes
+   */
+  updateCollaborationState() {
+    this.layoutButtons();
+  }
   
   /**
    * Clean up all UI elements
