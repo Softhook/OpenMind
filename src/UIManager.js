@@ -207,11 +207,21 @@ class UIManager {
         }
       }
       
-      // Request menu hide after blur
+      // Hide menu immediately on blur
+      this.hideButtons();
       this.suppressMenuUntilMouseExit = true;
     };
     input.addEventListener('blur', blurHandler);
     this.eventListenerRefs.push({ element: input, event: 'blur', handler: blurHandler });
+    
+    // Enter key handler - blur input and hide menu
+    const keydownHandler = (e) => {
+      if (e.key === 'Enter') {
+        input.blur(); // Blur will trigger the blur handler which hides menu
+      }
+    };
+    input.addEventListener('keydown', keydownHandler);
+    this.eventListenerRefs.push({ element: input, event: 'keydown', handler: keydownHandler });
     
     // Input handler for real-time updates (debounced)
     const inputHandler = () => {
