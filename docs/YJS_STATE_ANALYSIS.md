@@ -6,11 +6,12 @@ This document provides a critical analysis of the Yjs-based state management app
 
 **Risk Assessment**: 🟡 MEDIUM - System is stable but has known complexity that could cause issues at scale or in edge cases.
 
-**Status Update (2026-02-12)**: 
-- ✅ **Migrated to y-indexeddb** - IndexedDB persistence now primary, localStorage is legacy migration path
-- ✅ **Undo system hardened** - Race conditions fixed, comprehensive test coverage added
-- ✅ **Observer ordering** - Handled with proper sequencing and force-apply modes
-- ⚠️ **Dual-state still exists** - MindMap objects remain as UI layer, Yjs is source of truth
+**Status Update (2026-02-13)**: 
+- ✅ **Migrated to y-indexeddb** - IndexedDB persistence is now the primary storage engine.
+- ✅ **Undo system hardened** - `maxStackSize` implemented, race conditions fixed.
+- ✅ **Connection Sync** - Asymmetric sync issues resolved.
+- ⚠️ **Dual-state still exists** - MindMap objects remain as UI layer, Yjs is source of truth.
+- ⚠️ **O(n) Lookups** - `getBoxById` is still linear, affecting performance on large maps.
 - 📝 See [archive](./archive/) for detailed fix documentation
 
 ---
@@ -19,12 +20,11 @@ This document provides a critical analysis of the Yjs-based state management app
 
 ### 1. The Dual-State Contradiction
 
-**Problem**: The system maintains state in THREE places simultaneously, violating single-source-of-truth principle.
+**Problem**: The system maintains state in TWO places simultaneously, violating single-source-of-truth principle.
 
 **State Locations**:
 1. `yboxes` / `yconnections` (Yjs CRDT)
 2. `mindMap.boxes[]` / `mindMap.connections[]` (JavaScript objects)
-3. `localStorage['openmind_autosave']` (Serialized JSON)
 
 **Why This Is Problematic**:
 
@@ -83,12 +83,16 @@ Changes never persisted to localStorage
 - Real-time requires in-memory state
 - Collaboration requires CRDT (Yjs)
 
-**Better Alternative** (Not Implemented):
+**Status**: **PARTIALLY RESOLVED**
+- ✅ **Persistence**: Migrated to `y-indexeddb`. The "localStorage" risk is largely eliminated for data persistence.
+- ⚠️ **Runtime**: The dual-state between Yjs (CRDT) and `mindMap` (runtime objects) still exists and requires careful sync logic.
+
+**Implementation Update**:
 ```
-Use y-indexeddb provider:
+We now use y-indexeddb provider:
 - Yjs persists to IndexedDB automatically
-- Eliminates localStorage entirely
-- Single source of truth (Yjs)
+- Eliminates localStorage (except for small user settings)
+- Single source of truth for persistence (Yjs)
 - Async, no 5MB limit
 ```
 
@@ -135,22 +139,13 @@ BAD: yconnections fires first
   Works this time
 ```
 
-**Current Fix**: yconnections observer returns early during undo, letting yboxes handle it.
+**Current Fix**: 
+1. `yconnections` observer respects `isUndoRedo` flag.
+2. If `yconnections` detects that boxes also changed in the same transaction, it **returns early** and lets the `yboxes` observer handle the connection rebuild (lines 1616-1621 in `CollaborationManager.js`).
+3. `yboxes` observer explicitly calls `_rebuildConnectionsFromYjs()` during undo/redo (line 1514).
 
-**Side Effect**: Order-dependent logic scattered across observers. Future maintainers might not understand why.
-
-**Better Alternative**:
-```javascript
-// Single transaction observer
-ydoc.on('afterTransaction', (transaction) => {
-  if (transaction.origin === undoManager) {
-    // Process in deterministic order
-    _rebuildBoxesFromYjs();
-    _rebuildConnectionsFromYjs();
-    _syncConnectionsToYjsImpl();  // Sync back
-  }
-});
-```
+**Assessment**:
+The current approach is heavily documented in the code and handles the race condition correctly. While a single `afterTransaction` observer is cleaner conceptually, the current robust implementation reduces the urgency of a rewrite.
 
 ### 3. The isSyncing Flag Fragility
 
@@ -236,21 +231,15 @@ Total: ~7,200 operations in memory
 - Long-running sessions
 - Collaborative sessions (everyone's operations)
 
-**Current Mitigation**:
+**Current Status**: **RESOLVED**
 ```javascript
-clearUndoHistory();  // Called after loading from localStorage
-```
-
-**Problem**: Only clears at load, not during session.
-
-**Better Alternative**:
-```javascript
-undoManager = new Y.UndoManager([yboxes, yconnections], {
-  captureTimeout: 0,
-  trackedOrigins: new Set(),
-  maxStackSize: 100  // Limit to last 100 operations
+undoManager = new Y.UndoManager([this.yboxes, this.yconnections], {
+    captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
+    trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN]),
+    maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE // 200
 });
 ```
+We have implemented `maxStackSize: 200` to prevent memory leaks.
 
 ### 5. The 30-Second Window of Vulnerability
 
@@ -335,67 +324,19 @@ if (isUndoRedo) {
 ```
 
 **Fix Applied**:
-```javascript
-if (isUndoRedo) {
-  _rebuildConnectionsFromYjs();
-  // ✅ ADDED: Sync back
-  const localConns = this.mindMap.connections
-    .filter(c => c && c.fromBox && c.toBox && c.fromBox.id && c.toBox.id)
-    .map(c => ({ fromId: c.fromBox.id, toId: c.toBox.id }));
-  this._syncConnectionsToYjsImpl(localConns);
-}
-```
+The code now correctly handles connection syncing mostly via symmetric Yjs CRDT propagation.
+Crucially, during undo/redo, we **do NOT** manually sync connections back to Yjs in the observer, as this causes "phantom undo entries" (see `CollaborationManager.js` comments around line 1516).
+Instead, we rely on the fact that `undoManager.undo()` inherently updates the Yjs types (`yconnections`), which then propagates to peers automatically.
+
+**Status**: **RESOLVED**
 
 **Why This Was Missed**: Boxes sync via individual callbacks, connections sync as array. Inconsistent patterns.
 
 **Lesson**: Symmetric operations should use symmetric code paths.
 
-### 7. localStorage Quota Roulette
-
-**Problem**: 5-10 MB limit varies by browser, device, and settings.
-
-**Quota Varies**:
-- Chrome: 10 MB (typical)
-- Firefox: 10 MB (typical)
-- Safari: 5 MB (typical)
-- Private mode: 0-5 MB
-- Full disk: 0 MB
-
-**When User Hits Limit**:
-```javascript
-try {
-  localStorage.setItem(key, JSON.stringify(data));
-} catch (e) {
-  if (e.name === 'QuotaExceededError') {
-    // Try to prune old maps
-    pruneOldestCache();
-    // Retry once
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (retryError) {
-      // Show alert
-      alert('Storage quota exceeded. Please export your work.');
-      // ❌ Changes not saved
-    }
-  }
-}
-```
-
-**What Triggers Quota**:
-- Large images embedded in boxes
-- Many boxes (100+ is fine, 1000+ might hit it)
-- Multiple maps cached
-- Other site data (shared quota)
-
-**Current Handling**:
-✅ Try/catch with retry
-✅ Prune old caches
-✅ Alert user
-✅ Recommend export
-
-**Remaining Risk**: User might not export, close browser, lose work.
-
-**Better Alternative**: Don't use localStorage for images. Use object URLs with blob storage.
+**Status**: **OBSOLETE**
+With the migration to `y-indexeddb`, the main data is no longer stored in `localStorage`. `localStorage` is now only used for small user settings (userName, ID), which are unlikely to hit the quota.
+The 30-Second Window of Vulnerability is also **ELIMINATED** because IndexedDB persists changes almost immediately (async).
 
 ---
 
@@ -709,40 +650,29 @@ Despite 434 tests, some scenarios lack coverage:
 ### P0 (Critical - Do Immediately)
 
 1. **Add maxStackSize to undoManager** ✅ COMPLETED
-   - Prevents memory leak
-   - 1-line change
-   - No downsides
 
-2. **Add integration test for multi-user undo**
+2. **Migrate to y-indexeddb** ✅ COMPLETED
+   - Eliminates localStorage complexity
+   - Solves "30-second window" and "quota" issues
+
+3. **Add integration test for multi-user undo**
    - Validates critical fix
    - Prevents regression
 
 ### P1 (High - Next Sprint)
 
-1. **Reduce autosave interval to 10s**
-   - Reduces data loss window
-   - Minimal performance cost
-
-2. **Add beforeunload save**
-   - Catches explicit closes
-   - Simple addition
-
-3. **Map-based box lookup**
-   - Fixes O(n²) performance
-   - Enables large maps
+1. **Map-based box lookup**
+   - `MindMap.getBoxById` is currently O(n).
+   - This causes O(n²) behavior in `_rebuildConnectionsFromYjs` (which iterates connections and looks up boxes).
+   - **Action**: Change `mindMap.boxes` to a Map or add a lookup index.
 
 ### P2 (Medium - Next Quarter)
 
-1. **Migrate to y-indexeddb**
-   - Eliminates localStorage complexity
-   - Better performance
-   - Requires refactoring
+1. **Web Worker for serialization**
+   - Less critical now that we don't serialize for localStorage every 30s.
+   - Still useful for "Export to File".
 
-2. **Web Worker for serialization**
-   - Non-blocking saves
-   - Better UX for large maps
-
-3. **Performance benchmarks**
+2. **Performance benchmarks**
    - Identify bottlenecks
    - Prevent regressions
 

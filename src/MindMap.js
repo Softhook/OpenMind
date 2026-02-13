@@ -103,6 +103,11 @@ class MindMap {
     this.copiedBoxes = [];
     this.copiedConnections = [];
 
+    // O(1) Lookup Index
+    // Maps boxId -> TextBox instance
+    // Must be kept in sync with this.boxes array
+    this.boxIdMap = new Map();
+
     // Performance optimization: track if content has changed
     this.isDirty = true;
 
@@ -136,6 +141,9 @@ class MindMap {
     // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
     this._wrapInTransaction(() => {
       this.boxes.push(box);
+      if (box && box.id) {
+        this.boxIdMap.set(box.id, box);
+      }
       this.isDirty = true;
 
       // Notify collaboration system
@@ -144,6 +152,7 @@ class MindMap {
         MindMap.onBoxChange(box, true);
       }
     });
+
   }
 
   /**
@@ -153,8 +162,22 @@ class MindMap {
    */
   getBoxById(id) {
     if (!id || typeof id !== 'string') return null;
-    return this.boxes.find(box => box && box.id === id) || null;
+    return this.boxIdMap.get(id) || null;
   }
+
+  /**
+   * Rebuilds the O(1) lookup map from the current boxes array.
+   * Call this if the boxes array is modified directly (e.g. by CollaborationManager).
+   */
+  rebuildIndex() {
+    this.boxIdMap.clear();
+    for (const box of this.boxes) {
+      if (box && box.id) {
+        this.boxIdMap.set(box.id, box);
+      }
+    }
+  }
+
 
   /**
    * Adds a connection between two boxes
@@ -1364,9 +1387,11 @@ class MindMap {
       const newBox = TextBox.fromJSON(newBoxData);
       if (newBox) {
         this.boxes.push(newBox);
+        if (newBox.id) this.boxIdMap.set(newBox.id, newBox);
         this.addBoxToSelection(newBox);
         newBoxes.push(newBox);
       }
+
     }
 
     // Recreate connections between the pasted boxes
@@ -1410,7 +1435,9 @@ class MindMap {
       const index = this.boxes.indexOf(box);
       if (index > -1) {
         this.boxes.splice(index, 1);
+        if (box.id) this.boxIdMap.delete(box.id);
       }
+
 
       // Notify collaboration system of deletion
       if (MindMap.onBoxDelete && box.id) {
@@ -2732,7 +2759,9 @@ class MindMap {
     // Clean up existing references to prevent memory leaks
     this.boxes = [];
     this.connections = [];
+    if (this.boxIdMap) this.boxIdMap.clear();
     this.selectedBox = null;
+
     this.selectedConnection = null;
     this.connectingFrom = null;
     this.isArrowKeyNavigating = false; // Clear navigation state when loading new state
@@ -2752,7 +2781,11 @@ class MindMap {
           let box = TextBox.fromJSON(boxData);
           if (box) {
             this.boxes.push(box);
+            if (box.id && this.boxIdMap) {
+              this.boxIdMap.set(box.id, box);
+            }
           }
+
         } catch (e) {
           console.error('Failed to load box:', e);
         }

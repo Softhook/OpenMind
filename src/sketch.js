@@ -482,6 +482,12 @@ function _clearLocalState() {
   mindMap.boxes = [];
   mindMap.connections = [];
 
+  // Clear O(1) index
+  if (mindMap.boxIdMap) {
+    mindMap.boxIdMap.clear();
+  }
+
+
   // Clear selections
   mindMap.selectedBox = null;
   mindMap.selectedConnection = null;
@@ -2795,16 +2801,20 @@ async function handleFileLoad(file) {
     // Ensure the hidden file input is reset so selecting the same file again
     // will fire a change event in the browser and allow reloading the same file.
     try {
-      if (fileInput && fileInput.elt) {
-        fileInput.elt.value = '';
-      } else if (fileInput && typeof fileInput.value === 'function') {
-        // p5.Element fallback
-        fileInput.value('');
+      const input = (uiManager && uiManager.fileInput) ? uiManager.fileInput : null;
+      if (input) {
+        if (input.elt) {
+          input.elt.value = '';
+        } else if (typeof input.value === 'function') {
+          // p5.Element fallback
+          input.value('');
+        }
       }
     } catch (e) {
       // Non-fatal: browsers may restrict direct input manipulation
       console.warn('Failed to reset file input value:', e);
     }
+
   } catch (e) {
     console.error('Failed to load file:', e);
     alert('Failed to load file: ' + e.message);

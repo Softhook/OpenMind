@@ -1723,10 +1723,15 @@ class CollaborationManager {
         } else {
             // Create new box
             if (typeof TextBox !== 'undefined') {
-                box = TextBox.fromJSON(data);
+                const box = TextBox.fromJSON(data);
                 if (box) {
                     this.mindMap.boxes.push(box);
+                    // Maintain O(1) index
+                    if (this.mindMap.boxIdMap) {
+                        this.mindMap.boxIdMap.set(box.id, box);
+                    }
                 }
+
             }
         }
     }
@@ -1768,6 +1773,11 @@ class CollaborationManager {
             // Remove the box
             this.mindMap.boxes.splice(index, 1);
 
+            // Maintain O(1) index
+            if (this.mindMap.boxIdMap) {
+                this.mindMap.boxIdMap.delete(boxId);
+            }
+
             // Clear selection if this box was selected
             if (this.mindMap.selectedBox === box) {
                 this.mindMap.selectedBox = null;
@@ -1802,6 +1812,12 @@ class CollaborationManager {
             Utils.Logger.debug('[Cleanup] Removing local-only box:', box.id);
             return false;
         });
+
+        // Rebuild O(1) index after bulk operation
+        if (this.mindMap.rebuildIndex) {
+            this.mindMap.rebuildIndex();
+        }
+
 
         // Clear selection if selected box was removed
         if (this.mindMap.selectedBox && !yjsBoxIds.has(this.mindMap.selectedBox.id)) {
