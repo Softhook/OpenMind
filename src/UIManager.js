@@ -401,11 +401,29 @@ class UIManager {
     
     let x = startX;
     
+    // Temporarily show buttons to get accurate measurements
+    const buttonsToLayout = [
+      this.loadButton,
+      this.saveButton,
+      this.importTextButton,
+      this.exportPNGButton,
+      this.exportPDFButton,
+      this.exportTextButton,
+      this.keyboardControlsButton,
+      this.inviteButton
+    ];
+    
+    // Make visible for measurement
+    buttonsToLayout.forEach(btn => {
+      if (btn) btn.style('visibility', 'hidden', 'display', 'inline-block');
+    });
+    
     // Helper to position a button and advance x
     const positionButton = (button) => {
       if (button && button.elt) {
         button.position(x, buttonY);
-        x += button.elt.offsetWidth + buttonGap;
+        const width = button.elt.offsetWidth || 80; // Fallback width
+        x += width + buttonGap;
       }
     };
     
@@ -455,6 +473,11 @@ class UIManager {
       this.displayNameInput.position(x + leftGap, buttonY + yNudge);
       x += inputWidth + leftGap + buttonGap;
     }
+    
+    // Restore visibility based on current menu state
+    buttonsToLayout.forEach(btn => {
+      if (btn) btn.style('visibility', 'visible');
+    });
     
     // Update menu right edge for hover detection
     this.menuRightEdge = x + 10;
