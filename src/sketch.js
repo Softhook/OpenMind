@@ -75,23 +75,9 @@ const GRID_CONFIG = {
 
 let mindMap;
 let collaborationManager = null; // CollaborationManager for real-time sync
-let saveButton;
-let importTextButton;
-let loadButton;
-let fileInput;
-let importTextFileInput;
-let exportPNGButton;
-let exportPDFButton;
-let exportTextButton;
-let menuIsVisible = false;
-let keyboardControlsButton;
-let keyboardOverlay = null;
-let inviteButton = null; // Share button for collaboration
-let displayNameInput = null; // Text field for changing display name
-let keyboardOverlayContent = null;
-let keyboardOverlayVisible = false;
-let menuRightEdge = 600;
-let suppressMenuUntilMouseExit = false; // Prevent menu auto-show until cursor leaves band after blur
+let uiManager = null; // UIManager for all UI elements and interactions
+let exportManager = null; // ExportManager for PNG/PDF/Text exports
+let menuIsVisible = false; // Derived menu visibility flag (synced from uiManager)
 
 // Presence optimization: Idle detection for cursor/selection updates
 let lastPresenceBroadcast = {
@@ -692,7 +678,15 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
       if (prevStatus !== syncStatus) Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
 
-      try { layoutMenuButtons(); } catch (e) { }
+      // Update UI to reflect connection state
+      try { 
+        if (uiManager) {
+          Utils.Logger.state('[UI] Updating collaboration state, isConnected:', activeManager.isConnected);
+          uiManager.layoutButtons(); 
+        }
+      } catch (e) { 
+        console.error('[UI] Error updating collaboration state:', e);
+      }
     };
 
     let lastPeerCount = 0;
@@ -743,6 +737,18 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
+    
+    // Update UI buttons to reflect collaboration state
+    if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+      uiManager.updateCollaborationState();
+      
+      // Also schedule a delayed update in case connection state changes after initial call
+      setTimeout(() => {
+        if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+          uiManager.updateCollaborationState();
+        }
+      }, 500);
+    }
 
     // EXTENSION BRIDGE: Notify ThrustGame of new dependencies
     // If the game is loaded (even if dormant), we must poke it so it can
@@ -1303,14 +1309,20 @@ function setup() {
       initializeCollaboration(roomId, shouldShareLocalData);
     }
 
-    // Create UI buttons
-    setupUIButtons();
+    // Initialize Export Manager
+    exportManager = new ExportManager();
+    exportManager.initialize(window, mindMap, CONFIG);
 
-    // Lay out buttons neatly
-    layoutMenuButtons();
-
-    // Hide menu buttons initially
-    hideMenuButtons();
+    // Initialize UI Manager
+    uiManager = new UIManager();
+    uiManager.initialize(CONFIG, window, mindMap, collaborationManager, {
+      onLoadFile: handleFileLoad,
+      onImportText: handleTextImport,
+      onExportPNG: () => exportManager.exportPNG(),
+      onExportPDF: () => exportManager.exportPDF(),
+      onExportText: () => exportManager.exportText(),
+      onShareSession: shareSession
+    });
 
     // NOTE: With y-indexeddb, Yjs automatically persists to IndexedDB on every change.
     // We still run autosave as a backup mechanism for localStorage export/import compatibility.
@@ -1352,121 +1364,18 @@ function setup() {
 /**
  * Creates all UI buttons and file input
  */
-function setupUIButtons() {
-  loadButton = createButton('Load');
-  loadButton.position(100, 10);
-  loadButton.mousePressed(triggerFileLoad);
-
-  saveButton = createButton('Save');
-  saveButton.position(160, 10);
-  saveButton.mousePressed(() => {
-    // If in a collaborative room, use room name as suggested filename
-    if (collaborationManager && collaborationManager.roomName) {
-      const roomFilename = collaborationManager.roomName + '.json';
-      mindMap.setLastUsedFilename(roomFilename);
-    }
-    mindMap.save();
-  });
-
-  importTextButton = createButton('Import Text');
-  importTextButton.position(260, 10);
-  importTextButton.mousePressed(() => TextImporter.triggerImport(importTextFileInput));
-
-  exportPNGButton = createButton('Export PNG');
-  exportPNGButton.position(320, 10);
-  exportPNGButton.mousePressed(exportPNG);
-
-  exportPDFButton = createButton('Export PDF');
-  exportPDFButton.position(430, 10);
-  exportPDFButton.mousePressed(exportPDF);
-
-  exportTextButton = createButton('Export Text');
-  exportTextButton.position(530, 10);
-  exportTextButton.mousePressed(exportText);
-
-  keyboardControlsButton = createButton('Keyboard Controls');
-  keyboardControlsButton.position(630, 10);
-  keyboardControlsButton.mousePressed(toggleKeyboardControlsOverlay);
-  keyboardControlsButton.attribute('aria-expanded', 'false');
-
-  inviteButton = createButton('Start Collaboration');
-  inviteButton.position(780, 10);
-  inviteButton.mousePressed(shareSession);
-  inviteButton.style('background-color', '#4caf50');
-  inviteButton.style('color', 'white');
-
-  // Display name input - shown when connected to a room
-  // Styled to match buttons visually (green like Start Collaboration)
-  displayNameInput = createInput('');
-  displayNameInput.attribute('id', 'displayName');
-  displayNameInput.attribute('name', 'displayName');
-  displayNameInput.attribute('placeholder', 'Your name...');
-  displayNameInput.style('width', '110px');
-  displayNameInput.style('padding', '2px 8px');
-  displayNameInput.style('border', 'none');
-  displayNameInput.style('border-radius', '3px');
-  displayNameInput.style('background', '#4caf50');
-  displayNameInput.style('color', '#fff');
-  displayNameInput.style('font-size', '13px');
-  displayNameInput.style('font-family', 'inherit');
-  displayNameInput.style('display', 'none');
-  displayNameInput.style('box-sizing', 'border-box');
-  displayNameInput.style('outline', 'none');
-  displayNameInput.position(800, 10);
-
-  // Style placeholder text to be semi-transparent white
-  if (displayNameInput.elt) {
-    displayNameInput.elt.style.setProperty('--placeholder-color', 'rgba(255,255,255,0.7)');
-    // Add inline style for placeholder (works in most browsers)
-    const styleId = 'displayNameInputStyles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        input::placeholder { color: rgba(255,255,255,0.7); }
-      `;
-      document.head.appendChild(style);
-    }
-  }
-
-  attachDisplayNameInputHandlers(displayNameInput, {
-    collaborationManager,
-    onHideMenu: () => {
-      hideMenuButtons();
-      menuIsVisible = false;
-    },
-    requestMenuHide: () => {
-      suppressMenuUntilMouseExit = true;
-    },
-  });
-
-  setupKeyboardControlsOverlay();
-
-  // Ensure overlay sizing updates when the window resizes
-  addTrackedEventListener(window, 'resize', () => {
-    try { updateKeyboardOverlaySize(); } catch (_) { }
-  });
-  // Set initial size based on current viewport
-  try { updateKeyboardOverlaySize(); } catch (_) { }
-
-  // Create hidden file input for loading
-  fileInput = createFileInput(handleFileLoad);
-  fileInput.position(-200, -200);
-  fileInput.style('display', 'none');
-
-  // Create hidden file input for importing text
-  importTextFileInput = createFileInput((file) => TextImporter.handleFileImport(file, importTextFileInput));
-  importTextFileInput.position(-200, -200);
-  importTextFileInput.style('display', 'none');
-  importTextFileInput.attribute('accept', '.txt,.md,.text');
-}
-
 /**
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
   background(UI_COLORS.BACKGROUND);
-  updateMenuVisibility();
+  if (uiManager) {
+    // Hide menu buttons when overlays are showing to prevent blocking clicks
+    const hasOverlay = roomJoinConfirmation || syncStatus || isMapLoading;
+    uiManager.updateMenuVisibility(mouseX, mouseY, { forceHide: hasOverlay });
+    // Sync menuIsVisible with uiManager state
+    menuIsVisible = uiManager.isMenuVisible();
+  }
 
   if (mindMap) {
     try {
@@ -2129,236 +2038,6 @@ function handlePageBecameVisible() {
   }
 }
 
-/**
- * Updates menu visibility based on mouse position.
- * Shows menu when cursor is in trigger area or buttons band.
- */
-function updateMenuVisibility() {
-  const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
-  const inTrigger = validMouse && mouseX >= 0 && mouseY >= 0 &&
-    mouseX <= CONFIG.UI.MENU_TRIGGER_X && mouseY <= CONFIG.UI.MENU_TRIGGER_Y;
-
-  // Menu band extends full width of screen
-  const inButtonsBand = validMouse && mouseY >= 0 &&
-    mouseY <= CONFIG.UI.BUTTONS_BAND_HEIGHT && mouseX >= 0;
-
-  // Keep menu visible if the display name input has focus
-  const inputHasFocus = displayNameInput && displayNameInput.elt &&
-    document.activeElement === displayNameInput.elt;
-
-  let shouldShow = inTrigger || inButtonsBand || inputHasFocus;
-
-  // If a blur requested hiding, keep menu hidden until cursor leaves the band/trigger
-  if (suppressMenuUntilMouseExit) {
-    if (!inTrigger && !inButtonsBand) {
-      suppressMenuUntilMouseExit = false; // Reset once the cursor leaves the hover zone
-    } else {
-      shouldShow = inputHasFocus; // Allow showing only if input is refocused
-    }
-  }
-
-  if (shouldShow !== menuIsVisible) {
-    if (shouldShow) showMenuButtons(); else hideMenuButtons();
-    menuIsVisible = shouldShow;
-  }
-}
-
-/**
- * Shows all menu buttons by setting display style to inline-block
- */
-function showMenuButtons() {
-  // Guard if setup failed and buttons are not yet created
-  if (saveButton && saveButton.style) saveButton.style('display', 'inline-block');
-  if (importTextButton && importTextButton.style) importTextButton.style('display', 'inline-block');
-  if (loadButton && loadButton.style) loadButton.style('display', 'inline-block');
-  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'inline-block');
-  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'inline-block');
-  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'inline-block');
-  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'inline-block');
-  if (inviteButton && inviteButton.style) inviteButton.style('display', 'inline-block');
-  // Show display name input only when connected
-  if (collaborationManager && collaborationManager.isConnected) {
-    if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'inline-block');
-  }
-}
-
-/**
- * Hides all menu buttons by setting display style to none
- */
-function hideMenuButtons() {
-  if (saveButton && saveButton.style) saveButton.style('display', 'none');
-  if (importTextButton && importTextButton.style) importTextButton.style('display', 'none');
-  if (loadButton && loadButton.style) loadButton.style('display', 'none');
-  if (exportPNGButton && exportPNGButton.style) exportPNGButton.style('display', 'none');
-  if (exportPDFButton && exportPDFButton.style) exportPDFButton.style('display', 'none');
-  if (exportTextButton && exportTextButton.style) exportTextButton.style('display', 'none');
-  if (keyboardControlsButton && keyboardControlsButton.style) keyboardControlsButton.style('display', 'none');
-  if (inviteButton && inviteButton.style) inviteButton.style('display', 'none');
-  if (displayNameInput && displayNameInput.style) displayNameInput.style('display', 'none');
-}
-
-/**
- * Positions all menu buttons horizontally with proper spacing.
- * Order: Load, Save, Import Text, Export PNG, Export PDF, Export Text, Keyboard Controls
- */
-function layoutMenuButtons() {
-  const startX = CONFIG.UI.BUTTON_START_X;
-  const y = CONFIG.UI.BUTTON_Y;
-  const gap = CONFIG.UI.BUTTON_GAP;
-
-  // Ensure buttons are displayed to get proper widths
-  loadButton.style('display', 'inline-block');
-  saveButton.style('display', 'inline-block');
-  importTextButton.style('display', 'inline-block');
-  exportPNGButton.style('display', 'inline-block');
-  exportPDFButton.style('display', 'inline-block');
-  exportTextButton.style('display', 'inline-block');
-  keyboardControlsButton.style('display', 'inline-block');
-
-  const w = (el) => (el && el.elt && el.elt.offsetWidth) ? el.elt.offsetWidth : 100;
-
-  let x = startX;
-  loadButton.position(x, y); x += w(loadButton) + gap;
-  saveButton.position(x, y); x += w(saveButton) + gap;
-  importTextButton.position(x, y); x += w(importTextButton) + gap;
-  exportPNGButton.position(x, y); x += w(exportPNGButton) + gap;
-  exportPDFButton.position(x, y); x += w(exportPDFButton) + gap;
-  exportTextButton.position(x, y); x += w(exportTextButton) + gap;
-  keyboardControlsButton.position(x, y); x += w(keyboardControlsButton) + gap;
-
-  if (inviteButton) {
-    // Check if collaboration is active to update text/style
-    if (collaborationManager && collaborationManager.isConnected) {
-      inviteButton.html('Share Link');
-      inviteButton.style('background-color', '#2196f3');
-    } else {
-      inviteButton.html('Start Collaboration');
-      inviteButton.style('background-color', '#4caf50');
-    }
-    inviteButton.style('display', 'inline-block');
-    inviteButton.position(x, y); x += w(inviteButton) + gap;
-  }
-
-  // Display name input - only show and position when connected
-  if (displayNameInput && collaborationManager && collaborationManager.isConnected) {
-    displayNameInput.style('display', 'inline-block');
-    // Ensure the input visually matches the buttons: height, vertical alignment and spacing
-    const refBtn = keyboardControlsButton && keyboardControlsButton.elt ? keyboardControlsButton.elt : null;
-    const btnHeight = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : 28;
-    // Make input match button height and center text vertically
-    displayNameInput.style('height', btnHeight + 'px');
-    displayNameInput.style('line-height', btnHeight + 'px');
-    displayNameInput.style('padding', '0 8px');
-
-    // Set placeholder to current name if input is empty
-    if (!displayNameInput.value() && collaborationManager.getUserName) {
-      displayNameInput.attribute('placeholder', collaborationManager.getUserName() || 'Your name...');
-    }
-
-    // Ensure a reliable left gap from the previous button (some browsers report 0 width briefly)
-    const leftGap = Math.max(8, gap);
-
-    // Determine input width (fall back to configured style or 110px)
-    let inputWidth = 120;
-    try {
-      if (displayNameInput.elt) {
-        // Prefer explicit styled width, then measured offsetWidth
-        const styled = displayNameInput.elt.style && displayNameInput.elt.style.width;
-        if (styled && styled.match(/\d+/)) {
-          inputWidth = parseInt(styled, 10);
-        } else if (displayNameInput.elt.offsetWidth) {
-          inputWidth = displayNameInput.elt.offsetWidth;
-        }
-      }
-    } catch (_) { }
-
-    // Vertical nudge to better align the input with button baseline
-    const btnOffsetH = (refBtn && refBtn.offsetHeight) ? refBtn.offsetHeight : btnHeight;
-    const inputOffsetH = (displayNameInput.elt && displayNameInput.elt.offsetHeight) ? displayNameInput.elt.offsetHeight : btnOffsetH;
-    const yNudge = Math.round((btnOffsetH - inputOffsetH) / 2);
-
-    // Position the input with an explicit gap and vertical nudge
-    displayNameInput.position(x + leftGap, y + yNudge);
-    x += leftGap + inputWidth;
-  } else if (displayNameInput) {
-    displayNameInput.style('display', 'none');
-  }
-
-  // Update the hover band to cover to the right of the last button
-  menuRightEdge = x + 10;
-}
-
-// ============================================================================
-// KEYBOARD CONTROLS OVERLAY (delegated to KeyboardOverlay.js module)
-// ============================================================================
-
-/**
- * Sets up the keyboard controls overlay.
- * @see KeyboardOverlay.setup for implementation
- */
-function setupKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    const refs = KeyboardOverlay.setup({ keyboardControlsButton });
-    if (refs) {
-      keyboardOverlay = refs.overlay;
-      keyboardOverlayContent = refs.overlayContent;
-    }
-  }
-}
-
-/**
- * Populates the keyboard controls overlay with shortcuts.
- * @see KeyboardOverlay.populate for implementation
- */
-function populateKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.populate();
-  }
-}
-
-/**
- * Shows the keyboard controls overlay.
- * @see KeyboardOverlay.show for implementation
- */
-function showKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.show(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
-/**
- * Hides the keyboard controls overlay.
- * @see KeyboardOverlay.hide for implementation
- */
-function hideKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.hide(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
-/**
- * Updates overlay content size to fit viewport.
- * @see KeyboardOverlay.updateSize for implementation
- */
-function updateKeyboardOverlaySize() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.updateSize();
-  }
-}
-
-/**
- * Toggles the keyboard controls overlay visibility.
- * @see KeyboardOverlay.toggle for implementation
- */
-function toggleKeyboardControlsOverlay() {
-  if (typeof KeyboardOverlay !== 'undefined') {
-    KeyboardOverlay.toggle(keyboardControlsButton);
-    keyboardOverlayVisible = KeyboardOverlay.isVisible();
-  }
-}
-
 // ============================================================================
 // MOBILE NAVIGATION (delegated to MobileNavigation.js module)
 // ============================================================================
@@ -2379,7 +2058,7 @@ function toggleKeyboardControlsOverlay() {
  * Handles mouse press events
  */
 function mousePressed(e) {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   // Ignore clicks on UI elements (buttons, inputs, etc.)
   // Only handle clicks directly on the canvas
@@ -2480,6 +2159,11 @@ function mousePressed(e) {
       syncStatus = null;
       // Also clear the hash to prevent auto-reconnect
       if (typeof window !== 'undefined') window.location.hash = '';
+      
+      // Update UI buttons after disconnection
+      if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+        uiManager.updateCollaborationState();
+      }
       return;
     }
     return;
@@ -2522,7 +2206,7 @@ function mousePressed(e) {
  * Handles mouse release events
  */
 function mouseReleased() {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   if (CameraUtils.isPanning) {
     // If we were panning with right mouse, suppress the subsequent right-click action if it moved
@@ -2557,7 +2241,7 @@ function mouseReleased() {
  * Handles mouse drag events
  */
 function mouseDragged() {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
 
   if (CameraUtils.isPanning) {
     // Screen-space pan with soft limits
@@ -2750,10 +2434,10 @@ function keyPressed() {
     }
   }
 
-  if (keyboardOverlayVisible) {
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) {
     const escapeCode = (typeof ESCAPE !== 'undefined') ? ESCAPE : 27;
     if (keyCode === escapeCode || key === 'Escape') {
-      hideKeyboardControlsOverlay();
+      uiManager.hideKeyboardOverlay();
     }
     return false;
   }
@@ -3116,6 +2800,23 @@ async function handleFileLoad(file) {
     alert('Failed to load file: ' + e.message);
   } finally {
     isMapLoading = false;
+  }
+}
+
+/**
+ * Handle text file import for creating mind maps from text documents
+ * @param {Object} file - p5.js file object with text content
+ */
+async function handleTextImport(file) {
+  try {
+    // Get the file input element from uiManager
+    const fileInput = uiManager ? uiManager.importTextFileInput : null;
+    
+    // Delegate to TextImporter
+    await TextImporter.handleFileImport(file, fileInput);
+  } catch (e) {
+    console.error('Text import failed:', e);
+    alert('Failed to import text file: ' + e.message);
   }
 }
 
@@ -3565,6 +3266,11 @@ function windowResized() {
   if (now - lastResizeTime > debounceMs) {
     resizeCanvas(windowWidth, windowHeight);
     lastResizeTime = now;
+    
+    // Reposition UI buttons after resize
+    if (uiManager && typeof uiManager.handleResize === 'function') {
+      uiManager.handleResize();
+    }
   }
 }
 
@@ -3574,7 +3280,7 @@ function windowResized() {
  * @returns {boolean} false to prevent default browser behavior
  */
 function mouseWheel(event) {
-  if (keyboardOverlayVisible) return false;
+  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
   // Only when over the canvas area
   const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
   if (!overCanvas) return;
@@ -3843,676 +3549,27 @@ function isOverAnyInteractive() {
 /**
  * Exports the mind map as a PNG image
  */
-function exportPNG() {
-  try {
-    // Validate mindMap
-    if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
-      alert('No content to export');
-      return;
-    }
-
-    // Get content bounds in world space
-    const bounds = getContentBounds();
-    const contentWidth = bounds.maxX - bounds.minX;
-    const contentHeight = bounds.maxY - bounds.minY;
-
-    // Add padding
-    const padding = CONFIG.EXPORT.PADDING;
-    const totalWidth = contentWidth + padding * 2;
-    const totalHeight = contentHeight + padding * 2;
-
-    // Create an offscreen graphics buffer at the content size (rounded to integers)
-    const bufW = Math.max(1, Math.ceil(totalWidth));
-    const bufH = Math.max(1, Math.ceil(totalHeight));
-    const pg = createGraphics(bufW, bufH);
-
-    // Calculate the offset to map world space to buffer space
-    const offsetX = padding - bounds.minX;
-    const offsetY = padding - bounds.minY;
-
-    // Draw the mind map into the buffer
-    pg.push();
-    pg.translate(offsetX, offsetY);
-    pg.background(240);
-
-    // Draw connections
-    for (let conn of mindMap.connections) {
-      if (!conn || !conn.fromBox || !conn.toBox) continue;
-
-      let start = conn.fromBox.getConnectionPoint(conn.toBox);
-      let end = conn.toBox.getConnectionPoint(conn.fromBox);
-
-      if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
-        continue;
-      }
-
-      pg.stroke(80);
-      pg.strokeWeight(2);
-      pg.line(start.x, start.y, end.x, end.y);
-
-      // Draw arrow
-      let angle = Math.atan2(end.y - start.y, end.x - start.x);
-      if (!isNaN(angle)) {
-        pg.fill(80);
-        pg.noStroke();
-        pg.push();
-        pg.translate(end.x, end.y);
-        pg.rotate(angle);
-        pg.triangle(0, 0, -10, -5, -10, 5);
-        pg.pop();
-      }
-    }
-
-    // Draw boxes
-    for (let box of mindMap.boxes) {
-      if (!box) continue;
-
-      if (box.x == null || box.y == null || box.width == null || box.height == null ||
-        isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
-        continue;
-      }
-
-      // Draw box background (use box background color if available)
-      if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
-        pg.fill(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
-      } else {
-        pg.fill(255);
-      }
-      pg.stroke(100);
-      pg.strokeWeight(1);
-      pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height, box.cornerRadius);
-
-      // If this box contains an image, draw the image into the export buffer
-      if (box.imageUrl) {
-        try {
-          if (box.imageLoaded && box.img) {
-            // Preserve aspect ratio and center the image inside the box
-            const iw = (box.naturalImageWidth && box.naturalImageWidth > 0) ? box.naturalImageWidth : box.img.width;
-            const ih = (box.naturalImageHeight && box.naturalImageHeight > 0) ? box.naturalImageHeight : box.img.height;
-            const scale = Math.min(box.width / iw, box.height / ih);
-            const drawW = iw * scale;
-            const drawH = ih * scale;
-            pg.imageMode(CENTER);
-            pg.image(box.img, box.x, box.y, drawW, drawH);
-          } else if (box.imageLoadError) {
-            pg.fill(240);
-            pg.noStroke();
-            pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
-            pg.fill(120);
-            pg.textAlign(CENTER, CENTER);
-            pg.textSize(12);
-            pg.text('Failed to load image', box.x, box.y);
-          } else {
-            pg.fill(240);
-            pg.noStroke();
-            pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
-            pg.fill(100);
-            pg.textAlign(CENTER, CENTER);
-            pg.textSize(12);
-            pg.text('Loading image...', box.x, box.y);
-          }
-        } catch (e) {
-          // Fallback placeholder on any drawing error
-          pg.fill(220);
-          pg.noStroke();
-          pg.rect(box.x - box.width / 2 + 4, box.y - box.height / 2 + 4, box.width - 8, box.height - 8, 0);
-          pg.fill(80);
-          pg.textAlign(CENTER, CENTER);
-          pg.textSize(12);
-          pg.text('Image', box.x, box.y);
-        }
-        continue; // skip text drawing for image boxes
-      }
-
-      // Draw text
-      pg.fill(0);
-      pg.noStroke();
-      pg.textAlign(LEFT, CENTER);
-      pg.textSize(box.fontSize);
-
-      // Use TextBox's wrapText to populate cachedLineCharMap for highlight alignment
-      let wrappedLines = (typeof box.wrapText === 'function') ? box.wrapText(box.text || '') : getWrappedLines(box);
-      let lineHeight = box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5);
-      let startY = (box.y - box.height / 2) + box.padding + lineHeight / 2;
-      let textX = box.x - box.width / 2 + box.padding;
-
-      // Draw highlights behind text
-      try {
-        if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
-          const textStr = String(box.text || '');
-          const map = box.cachedLineCharMap || [];
-          const getLinePos = (absPos) => {
-            if (!map || map.length === 0) return { lineIndex: 0, posInLine: 0 };
-            let idx = 0;
-            for (let i = 0; i < map.length; i++) {
-              const s = map[i];
-              const e = (i < map.length - 1) ? map[i + 1] : textStr.length;
-              const last = (i === map.length - 1);
-              if ((absPos >= s && absPos < e) || (last && absPos >= s && absPos <= e)) { idx = i; break; }
-              if (last) idx = i;
-            }
-            const posInLine = Math.min(absPos - map[idx], (wrappedLines[idx] || '').length);
-            return { lineIndex: idx, posInLine };
-          };
-          pg.noStroke();
-          for (const hl of box.highlights) {
-            if (!hl || hl.start == null || hl.end == null) continue;
-            const start = Math.max(0, Math.min(textStr.length, Math.floor(hl.start)));
-            const end = Math.max(0, Math.min(textStr.length, Math.floor(hl.end)));
-            if (end <= start) continue;
-            const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
-            const alpha = (c.a != null) ? c.a : 180;
-            pg.fill(c.r, c.g, c.b, alpha);
-            const sInfo = getLinePos(start);
-            const eInfo = getLinePos(end);
-            if (sInfo.lineIndex === eInfo.lineIndex) {
-              const lineText = wrappedLines[sInfo.lineIndex] || '';
-              const x1 = textX + pg.textWidth(lineText.slice(0, Math.max(0, sInfo.posInLine)));
-              const x2 = textX + pg.textWidth(lineText.slice(0, Math.max(0, eInfo.posInLine)));
-              const y = startY + sInfo.lineIndex * lineHeight;
-              pg.rect(x1, y - lineHeight / 3, Math.max(0, x2 - x1), lineHeight * 0.67);
-            } else {
-              for (let li = sInfo.lineIndex; li <= eInfo.lineIndex; li++) {
-                if (li < 0 || li >= wrappedLines.length) continue;
-                const lineText = wrappedLines[li] || '';
-                const y = startY + li * lineHeight;
-                let x1, x2;
-                if (li === sInfo.lineIndex) {
-                  x1 = textX + pg.textWidth(lineText.slice(0, Math.max(0, sInfo.posInLine)));
-                  x2 = textX + pg.textWidth(lineText);
-                } else if (li === eInfo.lineIndex) {
-                  x1 = textX;
-                  x2 = textX + pg.textWidth(lineText.slice(0, Math.max(0, eInfo.posInLine)));
-                } else {
-                  x1 = textX;
-                  x2 = textX + pg.textWidth(lineText);
-                }
-                pg.rect(x1, y - lineHeight / 3, Math.max(0, x2 - x1), lineHeight * 0.67);
-              }
-            }
-          }
-          pg.fill(0);
-        }
-      } catch (_) { }
-
-      for (let i = 0; i < wrappedLines.length; i++) {
-        let lineText = wrappedLines[i];
-        if (lineText == null) continue;
-
-        const lineStartPos = (box.cachedLineCharMap && box.cachedLineCharMap[i] !== undefined)
-          ? box.cachedLineCharMap[i]
-          : 0;
-
-        let xPos = textX;
-        for (let ci = 0; ci < lineText.length; ci++) {
-          const ch = lineText[ci];
-          const absPos = lineStartPos + ci;
-          const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
-          const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
-
-          if (ch === ' ') {
-            xPos += pg.textWidth(' ');
-            continue;
-          }
-
-          const yPos = startY + i * lineHeight;
-          pg.push();
-          pg.translate(xPos, yPos);
-          if (isItalic) pg.shearX(TextBox.ITALIC_SHEAR_RADIANS);
-          if (isBold) {
-            pg.stroke(0);
-            pg.strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
-          } else {
-            pg.noStroke();
-          }
-          pg.text(ch, 0, 0);
-          pg.pop();
-
-          xPos += pg.textWidth(ch);
-        }
-      }
-    }
-
-    pg.pop();
-
-    // Save the buffer as PNG by converting to a data URL and downloading
-    try {
-      const dataUrl = pg.canvas && pg.canvas.toDataURL ? pg.canvas.toDataURL('image/png') : null;
-      if (dataUrl) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = 'mindmap.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } else if (typeof saveCanvas === 'function') {
-        // Fallback to p5 saveCanvas if available
-        saveCanvas(pg, 'mindmap', 'png');
-      } else {
-        throw new Error('Unable to generate PNG data');
-      }
-    } catch (e) {
-      console.error('Failed to save PNG:', e);
-      alert('Failed to save PNG: ' + e.message);
-    }
-  } catch (e) {
-    console.error('Failed to export PNG:', e);
-    alert('Failed to export PNG: ' + e.message);
-  }
-}
-
-// ============================================================================
-// TEXT WRAPPING UTILITIES
-// ============================================================================
-
 /**
- * Wraps text for a box based on its width, padding, and font size.
- * This shared utility is used for exports (PNG, PDF) since they use offscreen buffers.
- * 
- * @param {Object} box - The text box to wrap text for
- * @returns {Array<string>} Array of wrapped text lines
+ * Exports the mind map as a PNG image
+ * Delegates to ExportManager
  */
-function getWrappedLines(box) {
-  // Validate box and its properties
-  if (!box || !box.text || box.width == null || box.padding == null || box.fontSize == null) {
-    return [''];
+function exportPNG() {
+  if (exportManager) {
+    exportManager.exportPNG();
+  } else {
+    console.error('ExportManager not initialized');
   }
-
-  let lines = String(box.text).split('\n');
-  let wrappedLines = [];
-  let baseWidth = (box.width != null && isFinite(box.width)) ? box.width : (box.minWidth || 80);
-  let maxTextWidth = max(10, baseWidth - box.padding * 2);
-
-  // Set text size to match box font size for accurate measurements
-  textSize(box.fontSize);
-
-  for (let line of lines) {
-    // Handle empty lines (explicit newlines)
-    if (!line || line === '') {
-      wrappedLines.push('');
-      continue;
-    }
-
-    // If line fits within width, add it as-is
-    if (textWidth(line) <= maxTextWidth) {
-      wrappedLines.push(line);
-    } else {
-      // Line is too long, wrap by words
-      let words = line.split(' ');
-      let currentLine = '';
-
-      for (let i = 0; i < words.length; i++) {
-        let testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-
-        if (textWidth(testLine) <= maxTextWidth) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) {
-            wrappedLines.push(currentLine);
-            currentLine = words[i];
-          } else {
-            // Single word is too long, break it by characters
-            let word = words[i];
-            let charLine = '';
-            for (let char of word) {
-              if (textWidth(charLine + char) <= maxTextWidth) {
-                charLine += char;
-              } else {
-                if (charLine) wrappedLines.push(charLine);
-                charLine = char;
-              }
-            }
-            currentLine = charLine;
-          }
-        }
-      }
-
-      if (currentLine) {
-        wrappedLines.push(currentLine);
-      }
-    }
-  }
-
-  return wrappedLines.length > 0 ? wrappedLines : [''];
 }
 
 /**
  * Exports the mind map as a PDF document
+ * Delegates to ExportManager
  */
 async function exportPDF() {
-  try {
-    // Validate dependencies
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-      throw new Error('jsPDF library not loaded');
-    }
-
-    // Validate mindMap and its data
-    if (!mindMap || !mindMap.boxes || !mindMap.connections) {
-      throw new Error('MindMap not properly initialized');
-    }
-
-    if (mindMap.boxes.length === 0) {
-      alert('No content to export');
-      return;
-    }
-
-    // Create PDF using jsPDF
-    const { jsPDF } = window.jspdf;
-
-    // Get content bounds in world space
-    const bounds = getContentBounds();
-    const contentWidth = bounds.maxX - bounds.minX;
-    const contentHeight = bounds.maxY - bounds.minY;
-    const contentCenterX = (bounds.minX + bounds.maxX) / 2;
-    const contentCenterY = (bounds.minY + bounds.maxY) / 2;
-
-    // Add some padding around content
-    const padding = CONFIG.EXPORT.PADDING;
-    const totalWidth = contentWidth + padding * 2;
-    const totalHeight = contentHeight + padding * 2;
-
-    // Choose orientation based on content aspect ratio
-    const isLandscape = totalWidth > totalHeight;
-    const pdf = new jsPDF({
-      orientation: isLandscape ? 'landscape' : 'portrait',
-      unit: 'pt',
-      format: 'a4'
-    });
-
-    // Get PDF dimensions
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    // Calculate scaling to fit all content to page with margins
-    const margin = CONFIG.EXPORT.MARGIN;
-    const scale = Math.min(
-      (pageWidth - 2 * margin) / totalWidth,
-      (pageHeight - 2 * margin) / totalHeight
-    );
-
-    // Validate scale
-    if (!isFinite(scale) || scale <= 0 || isNaN(scale)) {
-      throw new Error('Invalid scaling calculation');
-    }
-
-    // Calculate offset to center the content on the page
-    // We need to map world space to PDF space
-    const offsetX = margin - bounds.minX * scale + (pageWidth - totalWidth * scale) / 2;
-    const offsetY = margin - bounds.minY * scale + (pageHeight - totalHeight * scale) / 2;
-
-    // Helper function to transform world coordinates to PDF coordinates
-    function tx(worldX) { return offsetX + worldX * scale; }
-    function ty(worldY) { return offsetY + worldY * scale; }
-    function ts(size) { return size * scale; }
-
-    // Preload/convert images for PDF export (convert to JPEG where possible so jsPDF accepts them)
-    const imageDataMap = new Map();
-    try {
-      const imageBoxes = mindMap.boxes.filter(b => b && b.imageUrl);
-      if (imageBoxes.length > 0) {
-        const imgPromises = imageBoxes.map(async (b) => {
-          try {
-            // Force JPEG output to maximise compatibility with jsPDF
-            const dataUrl = await convertDataUrlToWebP(b.imageUrl, { maxWidth: 1600, maxHeight: 1600, quality: 0.85, mimeType: 'image/jpeg' });
-            if (dataUrl) imageDataMap.set(b, dataUrl);
-          } catch (e) {
-            console.warn('Failed to prepare image for PDF export', e);
-          }
-        });
-        await Promise.all(imgPromises);
-      }
-    } catch (e) {
-      console.warn('Image prefetch for PDF failed', e);
-    }
-
-    // Draw connections first (behind boxes)
-    pdf.setLineWidth(ts(2));
-    for (let conn of mindMap.connections) {
-      if (!conn || !conn.fromBox || !conn.toBox) continue;
-
-      let start = conn.fromBox.getConnectionPoint(conn.toBox);
-      let end = conn.toBox.getConnectionPoint(conn.fromBox);
-
-      // Validate connection points
-      if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
-        continue;
-      }
-
-      // Set color
-      if (conn.selected) {
-        pdf.setDrawColor(100, 150, 255);
-        pdf.setFillColor(100, 150, 255);
-        pdf.setLineWidth(ts(3));
-      } else {
-        pdf.setDrawColor(80, 80, 80);
-        pdf.setFillColor(80, 80, 80);
-        pdf.setLineWidth(ts(2));
-      }
-
-      // Draw line
-      pdf.line(tx(start.x), ty(start.y), tx(end.x), ty(end.y));
-
-      // Draw arrow head
-      let angle = Math.atan2(end.y - start.y, end.x - start.x);
-
-      // Validate angle
-      if (isNaN(angle)) continue;
-
-      let arrowSize = ts(10);
-
-      let x1 = tx(end.x);
-      let y1 = ty(end.y);
-      let x2 = x1 - arrowSize * Math.cos(angle - Math.PI / 6);
-      let y2 = y1 - arrowSize * Math.sin(angle - Math.PI / 6);
-      let x3 = x1 - arrowSize * Math.cos(angle + Math.PI / 6);
-      let y3 = y1 - arrowSize * Math.sin(angle + Math.PI / 6);
-
-      pdf.triangle(x1, y1, x2, y2, x3, y3, 'F');
-    }
-
-    // Draw boxes
-    pdf.setLineWidth(ts(1));
-    for (let box of mindMap.boxes) {
-      if (!box) continue;
-
-      // Validate box properties
-      if (box.x == null || box.y == null || box.width == null || box.height == null ||
-        isNaN(box.x) || isNaN(box.y) || isNaN(box.width) || isNaN(box.height)) {
-        continue;
-      }
-
-      let boxX = tx(box.x - box.width / 2);
-      let boxY = ty(box.y - box.height / 2);
-      let boxW = ts(box.width);
-      let boxH = ts(box.height);
-
-      // Set fill color from box background; outline slightly heavier when selected
-      if (box.backgroundColor && Number.isFinite(box.backgroundColor.r)) {
-        pdf.setFillColor(box.backgroundColor.r, box.backgroundColor.g, box.backgroundColor.b);
-      } else {
-        pdf.setFillColor(255, 255, 255);
-      }
-      if (box.selected) {
-        pdf.setDrawColor(60, 120, 255);
-        pdf.setLineWidth(ts(2));
-      } else {
-        pdf.setDrawColor(100, 100, 100);
-        pdf.setLineWidth(ts(1));
-      }
-
-      // Draw rounded rectangle
-      pdf.roundedRect(boxX, boxY, boxW, boxH, ts(box.cornerRadius), ts(box.cornerRadius), 'FD');
-
-      // If this box contains an image and we have a prepared data URL, embed it into the PDF
-      if (box.imageUrl) {
-        const dataUrl = imageDataMap.get(box);
-        if (dataUrl) {
-          try {
-            const format = dataUrl.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
-            // Compute draw size preserving aspect ratio
-            const imgWpx = box.naturalImageWidth || box.width || 1;
-            const imgHpx = box.naturalImageHeight || box.height || 1;
-            let drawW = boxW;
-            let drawH = boxH;
-            if (imgWpx && imgHpx) {
-              const aspect = imgWpx / imgHpx;
-              if ((boxW / boxH) > aspect) {
-                drawW = boxH * aspect;
-              } else {
-                drawH = boxW / aspect;
-              }
-            }
-            const imgX = boxX + (boxW - drawW) / 2;
-            const imgY = boxY + (boxH - drawH) / 2;
-            pdf.addImage(dataUrl, format, imgX, imgY, drawW, drawH);
-            // skip text rendering for image boxes
-            continue;
-          } catch (e) {
-            console.warn('Failed to add image to PDF for box', e);
-            // fall back to text rendering placeholder below
-          }
-        }
-        // If we couldn't add the image, draw a light placeholder inside the box
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setFillColor(245, 245, 245);
-        pdf.rect(boxX + ts(4), boxY + ts(4), boxW - ts(8), boxH - ts(8), 'F');
-      }
-
-      // Draw text (for non-image boxes and fallbacks)
-      pdf.setFontSize(ts(box.fontSize));
-      pdf.setTextColor(0, 0, 0);
-
-      // Prefer TextBox's wrapText to obtain line-to-absolute mapping for highlights
-      let wrappedLines = (typeof box.wrapText === 'function') ? box.wrapText(box.text || '') : getWrappedLines(box);
-      let lineHeight = ts(box.fontSize * (TextBox.LINE_HEIGHT_MULTIPLIER || 1.5));
-      // Top-anchored text in PDF: use top baseline and align highlights to the same top
-      let startY = ty(box.y - box.height / 2) + ts(box.padding);
-      let textX = tx(box.x - box.width / 2 + box.padding);
-
-      // Helper: measure text width in current PDF font with scaling
-      const textWidthPdf = (s) => {
-        try { return pdf.getTextWidth(String(s)); } catch (_) { return String(s).length * (box.fontSize * 0.6); }
-      };
-
-      // Use native font weights/styles for export (bold/italic) and accurate measurements
-      const pdfFontName = 'helvetica';
-      let currentStyle = 'normal';
-      const ensureFont = (style) => {
-        if (currentStyle !== style) {
-          pdf.setFont(pdfFontName, style);
-          currentStyle = style;
-        }
-      };
-
-      // Draw persistent highlights behind text using rectangles, accounting for bold/italic width
-      try {
-        if (box.highlights && box.highlights.length > 0 && Array.isArray(wrappedLines)) {
-          const textStr = String(box.text || '');
-          const map = box.cachedLineCharMap || [];
-
-          const getLinePos = (absPos) => {
-            if (!map || map.length === 0) return { lineIndex: 0, posInLine: 0 };
-            let idx = 0;
-            for (let i = 0; i < map.length; i++) {
-              const startPos = map[i];
-              const endPos = (i < map.length - 1) ? map[i + 1] : textStr.length;
-              const isLast = (i === map.length - 1);
-              if ((absPos >= startPos && absPos < endPos) || (isLast && absPos >= startPos && absPos <= endPos)) { idx = i; break; }
-              if (isLast) idx = i;
-            }
-            const posInLine = Math.min(absPos - map[idx], (wrappedLines[idx] || '').length);
-            return { lineIndex: idx, posInLine };
-          };
-
-          const measureStyledWidth = (lineText, startIdx, endIdx, lineStartPos) => {
-            if (!lineText) return 0;
-            let w = 0;
-            const limit = Math.min(endIdx, lineText.length);
-            for (let k = startIdx; k < limit; k++) {
-              const absPos = lineStartPos + k;
-              const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
-              const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
-              const style = (isBold && isItalic) ? 'bolditalic' : (isBold ? 'bold' : (isItalic ? 'italic' : 'normal'));
-              ensureFont(style);
-              w += textWidthPdf(lineText[k]);
-            }
-            return w;
-          };
-
-          for (const hl of box.highlights) {
-            if (!hl || hl.start == null || hl.end == null) continue;
-            const start = Math.max(0, Math.min(textStr.length, Math.floor(hl.start)));
-            const end = Math.max(0, Math.min(textStr.length, Math.floor(hl.end)));
-            if (end <= start) continue;
-            const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
-            pdf.setFillColor(c.r || 255, c.g || 255, c.b || 0);
-            const sInfo = getLinePos(start);
-            const eInfo = getLinePos(end);
-            if (sInfo.lineIndex === eInfo.lineIndex) {
-              const lineText = wrappedLines[sInfo.lineIndex] || '';
-              const lineStartPos = (map && map[sInfo.lineIndex] !== undefined) ? map[sInfo.lineIndex] : 0;
-              const x1 = textX + measureStyledWidth(lineText, 0, Math.max(0, sInfo.posInLine), lineStartPos);
-              const x2 = textX + measureStyledWidth(lineText, 0, Math.max(0, eInfo.posInLine), lineStartPos);
-              const yTop = startY + sInfo.lineIndex * lineHeight;
-              pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
-            } else {
-              for (let li = sInfo.lineIndex; li <= eInfo.lineIndex; li++) {
-                if (li < 0 || li >= wrappedLines.length) continue;
-                const lineText = wrappedLines[li] || '';
-                const lineStartPos = (map && map[li] !== undefined) ? map[li] : 0;
-                const yTop = startY + li * lineHeight;
-                let x1, x2;
-                if (li === sInfo.lineIndex) {
-                  x1 = textX + measureStyledWidth(lineText, 0, Math.max(0, sInfo.posInLine), lineStartPos);
-                  x2 = textX + measureStyledWidth(lineText, 0, lineText.length, lineStartPos);
-                } else if (li === eInfo.lineIndex) {
-                  x1 = textX;
-                  x2 = textX + measureStyledWidth(lineText, 0, Math.max(0, eInfo.posInLine), lineStartPos);
-                } else {
-                  x1 = textX;
-                  x2 = textX + measureStyledWidth(lineText, 0, lineText.length, lineStartPos);
-                }
-                pdf.rect(x1, yTop, Math.max(0, x2 - x1), lineHeight * 0.8, 'F');
-              }
-            }
-          }
-          // Restore text color after highlight rectangles
-          pdf.setTextColor(0, 0, 0);
-        }
-      } catch (_) { }
-
-      for (let i = 0; i < wrappedLines.length; i++) {
-        const lineText = wrappedLines[i];
-        if (lineText == null) continue;
-
-        const lineStartPos = (box.cachedLineCharMap && box.cachedLineCharMap[i] !== undefined)
-          ? box.cachedLineCharMap[i]
-          : 0;
-
-        let xPos = textX;
-        for (let ci = 0; ci < lineText.length; ci++) {
-          const ch = lineText[ci];
-          const absPos = lineStartPos + ci;
-          const isBold = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.boldRanges, absPos) : false;
-          const isItalic = typeof box._isIndexInRanges === 'function' ? box._isIndexInRanges(box.italicRanges, absPos) : false;
-
-          const style = (isBold && isItalic) ? 'bolditalic' : (isBold ? 'bold' : (isItalic ? 'italic' : 'normal'));
-          ensureFont(style);
-
-          const w = textWidthPdf(ch);
-          const yTop = startY + i * lineHeight;
-
-          pdf.text(String(ch), xPos, yTop, { baseline: 'top' });
-          xPos += w;
-        }
-      }
-    }
-
-    // Save the PDF
-    pdf.save('mindmap.pdf');
-  } catch (e) {
-    console.error('Failed to export PDF:', e);
-    alert('Failed to export PDF: ' + e.message);
+  if (exportManager) {
+    await exportManager.exportPDF();
+  } else {
+    console.error('ExportManager not initialized');
   }
 }
 
@@ -4532,149 +3589,15 @@ function toggleFullScreen() {
  * Exports the mind map as a text file with hierarchy
  */
 function exportText() {
-  try {
-    // Validate mindMap
-    if (!mindMap || !mindMap.boxes || mindMap.boxes.length === 0) {
-      alert('No content to export');
-      return;
-    }
-
-    // Build a hierarchy based on connections
-    const hierarchy = buildTextHierarchy();
-
-    // Generate text output
-    let textOutput = hierarchy.join('\n\n');
-
-    // Create a blob and download
-    const blob = new Blob([textOutput], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mindmap-text.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch (e) {
-    console.error('Failed to export text:', e);
-    alert('Failed to export text: ' + e.message);
+  if (exportManager) {
+    exportManager.exportText();
+  } else {
+    console.error('ExportManager not initialized');
   }
 }
 
 /**
- * Builds a text hierarchy from the mind map based on connections
- * @returns {Array<string>} Array of text lines representing the hierarchy
- */
-function buildTextHierarchy() {
-  // Build adjacency list from connections (from -> to)
-  const children = new Map(); // box -> array of child boxes
-  const parents = new Map();  // box -> array of parent boxes
-
-  for (let box of mindMap.boxes) {
-    children.set(box, []);
-    parents.set(box, []);
-  }
-
-  for (let conn of mindMap.connections) {
-    if (!conn.fromBox || !conn.toBox) continue;
-    children.get(conn.fromBox).push(conn.toBox);
-    parents.get(conn.toBox).push(conn.fromBox);
-  }
-
-  // Find root nodes (boxes with no parents)
-  const roots = mindMap.boxes.filter(box => parents.get(box).length === 0);
-
-  // If no roots found (circular graph), use all boxes sorted by position
-  if (roots.length === 0) {
-    return mindMap.boxes
-      .map(box => {
-        const text = (box.text || '').trim();
-        if (!text) return null;
-        const priority = mindMap.getBoxColorPriority(box);
-        const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
-
-        // Prevent double headers
-        if (prefix && text.startsWith(prefix)) return text;
-        return prefix + text;
-      })
-      .filter(t => t !== null);
-  }
-
-  // Traverse from each root using depth-first search
-  const visited = new Set();
-  const result = [];
-
-  function traverse(box) {
-    if (visited.has(box)) return;
-    visited.add(box);
-
-    // Add this box's text with hierarchy prefix
-    if (box.text && box.text.trim() !== '') {
-      const text = box.text.trim();
-      const priority = mindMap.getBoxColorPriority(box);
-      let prefix = '';
-      if (priority === 1) prefix = '# ';
-      else if (priority === 2) prefix = '## ';
-
-      // Prevent double headers
-      if (prefix && text.startsWith(prefix)) {
-        result.push(text);
-      } else {
-        result.push(prefix + text);
-      }
-    }
-
-    // Traverse children
-    const boxChildren = children.get(box) || [];
-    for (let child of boxChildren) {
-      traverse(child);
-    }
-  }
-
-  // Sort roots by y-position (top to bottom), then x-position (left to right)
-  roots.sort((a, b) => {
-    const yDiff = a.y - b.y;
-    if (Math.abs(yDiff) > 50) return yDiff; // Different rows
-    return a.x - b.x; // Same row, sort by x
-  });
-
-  // Traverse from each root
-  for (let root of roots) {
-    traverse(root);
-  }
-
-  // Add any unvisited boxes (disconnected components)
-  const unvisited = mindMap.boxes.filter(box => !visited.has(box));
-  unvisited.sort((a, b) => {
-    const yDiff = a.y - b.y;
-    if (Math.abs(yDiff) > 50) return yDiff;
-    return a.x - b.x;
-  });
-
-  for (let box of unvisited) {
-    if (box.text && box.text.trim() !== '') {
-      const text = box.text.trim();
-      const priority = mindMap.getBoxColorPriority(box);
-      const prefix = priority === 1 ? '# ' : (priority === 2 ? '## ' : '');
-
-      // Prevent double headers
-      if (prefix && text.startsWith(prefix)) {
-        result.push(text);
-      } else {
-        result.push(prefix + text);
-      }
-    }
-  }
-
-  return result;
-}
-
-// ============================================================================
-// MULTI-BOX SELECTION FUNCTIONS
-// ============================================================================
-
-/**
- * Draws the selection rectangle during multi-box selection
+ * Draws the multi-box selection rectangle
  */
 function drawSelectionRectangle() {
   const x1 = min(selectionStartX, selectionCurrentX);
