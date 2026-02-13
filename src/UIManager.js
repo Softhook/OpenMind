@@ -158,7 +158,7 @@ class UIManager {
       }
     });
     this.fileInput.position(-200, -200);
-    this.fileInput.style('display', 'none');
+    // this.fileInput.style('display', 'none'); // Removed to ensure programmatic click works
     this.fileInput.attribute('accept', '.json');
 
     // Create hidden file input for importing text
@@ -168,8 +168,8 @@ class UIManager {
       }
     });
     this.importTextFileInput.position(-200, -200);
-    this.importTextFileInput.style('display', 'none');
-    this.importTextFileInput.attribute('accept', '.txt,.md');
+    // this.importTextFileInput.style('display', 'none'); // Removed to ensure programmatic click works
+    this.importTextFileInput.attribute('accept', '.txt,.md,.text');
 
     // Initially hide all buttons
     this.hideButtons();

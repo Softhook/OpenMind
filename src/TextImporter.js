@@ -55,6 +55,27 @@ class TextImporter {
     try {
       // Get the text data
       let textContent = file.data;
+
+      // Check if it's a data URL (base64 encoded) and decode it
+      if (typeof textContent === 'string' && textContent.startsWith('data:')) {
+        try {
+          // Extract base64 part
+          const base64Part = textContent.split(',')[1];
+          if (base64Part) {
+            textContent = atob(base64Part);
+            // Decode potential UTF-8 characters if they were encoded
+            try {
+              textContent = decodeURIComponent(escape(textContent));
+            } catch (e) {
+              // Ignore decoding errors, stick with atob result
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to decode base64 file content:', e);
+          // Fallback to original content
+        }
+      }
+
       if (!textContent || typeof textContent !== 'string') {
         throw new Error('File content is empty or invalid');
       }
@@ -365,9 +386,15 @@ class TextImporter {
     // Priority 2: First short heading that isn't common metadata
     for (let i = 0; i < scanLimit; i++) {
       const h = sections[i].heading.trim();
-      // Use NLP word count for consistency
-      const doc = nlp(h);
-      const wordCount = doc.wordCount();
+      // Use NLP word count for consistency if available
+      let wordCount;
+      if (typeof nlp !== 'undefined') {
+        const doc = nlp(h);
+        wordCount = doc.wordCount();
+      } else {
+        // Fallback word count
+        wordCount = h.trim().split(/\s+/).length;
+      }
 
       // Titles are usually fragments, 1-15 words, no terminal punctuation
       if (!metadataKeywords.test(h)) {
@@ -571,4 +598,14 @@ class TextImporter {
     }
     return sections;
   }
+}
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = TextImporter;
+}
+
+// Expose globally for browser usage
+if (typeof window !== 'undefined') {
+  window.TextImporter = TextImporter;
 }
