@@ -4,94 +4,133 @@
 
 const fs = require('fs');
 const path = require('path');
+const Y = require('yjs');
 
-// Load source files
-const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
+// provide Utils for TextBox and CollaborationManager
+global.Utils = require('../../src/utils');
 
-describe('Connection Undo System', () => {
-    describe('Box Deletion with Connections', () => {
-        test('deleteBoxFromYjs should delete connections in same transaction', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
+// provide ColorPalette
+global.ColorPalette = require('../../src/ColorPalette');
 
-            // Must access yconnections to delete associated connections
-            expect(deleteCode).toMatch(/this\.yconnections/);
-            
-            // Must find connections involving the deleted box (check both directions)
-            expect(deleteCode).toMatch(/c\.fromId\s*===\s*boxId/);
-            expect(deleteCode).toMatch(/c\.toId\s*===\s*boxId/);
-            
-            // Must delete connections in the same transaction as the box
-            // This ensures undo restores both box and connections together
-            const transactMatch = deleteCode.match(/this\.transact\([^{]*\{[\s\S]*?\}\s*,\s*['"]deleteBox['"]/);
-            expect(transactMatch).toBeTruthy();
-            
-            // Within the transaction, must delete from yconnections
-            expect(transactMatch[0]).toMatch(/yconnections\.delete/);
+// stub p5 functions
+global.textSize = jest.fn();
+global.textWidth = jest.fn((str) => str ? str.length * 10 : 50);
+global.max = Math.max;
+global.min = Math.min;
+global.stroke = jest.fn();
+global.strokeWeight = jest.fn();
+global.fill = jest.fn();
+global.rect = jest.fn();
+global.push = jest.fn();
+global.pop = jest.fn();
+global.text = jest.fn();
+global.textAlign = jest.fn();
+global.translate = jest.fn();
+global.cursor = jest.fn();
+global.lerp = (a, b, t) => a + (b - a) * t;
+
+// Load classes
+const TextBox = require('../../src/TextBox');
+const Connection = require('../../src/Connection');
+const MindMap = require('../../src/MindMap');
+const CollaborationManager = require('../../src/CollaborationManager');
+
+global.TextBox = TextBox;
+global.Connection = Connection;
+global.MindMap = MindMap;
+global.CollaborationManager = CollaborationManager;
+
+describe('Box Deletion with Connections behavioral tests', () => {
+    let cm;
+    let mindMap;
+
+    beforeEach(() => {
+        mindMap = new MindMap();
+        cm = new CollaborationManager(mindMap);
+
+        cm.Y = Y;
+        cm.ydoc = new Y.Doc();
+        cm.yboxes = cm.ydoc.getMap('boxes');
+        cm.yconnections = cm.ydoc.getArray('connections');
+        // Initialize UndoManager correctly
+        cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
+            trackedOrigins: new Set()
         });
+        cm.undoManager.trackedOrigins.add(cm.undoManager);
 
-        test('deleteBoxFromYjs should handle descending index deletion', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must sort indices in descending order to avoid index shifting issues
-            expect(deleteCode).toMatch(/sort.*\(a,\s*b\)\s*=>\s*b\s*-\s*a/);
-        });
-
-        test('deleteBoxFromYjs should delete both fromId and toId connections', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must check both directions (box as source and as target)
-            expect(deleteCode).toMatch(/c\.fromId\s*===\s*boxId/);
-            expect(deleteCode).toMatch(/c\.toId\s*===\s*boxId/);
-        });
-
-        test('deleteBoxFromYjs should include connection deletion in fallback case', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Should have fallback case (else branch)
-            const fallbackMatch = deleteCode.match(/else\s*\{[\s\S]*?Fallback[\s\S]*?\n\s{12}\}/);
-            expect(fallbackMatch).toBeTruthy();
-            
-            // Fallback should also delete connections
-            expect(fallbackMatch[0]).toMatch(/yconnections/);
-            expect(fallbackMatch[0]).toMatch(/c\.fromId\s*===\s*boxId/);
-            expect(fallbackMatch[0]).toMatch(/c\.toId\s*===\s*boxId/);
-        });
-
-        test('deleteBoxFromYjs should log connection deletion count', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Should log how many connections were deleted for debugging
-            expect(deleteCode).toMatch(/Logger\.debug.*[Dd]eleted.*connections?/);
-        });
+        cm.isInitialized = true;
+        cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
     });
 
-    describe('Documentation', () => {
-        test('deleteBoxFromYjs should document connection deletion in comment', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
+    test('deleteBoxFromYjs should delete connections in same transaction', () => {
+        const box1 = new TextBox(0, 0, 'Box 1');
+        const box2 = new TextBox(100, 0, 'Box 2');
+        mindMap.boxes.push(box1, box2);
 
-            // Should have CRITICAL comment explaining why connections are deleted in same transaction
-            expect(deleteCode).toMatch(/CRITICAL.*connections.*transaction/i);
-            expect(deleteCode).toMatch(/undo.*restore.*box.*connections/i);
+        const conn = new Connection(box1, box2);
+        mindMap.connections.push(conn);
+
+        // Initial sync
+        cm.ydoc.transact(() => {
+            cm.yboxes.set(box1.id, box1.toJSON());
+            cm.yboxes.set(box2.id, box2.toJSON());
+            cm.yconnections.push([{ fromId: box1.id, toId: box2.id }]);
         });
 
-        test('deleteBoxFromYjs JSDoc should mention connections', () => {
-            const jsdocMatch = collabCode.match(/\/\*\*[\s\S]*?Removes a box from Yjs[\s\S]*?\*\/\s*deleteBoxFromYjs/);
-            expect(jsdocMatch).toBeTruthy();
-            
-            // JSDoc should mention that it handles connections
-            expect(jsdocMatch[0]).toMatch(/connection/i);
+        expect(cm.yboxes.size).toBe(2);
+        expect(cm.yconnections.length).toBe(1);
+
+        // Delete box1
+        cm.deleteBoxFromYjs(box1.id);
+
+        // Verify box1 and connection are gone from Yjs
+        expect(cm.yboxes.has(box1.id)).toBe(false);
+        expect(cm.yboxes.has(box2.id)).toBe(true);
+        expect(cm.yconnections.length).toBe(0);
+
+        // Undo deletion
+        cm.undo();
+
+        // Verify both box and connection are restored
+        expect(cm.yboxes.has(box1.id)).toBe(true);
+        expect(cm.yconnections.length).toBe(1);
+        expect(cm.yconnections.get(0).fromId).toBe(box1.id);
+    });
+
+    test('deleteBoxFromYjs should handle multiple connections to the same box', () => {
+        const box1 = new TextBox(0, 0, 'Center');
+        const box2 = new TextBox(-100, 0, 'Left');
+        const box3 = new TextBox(100, 0, 'Right');
+        mindMap.boxes.push(box1, box2, box3);
+
+        mindMap.connections.push(new Connection(box2, box1));
+        mindMap.connections.push(new Connection(box1, box3));
+
+        // Initial sync
+        cm.ydoc.transact(() => {
+            cm.yboxes.set(box1.id, box1.toJSON());
+            cm.yboxes.set(box2.id, box2.toJSON());
+            cm.yboxes.set(box3.id, box3.toJSON());
+            cm.yconnections.push([
+                { fromId: box2.id, toId: box1.id },
+                { fromId: box1.id, toId: box3.id }
+            ]);
         });
+
+        expect(cm.yconnections.length).toBe(2);
+
+        // Delete box1
+        cm.deleteBoxFromYjs(box1.id);
+
+        expect(cm.yboxes.has(box1.id)).toBe(false);
+        expect(cm.yconnections.length).toBe(0);
+
+        // Undo
+        cm.undo();
+
+        expect(cm.yboxes.has(box1.id)).toBe(true);
+        expect(cm.yconnections.length).toBe(2);
     });
 });

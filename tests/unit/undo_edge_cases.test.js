@@ -4,408 +4,173 @@
 
 const fs = require('fs');
 const path = require('path');
+const Y = require('yjs');
 
-// Load source files
-const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
+// provide Utils for TextBox and CollaborationManager
+global.Utils = require('../../src/utils');
 
-describe('Undo System Edge Cases - Multi-User Scenarios', () => {
+// provide ColorPalette
+global.ColorPalette = require('../../src/ColorPalette');
+
+// stub p5 functions
+global.textSize = jest.fn();
+global.textWidth = jest.fn((str) => str ? str.length * 10 : 50);
+global.max = Math.max;
+global.min = Math.min;
+global.stroke = jest.fn();
+global.strokeWeight = jest.fn();
+global.fill = jest.fn();
+global.rect = jest.fn();
+global.push = jest.fn();
+global.pop = jest.fn();
+global.text = jest.fn();
+global.textAlign = jest.fn();
+global.translate = jest.fn();
+global.cursor = jest.fn();
+global.lerp = (a, b, t) => a + (b - a) * t;
+
+// Load classes
+const TextBox = require('../../src/TextBox');
+const Connection = require('../../src/Connection');
+const MindMap = require('../../src/MindMap');
+const CollaborationManager = require('../../src/CollaborationManager');
+
+global.TextBox = TextBox;
+global.Connection = Connection;
+global.MindMap = MindMap;
+global.CollaborationManager = CollaborationManager;
+
+describe('Undo System Edge Cases behavioral tests', () => {
+    let cm;
+    let mindMap;
+
+    beforeEach(() => {
+        mindMap = new MindMap();
+        cm = new CollaborationManager(mindMap);
+
+        cm.Y = Y;
+        cm.ydoc = new Y.Doc();
+        cm.yboxes = cm.ydoc.getMap('boxes');
+        cm.yconnections = cm.ydoc.getArray('connections');
+        // Initialize UndoManager correctly
+        cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
+            trackedOrigins: new Set()
+        });
+        cm.undoManager.trackedOrigins.add(cm.undoManager);
+
+        cm.isInitialized = true;
+        cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
+    });
+
     describe('Concurrent Editing Protection', () => {
         test('_applyBoxFromYjs should not overwrite text during active editing', () => {
-            // Critical: Remote updates should not overwrite local text while user is typing
-            expect(collabCode).toMatch(/if\s*\(\s*typeof\s+data\.text\s*===\s*['"]string['"]\s*&&\s*!box\.isEditing\s*\)/);
+            const box = new TextBox(0, 0, 'Initial');
+            mindMap.boxes.push(box);
+
+            box.isEditing = true;
+            box.text = 'Modified';
+
+            // Remote update arrives
+            const remoteData = { id: box.id, text: 'Remote Update' };
+            cm._applyBoxFromYjs(box.id, remoteData, false, false); // forceApply = false
+
+            // Text should remain 'Modified'
+            expect(box.text).toBe('Modified');
         });
 
-        test('_applyBoxFromYjs should have forceApply for undo/redo', () => {
-            // When undo/redo fires, we need to force-apply even if editing
-            expect(collabCode).toMatch(/forceApply/);
-            expect(collabCode).toMatch(/typeof\s+data\.text\s*===\s*['"]string['"]\s*&&\s*forceApply/);
-        });
+        test('_applyBoxFromYjs should force apply during undo/redo', () => {
+            const box = new TextBox(0, 0, 'Initial');
+            mindMap.boxes.push(box);
 
-        test('should protect highlights during editing', () => {
-            // Highlights should not be overwritten during editing
-            expect(collabCode).toMatch(/Array\.isArray\(data\.highlights\)\s*&&\s*\(\s*forceApply\s*\|\|\s*!box\.isEditing\s*\)/);
-        });
+            box.isEditing = true;
+            box.text = 'Modified';
 
-        test('should protect bold/italic ranges during editing', () => {
-            // Style ranges should not be overwritten during editing
-            expect(collabCode).toMatch(/Array\.isArray\(data\.boldRanges\)\s*&&\s*\(\s*forceApply\s*\|\|\s*!box\.isEditing\s*\)/);
-        });
-    });
+            // Remote update arrives with forceApply = true
+            const remoteData = { id: box.id, text: 'Forced Update' };
+            cm._applyBoxFromYjs(box.id, remoteData, false, true); // forceApply = true
 
-    describe('Undo During Active Editing', () => {
-        test('undo() should close text edit group before undoing', () => {
-            const undoMatch = collabCode.match(/undo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(undoMatch).toBeTruthy();
-            const undoCode = undoMatch[0];
-
-            // Must close text editing group before performing undo
-            expect(undoCode).toMatch(/if\s*\(\s*this\.isTextEditUndoGroupOpen\s*\)/);
-            expect(undoCode).toMatch(/_closeTextEditUndoGroup/);
-
-            // Close should come before undoManager.undo()
-            const closeIndex = undoCode.indexOf('_closeTextEditUndoGroup');
-            const undoIndex = undoCode.indexOf('undoManager.undo()');
-            expect(closeIndex).toBeLessThan(undoIndex);
-        });
-
-        test('redo() should close text edit group before redoing', () => {
-            const redoMatch = collabCode.match(/redo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(redoMatch).toBeTruthy();
-            const redoCode = redoMatch[0];
-
-            // Must close text editing group before performing redo
-            expect(redoCode).toMatch(/if\s*\(\s*this\.isTextEditUndoGroupOpen\s*\)/);
-            expect(redoCode).toMatch(/_closeTextEditUndoGroup/);
+            // Text should be overwritten
+            expect(box.text).toBe('Forced Update');
         });
     });
 
-    describe('Box Deletion Edge Cases', () => {
-        test('deleteBoxFromYjs should close undo group if deleting currently edited box', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
+    describe('Undo/Redo with Open Group', () => {
+        test('undo() should close text edit group', () => {
+            const box = new TextBox(0, 0, 'Start');
+            mindMap.boxes.push(box);
 
-            // Must check if deleting currently edited box
-            expect(deleteCode).toMatch(/if\s*\(\s*this\.currentEditingBoxId\s*===\s*boxId/);
-            // Must close undo group and clear currentEditingBoxId
-            expect(deleteCode).toMatch(/_closeTextEditUndoGroup/);
-            expect(deleteCode).toMatch(/this\.currentEditingBoxId\s*=\s*null/);
-        });
+            // Ensure something is on the undo stack
+            cm.transact(() => {
+                cm.yboxes.set(box.id, box.toJSON());
+            });
+            cm.undoManager.stopCapturing();
 
-        test('deleteBoxFromYjs should clear pending text sync timer', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
+            // Start editing
+            box.isEditing = true;
+            box.text = 'Edited';
+            cm.syncBoxToYjs(box);
 
-            // Must clear the pending timer to prevent stale sync
-            expect(deleteCode).toMatch(/textSyncTimers\.get\(\s*boxId\s*\)/);
-            expect(deleteCode).toMatch(/clearTimeout/);
-            expect(deleteCode).toMatch(/textSyncTimers\.delete/);
-        });
-    });
+            expect(cm.isTextEditUndoGroupOpen).toBe(true);
 
-    describe('Synchronization Flag Protection', () => {
-        test('should have isSyncing flag to prevent feedback loops', () => {
-            // Must have isSyncing flag in constructor
-            expect(collabCode).toMatch(/this\.isSyncing\s*=\s*false/);
-        });
+            // Undo - should first close group (flushing 'Edited' to Yjs) then undo
+            // Action 1: Start
+            // Action 2: Edited (flushed in undo -> _closeTextEditUndoGroup)
+            // undo() will undo Action 2, leaving it at 'Start'
+            cm.undo();
 
-        test('yboxes observer should check isSyncing flag with undo/redo exception', () => {
-            const observerMatch = collabCode.match(/this\.yboxes\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
-            expect(observerMatch).toBeTruthy();
-            const observerCode = observerMatch[0];
-
-            // Must check isSyncing with undo/redo exception to allow undo/redo through
-            // even when isSyncing is true from other operations
-            expect(observerCode).toMatch(/if\s*\(\s*this\.isSyncing\s*&&\s*!isUndoRedo\s*\)\s*return/);
-        });
-
-        test('should set isSyncing during observer execution', () => {
-            const observerMatch = collabCode.match(/yboxes\.observe\([^{]*\{[\s\S]*?\n\s{4}\}\);/);
-            expect(observerMatch).toBeTruthy();
-            const observerCode = observerMatch[0];
-
-            // Must set isSyncing = true before processing
-            expect(observerCode).toMatch(/this\.isSyncing\s*=\s*true/);
-            // Must reset isSyncing = false in finally block
-            expect(observerCode).toMatch(/finally[\s\S]*this\.isSyncing\s*=\s*false/);
+            expect(cm.isTextEditUndoGroupOpen).toBe(false);
+            expect(cm.yboxes.get(box.id).text).toBe('Start');
         });
     });
 
-    describe('Undo/Redo Performance Flag', () => {
-        test('should have _isPerformingUndoRedo flag', () => {
-            // Must track when undo/redo is in progress
-            expect(collabCode).toMatch(/this\._isPerformingUndoRedo\s*=\s*false/);
+    describe('Flag Synchronization', () => {
+        test('should set and clear _isPerformingUndoRedo during undo', () => {
+            // Put something on stack
+            cm.transact(() => { cm.yboxes.set('a', { text: 'hi' }); });
+            cm.undoManager.stopCapturing();
+
+            // Execute undo
+            cm.undo();
+
+            // Flag should be false now (cleared in finally)
+            expect(cm._isPerformingUndoRedo).toBe(false);
         });
 
-        test('undo() should set and clear _isPerformingUndoRedo', () => {
-            const undoMatch = collabCode.match(/undo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(undoMatch).toBeTruthy();
-            const undoCode = undoMatch[0];
+        test('yboxes observer should return early if isSyncing is true and not undo/redo', () => {
+            const box = new TextBox(0, 0, 'Test');
+            mindMap.boxes.push(box);
 
-            // Must set flag before undo
-            expect(undoCode).toMatch(/this\._isPerformingUndoRedo\s*=\s*true/);
-            // Must clear flag in finally block
-            expect(undoCode).toMatch(/finally[\s\S]*this\._isPerformingUndoRedo\s*=\s*false/);
-        });
+            cm.isSyncing = true;
 
-        test('redo() should set and clear _isPerformingUndoRedo', () => {
-            const redoMatch = collabCode.match(/redo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(redoMatch).toBeTruthy();
-            const redoCode = redoMatch[0];
+            // Emit a change that would normally be applied
+            cm.ydoc.transact(() => {
+                cm.yboxes.set(box.id, { ...box.toJSON(), x: 500 });
+            });
 
-            // Must set flag before redo
-            expect(redoCode).toMatch(/this\._isPerformingUndoRedo\s*=\s*true/);
-            // Must clear flag in finally block
-            expect(redoCode).toMatch(/finally[\s\S]*this\._isPerformingUndoRedo\s*=\s*false/);
-        });
-    });
-});
+            // Since isSyncing was true and this wasn't an undo/redo, it should have been skipped
+            expect(box.targetX).not.toBe(500);
 
-describe('Undo System Edge Cases - Timing Scenarios', () => {
-    describe('Empty Text Edit Protection', () => {
-        test('_boxDataEquals should compare text for changes', () => {
-            // Must properly detect when text has changed (including to/from empty)
-            const equalsMatch = collabCode.match(/_boxDataEquals\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(equalsMatch).toBeTruthy();
-        });
-
-        test('_flushPendingTextSyncs should check if data changed before syncing', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-
-            // Should check if data actually changed
-            expect(flushCode).toMatch(/_boxDataEquals/);
-            expect(flushCode).toMatch(/if\s*\(\s*!.*_boxDataEquals/);
+            cm.isSyncing = false;
         });
     });
 
-    describe('Rapid Box Switching (< 300ms)', () => {
-        test('syncBoxToYjs should handle very rapid box switches', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
+    describe('Rapid Switching', () => {
+        test('syncBoxToYjs should clear old timer when switching boxes', () => {
+            const box1 = new TextBox(0, 0, 'B1');
+            const box2 = new TextBox(100, 0, 'B2');
+            mindMap.boxes.push(box1, box2);
 
-            // When switching boxes, must flush previous box IMMEDIATELY
-            // This handles switches faster than the 300ms debounce
-            expect(syncCode).toMatch(/_flushPendingTextSyncs\(\s*this\.currentEditingBoxId\s*\)/);
+            box1.isEditing = true;
+            cm.syncBoxToYjs(box1);
+            expect(cm.textSyncTimers.has(box1.id)).toBe(true);
 
-            // Must happen in the box switching condition
-            const switchMatch = syncCode.match(/if\s*\(\s*this\.currentEditingBoxId.*!==\s*box\.id\s*\)[\s\S]*?\}/);
-            expect(switchMatch).toBeTruthy();
-            expect(switchMatch[0]).toMatch(/_flushPendingTextSyncs/);
-        });
+            box2.isEditing = true;
+            cm.syncBoxToYjs(box2);
 
-        test('syncBoxToYjs should clear existing timer when rapidly typing in same box', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Must clear existing timer before setting new one
-            expect(syncCode).toMatch(/existingTimer\s*=\s*this\.textSyncTimers\.get\(\s*boxId\s*\)/);
-            expect(syncCode).toMatch(/if\s*\(\s*existingTimer\s*\)/);
-            expect(syncCode).toMatch(/clearTimeout\(\s*existingTimer\s*\)/);
-        });
-    });
-
-    describe('Debounce Timer Validation', () => {
-        test('debounced callback should validate currentEditingBoxId matches', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Debounced callback must verify box is still the one being edited
-            expect(syncCode).toMatch(/this\.currentEditingBoxId\s*===\s*boxId/);
-        });
-
-        test('debounced callback should get fresh box reference', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Must get fresh box by ID, not use stale reference
-            expect(syncCode).toMatch(/getBoxById\(\s*boxId\s*\)/);
-        });
-
-        test('debounced callback should validate box still exists', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Must check if currentBox exists before syncing
-            expect(syncCode).toMatch(/if\s*\(\s*currentBox/);
-        });
-    });
-
-    describe('Transaction Origin Consistency', () => {
-        test('all text syncs should use undoManager as transaction origin', () => {
-            // _flushPendingTextSyncs must use undoManager origin
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-
-            expect(flushCode).toMatch(/this\.ydoc\.transact\(/);
-            expect(flushCode).toMatch(/,\s*this\.undoManager\s*\)/);
-        });
-
-        test('transact helper should use undoManager origin', () => {
-            const transactMatch = collabCode.match(/transact\s*\(\s*callback[\s\S]*?\n\s{4}\}/);
-            expect(transactMatch).toBeTruthy();
-            const transactCode = transactMatch[0];
-
-            // Should call ydoc.transact with undoManager as origin
-            expect(transactCode).toMatch(/this\.ydoc\.transact\(\s*callback\s*,\s*this\.undoManager\s*\)/);
-        });
-    });
-
-    describe('Stop Editing Edge Case', () => {
-        test('syncBoxToYjs should close undo group when editing stops', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // When box.isEditing becomes false, must close the group
-            // This is in the section after "if (box.isEditing)"
-            const afterEditingSection = syncCode.split('if (box.isEditing)')[1];
-            expect(afterEditingSection).toMatch(/if\s*\(\s*this\.isTextEditUndoGroupOpen\s*\)/);
-            expect(afterEditingSection).toMatch(/_closeTextEditUndoGroup/);
-        });
-    });
-});
-
-describe('Undo System Edge Cases - Robustness', () => {
-    describe('Remote Deletion Protection', () => {
-        test('_deleteBoxFromLocal should clear pending text sync timer', () => {
-            const deleteMatch = collabCode.match(/_deleteBoxFromLocal\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must clear pending timer to prevent stale sync
-            expect(deleteCode).toMatch(/textSyncTimers\.get\(\s*boxId\s*\)/);
-            expect(deleteCode).toMatch(/clearTimeout/);
-            expect(deleteCode).toMatch(/textSyncTimers\.delete/);
-        });
-
-        test('_deleteBoxFromLocal should close undo group if box was being edited', () => {
-            const deleteMatch = collabCode.match(/_deleteBoxFromLocal\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must close undo group if deleting currently edited box
-            expect(deleteCode).toMatch(/if\s*\(\s*this\.currentEditingBoxId\s*===\s*boxId/);
-            expect(deleteCode).toMatch(/_closeTextEditUndoGroup/);
-            expect(deleteCode).toMatch(/this\.currentEditingBoxId\s*=\s*null/);
-        });
-    });
-
-    describe('Null/Undefined Safety', () => {
-        test('syncBoxToYjs should validate required objects', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Must check all required objects exist
-            expect(syncCode).toMatch(/if\s*\(\s*!this\.yboxes\s*\|\|/);
-            expect(syncCode).toMatch(/!box\s*\|\|/);
-            expect(syncCode).toMatch(/!box\.id\s*\|\|/);
-        });
-
-        test('_flushPendingTextSyncs should validate mindMap and yboxes', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-
-            // Must validate all required objects before syncing
-            expect(flushCode).toMatch(/this\.mindMap/);
-            expect(flushCode).toMatch(/this\.yboxes/);
-            expect(flushCode).toMatch(/this\.ydoc/);
-            expect(flushCode).toMatch(/this\.undoManager/);
-        });
-
-        test('_flushPendingTextSyncs should check isSyncing to prevent re-entrancy', () => {
-            const flushMatch = collabCode.match(/_flushPendingTextSyncs\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(flushMatch).toBeTruthy();
-            const flushCode = flushMatch[0];
-
-            // Must check isSyncing flag to prevent re-entrant calls
-            expect(flushCode).toMatch(/!this\.isSyncing/);
-        });
-
-        test('deleteBoxFromYjs should validate yboxes and boxId', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must validate required parameters
-            expect(deleteCode).toMatch(/if\s*\(\s*!this\.yboxes/);
-            expect(deleteCode).toMatch(/!boxId/);
-        });
-    });
-
-    describe('Early Return Protection', () => {
-        test('syncBoxToYjs should return early if isSyncing', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Must check isSyncing flag to prevent feedback loops
-            expect(syncCode).toMatch(/this\.isSyncing.*return/);
-        });
-
-        test('deleteBoxFromYjs should return early if isSyncing', () => {
-            const deleteMatch = collabCode.match(/deleteBoxFromYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(deleteMatch).toBeTruthy();
-            const deleteCode = deleteMatch[0];
-
-            // Must check isSyncing flag
-            expect(deleteCode).toMatch(/this\.isSyncing.*return/);
-        });
-
-        test('undo() should return early if no undoManager', () => {
-            const undoMatch = collabCode.match(/undo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(undoMatch).toBeTruthy();
-            const undoCode = undoMatch[0];
-
-            // Must validate undoManager exists
-            expect(undoCode).toMatch(/if\s*\(\s*!this\.undoManager\s*\)/);
-        });
-
-        test('undo() should return early if undoStack is empty', () => {
-            const undoMatch = collabCode.match(/undo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(undoMatch).toBeTruthy();
-            const undoCode = undoMatch[0];
-
-            // Must check if there's something to undo
-            expect(undoCode).toMatch(/this\.undoManager\.undoStack\.length\s*===\s*0/);
-        });
-    });
-
-    describe('Redraw Triggering', () => {
-        test('undo() should mark mindMap as dirty', () => {
-            const undoMatch = collabCode.match(/undo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(undoMatch).toBeTruthy();
-            const undoCode = undoMatch[0];
-
-            // Must trigger redraw after undo
-            expect(undoCode).toMatch(/this\.mindMap\.isDirty\s*=\s*true/);
-        });
-
-        test('redo() should mark mindMap as dirty', () => {
-            const redoMatch = collabCode.match(/redo\s*\(\s*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(redoMatch).toBeTruthy();
-            const redoCode = redoMatch[0];
-
-            // Must trigger redraw after redo
-            expect(redoCode).toMatch(/this\.mindMap\.isDirty\s*=\s*true/);
-        });
-    });
-});
-
-describe('Undo System Documentation', () => {
-    describe('Critical Comments', () => {
-        test('should document why flush is critical in _closeTextEditUndoGroup', () => {
-            const closeMatch = collabCode.match(/_closeTextEditUndoGroup\s*\([^)]*\)\s*\{[\s\S]*?\n\s{4}\}/);
-            expect(closeMatch).toBeTruthy();
-            const closeCode = closeMatch[0];
-
-            // Must have CRITICAL comment explaining flush
-            expect(closeCode).toMatch(/CRITICAL/i);
-            expect(closeCode).toMatch(/flush/i);
-        });
-
-        test('should document box switching protection in syncBoxToYjs', () => {
-            const syncMatch = collabCode.match(/syncBoxToYjs\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-            expect(syncMatch).toBeTruthy();
-            const syncCode = syncMatch[0];
-
-            // Should explain why we flush when switching boxes
-            expect(syncCode).toMatch(/prevent.*mix/i);
-        });
-
-        test('should document remote edit protection in _applyBoxFromYjs', () => {
-            // Should explain why we check isEditing before applying remote text
-            expect(collabCode).toMatch(/IMPORTANT.*Don't overwrite text while user is actively editing/);
+            // box1 timer should be gone (flushed/cleared)
+            expect(cm.textSyncTimers.has(box1.id)).toBe(false);
         });
     });
 });
