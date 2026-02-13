@@ -2776,6 +2776,23 @@ async function handleFileLoad(file) {
   }
 }
 
+/**
+ * Handle text file import for creating mind maps from text documents
+ * @param {Object} file - p5.js file object with text content
+ */
+async function handleTextImport(file) {
+  try {
+    // Get the file input element from uiManager
+    const fileInput = uiManager ? uiManager.importTextFileInput : null;
+    
+    // Delegate to TextImporter
+    await TextImporter.handleFileImport(file, fileInput);
+  } catch (e) {
+    console.error('Text import failed:', e);
+    alert('Failed to import text file: ' + e.message);
+  }
+}
+
 
 /**
  * Handle files/URLs dropped onto the canvas. Supports image files and image URLs.
