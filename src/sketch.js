@@ -997,7 +997,7 @@ function drawRemoteCursors() {
     if (!userState.cursor) continue;
 
     const { x, y } = userState.cursor;
-    const color = userState.user ? userState.user.color : '#aaaaaa';
+    const color = userState.user ? userState.user.color : ColorPalette.toHex(ColorPalette.BASE.GRAY_MEDIUM);
     const name = userState.user ? userState.user.name : 'Unknown';
 
     // Draw cursor (simple arrow or circle)
@@ -1368,7 +1368,7 @@ function setup() {
  * p5.js draw function - renders the mind map and UI every frame
  */
 function draw() {
-  background(UI_COLORS.BACKGROUND);
+  background(ColorPalette.toCSS(UI_COLORS.BACKGROUND));
   if (uiManager) {
     // Hide menu buttons when overlays are showing to prevent blocking clicks
     const hasOverlay = roomJoinConfirmation || syncStatus || isMapLoading;
@@ -1454,7 +1454,7 @@ function draw() {
     rect(0, 0, width, height);
 
     // Loading text
-    fill(overlay.text);
+    fill(ColorPalette.toCSS(overlay.text));
     textAlign(CENTER, CENTER);
     textSize(20);
     text('Loading map...', width / 2, height / 2 - 10);
@@ -1463,7 +1463,7 @@ function draw() {
     push();
     translate(width / 2, height / 2 + 18);
     rotate(frameCount * 0.08);
-    stroke(overlay.spinner);
+    stroke(ColorPalette.toCSS(overlay.spinner));
     strokeWeight(3);
     noFill();
     arc(0, 0, 28, 28, 0, PI * 0.8);

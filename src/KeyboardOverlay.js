@@ -70,7 +70,7 @@ const OVERLAY_STYLES = {
 };
 
 const CONTENT_STYLES = {
-    background: '#ffffff',
+    background: ColorPalette.toCSS(ColorPalette.BASE.WHITE),
     padding: '24px 32px',
     borderRadius: '8px',
     maxWidth: '520px',
@@ -78,7 +78,7 @@ const CONTENT_STYLES = {
     display: 'inline-block',
     maxHeight: 'calc(100vh - 48px)',
     overflowY: 'auto',
-    color: '#222222',
+    color: ColorPalette.toCSS(ColorPalette.BASE.BLACK),
     boxShadow: '0 16px 40px rgba(0, 0, 0, 0.35)',
     boxSizing: 'border-box',
     fontFamily: 'sans-serif',
@@ -156,7 +156,7 @@ class KeyboardOverlayManager {
         hint.parent(this.overlayContent);
         hint.style('margin', '0 0 18px 0');
         hint.style('font-size', '13px');
-        hint.style('color', '#555555');
+        hint.style('color', ColorPalette.toCSS(ColorPalette.BASE.GRAY_DARK));
 
         for (const item of KEYBOARD_SHORTCUTS) {
             const row = createDiv();

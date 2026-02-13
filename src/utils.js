@@ -715,7 +715,7 @@ function validateColor(color, defaultColor = { r: 255, g: 255, b: 255 }) {
     r: clamp(safeNumber(color.r, defaultColor.r), 0, 255),
     g: clamp(safeNumber(color.g, defaultColor.g), 0, 255),
     b: clamp(safeNumber(color.b, defaultColor.b), 0, 255),
-    a: color.a !== undefined ? clamp(safeNumber(color.a, 255), 0, 255) : undefined
+    a: clamp(safeNumber(color.a, 255), 0, 255)
   };
 }
 

@@ -2241,7 +2241,7 @@ class CollaborationManager {
      * @private
      */
     _pickRandomColor() {
-        return ColorPalette.pickRandomUserColor();
+        return ColorPalette.pickRandomUserColor(true); // Return hex string for compatibility with drawing/sync
     }
 
     /**

@@ -132,8 +132,8 @@ class UIManager {
     // Invite/Share button
     this.inviteButton = p5.createButton('Start Collaboration');
     this.inviteButton.position(650, 10);
-    this.inviteButton.style('background-color', '#4caf50');
-    this.inviteButton.style('color', '#fff');
+    this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS));
+    this.inviteButton.style('color', ColorPalette.toCSS(ColorPalette.BASE.WHITE));
     this.inviteButton.mousePressed(() => this.handleShareSessionClick());
 
     // Display name input (for collaboration)
@@ -142,7 +142,7 @@ class UIManager {
     this.displayNameInput.position(750, 10);
     this.displayNameInput.style('display', 'none');
     this.displayNameInput.style('padding', '5px');
-    this.displayNameInput.style('border', '1px solid #4caf50');
+    this.displayNameInput.style('border', `1px solid ${ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)}`);
     this.displayNameInput.style('border-radius', '3px');
     this.displayNameInput.style('font-size', '14px');
     this.displayNameInput.style('outline', 'none');
@@ -185,14 +185,14 @@ class UIManager {
 
     // Focus handler
     const focusHandler = () => {
-      this.displayNameInput.style('border-color', '#2196f3');
+      this.displayNameInput.style('border-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY));
     };
     input.addEventListener('focus', focusHandler);
     this.eventListenerRefs.push({ element: input, event: 'focus', handler: focusHandler });
 
     // Blur handler
     const blurHandler = () => {
-      this.displayNameInput.style('border-color', '#4caf50');
+      this.displayNameInput.style('border-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS));
 
       // Clear any pending debounced update
       clearTimeout(this.displayNameDebounceTimer);
@@ -396,10 +396,10 @@ class UIManager {
     if (this.inviteButton) {
       this.inviteButton.style('display', 'inline-block');
       if (isConnected) {
-        this.inviteButton.style('background-color', '#2196F3'); // Blue for share
+        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY)); // Blue for share
         this.inviteButton.html('Copy Room Link');
       } else {
-        this.inviteButton.style('background-color', '#4caf50'); // Green for start
+        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)); // Green for start
         this.inviteButton.html('Start Collaboration');
       }
     }
@@ -503,7 +503,7 @@ class UIManager {
     if (isConnected) {
       // When connected: change button to "Copy Room Link" and show display name input
       if (this.inviteButton) {
-        this.inviteButton.style('background-color', '#2196F3'); // Blue for share action
+        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY)); // Blue for share action
         this.inviteButton.html('Copy Room Link');
         positionButton(this.inviteButton);
       }
@@ -542,7 +542,7 @@ class UIManager {
     } else {
       // When not connected: show "Start Collaboration" button, hide display name input
       if (this.inviteButton) {
-        this.inviteButton.style('background-color', '#4caf50'); // Green for start action
+        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)); // Green for start action
         this.inviteButton.html('Start Collaboration');
         positionButton(this.inviteButton);
       }

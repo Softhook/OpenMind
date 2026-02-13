@@ -791,7 +791,7 @@ class TextBox {
 
     // Draw box with appropriate styling based on state
     Utils.applyFill(this.backgroundColor);
-    
+
     if (this.isEditing) {
       // When editing text, keep a neutral outline (not blue)
       Utils.applyStroke(TextBox.STROKES.EDITING, 2 / zoomFactor);
@@ -887,9 +887,9 @@ class TextBox {
 
       if (shouldSimplifyText) {
         // Draw simplified representation: horizontal lines like redacted text
-        fill(0);
+        Utils.applyFill(ColorPalette.BASE.BLACK);
         strokeWeight(1.5);
-        stroke(0);
+        Utils.applyStroke(ColorPalette.BASE.BLACK);
         for (let i = 0; i < wrappedLines.length; i++) {
           let lineText = wrappedLines[i];
           if (lineText.length > 0) {
@@ -901,7 +901,7 @@ class TextBox {
         }
       } else {
         // Normal text rendering at readable zoom levels
-        fill(0);
+        Utils.applyFill(ColorPalette.BASE.BLACK);
         noStroke();
         textAlign(LEFT, CENTER);
         textSize(this.fontSize);
@@ -947,7 +947,7 @@ class TextBox {
             if (isInLink) {
               Utils.applyFill(linkColor); // Blue for links
             } else {
-              fill(0); // Black for regular text
+              Utils.applyFill(ColorPalette.BASE.BLACK); // Black for regular text
             }
 
             const isBold = this._isIndexInRanges(this.boldRanges, absCharPos);
@@ -964,7 +964,7 @@ class TextBox {
                 translate(xPos, yPos);
                 shearX(TextBox.ITALIC_SHEAR_RADIANS);
                 if (isBold) {
-                  stroke(isInLink ? linkColor.r : 0, isInLink ? linkColor.g : 0, isInLink ? linkColor.b : 0);
+                  stroke(isInLink ? linkColor.r : ColorPalette.BASE.BLACK.r, isInLink ? linkColor.g : ColorPalette.BASE.BLACK.g, isInLink ? linkColor.b : ColorPalette.BASE.BLACK.b);
                   strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
                 } else {
                   noStroke();
@@ -973,7 +973,7 @@ class TextBox {
                 pop();
               } else {
                 if (isBold) {
-                  stroke(isInLink ? linkColor.r : 0, isInLink ? linkColor.g : 0, isInLink ? linkColor.b : 0);
+                  stroke(isInLink ? linkColor.r : ColorPalette.BASE.BLACK.r, isInLink ? linkColor.g : ColorPalette.BASE.BLACK.g, isInLink ? linkColor.b : ColorPalette.BASE.BLACK.b);
                   strokeWeight(TextBox.BOLD_STROKE_WEIGHT);
                 } else {
                   noStroke();
@@ -1434,7 +1434,7 @@ class TextBox {
   _showEditingBlockedNotification(remoteState) {
     const userName = remoteState.userName || 'Another user';
     const message = `${userName} is currently editing this box`;
-    
+
     // Use browser notification if available
     if (typeof Utils !== 'undefined' && Utils.showNotification) {
       Utils.showNotification(message, 'info');
@@ -1623,12 +1623,12 @@ class TextBox {
         }
       }
       this.isEditing = true;
-      
+
       // Immediately broadcast editing state to prevent race conditions
       if (typeof TextBox.onEditingStateChange === 'function' && this.id) {
         TextBox.onEditingStateChange(this.id);
       }
-      
+
       this.selectWordAt(pos);
       this.cursorPosition = this.selectionEnd;
       this.resetCursorBlink();
@@ -2267,7 +2267,7 @@ class TextBox {
         if (this._dragLockOriginX === undefined && this._dragLockOriginY === undefined) {
           // Check if this is the first drag update (box is still at start position)
           const atStartPosition = (this.x === this._dragStartX && this.y === this._dragStartY);
-          
+
           if (atStartPosition) {
             // Shift held from start - lock to start position
             this._dragLockOriginX = this._dragStartX;
@@ -2282,7 +2282,7 @@ class TextBox {
         // Determine primary direction based on movement from start position
         const deltaX = Math.abs(newX - this._dragStartX);
         const deltaY = Math.abs(newY - this._dragStartY);
-        
+
         // Decide lock axis once per drag+Shift activation to prevent axis switching
         if (!this._dragLockAxis) {
           this._dragLockAxis = deltaX > deltaY ? 'x' : 'y';
@@ -2687,7 +2687,8 @@ class TextBox {
         const r = clampColor(c.r, 255);
         const g = clampColor(c.g, 255);
         const b = clampColor(c.b, 255);
-        box.backgroundColor = { r, g, b };
+        const a = clampColor(c.a, 255);
+        box.backgroundColor = { r, g, b, a };
       }
     }
     // Load image URL if present
@@ -3011,8 +3012,8 @@ class TextBox {
       if (start >= end) continue;
       let startInfo = this.getLineAndPositionFromChar(start, wrappedLines);
       let endInfo = this.getLineAndPositionFromChar(end, wrappedLines);
-      // Use hl.color if present, else default yellow
-      const c = hl.color && typeof hl.color === 'object' ? hl.color : { r: 255, g: 255, b: 0, a: 180 };
+      // Use hl.color if present, else default highlight color
+      const c = hl.color && typeof hl.color === 'object' ? hl.color : TextBox.COLORS.DEFAULT_HIGHLIGHT;
       Utils.applyFill(c);
 
       if (startInfo.lineIndex === endInfo.lineIndex) {

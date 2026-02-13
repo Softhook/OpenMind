@@ -100,8 +100,8 @@ class MobileNavigationManager {
             }
         };
 
-        const activeColor = ColorPalette.MOBILE.ACTIVE;
-        const normalColor = ColorPalette.MOBILE.NORMAL;
+        const activeColor = ColorPalette.toCSS(ColorPalette.MOBILE.ACTIVE);
+        const normalColor = ColorPalette.toCSS(ColorPalette.MOBILE.NORMAL);
 
         const handleTouchStart = (e) => {
             e.preventDefault();
@@ -203,7 +203,7 @@ class MobileNavigationManager {
             height: buttonSize + 'px',
             borderRadius: '50%',
             border: '2px solid rgba(100, 100, 100, 0.5)',
-            backgroundColor: ColorPalette.MOBILE.BACKGROUND,
+            backgroundColor: ColorPalette.toCSS(ColorPalette.MOBILE.BACKGROUND),
             color: '#333',
             fontSize: '24px',
             cursor: 'pointer',

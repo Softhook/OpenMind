@@ -99,7 +99,7 @@ class ThrustGame {
   };
 
   static DEFAULT_PLAYER_NAME = 'Player';      // Default name for players without a name
-  static DEFAULT_PLAYER_COLOR = '#ff6464';    // Default color for players without a color (red)
+  static DEFAULT_PLAYER_COLOR = ColorPalette.toHex({ r: 255, g: 100, b: 100, a: 255 });    // Default color for players without a color (red)
 
 
   static SPAWN = {
