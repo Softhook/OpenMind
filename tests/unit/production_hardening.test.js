@@ -67,7 +67,7 @@ describe('Production Hardening behavioral tests', () => {
         cm.yconnections = cm.ydoc.getArray('connections');
         // Initialize UndoManager correctly
         cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
-            trackedOrigins: new Set()
+            trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN])
         });
 
         cm.isInitialized = true;

@@ -4,66 +4,128 @@
 
 const fs = require('fs');
 const path = require('path');
+const Y = require('yjs');
 
-// Load source files
-const collabCode = fs.readFileSync(path.join(__dirname, '../../src/CollaborationManager.js'), 'utf8');
+// provide Utils for TextBox and CollaborationManager
+global.Utils = require('../../src/utils');
 
-describe('Connection Visual Restoration on Undo', () => {
-    test('connections observer should not skip during undo/redo even if isSyncing is true', () => {
-        // Find the yconnections observer
-        const connectionsObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
-        expect(connectionsObserverMatch).toBeTruthy();
-        const connectionsObserverCode = connectionsObserverMatch[0];
+// provide ColorPalette
+global.ColorPalette = require('../../src/ColorPalette');
 
-        // Should define isUndoRedo
-        expect(connectionsObserverCode).toMatch(/const isUndoRedo\s*=\s*event\.transaction\.origin\s*===\s*this\.undoManager/);
+// stub p5 functions
+global.textSize = jest.fn();
+global.textWidth = jest.fn((str) => str ? str.length * 10 : 50);
+global.max = Math.max;
+global.min = Math.min;
+global.stroke = jest.fn();
+global.strokeWeight = jest.fn();
+global.fill = jest.fn();
+global.rect = jest.fn();
+global.push = jest.fn();
+global.pop = jest.fn();
+global.text = jest.fn();
+global.textAlign = jest.fn();
+global.translate = jest.fn();
+global.cursor = jest.fn();
+global.lerp = (a, b, t) => a + (b - a) * t;
 
-        // CRITICAL: Should check isSyncing with isUndoRedo exception
-        // This prevents skipping the connections observer during undo/redo
-        // even if isSyncing is true from the boxes observer running first
-        expect(connectionsObserverCode).toMatch(/if\s*\(\s*this\.isSyncing\s*&&\s*!isUndoRedo\s*\)\s*return/);
+// Load classes
+const TextBox = require('../../src/TextBox');
+const Connection = require('../../src/Connection');
+const MindMap = require('../../src/MindMap');
+const CollaborationManager = require('../../src/CollaborationManager');
 
-        // Should also skip local non-undo transactions
-        expect(connectionsObserverCode).toMatch(/if\s*\(\s*event\.transaction\.local\s*&&\s*!isUndoRedo\s*\)\s*return/);
+global.TextBox = TextBox;
+global.Connection = Connection;
+global.MindMap = MindMap;
+global.CollaborationManager = CollaborationManager;
+
+describe('Connection Visual Restoration behavioral tests', () => {
+    let cm;
+    let mindMap;
+
+    beforeEach(() => {
+        mindMap = new MindMap();
+        cm = new CollaborationManager(mindMap);
+
+        cm.Y = Y;
+        cm.ydoc = new Y.Doc();
+        cm.yboxes = cm.ydoc.getMap('boxes');
+        cm.yconnections = cm.ydoc.getArray('connections');
+        // Initialize UndoManager correctly
+        cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
+            trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN])
+        });
+
+        cm.isInitialized = true;
+        cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
     });
 
-    test('connections observer should have comment explaining the fix', () => {
-        const connectionsObserverMatch = collabCode.match(/this\.yconnections\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
-        expect(connectionsObserverMatch).toBeTruthy();
-        const connectionsObserverCode = connectionsObserverMatch[0];
+    test('connections observer should not skip during undo even if isSyncing is true', () => {
+        const box1 = new TextBox(0, 0, '1');
+        const box2 = new TextBox(100, 0, '2');
+        mindMap.boxes.push(box1, box2);
 
-        // Should have a comment explaining why we allow undo/redo even when isSyncing
-        expect(connectionsObserverCode).toMatch(/CRITICAL.*undo.*redo.*isSyncing/i);
-        expect(connectionsObserverCode).toMatch(/connections.*rebuilt.*restored/i);
+        // 1. Initial state: no connections
+        cm.transact(() => {
+            cm.yboxes.set(box1.id, box1.toJSON());
+            cm.yboxes.set(box2.id, box2.toJSON());
+        });
+        cm.undoManager.stopCapturing();
+
+        // 2. Add a connection
+        cm.transact(() => {
+            cm.yconnections.push([{ fromId: box1.id, toId: box2.id }]);
+        });
+        cm.undoManager.stopCapturing();
+
+        expect(mindMap.connections.length).toBe(1);
+
+        // 3. Simulate isSyncing = true (e.g. from boxes observer)
+        cm.isSyncing = true;
+
+        // 4. Perform undo
+        // The yconnections observer MUST NOT return early, because this is an undo
+        cm.undo();
+
+        // 5. Verify connection is removed in mindMap
+        expect(mindMap.connections.length).toBe(0);
+
+        cm.isSyncing = false;
     });
 
-    test('boxes observer should also handle undo/redo with isSyncing correctly', () => {
-        // Find the yboxes observer
-        const boxesObserverMatch = collabCode.match(/this\.yboxes\.observe\(\(event\)\s*=>\s*\{[\s\S]*?(?=\s{8}\}\);)/);
-        expect(boxesObserverMatch).toBeTruthy();
-        const boxesObserverCode = boxesObserverMatch[0];
+    test('connections observer should skip remote updates if isSyncing is true', () => {
+        const box1 = new TextBox(0, 0, '1');
+        const box2 = new TextBox(100, 0, '2');
+        mindMap.boxes.push(box1, box2);
 
-        // Should define isUndoRedo
-        expect(boxesObserverCode).toMatch(/const isUndoRedo\s*=\s*event\.transaction\.origin\s*===\s*this\.undoManager/);
+        cm.isSyncing = true;
 
-        // CRITICAL: Should check isSyncing with isUndoRedo exception
-        // This ensures the boxes observer does not skip undo/redo transactions
-        // even when isSyncing is true
-        expect(boxesObserverCode).toMatch(/if\s*\(\s*this\.isSyncing\s*&&\s*!isUndoRedo\s*\)\s*return/);
-        expect(boxesObserverCode).toMatch(/if\s*\(\s*event\.transaction\.local\s*&&\s*!isUndoRedo\s*\)\s*return/);
+        // Simulate remote update
+        cm.ydoc.transact(() => {
+            cm.yconnections.push([{ fromId: box1.id, toId: box2.id }]);
+        });
+
+        // Should NOT have rebuilt connections because isSyncing was true and NOT undo/redo
+        expect(mindMap.connections.length).toBe(0);
+
+        cm.isSyncing = false;
     });
 
-    test('_rebuildConnectionsFromYjs should check for both fromBox and toBox existence', () => {
-        const rebuildMatch = collabCode.match(/_rebuildConnectionsFromYjs\s*\(\)\s*\{[\s\S]*?(?=\n\s{4}\/\*\*|\n\s{4}[a-z_][a-zA-Z_]*\s*\()/);
-        expect(rebuildMatch).toBeTruthy();
-        const rebuildCode = rebuildMatch[0];
+    test('_rebuildConnectionsFromYjs should only restore connections for valid box pairs', () => {
+        const box1 = new TextBox(0, 0, '1');
+        mindMap.boxes.push(box1);
 
-        // Should get boxes by ID
-        expect(rebuildCode).toMatch(/getBoxById\s*\(\s*data\.fromId\s*\)/);
-        expect(rebuildCode).toMatch(/getBoxById\s*\(\s*data\.toId\s*\)/);
+        // Connection to a missing box
+        cm.ydoc.transact(() => {
+            cm.yconnections.push([{ fromId: box1.id, toId: 'missing' }]);
+        });
 
-        // Should only create connection if both boxes exist
-        expect(rebuildCode).toMatch(/if\s*\(\s*fromBox\s*&&\s*toBox/);
-        expect(rebuildCode).toMatch(/new Connection\s*\(\s*fromBox\s*,\s*toBox\s*\)/);
+        cm._rebuildConnectionsFromYjs();
+
+        // Should have skipped the invalid connection
+        expect(mindMap.connections.length).toBe(0);
     });
 });

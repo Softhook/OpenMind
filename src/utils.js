@@ -381,6 +381,14 @@ const Logger = {
   },
 
   /**
+   * Logs a warning (always shown)
+   * @param {...any} args - Arguments to log
+   */
+  warn(...args) {
+    console.warn('[WARN]', ...args);
+  },
+
+  /**
    * Logs a debug message (useful for development)
    * @param {...any} args - Arguments to log
    */

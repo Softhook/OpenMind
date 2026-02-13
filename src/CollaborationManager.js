@@ -57,6 +57,9 @@ class CollaborationManager {
 
     // Timing constants
     static UNDO_CAPTURE_TIMEOUT = 0; // ms - disable time-based undo grouping (action-based undo)
+
+    // Origin for transactions that should be tracked by UndoManager
+    static TRACKED_ORIGIN = 'tracked-user-action';
     static TEXT_SYNC_DEBOUNCE = 300; // ms - debounce text sync during active editing
     // 1000ms timeout chosen based on typical typing pause patterns:
     // - Fast typing: 100-200ms between characters
@@ -234,10 +237,11 @@ class CollaborationManager {
             // captureTimeout: 0 disables time-based grouping for action-based undo
             // CRITICAL: UndoManager automatically tracks transactions with itself as origin.
             // We use ydoc.transact with undoManager as second parameter to mark trackable operations.
-            // Empty trackedOrigins means it only tracks when origin === undoManager instance.
+            // Empty trackedOrigins means it tracks nothing by default.
+            // We use this.undoManager as the origin for our own trackable transactions.
             this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
-                trackedOrigins: new Set(),
+                trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN]),
                 maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE
             });
 
@@ -852,8 +856,8 @@ class CollaborationManager {
         }
 
         if (this.ydoc && this.undoManager) {
-            // Set origin to undoManager so it knows to track this transaction
-            this.ydoc.transact(callback, this.undoManager);
+            // Set origin to specialized TRACKED_ORIGIN so it knows to track this transaction
+            this.ydoc.transact(callback, CollaborationManager.TRACKED_ORIGIN);
         } else if (this.ydoc) {
             // Fallback without undo manager
             this.ydoc.transact(callback);
@@ -1250,7 +1254,7 @@ class CollaborationManager {
                             const prevData = this.yboxes.get(boxId);
                             if (this._boxDataEquals(prevData, nextData)) return;
                             this.yboxes.set(boxId, nextData);
-                        }, this.undoManager);
+                        }, CollaborationManager.TRACKED_ORIGIN);
                     } else if (currentBox) {
                         // Fallback without undo tracking
                         const nextData = this._boxToYjsData(currentBox);
@@ -1480,8 +1484,9 @@ class CollaborationManager {
         // Observe box changes
         this.yboxes.observe((event) => {
             // Skip if we're in a sync loop, but DO process undo/redo transactions
-            // Undo/redo transactions are local but have origin === this.undoManager
-            const isUndoRedo = event.transaction.origin === this.undoManager;
+            // Undo/redo transactions are local and have origin === this.undoManager.
+            // We use _isPerformingUndoRedo to distinguish them from other tracked changes.
+            const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
             if (this.isSyncing && !isUndoRedo) return;
             if (event.transaction.local && !isUndoRedo) return;
 
@@ -1575,7 +1580,7 @@ class CollaborationManager {
                                             Utils.Logger.debug(`[Undo] Processed deferred flush for box ${boxId}`);
                                         }
                                     }
-                                }, this.undoManager);
+                                }, CollaborationManager.TRACKED_ORIGIN);
                             }
                         } finally {
                             this._isProcessingDeferredFlushes = false;
@@ -1595,7 +1600,8 @@ class CollaborationManager {
         // Observe connection changes
         this.yconnections.observe((event) => {
             // Skip if we're in a sync loop, but DO process undo/redo transactions
-            const isUndoRedo = event.transaction.origin === this.undoManager;
+            // Check if this is an actual undo/redo operation (not just a tracked change)
+            const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
             // CRITICAL: Don't skip during undo/redo even if isSyncing is true
             // This allows connections to be rebuilt after boxes are restored
             if (this.isSyncing && !isUndoRedo) return;

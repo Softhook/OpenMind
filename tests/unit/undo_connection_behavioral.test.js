@@ -55,10 +55,9 @@ describe('Undo Connection Restoration - Behavioral', () => {
         cm.yconnections = cm.ydoc.getArray('connections');
         // Initialize UndoManager correctly
         cm.undoManager = new Y.UndoManager([cm.yboxes, cm.yconnections], {
-            trackedOrigins: new Set()
+            trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN])
         });
         // We want UndoManager to track transactions with ITSELF as origin
-        cm.undoManager.trackedOrigins.add(cm.undoManager);
 
         // Mock providers
         cm.provider = { synced: true, on: jest.fn(), emit: jest.fn(), disconnect: jest.fn(), destroy: jest.fn() };
