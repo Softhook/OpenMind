@@ -741,6 +741,13 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     // Update UI buttons to reflect collaboration state
     if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
       uiManager.updateCollaborationState();
+      
+      // Also schedule a delayed update in case connection state changes after initial call
+      setTimeout(() => {
+        if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
+          uiManager.updateCollaborationState();
+        }
+      }, 500);
     }
 
     // EXTENSION BRIDGE: Notify ThrustGame of new dependencies

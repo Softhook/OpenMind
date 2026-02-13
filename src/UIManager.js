@@ -355,6 +355,9 @@ class UIManager {
     // Check connection state
     const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
     
+    // Log state for debugging
+    console.log('[UIManager] showButtons() - isConnected:', isConnected);
+    
     // Always show these buttons
     if (this.loadButton) this.loadButton.style('display', 'inline-block');
     if (this.saveButton) this.saveButton.style('display', 'inline-block');
@@ -370,9 +373,11 @@ class UIManager {
       if (isConnected) {
         this.inviteButton.style('background-color', '#2196F3'); // Blue for share
         this.inviteButton.html('Copy Room Link');
+        console.log('[UIManager] Setting button to "Copy Room Link" (blue)');
       } else {
         this.inviteButton.style('background-color', '#4caf50'); // Green for start
         this.inviteButton.html('Start Collaboration');
+        console.log('[UIManager] Setting button to "Start Collaboration" (green)');
       }
     }
     
@@ -381,9 +386,11 @@ class UIManager {
       if (isConnected) {
         this.displayNameInput.style('display', 'inline-block');
         this.displayNameInput.style('visibility', 'visible');
+        console.log('[UIManager] Showing display name input');
       } else {
         this.displayNameInput.style('display', 'none');
         this.displayNameInput.style('visibility', 'hidden');
+        console.log('[UIManager] Hiding display name input');
       }
     }
   }
@@ -423,6 +430,9 @@ class UIManager {
     
     // Check if we're connected to collaboration
     const isConnected = this.collaborationManager && this.collaborationManager.isConnected;
+    
+    // Log state for debugging
+    console.log('[UIManager] layoutButtons() - isConnected:', isConnected);
     
     // Store original display states to restore after measurement
     const originalStates = new Map();
