@@ -16,3 +16,6 @@ Nodes appear, move, shrink, cluster — looks like watching a thought organism g
 Confetti when a cluster closes
 When you link enough nodes to form a closed loop, tiny celebratory confetti falls.
 Silly but memorable.
+
+caledndar
+use nlp to extract dates and times and create a calendar view of the map

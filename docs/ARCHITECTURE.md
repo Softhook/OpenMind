@@ -4,9 +4,9 @@
 
 OpenMind is a collaborative real-time mind mapping application built on a three-tier state management architecture with Yjs CRDT as the master state, an in-memory object model for UI representation, and IndexedDB for robust offline persistence.
 
-**Version**: 1.1.0  
-**Last Updated**: 2026-02-12  
-**Architecture Pattern**: CRDT-based Event Sourcing with Observer Pattern
+**Version**: 1.2.0  
+**Last Updated**: 2026-02-13  
+**Architecture Pattern**: CRDT-based Event Sourcing with Observer Pattern / Modular UI extraction
 
 ---
 
@@ -206,7 +206,20 @@ MindMap.onBoxChange = (box) => {
 };
 ```
 
-#### 3. TextBox (`src/TextBox.js`)
+#### 3. UIManager (`src/UIManager.js`)
+
+**Responsibility**: Manages all UI elements, overlays, and user-initiated actions.
+
+**Key Features**:
+- **Dynamic Layout**: Positions buttons based on screen size and connection state.
+- **Contextual UI**: Shows/hides "Display Name" and "Copy Room Link" based on session state.
+- **State Encapsulation**: Moves UI logic out of the main `sketch.js` loop.
+
+#### 4. ExportManager (`src/ExportManager.js`)
+
+**Responsibility**: Handles all data serialization and file generation (PNG, PDF, Text).
+
+#### 5. TextBox (`src/TextBox.js`)
 
 **Responsibility**: Individual box representation.
 
@@ -229,7 +242,7 @@ MindMap.onBoxChange = (box) => {
 4. Rendered on canvas
 5. Changes propagate via callbacks
 
-#### 4. Connection (`src/Connection.js`)
+#### 6. Connection (`src/Connection.js`)
 
 **Responsibility**: Arrow between boxes.
 
@@ -648,6 +661,23 @@ ydoc.transact(() => {
 - Box existence validated before sync
 
 **Risk Level**: 🟢 LOW - Handled
+
+#### 8. **Split World: Global Scope Tension**
+
+**Issue**: The application mixes legacy p5.js "Global Mode" (relying on `window` variables) with modern Class-based encapsulation.
+
+**Manifestation**:
+- `ReferenceError` if classes are not explicitly attached to `window`.
+- Synchronization fragility between `UIManager` state and `sketch.js` logic.
+- Difficulties in transitioning to strict ES Modules.
+
+**Current Mitigation**:
+- Explicit `window.ExportManager = ExportManager` assignments.
+- Direct state querying from `sketch.js` (e.g., `uiManager.isMenuVisible()`) instead of polled flags.
+
+**Risk Level**: 🟡 MEDIUM - Structural fragility.
+
+**Recommendation**: Migrate to p5.js "Instance Mode" and ES Modules.
 
 **Recommendation**: None needed.
 
