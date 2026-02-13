@@ -679,12 +679,12 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
       if (prevStatus !== syncStatus) Utils.Logger.state('[Sync] Overlay status changed:', prevStatus, '→', syncStatus);
 
       // Update UI to reflect connection state
-      try { 
+      try {
         if (uiManager) {
           Utils.Logger.state('[UI] Updating collaboration state, isConnected:', activeManager.isConnected);
-          uiManager.layoutButtons(); 
+          uiManager.layoutButtons();
         }
-      } catch (e) { 
+      } catch (e) {
         console.error('[UI] Error updating collaboration state:', e);
       }
     };
@@ -737,11 +737,11 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
 
     // Update browser tab title to show room name
     document.title = roomName + ' — OpenMind';
-    
+
     // Update UI buttons to reflect collaboration state
     if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
       uiManager.updateCollaborationState();
-      
+
       // Also schedule a delayed update in case connection state changes after initial call
       setTimeout(() => {
         if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
@@ -2066,6 +2066,16 @@ function mousePressed(e) {
     return;
   }
 
+  // FIX: Hide menu when clicking on the background (canvas)
+  // This handles the case where user clicks away from username input or just wants to dismiss menu
+  if (uiManager && uiManager.isMenuVisible()) {
+    uiManager.hideButtons();
+    // Force blur on any active input to ensure state is saved
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+      document.activeElement.blur();
+    }
+  }
+
   // PRIORITY: Handle room join confirmation dialog before anything else
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
     // Check if click is on any of the three buttons
@@ -2159,7 +2169,7 @@ function mousePressed(e) {
       syncStatus = null;
       // Also clear the hash to prevent auto-reconnect
       if (typeof window !== 'undefined') window.location.hash = '';
-      
+
       // Update UI buttons after disconnection
       if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
         uiManager.updateCollaborationState();
@@ -2811,7 +2821,7 @@ async function handleTextImport(file) {
   try {
     // Get the file input element from uiManager
     const fileInput = uiManager ? uiManager.importTextFileInput : null;
-    
+
     // Delegate to TextImporter
     await TextImporter.handleFileImport(file, fileInput);
   } catch (e) {
@@ -3266,7 +3276,7 @@ function windowResized() {
   if (now - lastResizeTime > debounceMs) {
     resizeCanvas(windowWidth, windowHeight);
     lastResizeTime = now;
-    
+
     // Reposition UI buttons after resize
     if (uiManager && typeof uiManager.handleResize === 'function') {
       uiManager.handleResize();

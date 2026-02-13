@@ -91,123 +91,123 @@ class ExportManager {
 
       // Translate to account for padding and content offset
       pg.push();
-      
+
       try {
         pg.translate(padding - bounds.minX, padding - bounds.minY);
 
-    // Draw connections first (behind boxes)
-    if (this.mindMap.connections) {
-      this.mindMap.connections.forEach(conn => {
-        if (!conn || !conn.fromBox || !conn.toBox) return;
+        // Draw connections first (behind boxes)
+        if (this.mindMap.connections) {
+          this.mindMap.connections.forEach(conn => {
+            if (!conn || !conn.fromBox || !conn.toBox) return;
 
-        const from = conn.fromBox;
-        const to = conn.toBox;
+            const from = conn.fromBox;
+            const to = conn.toBox;
 
-        // Get proper connection points from box edges
-        const start = (typeof from.getConnectionPoint === 'function') 
-          ? from.getConnectionPoint(to) 
-          : { x: from.x, y: from.y };
-        const end = (typeof to.getConnectionPoint === 'function') 
-          ? to.getConnectionPoint(from) 
-          : { x: to.x, y: to.y };
+            // Get proper connection points from box edges
+            const start = (typeof from.getConnectionPoint === 'function')
+              ? from.getConnectionPoint(to)
+              : { x: from.x, y: from.y };
+            const end = (typeof to.getConnectionPoint === 'function')
+              ? to.getConnectionPoint(from)
+              : { x: to.x, y: to.y };
 
-        // Connection line
-        pg.stroke(ColorPalette.CONNECTION.NORMAL);
-        pg.strokeWeight(2);
-        pg.line(start.x, start.y, end.x, end.y);
+            // Connection line
+            pg.stroke(ColorPalette.CONNECTION.NORMAL);
+            pg.strokeWeight(2);
+            pg.line(start.x, start.y, end.x, end.y);
 
-        // Arrow at target
-        const angle = Math.atan2(end.y - start.y, end.x - start.x);
-        const arrowSize = 10;
-        const arrowX = end.x - Math.cos(angle) * 5;
-        const arrowY = end.y - Math.sin(angle) * 5;
+            // Arrow at target
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            const arrowSize = 10;
+            const arrowX = end.x - Math.cos(angle) * 5;
+            const arrowY = end.y - Math.sin(angle) * 5;
 
-        pg.push();
-        pg.translate(arrowX, arrowY);
-        pg.rotate(angle);
-        pg.fill(ColorPalette.CONNECTION.NORMAL);
-        pg.noStroke();
-        pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
-        pg.pop();
-      });
-    }
-
-    // Draw boxes
-    if (this.mindMap.boxes) {
-      this.mindMap.boxes.forEach(box => {
-        if (!box) return;
-
-        // Box background - use backgroundColor property
-        const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
-        pg.fill(bgColor.r, bgColor.g, bgColor.b);
-        pg.stroke(100);
-        pg.strokeWeight(1);
-        pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height);
-
-        // Draw image if present (using imageUrl/img properties)
-        if (box.imageUrl && box.img) {
-          try {
-            const imgW = box.width - 20;
-            const imgH = box.height - 20;
-            const imgX = box.x - imgW / 2;
-            const imgY = box.y - box.height / 2 + 10;
-
-            // Draw the loaded image
-            if (box.img.width && box.img.height) {
-              pg.image(box.img, imgX, imgY, imgW, imgH);
-            } else {
-              // Fallback: draw placeholder
-              pg.fill(200);
-              pg.noStroke();
-              pg.rect(imgX, imgY, imgW, imgH);
-            }
-          } catch (e) {
-            console.warn('Error drawing image in PNG export:', e);
-          }
-        }
-
-        // Draw text with wrapping and highlights (skip if image box)
-        if (!box.imageUrl) {
-          const lines = this.getWrappedLines(pg, box.text || '', box.width - 20, 16);
-        const lineHeight = 18;
-        const textStartY = box.y - (lines.length * lineHeight) / 2;
-
-        lines.forEach((line, idx) => {
-          const yPos = textStartY + idx * lineHeight;
-
-          // Draw highlights if present
-          if (box.highlights && box.highlights.length > 0) {
-            let charX = 0;
-            const chars = line.split('');
-
-            chars.forEach((char, charIdx) => {
-              const globalCharIdx = this.getGlobalCharIndex(box.text, lines, idx, charIdx);
-              const isHighlighted = this.isCharHighlighted(box.highlights, globalCharIdx);
-
-              if (isHighlighted) {
-                pg.fill(ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.r, 
-                       ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.g, 
-                       ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.b,
-                       ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.a || 180);
-                pg.noStroke();
-                const charWidth = pg.textWidth(char);
-                  pg.rect(box.x - box.width / 2 + 10 + charX, yPos - 14, charWidth, lineHeight);
-                }
-
-                charX += pg.textWidth(char);
-              });
-            }
-
-            // Draw text
-            pg.fill(0);
+            pg.push();
+            pg.translate(arrowX, arrowY);
+            pg.rotate(angle);
+            pg.fill(ColorPalette.CONNECTION.NORMAL);
             pg.noStroke();
-            pg.textAlign(pg.LEFT, pg.TOP);
-            pg.textSize(16);
-            pg.text(line, box.x - box.width / 2 + 10, yPos);
+            pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
+            pg.pop();
           });
         }
-      });
-    }
+
+        // Draw boxes
+        if (this.mindMap.boxes) {
+          this.mindMap.boxes.forEach(box => {
+            if (!box) return;
+
+            // Box background - use backgroundColor property
+            const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
+            pg.fill(bgColor.r, bgColor.g, bgColor.b);
+            pg.stroke(100);
+            pg.strokeWeight(1);
+            pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height);
+
+            // Draw image if present (using imageUrl/img properties)
+            if (box.imageUrl && box.img) {
+              try {
+                const imgW = box.width - 20;
+                const imgH = box.height - 20;
+                const imgX = box.x - imgW / 2;
+                const imgY = box.y - box.height / 2 + 10;
+
+                // Draw the loaded image
+                if (box.img.width && box.img.height) {
+                  pg.image(box.img, imgX, imgY, imgW, imgH);
+                } else {
+                  // Fallback: draw placeholder
+                  pg.fill(200);
+                  pg.noStroke();
+                  pg.rect(imgX, imgY, imgW, imgH);
+                }
+              } catch (e) {
+                console.warn('Error drawing image in PNG export:', e);
+              }
+            }
+
+            // Draw text with wrapping and highlights (skip if image box)
+            if (!box.imageUrl) {
+              const lines = this.getWrappedLines(pg, box.text || '', box.width - 20, 16);
+              const lineHeight = 18;
+              const textStartY = box.y - (lines.length * lineHeight) / 2;
+
+              lines.forEach((line, idx) => {
+                const yPos = textStartY + idx * lineHeight;
+
+                // Draw highlights if present
+                if (box.highlights && box.highlights.length > 0) {
+                  let charX = 0;
+                  const chars = line.split('');
+
+                  chars.forEach((char, charIdx) => {
+                    const globalCharIdx = this.getGlobalCharIndex(box.text, lines, idx, charIdx);
+                    const isHighlighted = this.isCharHighlighted(box.highlights, globalCharIdx);
+
+                    if (isHighlighted) {
+                      pg.fill(ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.r,
+                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.g,
+                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.b,
+                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.a || 180);
+                      pg.noStroke();
+                      const charWidth = pg.textWidth(char);
+                      pg.rect(box.x - box.width / 2 + 10 + charX, yPos - 14, charWidth, lineHeight);
+                    }
+
+                    charX += pg.textWidth(char);
+                  });
+                }
+
+                // Draw text
+                pg.fill(0);
+                pg.noStroke();
+                pg.textAlign(pg.LEFT, pg.TOP);
+                pg.textSize(16);
+                pg.text(line, box.x - box.width / 2 + 10, yPos);
+              });
+            }
+          });
+        }
 
       } finally {
         // Always restore graphics state
@@ -372,7 +372,7 @@ class ExportManager {
             // Validate image dimensions
             const imgWidth = Math.max(1, Math.min(4096, box.img.width || 100));
             const imgHeight = Math.max(1, Math.min(4096, box.img.height || 100));
-            
+
             if (!isFinite(imgWidth) || !isFinite(imgHeight)) {
               console.warn('Invalid image dimensions for box:', box.id);
               continue;
@@ -383,12 +383,12 @@ class ExportManager {
             canvas.width = imgWidth;
             canvas.height = imgHeight;
             const ctx = canvas.getContext('2d');
-            
+
             if (!ctx) {
               console.warn('Failed to get 2D context for image export');
               continue;
             }
-            
+
             ctx.drawImage(box.img, 0, 0);
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             imageCache.set(box.id, dataUrl);
@@ -404,99 +404,99 @@ class ExportManager {
 
     try {
       // Draw connections
-    if (this.mindMap.connections) {
-      this.mindMap.connections.forEach(conn => {
-        if (!conn || !conn.fromBox || !conn.toBox) return;
+      if (this.mindMap.connections) {
+        this.mindMap.connections.forEach(conn => {
+          if (!conn || !conn.fromBox || !conn.toBox) return;
 
-        const from = conn.fromBox;
-        const to = conn.toBox;
+          const from = conn.fromBox;
+          const to = conn.toBox;
 
-        // Get proper connection points
-        const start = (typeof from.getConnectionPoint === 'function') 
-          ? from.getConnectionPoint(to) 
-          : { x: from.x, y: from.y };
-        const end = (typeof to.getConnectionPoint === 'function') 
-          ? to.getConnectionPoint(from) 
-          : { x: to.x, y: to.y };
+          // Get proper connection points
+          const start = (typeof from.getConnectionPoint === 'function')
+            ? from.getConnectionPoint(to)
+            : { x: from.x, y: from.y };
+          const end = (typeof to.getConnectionPoint === 'function')
+            ? to.getConnectionPoint(from)
+            : { x: to.x, y: to.y };
 
-        const x1 = start.x * scale + offsetX;
-        const y1 = start.y * scale + offsetY;
-        const x2 = end.x * scale + offsetX;
-        const y2 = end.y * scale + offsetY;
+          const x1 = start.x * scale + offsetX;
+          const y1 = start.y * scale + offsetY;
+          const x2 = end.x * scale + offsetX;
+          const y2 = end.y * scale + offsetY;
 
-        pdf.setDrawColor(80);
-        pdf.setLineWidth(1.5 * scale);
-        pdf.line(x1, y1, x2, y2);
+          pdf.setDrawColor(80);
+          pdf.setLineWidth(1.5 * scale);
+          pdf.line(x1, y1, x2, y2);
 
-        // Arrow
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        const arrowSize = 10 * scale;
-        const arrowX = x2 - Math.cos(angle) * 5;
-        const arrowY = y2 - Math.sin(angle) * 5;
+          // Arrow
+          const angle = Math.atan2(y2 - y1, x2 - x1);
+          const arrowSize = 10 * scale;
+          const arrowX = x2 - Math.cos(angle) * 5;
+          const arrowY = y2 - Math.sin(angle) * 5;
 
-        pdf.setFillColor(80);
-        const arrowPoints = [
-          [arrowX, arrowY],
-          [arrowX - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize / 2,
-           arrowY - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize / 2],
-          [arrowX - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize / 2,
-           arrowY - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize / 2]
-        ];
-        pdf.triangle(...arrowPoints[0], ...arrowPoints[1], ...arrowPoints[2], 'F');
-      });
-    }
+          pdf.setFillColor(80);
+          const arrowPoints = [
+            [arrowX, arrowY],
+            [arrowX - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize / 2,
+            arrowY - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize / 2],
+            [arrowX - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize / 2,
+            arrowY - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize / 2]
+          ];
+          pdf.triangle(...arrowPoints[0], ...arrowPoints[1], ...arrowPoints[2], 'F');
+        });
+      }
 
-    // Draw boxes
-    if (this.mindMap.boxes) {
-      for (const box of this.mindMap.boxes) {
-        if (!box) continue;
+      // Draw boxes
+      if (this.mindMap.boxes) {
+        for (const box of this.mindMap.boxes) {
+          if (!box) continue;
 
-        const bx = (box.x - box.width / 2) * scale + offsetX;
-        const by = (box.y - box.height / 2) * scale + offsetY;
-        const bw = box.width * scale;
-        const bh = box.height * scale;
+          const bx = (box.x - box.width / 2) * scale + offsetX;
+          const by = (box.y - box.height / 2) * scale + offsetY;
+          const bw = box.width * scale;
+          const bh = box.height * scale;
 
-        // Box background - use backgroundColor property
-        const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
-        pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
-        pdf.setDrawColor(100);
-        pdf.setLineWidth(0.5);
-        pdf.rect(bx, by, bw, bh, 'FD');
+          // Box background - use backgroundColor property
+          const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
+          pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
+          pdf.setDrawColor(100);
+          pdf.setLineWidth(0.5);
+          pdf.rect(bx, by, bw, bh, 'FD');
 
-        // Image (using imageUrl property)
-        if (box.imageUrl && imageCache.has(box.id)) {
-          try {
-            const dataUrl = imageCache.get(box.id);
-            const imgW = (box.width - 20) * scale;
-            const imgH = (box.height - 20) * scale;
-            const imgX = (box.x - (box.width - 20) / 2) * scale + offsetX;
-            const imgY = (box.y - box.height / 2 + 10) * scale + offsetY;
+          // Image (using imageUrl property)
+          if (box.imageUrl && imageCache.has(box.id)) {
+            try {
+              const dataUrl = imageCache.get(box.id);
+              const imgW = (box.width - 20) * scale;
+              const imgH = (box.height - 20) * scale;
+              const imgX = (box.x - (box.width - 20) / 2) * scale + offsetX;
+              const imgY = (box.y - box.height / 2 + 10) * scale + offsetY;
 
-            pdf.addImage(dataUrl, 'JPEG', imgX, imgY, imgW, imgH);
-          } catch (e) {
-            console.warn('Error adding image to PDF:', e);
+              pdf.addImage(dataUrl, 'JPEG', imgX, imgY, imgW, imgH);
+            } catch (e) {
+              console.warn('Error adding image to PDF:', e);
+            }
+          }
+
+          // Text (skip if image box)
+          if (!box.imageUrl) {
+            const fontSize = 12 * scale;
+            pdf.setFontSize(fontSize);
+            pdf.setTextColor(0);
+
+            const lines = this.getWrappedLines(measureGraphics,
+              box.text || '', box.width - 20, 16);
+            const lineHeight = 14 * scale;
+            const textX = bx + 8 * scale;
+            let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
+
+            lines.forEach(line => {
+              pdf.text(line, textX, textY);
+              textY += lineHeight;
+            });
           }
         }
-
-        // Text (skip if image box)
-        if (!box.imageUrl) {
-          const fontSize = 12 * scale;
-          pdf.setFontSize(fontSize);
-          pdf.setTextColor(0);
-
-          const lines = this.getWrappedLines(measureGraphics, 
-                                            box.text || '', box.width - 20, 16);
-          const lineHeight = 14 * scale;
-          const textX = bx + 8 * scale;
-          let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
-
-          lines.forEach(line => {
-            pdf.text(line, textX, textY);
-            textY += lineHeight;
-          });
-        }
       }
-    }
 
     } finally {
       // Always clean up the measurement graphics buffer
@@ -529,7 +529,7 @@ class ExportManager {
     // Create blob and download with proper cleanup
     const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    
+
     try {
       const a = document.createElement('a');
       a.href = url;
@@ -564,8 +564,8 @@ class ExportManager {
         const toId = conn.toBox.id;
 
         // Validate IDs exist
-        if (fromId === undefined || fromId === null || 
-            toId === undefined || toId === null) {
+        if (fromId === undefined || fromId === null ||
+          toId === undefined || toId === null) {
           console.warn('Connection with missing ID:', conn);
           return;
         }
@@ -664,7 +664,7 @@ class ExportManager {
 
     this.mindMap.boxes.forEach(box => {
       if (!box) return;
-      
+
       // Validate all required properties exist and are finite numbers
       if (typeof box.x !== 'number' || !isFinite(box.x)) return;
       if (typeof box.width !== 'number' || !isFinite(box.width)) return;
@@ -693,4 +693,9 @@ class ExportManager {
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ExportManager;
+}
+
+// Expose globally for browser usage
+if (typeof window !== 'undefined') {
+  window.ExportManager = ExportManager;
 }

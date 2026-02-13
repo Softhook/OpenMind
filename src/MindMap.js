@@ -3228,3 +3228,13 @@ class MindMap {
     }
   }
 }
+// Expose MindMap globally for browser/test usage
+if (typeof globalThis !== 'undefined') {
+  globalThis.MindMap = MindMap;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = MindMap;
+}
+if (typeof window !== 'undefined') {
+  window.MindMap = MindMap;
+}

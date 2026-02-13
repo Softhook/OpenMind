@@ -14,554 +14,577 @@ const vm = require('vm');
 
 // Setup test environment with required dependencies
 function setupTestEnvironment() {
-  const context = {
-    console,
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
-    crypto: typeof crypto !== 'undefined' ? crypto : undefined,
-    Math,
-    Array,
-    Object,
-    Map,
-    Set,
-    String,
-    Number,
-    Boolean,
-    JSON,
-    Date,
-    RegExp,
-    Error,
-    TypeError,
-    RangeError
-  };
-
-  // Load utils.js first (provides Utils object with generateUUID)
-  const utilsCode = fs.readFileSync(path.join(__dirname, '../../src/utils.js'), 'utf8');
-  vm.runInNewContext(utilsCode, context);
-  
-  // Create mock Logger if not present
-  if (!context.Utils || !context.Utils.Logger) {
-    if (!context.Utils) {
-      context.Utils = {};
-    }
-    context.Utils.Logger = {
-      log: () => {},
-      debug: () => {},
-      warn: () => {},
-      error: () => {}
+    const context = {
+        console,
+        setTimeout,
+        clearTimeout,
+        setInterval,
+        clearInterval,
+        crypto: typeof crypto !== 'undefined' ? crypto : undefined,
+        Math,
+        Array,
+        Object,
+        Map,
+        Set,
+        String,
+        Number,
+        Boolean,
+        JSON,
+        Date,
+        RegExp,
+        Error,
+        TypeError,
+        RangeError,
+        // p5.js mocks
+        textSize: () => { },
+        textWidth: (str) => (str ? str.length * 8 : 0),
+        max: Math.max,
+        min: Math.min,
+        push: () => { },
+        pop: () => { },
+        fill: () => { },
+        stroke: () => { },
+        strokeWeight: () => { },
+        rect: () => { },
+        text: () => { },
+        background: () => { },
+        color: (r, g, b) => ({ toString: () => `rgb(${r},${g},${b})`, levels: [r, g, b, 255] }),
+        lerp: (start, stop, amt) => start + (stop - start) * amt,
+        loadImage: (url, success) => { if (success) setTimeout(() => success({ width: 100, height: 100 }), 0); }
     };
-  }
 
-  // Load ColorPalette
-  const colorPaletteCode = fs.readFileSync(path.join(__dirname, '../../src/ColorPalette.js'), 'utf8');
-  vm.runInNewContext(colorPaletteCode, context);
+    // Mock window object
+    context.window = context;
+    context.self = context;
 
-  // Load TextBox class
-  const textBoxCode = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
-  vm.runInNewContext(textBoxCode, context);
+    // Start with empty Utils
+    context.Utils = {};
 
-  // Load Connection class
-  const connectionCode = fs.readFileSync(path.join(__dirname, '../../src/Connection.js'), 'utf8');
-  vm.runInNewContext(connectionCode, context);
+    // Load utils.js first (provides Utils object with generateUUID)
+    const utilsCode = fs.readFileSync(path.join(__dirname, '../../src/utils.js'), 'utf8');
+    vm.runInNewContext(utilsCode, context);
 
-  // Load MindMap class
-  const mindMapCode = fs.readFileSync(path.join(__dirname, '../../src/MindMap.js'), 'utf8');
-  vm.runInNewContext(mindMapCode, context);
+    // Create mock Logger if not present
+    if (!context.Utils || !context.Utils.Logger) {
+        if (!context.Utils) {
+            context.Utils = {};
+        }
+        context.Utils.Logger = {
+            log: () => { },
+            debug: () => { },
+            warn: () => { },
+            error: () => { }
+        };
+    }
 
-  return context;
+    // Load ColorPalette
+    const colorPaletteCode = fs.readFileSync(path.join(__dirname, '../../src/ColorPalette.js'), 'utf8');
+    vm.runInNewContext(colorPaletteCode, context);
+
+    // Load TextBox class
+    const textBoxCode = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
+    vm.runInNewContext(textBoxCode, context);
+
+    // Load Connection class
+    const connectionCode = fs.readFileSync(path.join(__dirname, '../../src/Connection.js'), 'utf8');
+    vm.runInNewContext(connectionCode, context);
+
+    // Load MindMap class
+    const mindMapCode = fs.readFileSync(path.join(__dirname, '../../src/MindMap.js'), 'utf8');
+    vm.runInNewContext(mindMapCode, context);
+
+    return context;
 }
 
 describe('Utils.generateUUID', () => {
-  let context;
+    let context;
 
-  beforeAll(() => {
-    context = setupTestEnvironment();
-  });
+    beforeAll(() => {
+        context = setupTestEnvironment();
+    });
 
-  test('should generate valid UUID strings', () => {
-    const { Utils } = context;
-    const uuid1 = Utils.generateUUID();
-    const uuid2 = Utils.generateUUID();
+    test('should generate valid UUID strings', () => {
+        const { Utils } = context;
+        const uuid1 = Utils.generateUUID();
+        const uuid2 = Utils.generateUUID();
 
-    expect(typeof uuid1).toBe('string');
-    expect(typeof uuid2).toBe('string');
-    expect(uuid1.length).toBeGreaterThan(0);
-    expect(uuid2.length).toBeGreaterThan(0);
-  });
+        expect(typeof uuid1).toBe('string');
+        expect(typeof uuid2).toBe('string');
+        expect(uuid1.length).toBeGreaterThan(0);
+        expect(uuid2.length).toBeGreaterThan(0);
+    });
 
-  test('should generate unique UUIDs', () => {
-    const { Utils } = context;
-    const uuid1 = Utils.generateUUID();
-    const uuid2 = Utils.generateUUID();
-    const uuid3 = Utils.generateUUID();
+    test('should generate unique UUIDs', () => {
+        const { Utils } = context;
+        const uuid1 = Utils.generateUUID();
+        const uuid2 = Utils.generateUUID();
+        const uuid3 = Utils.generateUUID();
 
-    expect(uuid1).not.toBe(uuid2);
-    expect(uuid1).not.toBe(uuid3);
-    expect(uuid2).not.toBe(uuid3);
-  });
+        expect(uuid1).not.toBe(uuid2);
+        expect(uuid1).not.toBe(uuid3);
+        expect(uuid2).not.toBe(uuid3);
+    });
 
-  test('should generate UUIDs matching UUID v4 format', () => {
-    const { Utils } = context;
-    const uuid = Utils.generateUUID();
+    test('should generate UUIDs matching UUID v4 format', () => {
+        const { Utils } = context;
+        const uuid = Utils.generateUUID();
 
-    // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    // where x is any hex digit and y is one of 8,9,a,b
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    expect(uuid).toMatch(uuidRegex);
-  });
+        // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+        // where x is any hex digit and y is one of 8,9,a,b
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        expect(uuid).toMatch(uuidRegex);
+    });
 
-  test('should generate many unique UUIDs without collisions', () => {
-    const { Utils } = context;
-    const uuids = new Set();
-    const count = 1000;
+    test('should generate many unique UUIDs without collisions', () => {
+        const { Utils } = context;
+        const uuids = new Set();
+        const count = 1000;
 
-    for (let i = 0; i < count; i++) {
-      uuids.add(Utils.generateUUID());
-    }
+        for (let i = 0; i < count; i++) {
+            uuids.add(Utils.generateUUID());
+        }
 
-    expect(uuids.size).toBe(count);
-  });
+        expect(uuids.size).toBe(count);
+    });
 });
 
 describe('TextBox UUID Implementation', () => {
-  let context;
+    let context;
 
-  beforeAll(() => {
-    context = setupTestEnvironment();
-  });
-
-  test('should generate ID in constructor', () => {
-    const { TextBox } = context;
-    const box = new TextBox(100, 100, 'Test Box');
-
-    expect(box.id).toBeTruthy();
-    expect(typeof box.id).toBe('string');
-    expect(box.id.length).toBeGreaterThan(0);
-  });
-
-  test('should generate unique IDs for different boxes', () => {
-    const { TextBox } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    const box3 = new TextBox(300, 300, 'Box 3');
-
-    expect(box1.id).not.toBe(box2.id);
-    expect(box1.id).not.toBe(box3.id);
-    expect(box2.id).not.toBe(box3.id);
-  });
-
-  test('toJSON should include id field', () => {
-    const { TextBox } = context;
-    const box = new TextBox(100, 100, 'Test Box');
-    const json = box.toJSON();
-
-    expect(json).toHaveProperty('id');
-    expect(json.id).toBe(box.id);
-    expect(typeof json.id).toBe('string');
-  });
-
-  test('toJSON should include all essential fields', () => {
-    const { TextBox } = context;
-    const box = new TextBox(150, 200, 'Test Content');
-    box.width = 250;
-    box.height = 100;
-    const json = box.toJSON();
-
-    expect(json).toHaveProperty('id');
-    expect(json).toHaveProperty('x', 150);
-    expect(json).toHaveProperty('y', 200);
-    expect(json).toHaveProperty('text', 'Test Content');
-    expect(json).toHaveProperty('width');
-    expect(json).toHaveProperty('height');
-  });
-
-  test('fromJSON should preserve existing ID when present', () => {
-    const { TextBox } = context;
-    const existingId = 'test-uuid-12345';
-    const data = {
-      id: existingId,
-      x: 100,
-      y: 100,
-      text: 'Test',
-      width: 200,
-      height: 80
-    };
-
-    const box = TextBox.fromJSON(data);
-
-    expect(box.id).toBe(existingId);
-  });
-
-  test('fromJSON should generate new ID if missing', () => {
-    const { TextBox } = context;
-    const data = {
-      x: 100,
-      y: 100,
-      text: 'Test',
-      width: 200,
-      height: 80
-    };
-
-    const box = TextBox.fromJSON(data);
-
-    expect(box.id).toBeTruthy();
-    expect(typeof box.id).toBe('string');
-  });
-
-  test('fromJSON should ignore invalid ID types', () => {
-    const { TextBox } = context;
-    const invalidIds = [null, undefined, 123, {}, [], true];
-
-    invalidIds.forEach(invalidId => {
-      const data = {
-        id: invalidId,
-        x: 100,
-        y: 100,
-        text: 'Test',
-        width: 200,
-        height: 80
-      };
-
-      const box = TextBox.fromJSON(data);
-      
-      // Should generate new ID when given invalid ID
-      expect(box.id).toBeTruthy();
-      expect(typeof box.id).toBe('string');
-      expect(box.id).not.toBe(invalidId);
+    beforeAll(() => {
+        context = setupTestEnvironment();
     });
-  });
+
+    test('should generate ID in constructor', () => {
+        const { TextBox } = context;
+        const box = new TextBox(100, 100, 'Test Box');
+
+        expect(box.id).toBeTruthy();
+        expect(typeof box.id).toBe('string');
+        expect(box.id.length).toBeGreaterThan(0);
+    });
+
+    test('should generate unique IDs for different boxes', () => {
+        const { TextBox } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
+        const box3 = new TextBox(300, 300, 'Box 3');
+
+        expect(box1.id).not.toBe(box2.id);
+        expect(box1.id).not.toBe(box3.id);
+        expect(box2.id).not.toBe(box3.id);
+    });
+
+    test('toJSON should include id field', () => {
+        const { TextBox } = context;
+        const box = new TextBox(100, 100, 'Test Box');
+        const json = box.toJSON();
+
+        expect(json).toHaveProperty('id');
+        expect(json.id).toBe(box.id);
+        expect(typeof json.id).toBe('string');
+    });
+
+    test('toJSON should include all essential fields', () => {
+        const { TextBox } = context;
+        const box = new TextBox(150, 200, 'Test Content');
+        box.width = 250;
+        box.height = 100;
+        const json = box.toJSON();
+
+        expect(json).toHaveProperty('id');
+        expect(json).toHaveProperty('x', 150);
+        expect(json).toHaveProperty('y', 200);
+        expect(json).toHaveProperty('text', 'Test Content');
+        expect(json).toHaveProperty('width');
+        expect(json).toHaveProperty('height');
+    });
+
+    test('fromJSON should preserve existing ID when present', () => {
+        const { TextBox } = context;
+        const existingId = 'test-uuid-12345';
+        const data = {
+            id: existingId,
+            x: 100,
+            y: 100,
+            text: 'Test',
+            width: 200,
+            height: 80
+        };
+
+        const box = TextBox.fromJSON(data);
+
+        expect(box.id).toBe(existingId);
+    });
+
+    test('fromJSON should generate new ID if missing', () => {
+        const { TextBox } = context;
+        const data = {
+            x: 100,
+            y: 100,
+            text: 'Test',
+            width: 200,
+            height: 80
+        };
+
+        const box = TextBox.fromJSON(data);
+
+        expect(box.id).toBeTruthy();
+        expect(typeof box.id).toBe('string');
+    });
+
+    test('fromJSON should ignore invalid ID types', () => {
+        const { TextBox } = context;
+        const invalidIds = [null, undefined, 123, {}, [], true];
+
+        invalidIds.forEach(invalidId => {
+            const data = {
+                id: invalidId,
+                x: 100,
+                y: 100,
+                text: 'Test',
+                width: 200,
+                height: 80
+            };
+
+            const box = TextBox.fromJSON(data);
+
+            // Should generate new ID when given invalid ID
+            expect(box.id).toBeTruthy();
+            expect(typeof box.id).toBe('string');
+            expect(box.id).not.toBe(invalidId);
+        });
+    });
 });
 
 describe('Connection ID-based Serialization', () => {
-  let context;
+    let context;
 
-  beforeAll(() => {
-    context = setupTestEnvironment();
-  });
+    beforeAll(() => {
+        context = setupTestEnvironment();
+    });
 
-  test('toJSON should include fromId and toId', () => {
-    const { TextBox, Connection } = context;
-    const fromBox = new TextBox(100, 100, 'From');
-    const toBox = new TextBox(200, 200, 'To');
-    const conn = new Connection(fromBox, toBox);
+    test('toJSON should include fromId and toId', () => {
+        const { TextBox, Connection } = context;
+        const fromBox = new TextBox(100, 100, 'From');
+        const toBox = new TextBox(200, 200, 'To');
+        const conn = new Connection(fromBox, toBox);
 
-    const boxes = [fromBox, toBox];
-    const json = conn.toJSON(boxes);
+        const boxes = [fromBox, toBox];
+        const json = conn.toJSON(boxes);
 
-    expect(json).toHaveProperty('fromId');
-    expect(json).toHaveProperty('toId');
-    expect(json.fromId).toBe(fromBox.id);
-    expect(json.toId).toBe(toBox.id);
-  });
+        expect(json).toHaveProperty('fromId');
+        expect(json).toHaveProperty('toId');
+        expect(json.fromId).toBe(fromBox.id);
+        expect(json.toId).toBe(toBox.id);
+    });
 
-  test('toJSON should include legacy from and to indices for backward compatibility', () => {
-    const { TextBox, Connection } = context;
-    const fromBox = new TextBox(100, 100, 'From');
-    const toBox = new TextBox(200, 200, 'To');
-    const conn = new Connection(fromBox, toBox);
+    test('toJSON should include legacy from and to indices for backward compatibility', () => {
+        const { TextBox, Connection } = context;
+        const fromBox = new TextBox(100, 100, 'From');
+        const toBox = new TextBox(200, 200, 'To');
+        const conn = new Connection(fromBox, toBox);
 
-    const boxes = [fromBox, toBox];
-    const json = conn.toJSON(boxes);
+        const boxes = [fromBox, toBox];
+        const json = conn.toJSON(boxes);
 
-    expect(json).toHaveProperty('from');
-    expect(json).toHaveProperty('to');
-    expect(typeof json.from).toBe('number');
-    expect(typeof json.to).toBe('number');
-    expect(json.from).toBe(0);
-    expect(json.to).toBe(1);
-  });
+        expect(json).toHaveProperty('from');
+        expect(json).toHaveProperty('to');
+        expect(typeof json.from).toBe('number');
+        expect(typeof json.to).toBe('number');
+        expect(json.from).toBe(0);
+        expect(json.to).toBe(1);
+    });
 
-  test('fromJSON should use ID-based lookup when IDs are present', () => {
-    const { TextBox, Connection } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    const box3 = new TextBox(300, 300, 'Box 3');
+    test('fromJSON should use ID-based lookup when IDs are present', () => {
+        const { TextBox, Connection } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
+        const box3 = new TextBox(300, 300, 'Box 3');
 
-    const data = {
-      fromId: box1.id,
-      toId: box3.id,
-      from: 0,  // Legacy index (should be ignored when IDs present)
-      to: 1     // Legacy index (should be ignored when IDs present)
-    };
+        const data = {
+            fromId: box1.id,
+            toId: box3.id,
+            from: 0,  // Legacy index (should be ignored when IDs present)
+            to: 1     // Legacy index (should be ignored when IDs present)
+        };
 
-    const boxes = [box1, box2, box3];
-    const conn = Connection.fromJSON(data, boxes);
+        const boxes = [box1, box2, box3];
+        const conn = Connection.fromJSON(data, boxes);
 
-    expect(conn).toBeTruthy();
-    expect(conn.fromBox).toBe(box1);
-    expect(conn.toBox).toBe(box3);
-  });
+        expect(conn).toBeTruthy();
+        expect(conn.fromBox).toBe(box1);
+        expect(conn.toBox).toBe(box3);
+    });
 
-  test('fromJSON should fall back to index-based lookup when IDs missing', () => {
-    const { TextBox, Connection } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
+    test('fromJSON should fall back to index-based lookup when IDs missing', () => {
+        const { TextBox, Connection } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
 
-    const data = {
-      from: 0,
-      to: 1
-    };
+        const data = {
+            from: 0,
+            to: 1
+        };
 
-    const boxes = [box1, box2];
-    const conn = Connection.fromJSON(data, boxes);
+        const boxes = [box1, box2];
+        const conn = Connection.fromJSON(data, boxes);
 
-    expect(conn).toBeTruthy();
-    expect(conn.fromBox).toBe(box1);
-    expect(conn.toBox).toBe(box2);
-  });
+        expect(conn).toBeTruthy();
+        expect(conn.fromBox).toBe(box1);
+        expect(conn.toBox).toBe(box2);
+    });
 
-  test('fromJSON should support Map input for ID lookup', () => {
-    const { TextBox, Connection } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
+    test('fromJSON should support Map input for ID lookup', () => {
+        const { TextBox, Connection } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
 
-    const data = {
-      fromId: box1.id,
-      toId: box2.id
-    };
+        const data = {
+            fromId: box1.id,
+            toId: box2.id
+        };
 
-    const boxMap = new Map();
-    boxMap.set(box1.id, box1);
-    boxMap.set(box2.id, box2);
+        const boxMap = new Map();
+        boxMap.set(box1.id, box1);
+        boxMap.set(box2.id, box2);
 
-    const conn = Connection.fromJSON(data, boxMap);
+        const conn = Connection.fromJSON(data, boxMap);
 
-    expect(conn).toBeTruthy();
-    expect(conn.fromBox).toBe(box1);
-    expect(conn.toBox).toBe(box2);
-  });
+        expect(conn).toBeTruthy();
+        expect(conn.fromBox).toBe(box1);
+        expect(conn.toBox).toBe(box2);
+    });
 
-  test('fromJSON should return null when boxes not found by ID', () => {
-    const { TextBox, Connection } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
+    test('fromJSON should return null when boxes not found by ID', () => {
+        const { TextBox, Connection } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
 
-    const data = {
-      fromId: 'non-existent-id-1',
-      toId: 'non-existent-id-2'
-    };
+        const data = {
+            fromId: 'non-existent-id-1',
+            toId: 'non-existent-id-2'
+        };
 
-    const boxes = [box1, box2];
-    const conn = Connection.fromJSON(data, boxes);
+        const boxes = [box1, box2];
+        const conn = Connection.fromJSON(data, boxes);
 
-    expect(conn).toBeNull();
-  });
+        expect(conn).toBeNull();
+    });
 
-  test('fromJSON should return null when indices out of bounds', () => {
-    const { TextBox, Connection } = context;
-    const box1 = new TextBox(100, 100, 'Box 1');
+    test('fromJSON should return null when indices out of bounds', () => {
+        const { TextBox, Connection } = context;
+        const box1 = new TextBox(100, 100, 'Box 1');
 
-    const data = {
-      from: 0,
-      to: 5  // Out of bounds
-    };
+        const data = {
+            from: 0,
+            to: 5  // Out of bounds
+        };
 
-    const boxes = [box1];
-    const conn = Connection.fromJSON(data, boxes);
+        const boxes = [box1];
+        const conn = Connection.fromJSON(data, boxes);
 
-    expect(conn).toBeNull();
-  });
+        expect(conn).toBeNull();
+    });
 
-  test('fromJSON edge case: empty array should return null', () => {
-    const { Connection } = context;
-    const data = {
-      from: 0,
-      to: 1
-    };
+    test('fromJSON edge case: empty array should return null', () => {
+        const { Connection } = context;
+        const data = {
+            from: 0,
+            to: 1
+        };
 
-    const conn = Connection.fromJSON(data, []);
+        const conn = Connection.fromJSON(data, []);
 
-    expect(conn).toBeNull();
-  });
+        expect(conn).toBeNull();
+    });
 });
 
 describe('MindMap.getBoxById', () => {
-  let context;
+    let context;
 
-  beforeAll(() => {
-    context = setupTestEnvironment();
-  });
+    beforeAll(() => {
+        context = setupTestEnvironment();
+    });
 
-  test('should find box by ID', () => {
-    const { TextBox, MindMap } = context;
-    const mindMap = new MindMap();
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    const box3 = new TextBox(300, 300, 'Box 3');
-    
-    mindMap.boxes.push(box1, box2, box3);
+    test('should find box by ID', () => {
+        const { TextBox, MindMap } = context;
+        const mindMap = new MindMap();
 
-    const found = mindMap.getBoxById(box2.id);
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
+        const box3 = new TextBox(300, 300, 'Box 3');
 
-    expect(found).toBe(box2);
-  });
+        mindMap.boxes.push(box1, box2, box3);
 
-  test('should return null for non-existent ID', () => {
-    const { TextBox, MindMap } = context;
-    const mindMap = new MindMap();
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    mindMap.boxes.push(box1);
+        const found = mindMap.getBoxById(box2.id);
 
-    const found = mindMap.getBoxById('non-existent-id');
+        expect(found).toBe(box2);
+    });
 
-    expect(found).toBeNull();
-  });
+    test('should return null for non-existent ID', () => {
+        const { TextBox, MindMap } = context;
+        const mindMap = new MindMap();
 
-  test('should return null for null ID', () => {
-    const { MindMap } = context;
-    const mindMap = new MindMap();
+        const box1 = new TextBox(100, 100, 'Box 1');
+        mindMap.boxes.push(box1);
 
-    const found = mindMap.getBoxById(null);
+        const found = mindMap.getBoxById('non-existent-id');
 
-    expect(found).toBeNull();
-  });
+        expect(found).toBeNull();
+    });
 
-  test('should return null for undefined ID', () => {
-    const { MindMap } = context;
-    const mindMap = new MindMap();
+    test('should return null for null ID', () => {
+        const { MindMap } = context;
+        const mindMap = new MindMap();
 
-    const found = mindMap.getBoxById(undefined);
+        const found = mindMap.getBoxById(null);
 
-    expect(found).toBeNull();
-  });
+        expect(found).toBeNull();
+    });
 
-  test('should return null for non-string ID', () => {
-    const { TextBox, MindMap } = context;
-    const mindMap = new MindMap();
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    mindMap.boxes.push(box1);
+    test('should return null for undefined ID', () => {
+        const { MindMap } = context;
+        const mindMap = new MindMap();
 
-    const found1 = mindMap.getBoxById(123);
-    const found2 = mindMap.getBoxById({});
-    const found3 = mindMap.getBoxById([]);
+        const found = mindMap.getBoxById(undefined);
 
-    expect(found1).toBeNull();
-    expect(found2).toBeNull();
-    expect(found3).toBeNull();
-  });
+        expect(found).toBeNull();
+    });
 
-  test('should return null for empty string ID', () => {
-    const { MindMap } = context;
-    const mindMap = new MindMap();
+    test('should return null for non-string ID', () => {
+        const { TextBox, MindMap } = context;
+        const mindMap = new MindMap();
 
-    const found = mindMap.getBoxById('');
+        const box1 = new TextBox(100, 100, 'Box 1');
+        mindMap.boxes.push(box1);
 
-    expect(found).toBeNull();
-  });
+        const found1 = mindMap.getBoxById(123);
+        const found2 = mindMap.getBoxById({});
+        const found3 = mindMap.getBoxById([]);
 
-  test('should work with empty boxes array', () => {
-    const { MindMap } = context;
-    const mindMap = new MindMap();
+        expect(found1).toBeNull();
+        expect(found2).toBeNull();
+        expect(found3).toBeNull();
+    });
 
-    const found = mindMap.getBoxById('some-id');
+    test('should return null for empty string ID', () => {
+        const { MindMap } = context;
+        const mindMap = new MindMap();
 
-    expect(found).toBeNull();
-  });
+        const found = mindMap.getBoxById('');
+
+        expect(found).toBeNull();
+    });
+
+    test('should work with empty boxes array', () => {
+        const { MindMap } = context;
+        const mindMap = new MindMap();
+
+        const found = mindMap.getBoxById('some-id');
+
+        expect(found).toBeNull();
+    });
 });
 
 describe('Backward Compatibility', () => {
-  let context;
+    let context;
 
-  beforeAll(() => {
-    context = setupTestEnvironment();
-  });
+    beforeAll(() => {
+        context = setupTestEnvironment();
+    });
 
-  test('should handle legacy data without IDs in TextBox', () => {
-    const { TextBox } = context;
-    
-    const legacyData = {
-      x: 100,
-      y: 100,
-      text: 'Legacy Box',
-      width: 200,
-      height: 80
-      // No 'id' field
-    };
+    test('should handle legacy data without IDs in TextBox', () => {
+        const { TextBox } = context;
 
-    const box = TextBox.fromJSON(legacyData);
+        const legacyData = {
+            x: 100,
+            y: 100,
+            text: 'Legacy Box',
+            width: 200,
+            height: 80
+            // No 'id' field
+        };
 
-    expect(box).toBeTruthy();
-    expect(box.id).toBeTruthy();
-    expect(typeof box.id).toBe('string');
-    expect(box.x).toBe(100);
-    expect(box.y).toBe(100);
-    expect(box.text).toBe('Legacy Box');
-  });
+        const box = TextBox.fromJSON(legacyData);
 
-  test('should handle legacy data with only indices in Connection', () => {
-    const { TextBox, Connection } = context;
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    
-    const legacyData = {
-      from: 0,
-      to: 1
-      // No 'fromId' or 'toId' fields
-    };
+        expect(box).toBeTruthy();
+        expect(box.id).toBeTruthy();
+        expect(typeof box.id).toBe('string');
+        expect(box.x).toBe(100);
+        expect(box.y).toBe(100);
+        expect(box.text).toBe('Legacy Box');
+    });
 
-    const boxes = [box1, box2];
-    const conn = Connection.fromJSON(legacyData, boxes);
+    test('should handle legacy data with only indices in Connection', () => {
+        const { TextBox, Connection } = context;
 
-    expect(conn).toBeTruthy();
-    expect(conn.fromBox).toBe(box1);
-    expect(conn.toBox).toBe(box2);
-  });
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
 
-  test('should handle mixed data with both IDs and indices', () => {
-    const { TextBox, Connection } = context;
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    const box3 = new TextBox(300, 300, 'Box 3');
-    
-    const mixedData = {
-      fromId: box1.id,
-      toId: box3.id,
-      from: 1,  // These indices point to different boxes
-      to: 2     // but IDs should take precedence
-    };
+        const legacyData = {
+            from: 0,
+            to: 1
+            // No 'fromId' or 'toId' fields
+        };
 
-    const boxes = [box1, box2, box3];
-    const conn = Connection.fromJSON(mixedData, boxes);
+        const boxes = [box1, box2];
+        const conn = Connection.fromJSON(legacyData, boxes);
 
-    expect(conn).toBeTruthy();
-    // Should use ID-based lookup (box1 -> box3), not index-based (box2 -> box3)
-    expect(conn.fromBox).toBe(box1);
-    expect(conn.toBox).toBe(box3);
-  });
+        expect(conn).toBeTruthy();
+        expect(conn.fromBox).toBe(box1);
+        expect(conn.toBox).toBe(box2);
+    });
 
-  test('Round-trip: save and load should preserve IDs', () => {
-    const { TextBox, Connection } = context;
-    
-    const box1 = new TextBox(100, 100, 'Box 1');
-    const box2 = new TextBox(200, 200, 'Box 2');
-    const originalId1 = box1.id;
-    const originalId2 = box2.id;
-    
-    const conn = new Connection(box1, box2);
-    const boxes = [box1, box2];
-    
-    // Save
-    const json = conn.toJSON(boxes);
-    
-    // Load
-    const loadedBoxes = [
-      TextBox.fromJSON(box1.toJSON()),
-      TextBox.fromJSON(box2.toJSON())
-    ];
-    const loadedConn = Connection.fromJSON(json, loadedBoxes);
+    test('should handle mixed data with both IDs and indices', () => {
+        const { TextBox, Connection } = context;
 
-    expect(loadedBoxes[0].id).toBe(originalId1);
-    expect(loadedBoxes[1].id).toBe(originalId2);
-    expect(loadedConn.fromBox.id).toBe(originalId1);
-    expect(loadedConn.toBox.id).toBe(originalId2);
-  });
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
+        const box3 = new TextBox(300, 300, 'Box 3');
+
+        const mixedData = {
+            fromId: box1.id,
+            toId: box3.id,
+            from: 1,  // These indices point to different boxes
+            to: 2     // but IDs should take precedence
+        };
+
+        const boxes = [box1, box2, box3];
+        const conn = Connection.fromJSON(mixedData, boxes);
+
+        expect(conn).toBeTruthy();
+        // Should use ID-based lookup (box1 -> box3), not index-based (box2 -> box3)
+        expect(conn.fromBox).toBe(box1);
+        expect(conn.toBox).toBe(box3);
+    });
+
+    test('Round-trip: save and load should preserve IDs', () => {
+        const { TextBox, Connection } = context;
+
+        const box1 = new TextBox(100, 100, 'Box 1');
+        const box2 = new TextBox(200, 200, 'Box 2');
+        const originalId1 = box1.id;
+        const originalId2 = box2.id;
+
+        const conn = new Connection(box1, box2);
+        const boxes = [box1, box2];
+
+        // Save
+        const json = conn.toJSON(boxes);
+
+        // Load
+        const loadedBoxes = [
+            TextBox.fromJSON(box1.toJSON()),
+            TextBox.fromJSON(box2.toJSON())
+        ];
+        const loadedConn = Connection.fromJSON(json, loadedBoxes);
+
+        expect(loadedBoxes[0].id).toBe(originalId1);
+        expect(loadedBoxes[1].id).toBe(originalId2);
+        expect(loadedConn.fromBox.id).toBe(originalId1);
+        expect(loadedConn.toBox.id).toBe(originalId2);
+    });
 });
 
 // ============================================================================

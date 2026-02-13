@@ -441,7 +441,7 @@ function applyStroke(color, weight = 1) {
   if (color == null) {
     return; // Silently skip if no color provided
   }
-  
+
   if (typeof color === 'number') {
     if (Number.isFinite(color)) {
       stroke(color);
@@ -467,7 +467,7 @@ function applyFill(color) {
   if (color == null) {
     return; // Silently skip if no color provided
   }
-  
+
   if (typeof color === 'number') {
     if (Number.isFinite(color)) {
       fill(color);
@@ -862,7 +862,7 @@ function showNotification(message, type = 'info', duration = 3000) {
   // Validate type parameter to prevent potential security issues
   const validTypes = ['info', 'warning', 'error'];
   type = validTypes.includes(type) ? type : 'info';
-  
+
   // Create notification element if it doesn't exist
   let container = document.getElementById('notification-container');
   if (!container) {
@@ -881,7 +881,7 @@ function showNotification(message, type = 'info', duration = 3000) {
   // Create notification element
   const notification = document.createElement('div');
   notification.className = `notification notification-${type}`;
-  
+
   // Set styles based on type
   const colors = {
     info: { bg: '#2196F3', text: '#fff' },
@@ -889,7 +889,7 @@ function showNotification(message, type = 'info', duration = 3000) {
     error: { bg: '#f44336', text: '#fff' }
   };
   const color = colors[type] || colors.info;
-  
+
   notification.style.cssText = `
     background-color: ${color.bg};
     color: ${color.text};
@@ -903,7 +903,7 @@ function showNotification(message, type = 'info', duration = 3000) {
     pointer-events: auto;
     max-width: 300px;
   `;
-  
+
   notification.textContent = message;
   container.appendChild(notification);
 
@@ -1036,4 +1036,48 @@ if (typeof window !== 'undefined') {
   // Also expose commonly used utilities via simpler aliases for backward compatibility
   window.AppConfig = AppConfig;
   window.Utils = window.OpenMindUtils;
+}
+
+// Export for CommonJS (Node.js/Jest)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    AppConfig,
+    isValidNumber,
+    areValidCoordinates,
+    isValidPoint,
+    areValidDimensions,
+    safeValue,
+    safeNumber,
+    safePositiveNumber,
+    clamp,
+    getCurrentZoom,
+    getClampedZoomFactor,
+    sanitizeText,
+    isWhitespace,
+    safeString,
+    getWorldMouseCoordinates,
+    getMouseCoordinates,
+    screenX,
+    screenY,
+    worldToScreen,
+    Logger,
+    applyStroke,
+    applyFill,
+    distance,
+    distanceSquared,
+    distanceToSegment,
+    isPointInRect,
+    rectanglesOverlap,
+    segmentIntersectsRect,
+    validateColor,
+    colorToRGBA,
+    safeForEach,
+    safeFilter,
+    safeMap,
+    deepClone,
+    generateUUID,
+    showNotification,
+    safeExecute,
+    wrapWithErrorHandler
+  };
 }
