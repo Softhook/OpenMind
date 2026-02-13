@@ -2421,6 +2421,13 @@ class CollaborationManager {
         console.log('provider.synced:', this.provider?.synced);
         console.groupEnd();
 
+        // Persistence status
+        console.group('💾 Persistence');
+        console.log('IndexedDB Provider:', this.indexeddbProvider ? 'Active' : 'Missing');
+        console.log('IndexedDB Synced:', this.indexeddbProvider?.synced ?? 'N/A');
+        console.log('Has Legacy Data (LocalStorage):', this.hasLoadedFromLocalStorage);
+        console.groupEnd();
+
         // Box comparison
         console.group('📦 Boxes');
         const yjsBoxCount = this.yboxes?.size ?? 0;
