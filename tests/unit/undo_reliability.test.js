@@ -67,6 +67,7 @@ describe('Undo Reliability behavioral tests', () => {
         test('_closeTextEditUndoGroup should flush pending text syncs', () => {
             const box = new TextBox(0, 0, 'Original');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box.id, box.toJSON());
             });
@@ -93,6 +94,7 @@ describe('Undo Reliability behavioral tests', () => {
             const box1 = new TextBox(0, 0, 'Box 1');
             const box2 = new TextBox(100, 0, 'Box 2');
             mindMap.boxes.push(box1, box2);
+            mindMap.rebuildIndex();
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box1.id, box1.toJSON());
                 cm.yboxes.set(box2.id, box2.toJSON());
@@ -123,6 +125,7 @@ describe('Undo Reliability behavioral tests', () => {
         test('deleteBoxFromYjs should close text editing undo group', () => {
             const box = new TextBox(0, 0, 'Box 1');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box.id, box.toJSON());
             });

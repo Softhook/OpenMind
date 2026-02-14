@@ -7,7 +7,12 @@ const fs = require('fs');
 const path = require('path');
 
 // Create a sandbox context with ThrustGame
+const ColorPalette = require('../../src/ColorPalette');
+const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
+
+// Create a sandbox context with ThrustGame
 const sandbox = {
+  ColorPalette: ColorPalette,
   console: console,
   Date: Date,
   Math: Math,
@@ -44,7 +49,6 @@ const sandbox = {
 };
 
 // Load ThrustGame.js
-const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
 const script = new vm.Script(thrustGameCode);
 script.runInNewContext(sandbox);
 

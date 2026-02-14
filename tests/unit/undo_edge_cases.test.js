@@ -67,6 +67,7 @@ describe('Undo System Edge Cases behavioral tests', () => {
         test('_applyBoxFromYjs should not overwrite text during active editing', () => {
             const box = new TextBox(0, 0, 'Initial');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
 
             box.isEditing = true;
             box.text = 'Modified';
@@ -82,6 +83,7 @@ describe('Undo System Edge Cases behavioral tests', () => {
         test('_applyBoxFromYjs should force apply during undo/redo', () => {
             const box = new TextBox(0, 0, 'Initial');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
 
             box.isEditing = true;
             box.text = 'Modified';
@@ -99,6 +101,7 @@ describe('Undo System Edge Cases behavioral tests', () => {
         test('undo() should close text edit group', () => {
             const box = new TextBox(0, 0, 'Start');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
 
             // Ensure something is on the undo stack
             cm.transact(() => {
@@ -140,6 +143,7 @@ describe('Undo System Edge Cases behavioral tests', () => {
         test('yboxes observer should return early if isSyncing is true and not undo/redo', () => {
             const box = new TextBox(0, 0, 'Test');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
 
             cm.isSyncing = true;
 
@@ -160,6 +164,7 @@ describe('Undo System Edge Cases behavioral tests', () => {
             const box1 = new TextBox(0, 0, 'B1');
             const box2 = new TextBox(100, 0, 'B2');
             mindMap.boxes.push(box1, box2);
+            mindMap.rebuildIndex();
 
             box1.isEditing = true;
             cm.syncBoxToYjs(box1);

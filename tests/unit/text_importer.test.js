@@ -10,6 +10,15 @@ global.mindMap = {
     isDirty: false,
     isSaved: true,
     saveToLocalStorage: jest.fn(),
+    _wrapInTransaction: jest.fn(callback => callback()),
+    addBox: jest.fn(box => {
+        global.mindMap.boxes.push(box);
+    }),
+    addConnection: jest.fn((from, to) => {
+        const conn = { fromBox: from, toBox: to };
+        global.mindMap.connections.push(conn);
+        return conn;
+    })
 };
 
 global.Utils = {

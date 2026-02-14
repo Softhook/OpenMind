@@ -67,6 +67,7 @@ describe('Box Deletion with Connections behavioral tests', () => {
         const box1 = new TextBox(0, 0, 'Box 1');
         const box2 = new TextBox(100, 0, 'Box 2');
         mindMap.boxes.push(box1, box2);
+        mindMap.rebuildIndex();
 
         const conn = new Connection(box1, box2);
         mindMap.connections.push(conn);
@@ -103,6 +104,7 @@ describe('Box Deletion with Connections behavioral tests', () => {
         const box2 = new TextBox(-100, 0, 'Left');
         const box3 = new TextBox(100, 0, 'Right');
         mindMap.boxes.push(box1, box2, box3);
+        mindMap.rebuildIndex();
 
         mindMap.connections.push(new Connection(box2, box1));
         mindMap.connections.push(new Connection(box1, box3));

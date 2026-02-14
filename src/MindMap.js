@@ -138,13 +138,8 @@ class MindMap {
    */
   addBox(box) {
     // Wrap in transaction for proper undo tracking
-    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
     this._wrapInTransaction(() => {
-      this.boxes.push(box);
-      if (box && box.id) {
-        this.boxIdMap.set(box.id, box);
-      }
-      this.isDirty = true;
+      this._registerBox(box);
 
       // Notify collaboration system
       // Pass skipTransactionWrapper=true since we're already in a transaction
@@ -152,7 +147,116 @@ class MindMap {
         MindMap.onBoxChange(box, true);
       }
     });
+  }
 
+  /**
+   * Internal data structure methods to maintain index integrity.
+   * Using these instead of direct array manipulation ensures boxIdMap stays in sync.
+   * @private
+   */
+
+  /**
+   * Registers a box to the internal state (array and O(1) map).
+   * @param {TextBox} box 
+   */
+  _registerBox(box) {
+    if (!box) return;
+    this.boxes.push(box);
+    if (box.id && this.boxIdMap) {
+      this.boxIdMap.set(box.id, box);
+    }
+    this.isDirty = true;
+    this.isSaved = false;
+  }
+
+  /**
+   * Unregisters a box from the internal state (array and O(1) map).
+   * Note: Does NOT handle connections or selection cleanup.
+   * @param {TextBox|string} boxOrId 
+   */
+  _unregisterBox(boxOrId) {
+    if (!boxOrId) return false;
+
+    // Support passing either the box object or its ID
+    let box, boxId;
+    if (typeof boxOrId === 'string') {
+      boxId = boxOrId;
+      box = this.getBoxById(boxId);
+    } else {
+      box = boxOrId;
+      boxId = box.id;
+    }
+
+    if (!box) return false;
+
+    const index = this.boxes.indexOf(box);
+    if (index > -1) {
+      this.boxes.splice(index, 1);
+      if (boxId && this.boxIdMap) this.boxIdMap.delete(boxId);
+      this.isDirty = true;
+      this.isSaved = false;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Registers a connection to the internal state.
+   * @param {Connection} conn 
+   */
+  _registerConnection(conn) {
+    if (!conn) return;
+    this.connections.push(conn);
+    this.isDirty = true;
+    this.isSaved = false;
+  }
+
+  /**
+   * Unregisters a connection.
+   * @param {Connection} conn 
+   * @returns {boolean} True if found and removed
+   */
+  _unregisterConnection(conn) {
+    if (!conn) return false;
+    const index = this.connections.indexOf(conn);
+    if (index > -1) {
+      this.connections.splice(index, 1);
+      this.isDirty = true;
+      this.isSaved = false;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Low-level helper to bring a box to the top of the Z-order (end of array).
+   * @param {TextBox} box 
+   */
+  _bringBoxToTop(box) {
+    if (!box) return;
+    const index = this.boxes.indexOf(box);
+    if (index > -1) {
+      this.boxes.splice(index, 1);
+      this.boxes.push(box);
+      this.isDirty = true;
+      this.isSaved = false;
+    }
+  }
+
+  /**
+   * Filters out connections involving the specified box.
+   * @param {TextBox} box 
+   */
+  _removeConnectionsForBox(box) {
+    if (!box) return;
+    const initialLength = this.connections.length;
+    this.connections = this.connections.filter(
+      c => c.fromBox !== box && c.toBox !== box
+    );
+    if (this.connections.length !== initialLength) {
+      this.isDirty = true;
+      this.isSaved = false;
+    }
   }
 
   /**
@@ -206,11 +310,8 @@ class MindMap {
     }
 
     // Wrap in transaction for proper undo tracking
-    // Note: pushUndo() is deprecated and not needed here as _wrapInTransaction handles undo via Yjs
     this._wrapInTransaction(() => {
-      this.connections.push(new Connection(fromBox, toBox));
-      this.isDirty = true;
-      this.isSaved = false; // Mark as unsaved for browser autosave
+      this._registerConnection(new Connection(fromBox, toBox));
 
       // Notify collaboration system
       // Pass skipTransactionWrapper=true since we're already in a transaction
@@ -1386,12 +1487,10 @@ class MindMap {
       };
       const newBox = TextBox.fromJSON(newBoxData);
       if (newBox) {
-        this.boxes.push(newBox);
-        if (newBox.id) this.boxIdMap.set(newBox.id, newBox);
+        this._registerBox(newBox);
         this.addBoxToSelection(newBox);
         newBoxes.push(newBox);
       }
-
     }
 
     // Recreate connections between the pasted boxes
@@ -1400,12 +1499,10 @@ class MindMap {
         const fromBox = newBoxes[connData.from];
         const toBox = newBoxes[connData.to];
         if (fromBox && toBox) {
-          this.connections.push(new Connection(fromBox, toBox));
+          this._registerConnection(new Connection(fromBox, toBox));
         }
       }
     }
-
-    this.isDirty = true;
 
     // Sync pasted boxes and connections to collaboration
     for (const box of newBoxes) {
@@ -1427,17 +1524,10 @@ class MindMap {
   _performBoxDeletion(boxesToDelete) {
     for (const box of boxesToDelete) {
       // Remove connections involving this box
-      this.connections = this.connections.filter(conn =>
-        conn.fromBox !== box && conn.toBox !== box
-      );
+      this._removeConnectionsForBox(box);
 
       // Remove the box
-      const index = this.boxes.indexOf(box);
-      if (index > -1) {
-        this.boxes.splice(index, 1);
-        if (box.id) this.boxIdMap.delete(box.id);
-      }
-
+      this._unregisterBox(box);
 
       // Notify collaboration system of deletion
       if (MindMap.onBoxDelete && box.id) {
@@ -1966,9 +2056,8 @@ class MindMap {
           }
         }
 
-        // Move this box to the end (on top)
-        this.boxes.splice(i, 1);
-        this.boxes.push(box);
+        // Move this box to the end (on top) for Z-order
+        this._bringBoxToTop(box);
         return;
       }
     }
@@ -2678,21 +2767,18 @@ class MindMap {
         this.isArrowKeyNavigating = false;
       } else if (this.selectedConnection) {
         // Delete selected connection only
-        let index = this.connections.indexOf(this.selectedConnection);
-        if (index > -1) {
-          this._wrapInTransaction(() => {
-            this.connections.splice(index, 1);
+        this._wrapInTransaction(() => {
+          if (this._unregisterConnection(this.selectedConnection)) {
             this.selectedConnection = null;
-            this.isSaved = false; // Mark as unsaved for browser autosave
             // Sync connection deletion to collaboration
             if (MindMap.onConnectionsChange) {
               MindMap.onConnectionsChange();
             }
-          });
-        }
-        // Clear navigation mode after deleting single connection
-        this.isArrowKeyNavigating = false;
+          }
+        });
       }
+      // Clear navigation mode after deleting single connection
+      this.isArrowKeyNavigating = false;
     } else if (key === '1' || key === '2' || key === '3') {
       // Number keys to change selected box colors (when not editing)
       // 1 = red, 2 = orange, 3 = white
@@ -2715,8 +2801,6 @@ class MindMap {
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
           if (typeof this.selectedBox.setBackgroundByKey === 'function') {
             // Wrap for consistency with multi-box color change above.
-            // While a single setBackgroundByKey is atomic, wrapping ensures uniform behavior
-            // and makes the undo boundary explicit, which is the goal of action-based undo.
             this._wrapInTransaction(() => {
               this.selectedBox.setBackgroundByKey(colorKey);
               this._notifyBoxesChanged([this.selectedBox], true);
@@ -2780,10 +2864,7 @@ class MindMap {
         try {
           let box = TextBox.fromJSON(boxData);
           if (box) {
-            this.boxes.push(box);
-            if (box.id && this.boxIdMap) {
-              this.boxIdMap.set(box.id, box);
-            }
+            this._registerBox(box);
           }
 
         } catch (e) {
@@ -2809,7 +2890,7 @@ class MindMap {
         try {
           let conn = Connection.fromJSON(connData, this.boxes);
           if (conn && conn.fromBox && conn.toBox) {
-            this.connections.push(conn);
+            this._registerConnection(conn);
           }
         } catch (e) {
           console.error('Failed to load connection:', e);

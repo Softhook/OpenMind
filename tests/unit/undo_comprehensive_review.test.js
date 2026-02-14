@@ -67,6 +67,7 @@ describe('Advanced Collaboration & Formatting behavioral tests', () => {
         test('should sync bold and italic ranges', () => {
             const box = new TextBox(0, 0, 'Formatted Text');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box.id, box.toJSON());
             });
@@ -86,6 +87,7 @@ describe('Advanced Collaboration & Formatting behavioral tests', () => {
         test('should sync highlights with color', () => {
             const box = new TextBox(0, 0, 'Highlighted');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box.id, box.toJSON());
             });
@@ -103,6 +105,7 @@ describe('Advanced Collaboration & Formatting behavioral tests', () => {
             const box1 = new TextBox(0, 0, 'B1');
             const box2 = new TextBox(0, 100, 'B2');
             mindMap.boxes.push(box1, box2);
+            mindMap.rebuildIndex();
 
             cm.ydoc.transact(() => {
                 cm.yboxes.set(box1.id, box1.toJSON());
@@ -126,6 +129,7 @@ describe('Advanced Collaboration & Formatting behavioral tests', () => {
         test('should prevent feedback loops using isSyncing flag', () => {
             const box = new TextBox(0, 0, 'Loop Test');
             mindMap.boxes.push(box);
+            mindMap.rebuildIndex();
 
             const syncSpy = jest.spyOn(cm, 'syncBoxToYjs');
 

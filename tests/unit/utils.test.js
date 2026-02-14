@@ -340,13 +340,13 @@ describe('AppConfig', () => {
 describe('applyFill and applyStroke color helpers', () => {
   let mockFill, mockStroke, mockStrokeWeight;
   let testSandbox, applyFill, applyStroke;
-  
+
   beforeEach(() => {
     // Create a fresh sandbox for each test with mocked p5.js functions
     mockFill = jest.fn();
     mockStroke = jest.fn();
     mockStrokeWeight = jest.fn();
-    
+
     testSandbox = {
       window: {
         matchMedia: jest.fn().mockImplementation(query => ({
@@ -364,117 +364,118 @@ describe('applyFill and applyStroke color helpers', () => {
       stroke: mockStroke,
       strokeWeight: mockStrokeWeight,
     };
-    
+
     // Load utils in fresh context
     const script = new vm.Script(utilsCode);
     script.runInNewContext(testSandbox);
-    
+
     // Extract the helper functions
     applyFill = testSandbox.window.OpenMindUtils.applyFill;
     applyStroke = testSandbox.window.OpenMindUtils.applyStroke;
   });
-  
+
   describe('applyFill', () => {
     test('should handle RGB color object without alpha', () => {
       const color = { r: 100, g: 150, b: 255 };
       applyFill(color);
-      
-      expect(mockFill).toHaveBeenCalledWith(100, 150, 255);
+
+      expect(mockFill).toHaveBeenCalledWith(100, 150, 255, 255);
     });
-    
+
     test('should handle RGBA color object with alpha', () => {
+
       const color = { r: 100, g: 150, b: 255, a: 128 };
       applyFill(color);
-      
+
       expect(mockFill).toHaveBeenCalledWith(100, 150, 255, 128);
     });
-    
+
     test('should handle grayscale number', () => {
       applyFill(200);
-      
+
       expect(mockFill).toHaveBeenCalledWith(200);
     });
-    
+
     test('should handle alpha = 0', () => {
       const color = { r: 100, g: 150, b: 255, a: 0 };
       applyFill(color);
-      
+
       expect(mockFill).toHaveBeenCalledWith(100, 150, 255, 0);
     });
-    
+
     test('should handle alpha = 255', () => {
       const color = { r: 100, g: 150, b: 255, a: 255 };
       applyFill(color);
-      
+
       expect(mockFill).toHaveBeenCalledWith(100, 150, 255, 255);
     });
-    
+
     test('should handle null color gracefully', () => {
       applyFill(null);
-      
+
       expect(mockFill).not.toHaveBeenCalled();
     });
-    
+
     test('should handle undefined color gracefully', () => {
       applyFill(undefined);
-      
+
       expect(mockFill).not.toHaveBeenCalled();
     });
-    
+
     test('should validate and clamp color values using validateColor', () => {
       const color = { r: 300, g: -50, b: 150 }; // Out of bounds values
       applyFill(color);
-      
+
       // validateColor should clamp to 0-255
-      expect(mockFill).toHaveBeenCalledWith(255, 0, 150);
+      expect(mockFill).toHaveBeenCalledWith(255, 0, 150, 255);
     });
   });
-  
+
   describe('applyStroke', () => {
     test('should handle RGB color object without alpha', () => {
       const color = { r: 100, g: 150, b: 255 };
       applyStroke(color, 2);
-      
-      expect(mockStroke).toHaveBeenCalledWith(100, 150, 255);
+
+      expect(mockStroke).toHaveBeenCalledWith(100, 150, 255, 255);
       expect(mockStrokeWeight).toHaveBeenCalledWith(2);
     });
-    
+
     test('should handle RGBA color object with alpha', () => {
       const color = { r: 100, g: 150, b: 255, a: 128 };
       applyStroke(color, 3);
-      
+
       expect(mockStroke).toHaveBeenCalledWith(100, 150, 255, 128);
       expect(mockStrokeWeight).toHaveBeenCalledWith(3);
     });
-    
+
     test('should handle grayscale number', () => {
       applyStroke(200, 1);
-      
+
       expect(mockStroke).toHaveBeenCalledWith(200);
       expect(mockStrokeWeight).toHaveBeenCalledWith(1);
     });
-    
+
     test('should use default weight of 1', () => {
       const color = { r: 100, g: 150, b: 255 };
       applyStroke(color);
-      
+
       expect(mockStrokeWeight).toHaveBeenCalledWith(1);
     });
-    
+
     test('should handle null color gracefully', () => {
       applyStroke(null, 2);
-      
+
       expect(mockStroke).not.toHaveBeenCalled();
       // When color is null, function returns early so strokeWeight is not called
       expect(mockStrokeWeight).not.toHaveBeenCalled();
     });
-    
+
     test('should validate and clamp color values using validateColor', () => {
       const color = { r: 300, g: -50, b: 150 }; // Out of bounds values
       applyStroke(color, 2);
-      
+
       // validateColor should clamp to 0-255
-      expect(mockStroke).toHaveBeenCalledWith(255, 0, 150);
+      expect(mockStroke).toHaveBeenCalledWith(255, 0, 150, 255);
     });
   });
 });

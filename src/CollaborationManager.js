@@ -1725,11 +1725,7 @@ class CollaborationManager {
             if (typeof TextBox !== 'undefined') {
                 const box = TextBox.fromJSON(data);
                 if (box) {
-                    this.mindMap.boxes.push(box);
-                    // Maintain O(1) index
-                    if (this.mindMap.boxIdMap) {
-                        this.mindMap.boxIdMap.set(box.id, box);
-                    }
+                    this.mindMap._registerBox(box);
                 }
 
             }
@@ -1764,19 +1760,10 @@ class CollaborationManager {
             const box = this.mindMap.boxes[index];
 
             // Remove connections involving this box from local state.
-            // During undo/redo, the yboxes observer will call _rebuildConnectionsFromYjs()
-            // after processing all changes, which rebuilds the authoritative connection list.
-            this.mindMap.connections = this.mindMap.connections.filter(
-                c => c.fromBox !== box && c.toBox !== box
-            );
+            this.mindMap._removeConnectionsForBox(box);
 
             // Remove the box
-            this.mindMap.boxes.splice(index, 1);
-
-            // Maintain O(1) index
-            if (this.mindMap.boxIdMap) {
-                this.mindMap.boxIdMap.delete(boxId);
-            }
+            this.mindMap._unregisterBox(box);
 
             // Clear selection if this box was selected
             if (this.mindMap.selectedBox === box) {
@@ -1865,7 +1852,7 @@ class CollaborationManager {
             const toBox = this.mindMap.getBoxById(data.toId);
 
             if (fromBox && toBox && typeof Connection !== 'undefined') {
-                this.mindMap.connections.push(new Connection(fromBox, toBox));
+                this.mindMap._registerConnection(new Connection(fromBox, toBox));
             } else {
                 // Log when connections are skipped due to missing boxes
                 // This helps debug race conditions during undo/redo

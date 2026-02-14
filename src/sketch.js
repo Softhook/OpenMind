@@ -3220,7 +3220,7 @@ async function mergeMapData(data, wx, wy) {
           bcopy.y = (bcopy.y != null && isFinite(bcopy.y)) ? (bcopy.y + offsetY) : (wy + offsetY);
           const newBox = TextBox.fromJSON(bcopy);
           if (newBox) {
-            mindMap.boxes.push(newBox);
+            mindMap.addBox(newBox);
             newBoxes.push(newBox);
           }
         } catch (e) {
@@ -3235,7 +3235,9 @@ async function mergeMapData(data, wx, wy) {
             if (!c || typeof c !== 'object') continue;
             const mapped = { from: (Number.isFinite(c.from) ? c.from : 0) + baseIndex, to: (Number.isFinite(c.to) ? c.to : 0) + baseIndex };
             const conn = Connection.fromJSON(mapped, mindMap.boxes);
-            if (conn) mindMap.connections.push(conn);
+            if (conn && conn.fromBox && conn.toBox) {
+              mindMap.addConnection(conn.fromBox, conn.toBox);
+            }
           } catch (e) {
             console.warn('Failed to import connection', e);
           }
@@ -3244,19 +3246,6 @@ async function mergeMapData(data, wx, wy) {
 
       mindMap.isDirty = true;
       mindMap.isSaved = false;
-
-      // Sync new boxes to collaboration system
-      if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-        for (const nb of newBoxes) {
-          if (nb && nb.id) {
-            MindMap.onBoxChange(nb);
-          }
-        }
-      }
-      // Sync connections
-      if (typeof MindMap !== 'undefined' && MindMap.onConnectionsChange) {
-        MindMap.onConnectionsChange();
-      }
     }
 
     // Clear selection and select the newly added boxes

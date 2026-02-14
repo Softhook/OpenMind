@@ -7,7 +7,12 @@ const fs = require('fs');
 const path = require('path');
 
 // Create a sandbox context with ThrustGame
+const ColorPalette = require('../../src/ColorPalette');
+const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
+
+// Create a sandbox context with ThrustGame
 const sandbox = {
+  ColorPalette: ColorPalette,
   console: console,
   Date: Date,
   Math: Math,
@@ -42,7 +47,6 @@ const sandbox = {
 };
 
 // Load ThrustGame.js
-const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
 const script = new vm.Script(thrustGameCode);
 script.runInNewContext(sandbox);
 
@@ -53,7 +57,7 @@ describe('ThrustGame Collision Detection', () => {
     test('should return 3 vertices for a ship at origin with 0 angle', () => {
       const player = { x: 0, y: 0, angle: 0 };
       const vertices = ThrustGame.getShipTriangleVertices(player);
-      
+
       expect(vertices).toHaveLength(3);
       expect(vertices[0].x).toBeCloseTo(15, 1); // Front tip
       expect(vertices[0].y).toBeCloseTo(0, 1);
@@ -66,7 +70,7 @@ describe('ThrustGame Collision Detection', () => {
     test('should rotate vertices correctly for 90 degree angle', () => {
       const player = { x: 0, y: 0, angle: Math.PI / 2 };
       const vertices = ThrustGame.getShipTriangleVertices(player);
-      
+
       expect(vertices).toHaveLength(3);
       expect(vertices[0].x).toBeCloseTo(0, 1); // Front tip rotated
       expect(vertices[0].y).toBeCloseTo(15, 1);
@@ -75,7 +79,7 @@ describe('ThrustGame Collision Detection', () => {
     test('should translate vertices to player position', () => {
       const player = { x: 100, y: 200, angle: 0 };
       const vertices = ThrustGame.getShipTriangleVertices(player);
-      
+
       expect(vertices[0].x).toBeCloseTo(115, 1); // 100 + 15
       expect(vertices[0].y).toBeCloseTo(200, 1);
     });
@@ -89,7 +93,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 5, y: 10 }
       ];
       const point = { x: 5, y: 5 };
-      
+
       expect(ThrustGame.pointInTriangle(point, triangle)).toBe(true);
     });
 
@@ -100,7 +104,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 5, y: 10 }
       ];
       const point = { x: 20, y: 20 };
-      
+
       expect(ThrustGame.pointInTriangle(point, triangle)).toBe(false);
     });
 
@@ -111,7 +115,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 5, y: 10 }
       ];
       const point = { x: 5, y: 0 }; // On bottom edge
-      
+
       // Edge points might be slightly inside or outside due to floating point
       const result = ThrustGame.pointInTriangle(point, triangle);
       expect(typeof result).toBe('boolean');
@@ -126,7 +130,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 100, y: 0 }
       ];
       const box = { x: 50, y: 50, width: 40, height: 40 };
-      
+
       expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
     });
 
@@ -137,7 +141,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 50, y: 100 }
       ];
       const box = { x: 50, y: 20, width: 10, height: 10 }; // Small box inside triangle
-      
+
       expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
     });
 
@@ -148,7 +152,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 5, y: 10 }
       ];
       const box = { x: 100, y: 100, width: 20, height: 20 };
-      
+
       expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(false);
     });
 
@@ -159,7 +163,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 50, y: 0 }
       ];
       const box = { x: 50, y: 60, width: 20, height: 20 };
-      
+
       expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
     });
   });
@@ -170,7 +174,7 @@ describe('ThrustGame Collision Detection', () => {
       const p2 = { x: 10, y: 10 };
       const p3 = { x: 0, y: 10 };
       const p4 = { x: 10, y: 0 };
-      
+
       expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(true);
     });
 
@@ -179,7 +183,7 @@ describe('ThrustGame Collision Detection', () => {
       const p2 = { x: 10, y: 0 };
       const p3 = { x: 0, y: 10 };
       const p4 = { x: 10, y: 10 };
-      
+
       expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
     });
 
@@ -188,7 +192,7 @@ describe('ThrustGame Collision Detection', () => {
       const p2 = { x: 10, y: 0 };
       const p3 = { x: 0, y: 5 };
       const p4 = { x: 10, y: 5 };
-      
+
       expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
     });
   });
@@ -198,7 +202,7 @@ describe('ThrustGame Collision Detection', () => {
       const boxes = [
         { x: 0, y: 0, width: 20, height: 20 }
       ];
-      
+
       expect(ThrustGame.isValidSpawnPosition(100, 100, boxes, 30)).toBe(true);
     });
 
@@ -206,7 +210,7 @@ describe('ThrustGame Collision Detection', () => {
       const boxes = [
         { x: 50, y: 50, width: 40, height: 40 }
       ];
-      
+
       expect(ThrustGame.isValidSpawnPosition(50, 50, boxes, 0)).toBe(false);
     });
 
@@ -214,7 +218,7 @@ describe('ThrustGame Collision Detection', () => {
       const boxes = [
         { x: 50, y: 50, width: 40, height: 40 }
       ];
-      
+
       // Position is just outside box but within minDistance
       expect(ThrustGame.isValidSpawnPosition(75, 50, boxes, 30)).toBe(false);
     });
@@ -223,7 +227,7 @@ describe('ThrustGame Collision Detection', () => {
       const boxes = [
         { x: 50, y: 50, width: 40, height: 40 }
       ];
-      
+
       // Position is just beyond the edge (box right edge is at 70, plus minDistance 30 = 100, so 100.1 is valid)
       expect(ThrustGame.isValidSpawnPosition(100.1, 50, boxes, 30)).toBe(true);
     });
@@ -250,7 +254,7 @@ describe('ThrustGame Spawn Logic', () => {
   test('should create player with valid coordinates', () => {
     const game = new ThrustGame(null, mockMindMap);
     const player = game.createPlayer();
-    
+
     expect(typeof player.x).toBe('number');
     expect(typeof player.y).toBe('number');
     expect(Number.isFinite(player.x)).toBe(true);
@@ -260,7 +264,7 @@ describe('ThrustGame Spawn Logic', () => {
   test('should not spawn player inside a box', () => {
     const game = new ThrustGame(null, mockMindMap);
     const player = game.createPlayer();
-    
+
     // Check player is not inside any box
     for (const box of mockMindMap.boxes) {
       const halfW = box.width / 2;
@@ -278,17 +282,17 @@ describe('ThrustGame Spawn Logic', () => {
   test('should spawn near boxes when boxes exist', () => {
     const game = new ThrustGame(null, mockMindMap);
     const player = game.createPlayer();
-    
+
     // Calculate center of boxes
     const centerX = 150; // (100 + 200) / 2
     const centerY = 125; // (100 + 150) / 2
-    
+
     // Player should be within reasonable distance of center
     const distance = Math.sqrt(
-      Math.pow(player.x - centerX, 2) + 
+      Math.pow(player.x - centerX, 2) +
       Math.pow(player.y - centerY, 2)
     );
-    
+
     // Should be within search radius * 2 (accounting for fallback)
     expect(distance).toBeLessThan(300);
   });
@@ -297,7 +301,7 @@ describe('ThrustGame Spawn Logic', () => {
     const emptyMindMap = { boxes: [] };
     const game = new ThrustGame(null, emptyMindMap);
     const player = game.createPlayer();
-    
+
     expect(player.x).toBe(300);
     expect(player.y).toBe(200);
   });
@@ -305,7 +309,7 @@ describe('ThrustGame Spawn Logic', () => {
   test('should initialize player with correct default values', () => {
     const game = new ThrustGame(null, mockMindMap);
     const player = game.createPlayer();
-    
+
     expect(player.vx).toBe(0);
     expect(player.vy).toBe(0);
     expect(player.angle).toBe(0);
@@ -322,15 +326,15 @@ describe('ThrustGame Integration', () => {
         { x: 100, y: 100, width: 50, height: 50 }
       ]
     };
-    
+
     const game = new ThrustGame(null, mockMindMap);
     game.player.alive = false;
     game.respawnPlayer();
-    
+
     expect(game.player.alive).toBe(true);
     expect(game.player.vx).toBe(0);
     expect(game.player.vy).toBe(0);
-    
+
     // Should not be inside the box
     const box = mockMindMap.boxes[0];
     const halfW = box.width / 2;

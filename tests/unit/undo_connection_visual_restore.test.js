@@ -67,6 +67,7 @@ describe('Connection Visual Restoration behavioral tests', () => {
         const box1 = new TextBox(0, 0, '1');
         const box2 = new TextBox(100, 0, '2');
         mindMap.boxes.push(box1, box2);
+        mindMap.rebuildIndex();
 
         // 1. Initial state: no connections
         cm.transact(() => {
@@ -75,10 +76,8 @@ describe('Connection Visual Restoration behavioral tests', () => {
         });
         cm.undoManager.stopCapturing();
 
-        // 2. Add a connection
-        cm.transact(() => {
-            cm.yconnections.push([{ fromId: box1.id, toId: box2.id }]);
-        });
+        // 2. Add a connection via MindMap
+        mindMap.addConnection(box1, box2);
         cm.undoManager.stopCapturing();
 
         expect(mindMap.connections.length).toBe(1);
@@ -100,6 +99,7 @@ describe('Connection Visual Restoration behavioral tests', () => {
         const box1 = new TextBox(0, 0, '1');
         const box2 = new TextBox(100, 0, '2');
         mindMap.boxes.push(box1, box2);
+        mindMap.rebuildIndex();
 
         cm.isSyncing = true;
 
@@ -117,6 +117,7 @@ describe('Connection Visual Restoration behavioral tests', () => {
     test('_rebuildConnectionsFromYjs should only restore connections for valid box pairs', () => {
         const box1 = new TextBox(0, 0, '1');
         mindMap.boxes.push(box1);
+        mindMap.rebuildIndex();
 
         // Connection to a missing box
         cm.ydoc.transact(() => {

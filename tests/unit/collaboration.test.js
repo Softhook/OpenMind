@@ -59,6 +59,8 @@ describe('Collaboration System Behavioral tests', () => {
 
         cm.isInitialized = true;
         cm.isConnected = true;
+        cm._setupObservers();
+        cm._setupMindMapCallbacks();
     });
 
     describe('UUID and Serialization', () => {
@@ -96,7 +98,7 @@ describe('Collaboration System Behavioral tests', () => {
     describe('Remote Synchronization', () => {
         test('should apply remote box position updates', () => {
             const box = new TextBox(0, 0, 'hi');
-            mindMap.boxes.push(box);
+            mindMap.addBox(box);
 
             const remoteData = { id: box.id, x: 120, y: 220 };
             cm._applyBoxFromYjs(box.id, remoteData, false, true);
@@ -114,7 +116,7 @@ describe('Collaboration System Behavioral tests', () => {
 
         test('should snap positions when requested', () => {
             const box = new TextBox(0, 0, 'hi');
-            mindMap.boxes.push(box);
+            mindMap.addBox(box);
 
             const remoteData = { id: box.id, x: 200, y: 300 };
             cm._applyBoxFromYjs(box.id, remoteData, true, true);
@@ -126,7 +128,7 @@ describe('Collaboration System Behavioral tests', () => {
         test('should clear styles when omitted in remote payload', () => {
             const box = new TextBox(0, 0, 'hi');
             box.boldRanges = [{ start: 0, end: 1 }];
-            mindMap.boxes.push(box);
+            mindMap.addBox(box);
 
             const remoteData = { id: box.id, boldRanges: null };
             cm._applyBoxFromYjs(box.id, remoteData, false, true);

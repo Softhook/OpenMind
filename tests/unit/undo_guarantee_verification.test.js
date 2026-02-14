@@ -66,6 +66,7 @@ describe('Undo Identity & Text Integrity behavioral tests', () => {
     test('should defer text sync when isSyncing is true (loop prevention)', () => {
         const box = new TextBox(0, 0, 'Initial');
         mindMap.boxes.push(box);
+        mindMap.rebuildIndex();
         cm.ydoc.transact(() => {
             cm.yboxes.set(box.id, box.toJSON());
         });
@@ -87,6 +88,7 @@ describe('Undo Identity & Text Integrity behavioral tests', () => {
         const box1 = new TextBox(0, 0, 'Text 1');
         const box2 = new TextBox(100, 0, 'Text 2');
         mindMap.boxes.push(box1, box2);
+        mindMap.rebuildIndex();
 
         cm.ydoc.transact(() => {
             cm.yboxes.set(box1.id, box1.toJSON());
@@ -107,9 +109,10 @@ describe('Undo Identity & Text Integrity behavioral tests', () => {
 
         cm.isSyncing = false;
 
-        // Trigger observer to process deferred
-        // Must be non-local or undo/redo to pass the observer filter
+        // Trigger observer to process deferred by simulating an undo/redo origin
+        cm._isPerformingUndoRedo = true;
         cm.ydoc.transact(() => { cm.yboxes.set('dummy', { text: 'hi' }); }, cm.undoManager);
+        cm._isPerformingUndoRedo = false;
 
         // Final state check
         setTimeout(() => {

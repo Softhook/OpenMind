@@ -167,94 +167,86 @@ class TextImporter {
     // Detect the title section index
     const titleSectionIdx = this.detectTitleIndex(sections);
 
-    // Process each section
-    for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
-      const section = sections[sectionIdx];
-      const heading = section.heading;
-      const paragraphs = section.paragraphs;
+    // Wrap all additions in a single transaction for atomicity and single undo step
+    mindMap._wrapInTransaction(() => {
+      // Process each section
+      for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
+        const section = sections[sectionIdx];
+        const heading = section.heading;
+        const paragraphs = section.paragraphs;
 
-      // Create heading box
-      const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
+        // Create heading box
+        const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
 
-      // Style title red (key 3), others orange (key 2)
-      if (sectionIdx === titleSectionIdx) {
-        headingBox.setBackgroundByKey('red');
-      } else {
-        headingBox.setBackgroundByKey('orange');
-      }
-
-      // Set fixed width for imported boxes
-      headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
-      headingBox.userResized = true;
-      headingBox.updateDimensions();
-
-      // Ensure target position is updated
-      headingBox.targetX = headingBox.x;
-      headingBox.targetY = headingBox.y;
-
-      mindMap.boxes.push(headingBox);
-      allNewBoxes.push(headingBox);
-
-      // Start positioning paragraphs below the heading
-      let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
-      let previousParagraphBox = null;
-
-      // Create paragraph boxes vertically under the heading
-      for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
-        const paragraph = paragraphs[paraIdx];
-
-        // Skip empty paragraphs
-        if (!paragraph || paragraph.trim() === '') {
-          continue;
+        // Style title red (key 3), others orange (key 2)
+        if (sectionIdx === titleSectionIdx) {
+          headingBox.setBackgroundByKey('red');
+        } else {
+          headingBox.setBackgroundByKey('orange');
         }
-
-        // Create paragraph box
-        const paragraphBox = new TextBox(currentX, currentY, paragraph);
 
         // Set fixed width for imported boxes
-        paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
-        paragraphBox.userResized = true;
-        paragraphBox.updateDimensions();
+        headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+        headingBox.userResized = true;
+        headingBox.updateDimensions();
 
-        // Adjust Y to center position
-        paragraphBox.y = currentY + paragraphBox.height / 2;
+        // Ensure target position is updated
+        headingBox.targetX = headingBox.x;
+        headingBox.targetY = headingBox.y;
 
-        // Ensure target position is updated to prevent interpolation snap-back
-        paragraphBox.targetX = paragraphBox.x;
-        paragraphBox.targetY = paragraphBox.y;
+        mindMap.addBox(headingBox);
 
-        mindMap.boxes.push(paragraphBox);
-        allNewBoxes.push(paragraphBox);
+        // Start positioning paragraphs below the heading
+        let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
+        let previousParagraphBox = null;
 
-        // Connect to previous box
-        if (previousParagraphBox) {
-          mindMap.connections.push(new Connection(previousParagraphBox, paragraphBox));
-        } else {
-          // First paragraph: connect to heading
-          mindMap.connections.push(new Connection(headingBox, paragraphBox));
+        // Create paragraph boxes vertically under the heading
+        for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
+          const paragraph = paragraphs[paraIdx];
+
+          // Skip empty paragraphs
+          if (!paragraph || paragraph.trim() === '') {
+            continue;
+          }
+
+          // Create paragraph box
+          const paragraphBox = new TextBox(currentX, currentY, paragraph);
+
+          // Set fixed width for imported boxes
+          paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+          paragraphBox.userResized = true;
+          paragraphBox.updateDimensions();
+
+          // Adjust Y to center position
+          paragraphBox.y = currentY + paragraphBox.height / 2;
+
+          // Ensure target position is updated to prevent interpolation snap-back
+          paragraphBox.targetX = paragraphBox.x;
+          paragraphBox.targetY = paragraphBox.y;
+
+          mindMap.addBox(paragraphBox);
+
+          // Connect to previous box
+          if (previousParagraphBox) {
+            mindMap.addConnection(previousParagraphBox, paragraphBox);
+          } else {
+            // First paragraph: connect to heading
+            mindMap.addConnection(headingBox, paragraphBox);
+          }
+
+          // Calculate next box position
+          currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
+          previousParagraphBox = paragraphBox;
         }
 
-        // Calculate next box position
-        currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
-        previousParagraphBox = paragraphBox;
+        // Move to next column
+        currentX += IMPORT_LAYOUT.HORIZONTAL_SPACING;
       }
-
-      // Move to next column
-      currentX += IMPORT_LAYOUT.HORIZONTAL_SPACING;
-    }
+    }, 'Import Text');
 
     // Mark map as dirty
     mindMap.isDirty = true;
     mindMap.isSaved = false;
-
-    // Sync to collaboration system
-    if (MindMap.onBoxChange) {
-      for (const box of allNewBoxes) {
-        if (box && box.id) {
-          MindMap.onBoxChange(box);
-        }
-      }
-    }
 
     // Sync connections
     if (MindMap.onConnectionsChange) {

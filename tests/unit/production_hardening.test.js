@@ -114,6 +114,7 @@ describe('Production Hardening behavioral tests', () => {
             const box1 = new TextBox(0, 0, 'Box 1');
             const box2 = new TextBox(100, 0, 'Box 2');
             mindMap.boxes.push(box1, box2);
+            mindMap.rebuildIndex();
 
             // Add DUPLICATE connection data to Yjs
             const connData = { fromId: box1.id, toId: box2.id };
@@ -130,6 +131,7 @@ describe('Production Hardening behavioral tests', () => {
         test('_rebuildConnectionsFromYjs should skip connections with missing boxes', () => {
             const box1 = new TextBox(0, 0, 'Box 1');
             mindMap.boxes.push(box1);
+            mindMap.rebuildIndex();
 
             // Connection to missing box
             const connData = { fromId: box1.id, toId: 'missing-id' };

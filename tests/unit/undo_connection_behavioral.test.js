@@ -40,6 +40,17 @@ global.Connection = Connection;
 global.MindMap = MindMap;
 global.CollaborationManager = CollaborationManager;
 
+global.CENTER = 'center';
+global.TOP = 'top';
+global.BOTTOM = 'bottom';
+global.UP_ARROW = 38;
+global.DOWN_ARROW = 40;
+global.LEFT_ARROW = 37;
+global.RIGHT_ARROW = 39;
+global.BACKSPACE = 8;
+global.DELETE = 46;
+global.keyIsDown = jest.fn(() => false);
+
 describe('Undo Connection Restoration - Behavioral', () => {
     let cm;
     let mindMap;
@@ -76,6 +87,7 @@ describe('Undo Connection Restoration - Behavioral', () => {
         const box2 = new TextBox(100, 0, 'Box 2');
         const box3 = new TextBox(200, 0, 'Box 3');
         mindMap.boxes.push(box1, box2, box3);
+        mindMap.rebuildIndex();
 
         const conn1 = new Connection(box1, box2);
         const conn2 = new Connection(box2, box3);
@@ -92,19 +104,10 @@ describe('Undo Connection Restoration - Behavioral', () => {
         expect(mindMap.boxes.length).toBe(3);
         expect(mindMap.connections.length).toBe(2);
 
-        // Perform deletion of box2 in a single transaction
-        // This should delete box2 and BOTH connections (conn1 and conn2)
-        cm.transact(() => {
-            cm.yboxes.delete(box2.id);
-            // Search and delete connections
-            // (Simulating CollaborationManager.deleteBoxFromYjs behavior)
-            const conns = cm.yconnections.toArray();
-            for (let i = conns.length - 1; i >= 0; i--) {
-                const c = conns[i];
-                if (c.fromId === box2.id || c.toId === box2.id) {
-                    cm.yconnections.delete(i, 1);
-                }
-            }
+        // Perform deletion of box2 via MindMap
+        // This will trigger cm.deleteBoxFromYjs via onBoxDelete callback
+        mindMap._wrapInTransaction(() => {
+            mindMap._performBoxDeletion([box2]);
         });
 
         expect(mindMap.boxes.length).toBe(2);
@@ -119,7 +122,7 @@ describe('Undo Connection Restoration - Behavioral', () => {
         expect(mindMap.getBoxById(box2.id)).toBeTruthy();
 
         // Redo
-        cm.undoManager.redo();
+        cm.redo();
         expect(mindMap.boxes.length).toBe(2);
         expect(mindMap.connections.length).toBe(0);
     });
@@ -128,6 +131,7 @@ describe('Undo Connection Restoration - Behavioral', () => {
         const box1 = new TextBox(0, 0, 'Box 1');
         const box2 = new TextBox(100, 0, 'Box 2');
         mindMap.boxes.push(box1, box2);
+        mindMap.rebuildIndex();
         const conn = new Connection(box1, box2);
         mindMap.connections.push(conn);
 
@@ -137,10 +141,9 @@ describe('Undo Connection Restoration - Behavioral', () => {
             cm.yconnections.push([conn.toJSON(mindMap.boxes)]);
         });
 
-        // Delete only connection
-        cm.transact(() => {
-            cm.yconnections.delete(0, 1);
-        });
+        // Perform connection-only deletion
+        mindMap.selectedConnections.add(conn);
+        mindMap.handleKeyPressed('', 46); // 46 is DELETE keyCode
 
         expect(mindMap.connections.length).toBe(0);
 
@@ -153,6 +156,7 @@ describe('Undo Connection Restoration - Behavioral', () => {
     test('should NOT sync back to Yjs during undo (no loop)', () => {
         const box1 = new TextBox(0, 0, 'Box 1');
         mindMap.boxes.push(box1);
+        mindMap.rebuildIndex();
         cm.ydoc.transact(() => {
             cm.yboxes.set(box1.id, box1.toJSON());
         });
