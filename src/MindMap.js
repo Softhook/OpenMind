@@ -150,6 +150,38 @@ class MindMap {
   }
 
   /**
+   * Batch adds boxes and connections to the mind map.
+   * Highly efficient: performs ONE sync reconciliation at the end.
+   * @param {TextBox[]} boxes - Array of boxes to add
+   * @param {Connection[]} connections - Array of connections to add
+   */
+  batchAdd(boxes = [], connections = []) {
+    if ((!boxes || boxes.length === 0) && (!connections || connections.length === 0)) return;
+
+    this._wrapInTransaction(() => {
+      // 1. Register all boxes and sync to Yjs (O(1) per box)
+      for (const box of boxes) {
+        if (!box) continue;
+        this._registerBox(box);
+        if (MindMap.onBoxChange) {
+          MindMap.onBoxChange(box, true);
+        }
+      }
+
+      // 2. Register all connections (O(1) per connection)
+      for (const conn of connections) {
+        if (!conn) continue;
+        this._registerConnection(conn);
+      }
+
+      // 3. Reconcile ALL connections on Yjs once (O(N_connections))
+      if (MindMap.onConnectionsChange && connections.length > 0) {
+        MindMap.onConnectionsChange(true);
+      }
+    });
+  }
+
+  /**
    * Internal data structure methods to maintain index integrity.
    * Using these instead of direct array manipulation ensures boxIdMap stays in sync.
    * @private
@@ -193,6 +225,14 @@ class MindMap {
     if (index > -1) {
       this.boxes.splice(index, 1);
       if (boxId && this.boxIdMap) this.boxIdMap.delete(boxId);
+
+      // Cleanup selection state if this box was selected
+      if (this.selectedBox === box) {
+        if (box.isEditing) box.stopEditing();
+        this.selectedBox = null;
+      }
+      if (this.selectedBoxes) this.selectedBoxes.delete(box);
+
       this.isDirty = true;
       this.isSaved = false;
       return true;
@@ -221,11 +261,47 @@ class MindMap {
     const index = this.connections.indexOf(conn);
     if (index > -1) {
       this.connections.splice(index, 1);
+
+      // Cleanup selection state if this connection was selected
+      if (this.selectedConnection === conn) this.selectedConnection = null;
+      if (this.selectedConnections) this.selectedConnections.delete(conn);
+      conn.selected = false;
+
       this.isDirty = true;
       this.isSaved = false;
       return true;
     }
     return false;
+  }
+
+  /**
+   * Bulk deletes specified connections.
+   * Efficiently handles array filtering and selection cleanup.
+   * @param {Connection[]} connectionsToDelete 
+   */
+  _performConnectionDeletion(connectionsToDelete) {
+    if (!connectionsToDelete || connectionsToDelete.length === 0) return;
+    const connSet = new Set(connectionsToDelete);
+    const initialLength = this.connections.length;
+
+    this.connections = this.connections.filter(c => !connSet.has(c));
+
+    if (this.connections.length !== initialLength) {
+      // Cleanup selection state for all deleted connections
+      for (const conn of connectionsToDelete) {
+        if (this.selectedConnection === conn) this.selectedConnection = null;
+        if (this.selectedConnections) this.selectedConnections.delete(conn);
+        conn.selected = false;
+      }
+
+      this.isDirty = true;
+      this.isSaved = false;
+
+      // Sync connection deletion to collaboration
+      if (MindMap.onConnectionsChange) {
+        MindMap.onConnectionsChange();
+      }
+    }
   }
 
   /**
@@ -249,11 +325,34 @@ class MindMap {
    */
   _removeConnectionsForBox(box) {
     if (!box) return;
+    this._removeConnectionsForBoxes([box]);
+  }
+
+  /**
+   * Bulk filters out connections involving any of the specified boxes.
+   * Efficiently cleans up all related connections in a single pass.
+   * @param {TextBox[]} boxes - Array of boxes to clear connections for
+   */
+  _removeConnectionsForBoxes(boxes) {
+    if (!boxes || boxes.length === 0) return;
+    const boxSet = new Set(boxes);
     const initialLength = this.connections.length;
+
+    // Track which connections are being removed for selection cleanup
+    const removedConns = this.connections.filter(c => boxSet.has(c.fromBox) || boxSet.has(c.toBox));
+
     this.connections = this.connections.filter(
-      c => c.fromBox !== box && c.toBox !== box
+      c => !boxSet.has(c.fromBox) && !boxSet.has(c.toBox)
     );
+
     if (this.connections.length !== initialLength) {
+      // Cleanup selection state for all removed connections
+      for (const conn of removedConns) {
+        if (this.selectedConnection === conn) this.selectedConnection = null;
+        if (this.selectedConnections) this.selectedConnections.delete(conn);
+        conn.selected = false;
+      }
+
       this.isDirty = true;
       this.isSaved = false;
     }
@@ -1522,11 +1621,14 @@ class MindMap {
    * @private
    */
   _performBoxDeletion(boxesToDelete) {
-    for (const box of boxesToDelete) {
-      // Remove connections involving this box
-      this._removeConnectionsForBox(box);
+    if (!boxesToDelete || boxesToDelete.length === 0) return;
 
-      // Remove the box
+    // 1. Bulk remove all related connections efficiently (O(Connections))
+    this._removeConnectionsForBoxes(boxesToDelete);
+
+    // 2. Unregister boxes and notify collaboration
+    for (const box of boxesToDelete) {
+      if (!box) continue;
       this._unregisterBox(box);
 
       // Notify collaboration system of deletion
@@ -1535,9 +1637,9 @@ class MindMap {
       }
     }
 
-    // Notify collaboration system of connection changes
+    // 3. Notify collaboration system of connection changes once
     if (MindMap.onConnectionsChange) {
-      MindMap.onConnectionsChange();
+      MindMap.onConnectionsChange(true);
     }
   }
 
@@ -2750,17 +2852,9 @@ class MindMap {
         }
       } else if (this.selectedConnections && this.selectedConnections.size > 0) {
         // Delete all selected connections (multi-selection)
+        const connsToDelete = Array.from(this.selectedConnections);
         this._wrapInTransaction(() => {
-          this.connections = this.connections.filter(conn => !this.selectedConnections.has(conn));
-          this.clearConnectionSelection();
-          if (this.selectedConnection && !this.connections.includes(this.selectedConnection)) {
-            this.selectedConnection = null;
-          }
-          this.isSaved = false; // Mark as unsaved for browser autosave
-          // Sync connection deletion to collaboration
-          if (MindMap.onConnectionsChange) {
-            MindMap.onConnectionsChange();
-          }
+          this._performConnectionDeletion(connsToDelete);
         });
 
         // Clear navigation mode after deleting connections
@@ -2768,12 +2862,10 @@ class MindMap {
       } else if (this.selectedConnection) {
         // Delete selected connection only
         this._wrapInTransaction(() => {
-          if (this._unregisterConnection(this.selectedConnection)) {
-            this.selectedConnection = null;
-            // Sync connection deletion to collaboration
-            if (MindMap.onConnectionsChange) {
-              MindMap.onConnectionsChange();
-            }
+          this._unregisterConnection(this.selectedConnection);
+          // Sync connection deletion to collaboration
+          if (MindMap.onConnectionsChange) {
+            MindMap.onConnectionsChange();
           }
         });
       }

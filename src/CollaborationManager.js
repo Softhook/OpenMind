@@ -1791,24 +1791,14 @@ class CollaborationManager {
             this._applyBoxFromYjs(boxId, data, true, true); // snapToPosition = true, forceApply = true
         });
 
-        // Remove local boxes that don't exist in Yjs
-        // (They were deleted by another user or never synced)
-        this.mindMap.boxes = this.mindMap.boxes.filter(box => {
-            if (!box || !box.id) return false;
-            if (yjsBoxIds.has(box.id)) return true;
-            Utils.Logger.debug('[Cleanup] Removing local-only box:', box.id);
-            return false;
-        });
-
-        // Rebuild O(1) index after bulk operation
-        if (this.mindMap.rebuildIndex) {
-            this.mindMap.rebuildIndex();
-        }
-
-
-        // Clear selection if selected box was removed
-        if (this.mindMap.selectedBox && !yjsBoxIds.has(this.mindMap.selectedBox.id)) {
-            this.mindMap.selectedBox = null;
+        // Remove local boxes that don't exist in Yjs efficiently using internal helper
+        // This handles selection cleanup and index updates automatically per box
+        const localBoxes = [...this.mindMap.boxes];
+        for (const box of localBoxes) {
+            if (box && box.id && !yjsBoxIds.has(box.id)) {
+                Utils.Logger.debug('[Cleanup] Removing local-only box:', box.id);
+                this.mindMap._unregisterBox(box);
+            }
         }
 
         // Mark for redraw
@@ -1830,7 +1820,10 @@ class CollaborationManager {
             return;
         }
 
-        // Clear existing connections
+        // Clear existing connections and selection
+        if (this.mindMap.clearConnectionSelection) {
+            this.mindMap.clearConnectionSelection();
+        }
         this.mindMap.connections = [];
 
         // Rebuild from Yjs with duplicate prevention

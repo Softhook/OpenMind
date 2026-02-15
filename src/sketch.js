@@ -3213,6 +3213,9 @@ async function mergeMapData(data, wx, wy) {
       // Create new boxes with positional offset so import center maps to drop point
       const offsetX = wx - importCenterX;
       const offsetY = wy - importCenterY;
+      const mergedBoxes = [];
+      const mergedConnections = [];
+
       for (const b of data.boxes) {
         try {
           const bcopy = Object.assign({}, b);
@@ -3220,7 +3223,7 @@ async function mergeMapData(data, wx, wy) {
           bcopy.y = (bcopy.y != null && isFinite(bcopy.y)) ? (bcopy.y + offsetY) : (wy + offsetY);
           const newBox = TextBox.fromJSON(bcopy);
           if (newBox) {
-            mindMap.addBox(newBox);
+            mergedBoxes.push(newBox);
             newBoxes.push(newBox);
           }
         } catch (e) {
@@ -3234,15 +3237,22 @@ async function mergeMapData(data, wx, wy) {
           try {
             if (!c || typeof c !== 'object') continue;
             const mapped = { from: (Number.isFinite(c.from) ? c.from : 0) + baseIndex, to: (Number.isFinite(c.to) ? c.to : 0) + baseIndex };
-            const conn = Connection.fromJSON(mapped, mindMap.boxes);
+            // Note: Connection.fromJSON expects the box array to be populated for index lookup.
+            // Since we haven't added them to mindMap.boxes yet, we should use our mergedBoxes array
+            // combined with existing mindMap.boxes.
+            const allBoxes = [...mindMap.boxes, ...mergedBoxes];
+            const conn = Connection.fromJSON(mapped, allBoxes);
             if (conn && conn.fromBox && conn.toBox) {
-              mindMap.addConnection(conn.fromBox, conn.toBox);
+              mergedConnections.push(conn);
             }
           } catch (e) {
             console.warn('Failed to import connection', e);
           }
         }
       }
+
+      // Perform batch addition and sync
+      mindMap.batchAdd(mergedBoxes, mergedConnections);
 
       mindMap.isDirty = true;
       mindMap.isSaved = false;

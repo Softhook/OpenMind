@@ -18,6 +18,10 @@ global.mindMap = {
         const conn = { fromBox: from, toBox: to };
         global.mindMap.connections.push(conn);
         return conn;
+    }),
+    batchAdd: jest.fn((boxes, connections) => {
+        if (boxes) boxes.forEach(b => global.mindMap.boxes.push(b));
+        if (connections) connections.forEach(c => global.mindMap.connections.push(c));
     })
 };
 

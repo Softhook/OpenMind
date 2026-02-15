@@ -161,97 +161,90 @@ class TextImporter {
       mindMap.selectedBox = null;
     }
 
-    const allNewBoxes = [];
     let currentX = IMPORT_LAYOUT.START_X;
 
     // Detect the title section index
     const titleSectionIdx = this.detectTitleIndex(sections);
 
-    // Wrap all additions in a single transaction for atomicity and single undo step
-    mindMap._wrapInTransaction(() => {
-      // Process each section
-      for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
-        const section = sections[sectionIdx];
-        const heading = section.heading;
-        const paragraphs = section.paragraphs;
+    const allNewBoxes = [];
+    const allNewConnections = [];
 
-        // Create heading box
-        const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
+    // Process each section
+    for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
+      const section = sections[sectionIdx];
+      const heading = section.heading;
+      const paragraphs = section.paragraphs;
 
-        // Style title red (key 3), others orange (key 2)
-        if (sectionIdx === titleSectionIdx) {
-          headingBox.setBackgroundByKey('red');
-        } else {
-          headingBox.setBackgroundByKey('orange');
+      // Create heading box
+      const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
+
+      // Style title red (key 3), others orange (key 2)
+      if (sectionIdx === titleSectionIdx) {
+        headingBox.setBackgroundByKey('red');
+      } else {
+        headingBox.setBackgroundByKey('orange');
+      }
+
+      // Set fixed width for imported boxes
+      headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+      headingBox.userResized = true;
+      headingBox.updateDimensions();
+
+      // Ensure target position is updated
+      headingBox.targetX = headingBox.x;
+      headingBox.targetY = headingBox.y;
+
+      allNewBoxes.push(headingBox);
+
+      // Start positioning paragraphs below the heading
+      let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
+      let previousParagraphBox = null;
+
+      // Create paragraph boxes vertically under the heading
+      for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
+        const paragraph = paragraphs[paraIdx];
+
+        // Skip empty paragraphs
+        if (!paragraph || paragraph.trim() === '') {
+          continue;
         }
+
+        // Create paragraph box
+        const paragraphBox = new TextBox(currentX, currentY, paragraph);
 
         // Set fixed width for imported boxes
-        headingBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
-        headingBox.userResized = true;
-        headingBox.updateDimensions();
+        paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
+        paragraphBox.userResized = true;
+        paragraphBox.updateDimensions();
 
-        // Ensure target position is updated
-        headingBox.targetX = headingBox.x;
-        headingBox.targetY = headingBox.y;
+        // Adjust Y to center position
+        paragraphBox.y = currentY + paragraphBox.height / 2;
 
-        mindMap.addBox(headingBox);
+        // Ensure target position is updated to prevent interpolation snap-back
+        paragraphBox.targetX = paragraphBox.x;
+        paragraphBox.targetY = paragraphBox.y;
 
-        // Start positioning paragraphs below the heading
-        let currentY = IMPORT_LAYOUT.START_Y + headingBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
-        let previousParagraphBox = null;
+        allNewBoxes.push(paragraphBox);
 
-        // Create paragraph boxes vertically under the heading
-        for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
-          const paragraph = paragraphs[paraIdx];
-
-          // Skip empty paragraphs
-          if (!paragraph || paragraph.trim() === '') {
-            continue;
-          }
-
-          // Create paragraph box
-          const paragraphBox = new TextBox(currentX, currentY, paragraph);
-
-          // Set fixed width for imported boxes
-          paragraphBox.width = IMPORT_LAYOUT.IMPORTED_BOX_WIDTH;
-          paragraphBox.userResized = true;
-          paragraphBox.updateDimensions();
-
-          // Adjust Y to center position
-          paragraphBox.y = currentY + paragraphBox.height / 2;
-
-          // Ensure target position is updated to prevent interpolation snap-back
-          paragraphBox.targetX = paragraphBox.x;
-          paragraphBox.targetY = paragraphBox.y;
-
-          mindMap.addBox(paragraphBox);
-
-          // Connect to previous box
-          if (previousParagraphBox) {
-            mindMap.addConnection(previousParagraphBox, paragraphBox);
-          } else {
-            // First paragraph: connect to heading
-            mindMap.addConnection(headingBox, paragraphBox);
-          }
-
-          // Calculate next box position
-          currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
-          previousParagraphBox = paragraphBox;
+        // Connect to previous box
+        if (previousParagraphBox) {
+          allNewConnections.push(new Connection(previousParagraphBox, paragraphBox));
+        } else {
+          // First paragraph: connect to heading
+          allNewConnections.push(new Connection(headingBox, paragraphBox));
         }
 
-        // Move to next column
-        currentX += IMPORT_LAYOUT.HORIZONTAL_SPACING;
+        // Calculate next box position
+        currentY = paragraphBox.y + paragraphBox.height / 2 + IMPORT_LAYOUT.VERTICAL_SPACING;
+        previousParagraphBox = paragraphBox;
       }
-    }, 'Import Text');
 
-    // Mark map as dirty
-    mindMap.isDirty = true;
-    mindMap.isSaved = false;
-
-    // Sync connections
-    if (MindMap.onConnectionsChange) {
-      MindMap.onConnectionsChange();
+      // Move to next column
+      currentX += IMPORT_LAYOUT.HORIZONTAL_SPACING;
     }
+
+    // Perform batch addition and sync (Atomic & Efficient)
+    mindMap.batchAdd(allNewBoxes, allNewConnections);
 
     // Save to localStorage
     try {
@@ -262,7 +255,7 @@ class TextImporter {
 
     // Reset view
     try {
-      resetView();
+      if (typeof resetView === 'function') resetView();
     } catch (e) {
       console.warn('resetView failed after text import:', e);
     }
