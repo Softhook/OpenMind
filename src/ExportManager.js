@@ -730,6 +730,17 @@ class ExportManager {
             // y is the vertical center of each line (matches p5 textAlign CENTER)
             const startY = by + padding * scale + pdfLineHeight / 2;
 
+            // Compute how many spaces to substitute for each tab character so that
+            // jsPDF (which renders \t as zero-width) matches the p5.js visual width.
+            // Fall back to 4 spaces if the space glyph reports zero width (font not loaded yet).
+            measureGraphics.textSize(fontSize);
+            const tabPx = measureGraphics.textWidth('\t');
+            const spacePx = measureGraphics.textWidth(' ');
+            const spacesPerTab = (spacePx > 0)
+              ? Math.max(1, Math.round(tabPx / spacePx))
+              : 4; // safe default when font metrics are unavailable
+            const tabReplacement = ' '.repeat(spacesPerTab);
+
             pdf.setFontSize(pdfFontSize);
             pdf.setTextColor(0);
 
@@ -742,9 +753,59 @@ class ExportManager {
               pdf.setTextColor(0);
             }
 
+            // Render each line as segments so bold/italic formatting is applied.
+            // Each segment is a run of consecutive characters with the same style.
+            const fontName = 'helvetica';
             lines.forEach((line, i) => {
-              // Use 'middle' baseline so y matches p5 textAlign(LEFT, CENTER)
-              pdf.text(line, textX, startY + i * pdfLineHeight, { baseline: 'middle' });
+              const lineStartPos = charMap[i] || 0;
+              const y = startY + i * pdfLineHeight;
+              let x = textX;
+
+              // Collect segments: {text, bold, italic}
+              const segments = [];
+              let segText = '';
+              let segBold = false;
+              let segItalic = false;
+
+              for (let ci = 0; ci < line.length; ci++) {
+                const absPos = lineStartPos + ci;
+                const isBold = this.isIndexInRanges(box.boldRanges, absPos);
+                const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+
+                if (ci === 0) {
+                  segBold = isBold;
+                  segItalic = isItalic;
+                }
+
+                if (isBold !== segBold || isItalic !== segItalic) {
+                  // Style changed — flush current segment
+                  if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+                  segText = line[ci];
+                  segBold = isBold;
+                  segItalic = isItalic;
+                } else {
+                  segText += line[ci];
+                }
+              }
+              if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+
+              if (segments.length === 0) return;
+
+              for (const seg of segments) {
+                // Normalize tab characters (jsPDF renders \t as zero-width)
+                const normalizedText = seg.text.replace(/\t/g, tabReplacement);
+
+                const style = seg.bold && seg.italic ? 'bolditalic'
+                  : seg.bold ? 'bold'
+                    : seg.italic ? 'italic'
+                      : 'normal';
+                pdf.setFont(fontName, style);
+                pdf.text(normalizedText, x, y, { baseline: 'middle' });
+                x += pdf.getTextWidth(normalizedText);
+              }
+
+              // Reset to normal font for next line
+              pdf.setFont(fontName, 'normal');
             });
           }
         }
