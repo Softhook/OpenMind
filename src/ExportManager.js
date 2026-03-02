@@ -87,7 +87,8 @@ class ExportManager {
 
     try {
       // Set background
-      pg.background(ColorPalette.UI.BACKGROUND);
+      const bgUI = ColorPalette.UI.BACKGROUND;
+      pg.background(bgUI.r, bgUI.g, bgUI.b);
 
       // Translate to account for padding and content offset
       pg.push();
@@ -112,7 +113,8 @@ class ExportManager {
               : { x: to.x, y: to.y };
 
             // Connection line
-            pg.stroke(ColorPalette.CONNECTION.NORMAL);
+            const connColor = ColorPalette.CONNECTION.NORMAL;
+            pg.stroke(connColor.r, connColor.g, connColor.b);
             pg.strokeWeight(2);
             pg.line(start.x, start.y, end.x, end.y);
 
@@ -125,7 +127,8 @@ class ExportManager {
             pg.push();
             pg.translate(arrowX, arrowY);
             pg.rotate(angle);
-            pg.fill(ColorPalette.CONNECTION.NORMAL);
+            const arrowColor = ColorPalette.CONNECTION.NORMAL;
+            pg.fill(arrowColor.r, arrowColor.g, arrowColor.b);
             pg.noStroke();
             pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
             pg.pop();
@@ -399,9 +402,7 @@ class ExportManager {
       }
     }
 
-    // Create a single graphics buffer for text measurement (reused)
-    const measureGraphics = this.p5Instance.createGraphics(100, 100);
-
+    // Draw connections and boxes
     try {
       // Draw connections
       if (this.mindMap.connections) {
@@ -484,9 +485,9 @@ class ExportManager {
             pdf.setFontSize(fontSize);
             pdf.setTextColor(0);
 
-            const lines = this.getWrappedLines(measureGraphics,
-              box.text || '', box.width - 20, 16);
-            const lineHeight = 14 * scale;
+            const maxTextWidth = (box.width - 20) * scale;
+            const lines = pdf.splitTextToSize(box.text || '', maxTextWidth);
+            const lineHeight = fontSize * 1.2;
             const textX = bx + 8 * scale;
             let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
 
@@ -499,8 +500,7 @@ class ExportManager {
       }
 
     } finally {
-      // Always clean up the measurement graphics buffer
-      measureGraphics.remove();
+      // No cleanup needed
     }
 
     // Save PDF
