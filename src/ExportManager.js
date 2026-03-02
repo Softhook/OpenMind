@@ -195,7 +195,8 @@ class ExportManager {
                   lines, charMap, textX, startY, lineHeight, fontSize);
               }
 
-              // Draw text character-by-character to support bold/italic
+              // Draw text character-by-character to support bold/italic and link colouring
+              const links = this.detectLinksInText(box.text || '');
               pg.noStroke();
               for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
@@ -208,13 +209,20 @@ class ExportManager {
                   const absPos = lineStartPos + ci;
                   const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                   const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+                  const isInLink = this.getLinkAtIndex(links, absPos) !== null;
 
-                  pg.fill(0);
+                  const linkColor = ColorPalette.TEXTBOX.LINK_TEXT;
+                  if (isInLink) {
+                    pg.fill(linkColor.r, linkColor.g, linkColor.b);
+                  } else {
+                    pg.fill(0);
+                  }
                   if (char === ' ') {
                     xPos += pg.textWidth(' ');
                   } else {
                     if (isBold) {
-                      pg.stroke(0);
+                      const strokeColor = isInLink ? linkColor : { r: 0, g: 0, b: 0 };
+                      pg.stroke(strokeColor.r, strokeColor.g, strokeColor.b);
                       pg.strokeWeight(boldWeight);
                     } else {
                       pg.noStroke();
@@ -422,6 +430,50 @@ class ExportManager {
       if (idx >= r.start && idx < r.end) return true;
     }
     return false;
+  }
+
+  /**
+   * Detects all hyperlinks in the given text, mirroring TextBox.detectLinks().
+   * Uses TextBox.URL_PATTERN when available so the same URLs are highlighted.
+   *
+   * @param {string} text - Text to scan for URLs
+   * @returns {Array<{start: number, end: number, url: string}>}
+   */
+  detectLinksInText(text) {
+    if (!text) return [];
+    const src = (typeof TextBox !== 'undefined' && TextBox.URL_PATTERN)
+      ? TextBox.URL_PATTERN.source
+      : '(?:https?:\\/\\/|file:\\/\\/)[^\\s<>"\'\\)\\]]+|(?:\\.{0,2}\\/)[^\\s<>"\'\\)\\]]+';
+    const pattern = new RegExp(src, 'gi');
+    const links = [];
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      let url = match[0];
+      // Strip trailing punctuation that is likely not part of the URL
+      while (url.length > 0 && /[.,;:!?)}\]'"]$/.test(url)) {
+        url = url.slice(0, -1);
+      }
+      if (url.length > 0) {
+        links.push({ start: match.index, end: match.index + url.length, url });
+      }
+    }
+    return links;
+  }
+
+  /**
+   * Returns the link object whose range contains the given character index,
+   * or null if the index is not inside any link.
+   *
+   * @param {Array<{start: number, end: number, url: string}>} links
+   * @param {number} idx - Character index
+   * @returns {{start: number, end: number, url: string}|null}
+   */
+  getLinkAtIndex(links, idx) {
+    if (!Array.isArray(links)) return null;
+    for (const link of links) {
+      if (idx >= link.start && idx < link.end) return link;
+    }
+    return null;
   }
 
   /**
@@ -753,44 +805,55 @@ class ExportManager {
               pdf.setTextColor(0);
             }
 
-            // Render each line as segments so bold/italic formatting is applied.
+            // Render each line as segments so bold/italic/link formatting is applied.
             // Each segment is a run of consecutive characters with the same style.
             const fontName = 'helvetica';
+            const links = this.detectLinksInText(box.text || '');
             lines.forEach((line, i) => {
               const lineStartPos = charMap[i] || 0;
               const y = startY + i * pdfLineHeight;
               let x = textX;
 
-              // Collect segments: {text, bold, italic}
+              // Collect segments: {text, bold, italic, link, url}
               const segments = [];
               let segText = '';
               let segBold = false;
               let segItalic = false;
+              let segLink = false;
+              let segUrl = '';
 
               for (let ci = 0; ci < line.length; ci++) {
                 const absPos = lineStartPos + ci;
                 const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                 const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+                const linkObj = this.getLinkAtIndex(links, absPos);
+                const isLink = linkObj !== null;
+                const linkUrl = linkObj ? linkObj.url : '';
 
                 if (ci === 0) {
                   segBold = isBold;
                   segItalic = isItalic;
+                  segLink = isLink;
+                  segUrl = linkUrl;
                 }
 
-                if (isBold !== segBold || isItalic !== segItalic) {
+                if (isBold !== segBold || isItalic !== segItalic || isLink !== segLink || linkUrl !== segUrl) {
                   // Style changed — flush current segment
-                  if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+                  if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
                   segText = line[ci];
                   segBold = isBold;
                   segItalic = isItalic;
+                  segLink = isLink;
+                  segUrl = linkUrl;
                 } else {
                   segText += line[ci];
                 }
               }
-              if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+              if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
 
               if (segments.length === 0) return;
 
+              const lc = ColorPalette.TEXTBOX.LINK_TEXT;
               for (const seg of segments) {
                 // Normalize tab characters (jsPDF renders \t as zero-width)
                 const normalizedText = seg.text.replace(/\t/g, tabReplacement);
@@ -800,12 +863,24 @@ class ExportManager {
                     : seg.italic ? 'italic'
                       : 'normal';
                 pdf.setFont(fontName, style);
+                if (seg.link) {
+                  pdf.setTextColor(lc.r, lc.g, lc.b);
+                } else {
+                  pdf.setTextColor(0);
+                }
                 pdf.text(normalizedText, x, y, { baseline: 'middle' });
-                x += pdf.getTextWidth(normalizedText);
+                const segWidth = pdf.getTextWidth(normalizedText);
+                // Add a clickable annotation for each link segment so that
+                // multi-line URLs remain fully clickable across all wrapped lines.
+                if (seg.link && seg.url) {
+                  pdf.link(x, y - pdfLineHeight / 2, segWidth, pdfLineHeight, { url: seg.url });
+                }
+                x += segWidth;
               }
 
-              // Reset to normal font for next line
+              // Reset to normal font and black text for next line
               pdf.setFont(fontName, 'normal');
+              pdf.setTextColor(0);
             });
           }
         }
