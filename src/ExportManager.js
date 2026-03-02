@@ -87,7 +87,8 @@ class ExportManager {
 
     try {
       // Set background
-      pg.background(ColorPalette.UI.BACKGROUND);
+      const bgUI = ColorPalette.UI.BACKGROUND;
+      pg.background(bgUI.r, bgUI.g, bgUI.b);
 
       // Translate to account for padding and content offset
       pg.push();
@@ -112,7 +113,8 @@ class ExportManager {
               : { x: to.x, y: to.y };
 
             // Connection line
-            pg.stroke(ColorPalette.CONNECTION.NORMAL);
+            const connColor = ColorPalette.CONNECTION.NORMAL;
+            pg.stroke(connColor.r, connColor.g, connColor.b);
             pg.strokeWeight(2);
             pg.line(start.x, start.y, end.x, end.y);
 
@@ -125,7 +127,8 @@ class ExportManager {
             pg.push();
             pg.translate(arrowX, arrowY);
             pg.rotate(angle);
-            pg.fill(ColorPalette.CONNECTION.NORMAL);
+            const arrowColor = ColorPalette.CONNECTION.NORMAL;
+            pg.fill(arrowColor.r, arrowColor.g, arrowColor.b);
             pg.noStroke();
             pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
             pg.pop();
@@ -166,45 +169,70 @@ class ExportManager {
               }
             }
 
-            // Draw text with wrapping and highlights (skip if image box)
+            // Draw text with wrapping, highlights, bold/italic (skip if image box)
             if (!box.imageUrl) {
-              const lines = this.getWrappedLines(pg, box.text || '', box.width - 20, 16);
-              const lineHeight = 18;
-              const textStartY = box.y - (lines.length * lineHeight) / 2;
+              const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
+              const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
+              const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
+              const italicShear = (typeof TextBox !== 'undefined' && TextBox.ITALIC_SHEAR_RADIANS) || -0.24;
+              const boldWeight = (typeof TextBox !== 'undefined' && TextBox.BOLD_STROKE_WEIGHT) || 0.8;
+              const fontSize = box.fontSize || defaultFontSize;
+              const padding = box.padding || defaultPadding;
+              const lineHeight = fontSize * lineHeightMult;
+              const maxTextWidth = box.width - padding * 2;
+              const { lines, charMap } = this.wrapTextForExport(pg, box.text || '', maxTextWidth, fontSize);
 
-              lines.forEach((line, idx) => {
-                const yPos = textStartY + idx * lineHeight;
+              // Match TextBox.draw(): textAlign LEFT,CENTER; y is vertical center of each line
+              const startY = (box.y - box.height / 2) + padding + lineHeight / 2;
+              const textX = box.x - box.width / 2 + padding;
 
-                // Draw highlights if present
-                if (box.highlights && box.highlights.length > 0) {
-                  let charX = 0;
-                  const chars = line.split('');
+              pg.textSize(fontSize);
+              pg.textAlign(pg.LEFT, pg.CENTER);
 
-                  chars.forEach((char, charIdx) => {
-                    const globalCharIdx = this.getGlobalCharIndex(box.text, lines, idx, charIdx);
-                    const isHighlighted = this.isCharHighlighted(box.highlights, globalCharIdx);
+              // Draw highlights behind text (mirrors TextBox.drawHighlights)
+              if (box.highlights && box.highlights.length > 0) {
+                this.drawPNGHighlights(pg, box.text || '', box.highlights,
+                  lines, charMap, textX, startY, lineHeight, fontSize);
+              }
 
-                    if (isHighlighted) {
-                      pg.fill(ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.r,
-                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.g,
-                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.b,
-                        ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT.a || 180);
+              // Draw text character-by-character to support bold/italic
+              pg.noStroke();
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lineStartPos = charMap[i] || 0;
+                const yPos = startY + i * lineHeight;
+                let xPos = textX;
+
+                for (let ci = 0; ci < line.length; ci++) {
+                  const char = line[ci];
+                  const absPos = lineStartPos + ci;
+                  const isBold = this.isIndexInRanges(box.boldRanges, absPos);
+                  const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+
+                  pg.fill(0);
+                  if (char === ' ') {
+                    xPos += pg.textWidth(' ');
+                  } else {
+                    if (isBold) {
+                      pg.stroke(0);
+                      pg.strokeWeight(boldWeight);
+                    } else {
                       pg.noStroke();
-                      const charWidth = pg.textWidth(char);
-                      pg.rect(box.x - box.width / 2 + 10 + charX, yPos - 14, charWidth, lineHeight);
                     }
-
-                    charX += pg.textWidth(char);
-                  });
+                    if (isItalic) {
+                      pg.push();
+                      pg.translate(xPos, yPos);
+                      pg.shearX(italicShear);
+                      pg.text(char, 0, 0);
+                      pg.pop();
+                    } else {
+                      pg.text(char, xPos, yPos);
+                    }
+                    pg.noStroke();
+                    xPos += pg.textWidth(char);
+                  }
                 }
-
-                // Draw text
-                pg.fill(0);
-                pg.noStroke();
-                pg.textAlign(pg.LEFT, pg.TOP);
-                pg.textSize(16);
-                pg.text(line, box.x - box.width / 2 + 10, yPos);
-              });
+              }
             }
           });
         }
@@ -249,69 +277,276 @@ class ExportManager {
   }
 
   /**
-   * Get wrapped lines of text for rendering
-   * @param {Object} pg - p5.Graphics instance
+   * Wraps text for export, handling explicit newlines and word wrapping.
+   * Returns both the wrapped lines and a character-position map so highlights
+   * can be mapped back to the original text — mirrors TextBox.wrapText().
+   *
+   * @param {Object} pg - p5.Graphics instance for text measurement
    * @param {string} text - Text to wrap
-   * @param {number} maxWidth - Maximum width in pixels
-   * @param {number} fontSize - Font size
-   * @returns {Array<string>} Array of wrapped lines
+   * @param {number} maxTextWidth - Maximum text width in pixels
+   * @param {number} fontSize - Font size in pixels
+   * @returns {{ lines: string[], charMap: number[] }}
    */
-  getWrappedLines(pg, text, maxWidth, fontSize) {
-    if (!text) return [];
-
+  wrapTextForExport(pg, text, maxTextWidth, fontSize) {
     pg.textSize(fontSize);
-    const words = text.split(' ');
+    if (!text) return { lines: [''], charMap: [0] };
+
+    const logicalLines = text.split('\n');
     const lines = [];
-    let currentLine = '';
+    const charMap = [];
+    let charPos = 0;
 
-    words.forEach(word => {
-      const testLine = currentLine ? currentLine + ' ' + word : word;
-      const testWidth = pg.textWidth(testLine);
+    for (let li = 0; li < logicalLines.length; li++) {
+      const logical = logicalLines[li];
+      const lineStartPos = charPos;
 
-      if (testWidth > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = testLine;
+      if (logical === '') {
+        lines.push('');
+        charMap.push(charPos);
+        charPos += (li < logicalLines.length - 1 ? 1 : 0);
+        continue;
       }
-    });
 
-    if (currentLine) {
-      lines.push(currentLine);
+      if (pg.textWidth(logical) <= maxTextWidth) {
+        lines.push(logical);
+        charMap.push(charPos);
+      } else {
+        // Word-wrap this logical line, preserving all whitespace and character positions
+        const tokens = [];
+        const tokenRegex = /(\s+|\S+)/g;
+        let tokenMatch;
+        while ((tokenMatch = tokenRegex.exec(logical)) !== null) {
+          tokens.push({ text: tokenMatch[0], start: tokenMatch.index });
+        }
+
+        let currentLine = '';
+        let currentLineStart = 0; // offset within `logical`
+
+        for (let ti = 0; ti < tokens.length; ti++) {
+          const token = tokens[ti];
+          const testLine = currentLine ? currentLine + token.text : token.text;
+
+          if (pg.textWidth(testLine) <= maxTextWidth) {
+            if (!currentLine) currentLineStart = token.start;
+            currentLine = testLine;
+          } else {
+            if (currentLine) {
+              // Flush the current visual line; start a new one with this token
+              lines.push(currentLine);
+              charMap.push(lineStartPos + currentLineStart);
+              currentLine = token.text;
+              currentLineStart = token.start;
+            } else {
+              // Single token too wide — break by character while preserving indices
+              let charLine = '';
+              let charLineStart = token.start;
+              for (let ci = 0; ci < token.text.length; ci++) {
+                const c = token.text[ci];
+                if (pg.textWidth(charLine + c) <= maxTextWidth) {
+                  charLine += c;
+                } else {
+                  if (charLine) {
+                    lines.push(charLine);
+                    charMap.push(lineStartPos + charLineStart);
+                    charLineStart += charLine.length;
+                  }
+                  charLine = c;
+                }
+              }
+              currentLine = charLine;
+              currentLineStart = charLineStart;
+            }
+          }
+        }
+
+        if (currentLine) {
+          lines.push(currentLine);
+          charMap.push(lineStartPos + currentLineStart);
+        }
+      }
+
+      charPos += logical.length + (li < logicalLines.length - 1 ? 1 : 0);
     }
 
-    return lines;
+    if (lines.length === 0) {
+      lines.push('');
+      charMap.push(0);
+    }
+
+    return { lines, charMap };
   }
 
   /**
-   * Get global character index in text from line and character position
-   * @param {string} text - Full text
-   * @param {Array<string>} lines - Wrapped lines
-   * @param {number} lineIdx - Line index
-   * @param {number} charIdx - Character index in line
-   * @returns {number} Global character index
+   * Returns the line index and position within the line for a given character
+   * position in the original text — mirrors TextBox.getLineAndPositionFromChar().
+   *
+   * @param {number} charPos - Character position in original text
+   * @param {string[]} lines - Wrapped lines
+   * @param {number[]} charMap - Start char index of each line
+   * @param {number} textLength - Total text length
+   * @returns {{ lineIndex: number, posInLine: number }}
    */
-  getGlobalCharIndex(text, lines, lineIdx, charIdx) {
-    let globalIdx = 0;
-    for (let i = 0; i < lineIdx; i++) {
-      globalIdx += lines[i].length + 1; // +1 for space
+  getLineAndPosFromChar(charPos, lines, charMap, textLength) {
+    let lineIndex = 0;
+    for (let i = 0; i < charMap.length; i++) {
+      const lineStart = charMap[i];
+      const lineEnd = (i < charMap.length - 1) ? charMap[i + 1] : textLength;
+      const isLast = (i === charMap.length - 1);
+      if ((charPos >= lineStart && charPos < lineEnd) ||
+        (isLast && charPos >= lineStart && charPos <= lineEnd)) {
+        lineIndex = i;
+        break;
+      }
+      if (isLast) lineIndex = i;
     }
-    return globalIdx + charIdx;
+    const lineStartPos = charMap[lineIndex] || 0;
+    let posInLine = charPos - lineStartPos;
+    if (lines[lineIndex]) {
+      posInLine = Math.min(posInLine, lines[lineIndex].length);
+    }
+    return { lineIndex, posInLine };
   }
 
   /**
-   * Check if a character is highlighted
-   * @param {Array} highlights - Array of highlight ranges
-   * @param {number} charIdx - Character index
-   * @returns {boolean} True if highlighted
+   * Check whether a character index falls inside any of the given ranges.
+   * Mirrors TextBox._isIndexInRanges().
+   *
+   * @param {Array} ranges - Array of {start, end} range objects
+   * @param {number} idx - Character index
+   * @returns {boolean}
    */
-  isCharHighlighted(highlights, charIdx) {
-    if (!highlights || !Array.isArray(highlights)) return false;
+  isIndexInRanges(ranges, idx) {
+    if (!Array.isArray(ranges) || !Number.isFinite(idx)) return false;
+    for (const r of ranges) {
+      if (!r || typeof r.start !== 'number' || typeof r.end !== 'number') continue;
+      if (idx >= r.start && idx < r.end) return true;
+    }
+    return false;
+  }
 
-    return highlights.some(h => {
-      if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') return false;
-      return charIdx >= h.start && charIdx < h.end;
-    });
+  /**
+   * Draw text highlights onto a p5.Graphics buffer, mirroring TextBox.drawHighlights().
+   *
+   * @param {Object} pg - p5.Graphics instance
+   * @param {string} text - Original full text
+   * @param {Array} highlights - Highlight range objects from box.highlights
+   * @param {string[]} lines - Wrapped lines
+   * @param {number[]} charMap - Start char index of each line
+   * @param {number} textX - X start of text
+   * @param {number} startY - Y center of first line
+   * @param {number} lineHeight - Line height in pixels
+   * @param {number} fontSize - Font size in pixels
+   */
+  drawPNGHighlights(pg, text, highlights, lines, charMap, textX, startY, lineHeight, fontSize) {
+    pg.textSize(fontSize);
+    pg.noStroke();
+    for (const hl of highlights) {
+      if (!hl || hl.start == null || hl.end == null) continue;
+      const start = Math.max(0, Math.min(text.length, hl.start));
+      const end = Math.max(0, Math.min(text.length, hl.end));
+      if (start >= end) continue;
+
+      const c = (hl.color && typeof hl.color === 'object')
+        ? hl.color : ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT;
+      pg.fill(c.r, c.g, c.b, c.a !== undefined ? c.a : 180);
+
+      const startInfo = this.getLineAndPosFromChar(start, lines, charMap, text.length);
+      const endInfo = this.getLineAndPosFromChar(end, lines, charMap, text.length);
+
+      if (startInfo.lineIndex === endInfo.lineIndex) {
+        const lineText = lines[startInfo.lineIndex] || '';
+        const x1 = textX + pg.textWidth(lineText.slice(0, startInfo.posInLine));
+        const x2 = textX + pg.textWidth(lineText.slice(0, endInfo.posInLine));
+        const y = startY + startInfo.lineIndex * lineHeight;
+        pg.rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+      } else {
+        for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
+          if (i < 0 || i >= lines.length) continue;
+          const lineText = lines[i] || '';
+          const y = startY + i * lineHeight;
+          let x1, x2;
+          if (i === startInfo.lineIndex) {
+            x1 = textX + pg.textWidth(lineText.slice(0, startInfo.posInLine));
+            x2 = textX + pg.textWidth(lineText);
+          } else if (i === endInfo.lineIndex) {
+            x1 = textX;
+            x2 = textX + pg.textWidth(lineText.slice(0, endInfo.posInLine));
+          } else {
+            x1 = textX;
+            x2 = textX + pg.textWidth(lineText);
+          }
+          pg.rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67);
+        }
+      }
+    }
+  }
+
+  /**
+   * Draw text highlights into a PDF, using p5 text-width measurements scaled to
+   * PDF points to approximate highlight rectangle positions.
+   *
+   * @param {Object} pdf - jsPDF instance
+   * @param {string} text - Original full text
+   * @param {Array} highlights - Highlight range objects from box.highlights
+   * @param {string[]} lines - Wrapped lines
+   * @param {number[]} charMap - Start char index of each line
+   * @param {number} textX - X start of text in PDF points
+   * @param {number} startY - Y center of first line in PDF points
+   * @param {number} lineHeight - Line height in PDF points
+   * @param {Object} pg - p5.Graphics used for text-width measurement
+   * @param {number} fontSize - p5.js font size (pixels)
+   * @param {number} pdfFontSize - PDF font size (points)
+   */
+  drawPDFHighlights(pdf, text, highlights, lines, charMap, textX, startY,
+    lineHeight, pg, fontSize, pdfFontSize) {
+    const ptPerPx = pdfFontSize / fontSize;
+    pg.textSize(fontSize);
+
+    for (const hl of highlights) {
+      if (!hl || hl.start == null || hl.end == null) continue;
+      const start = Math.max(0, Math.min(text.length, hl.start));
+      const end = Math.max(0, Math.min(text.length, hl.end));
+      if (start >= end) continue;
+
+      const c = (hl.color && typeof hl.color === 'object')
+        ? hl.color : ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT;
+      // PDF doesn't support true alpha; blend toward white to approximate transparency.
+      // Default ~180/255 ≈ 70% opacity matches the in-app semi-transparent highlight look.
+      const DEFAULT_HIGHLIGHT_ALPHA = 180;
+      const rawAlpha = (c && typeof c.a === 'number') ? c.a : DEFAULT_HIGHLIGHT_ALPHA;
+      const alpha = Math.max(0, Math.min(1, rawAlpha > 1 ? rawAlpha / 255 : rawAlpha));
+      const blendToWhite = ch => Math.round(255 * (1 - alpha) + ch * alpha);
+      pdf.setFillColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
+
+      const startInfo = this.getLineAndPosFromChar(start, lines, charMap, text.length);
+      const endInfo = this.getLineAndPosFromChar(end, lines, charMap, text.length);
+
+      if (startInfo.lineIndex === endInfo.lineIndex) {
+        const lineText = lines[startInfo.lineIndex] || '';
+        const x1 = textX + pg.textWidth(lineText.slice(0, startInfo.posInLine)) * ptPerPx;
+        const x2 = textX + pg.textWidth(lineText.slice(0, endInfo.posInLine)) * ptPerPx;
+        const y = startY + startInfo.lineIndex * lineHeight;
+        pdf.rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67, 'F');
+      } else {
+        for (let i = startInfo.lineIndex; i <= endInfo.lineIndex; i++) {
+          if (i < 0 || i >= lines.length) continue;
+          const lineText = lines[i] || '';
+          const y = startY + i * lineHeight;
+          let x1, x2;
+          if (i === startInfo.lineIndex) {
+            x1 = textX + pg.textWidth(lineText.slice(0, startInfo.posInLine)) * ptPerPx;
+            x2 = textX + pg.textWidth(lineText) * ptPerPx;
+          } else if (i === endInfo.lineIndex) {
+            x1 = textX;
+            x2 = textX + pg.textWidth(lineText.slice(0, endInfo.posInLine)) * ptPerPx;
+          } else {
+            x1 = textX;
+            x2 = textX + pg.textWidth(lineText) * ptPerPx;
+          }
+          pdf.rect(x1, y - lineHeight / 3, x2 - x1, lineHeight * 0.67, 'F');
+        }
+      }
+    }
   }
 
   // ==========================================================================
@@ -399,9 +634,8 @@ class ExportManager {
       }
     }
 
-    // Create a single graphics buffer for text measurement (reused)
+    // Draw connections and boxes — measureGraphics provides p5 text metrics for line-wrapping
     const measureGraphics = this.p5Instance.createGraphics(100, 100);
-
     try {
       // Draw connections
       if (this.mindMap.connections) {
@@ -480,26 +714,104 @@ class ExportManager {
 
           // Text (skip if image box)
           if (!box.imageUrl) {
-            const fontSize = 12 * scale;
-            pdf.setFontSize(fontSize);
+            const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
+            const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
+            const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
+            const fontSize = box.fontSize || defaultFontSize;
+            const padding = box.padding || defaultPadding;
+            // Wrap using p5.js metrics so lines match the box's actual dimensions
+            const maxTextWidth = box.width - padding * 2;
+            const { lines, charMap } = this.wrapTextForExport(
+              measureGraphics, box.text || '', maxTextWidth, fontSize);
+
+            const pdfFontSize = fontSize * scale;
+            const pdfLineHeight = fontSize * lineHeightMult * scale;
+            const textX = bx + padding * scale;
+            // y is the vertical center of each line (matches p5 textAlign CENTER)
+            const startY = by + padding * scale + pdfLineHeight / 2;
+
+            // Compute how many spaces to substitute for each tab character so that
+            // jsPDF (which renders \t as zero-width) matches the p5.js visual width.
+            // Fall back to 4 spaces if the space glyph reports zero width (font not loaded yet).
+            measureGraphics.textSize(fontSize);
+            const tabPx = measureGraphics.textWidth('\t');
+            const spacePx = measureGraphics.textWidth(' ');
+            const spacesPerTab = (spacePx > 0)
+              ? Math.max(1, Math.round(tabPx / spacePx))
+              : 4; // safe default when font metrics are unavailable
+            const tabReplacement = ' '.repeat(spacesPerTab);
+
+            pdf.setFontSize(pdfFontSize);
             pdf.setTextColor(0);
 
-            const lines = this.getWrappedLines(measureGraphics,
-              box.text || '', box.width - 20, 16);
-            const lineHeight = 14 * scale;
-            const textX = bx + 8 * scale;
-            let textY = by + (bh - lines.length * lineHeight) / 2 + lineHeight;
+            // Draw highlights before text
+            if (box.highlights && box.highlights.length > 0) {
+              this.drawPDFHighlights(pdf, box.text || '', box.highlights,
+                lines, charMap, textX, startY, pdfLineHeight,
+                measureGraphics, fontSize, pdfFontSize);
+              // Restore text color after highlights changed fill
+              pdf.setTextColor(0);
+            }
 
-            lines.forEach(line => {
-              pdf.text(line, textX, textY);
-              textY += lineHeight;
+            // Render each line as segments so bold/italic formatting is applied.
+            // Each segment is a run of consecutive characters with the same style.
+            const fontName = 'helvetica';
+            lines.forEach((line, i) => {
+              const lineStartPos = charMap[i] || 0;
+              const y = startY + i * pdfLineHeight;
+              let x = textX;
+
+              // Collect segments: {text, bold, italic}
+              const segments = [];
+              let segText = '';
+              let segBold = false;
+              let segItalic = false;
+
+              for (let ci = 0; ci < line.length; ci++) {
+                const absPos = lineStartPos + ci;
+                const isBold = this.isIndexInRanges(box.boldRanges, absPos);
+                const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+
+                if (ci === 0) {
+                  segBold = isBold;
+                  segItalic = isItalic;
+                }
+
+                if (isBold !== segBold || isItalic !== segItalic) {
+                  // Style changed — flush current segment
+                  if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+                  segText = line[ci];
+                  segBold = isBold;
+                  segItalic = isItalic;
+                } else {
+                  segText += line[ci];
+                }
+              }
+              if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic });
+
+              if (segments.length === 0) return;
+
+              for (const seg of segments) {
+                // Normalize tab characters (jsPDF renders \t as zero-width)
+                const normalizedText = seg.text.replace(/\t/g, tabReplacement);
+
+                const style = seg.bold && seg.italic ? 'bolditalic'
+                  : seg.bold ? 'bold'
+                    : seg.italic ? 'italic'
+                      : 'normal';
+                pdf.setFont(fontName, style);
+                pdf.text(normalizedText, x, y, { baseline: 'middle' });
+                x += pdf.getTextWidth(normalizedText);
+              }
+
+              // Reset to normal font for next line
+              pdf.setFont(fontName, 'normal');
             });
           }
         }
       }
 
     } finally {
-      // Always clean up the measurement graphics buffer
       measureGraphics.remove();
     }
 
