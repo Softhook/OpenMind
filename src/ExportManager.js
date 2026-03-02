@@ -171,9 +171,14 @@ class ExportManager {
 
             // Draw text with wrapping, highlights, bold/italic (skip if image box)
             if (!box.imageUrl) {
-              const fontSize = box.fontSize || 14;
-              const padding = box.padding || 12;
-              const lineHeight = fontSize * 1.5;
+              const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
+              const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
+              const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
+              const italicShear = (typeof TextBox !== 'undefined' && TextBox.ITALIC_SHEAR_RADIANS) || -0.24;
+              const boldWeight = (typeof TextBox !== 'undefined' && TextBox.BOLD_STROKE_WEIGHT) || 0.8;
+              const fontSize = box.fontSize || defaultFontSize;
+              const padding = box.padding || defaultPadding;
+              const lineHeight = fontSize * lineHeightMult;
               const maxTextWidth = box.width - padding * 2;
               const { lines, charMap } = this.wrapTextForExport(pg, box.text || '', maxTextWidth, fontSize);
 
@@ -210,14 +215,14 @@ class ExportManager {
                   } else {
                     if (isBold) {
                       pg.stroke(0);
-                      pg.strokeWeight(0.8);
+                      pg.strokeWeight(boldWeight);
                     } else {
                       pg.noStroke();
                     }
                     if (isItalic) {
                       pg.push();
                       pg.translate(xPos, yPos);
-                      pg.shearX(-0.24);
+                      pg.shearX(italicShear);
                       pg.text(char, 0, 0);
                       pg.pop();
                     } else {
@@ -306,46 +311,57 @@ class ExportManager {
         lines.push(logical);
         charMap.push(charPos);
       } else {
-        // Word-wrap this logical line
-        const words = logical.split(' ');
-        let currentLine = '';
-        let currentLineStartOffset = 0;
+        // Word-wrap this logical line, preserving all whitespace and character positions
+        const tokens = [];
+        const tokenRegex = /(\s+|\S+)/g;
+        let tokenMatch;
+        while ((tokenMatch = tokenRegex.exec(logical)) !== null) {
+          tokens.push({ text: tokenMatch[0], start: tokenMatch.index });
+        }
 
-        for (let wi = 0; wi < words.length; wi++) {
-          const word = words[wi];
-          const testLine = currentLine ? currentLine + ' ' + word : word;
+        let currentLine = '';
+        let currentLineStart = 0; // offset within `logical`
+
+        for (let ti = 0; ti < tokens.length; ti++) {
+          const token = tokens[ti];
+          const testLine = currentLine ? currentLine + token.text : token.text;
 
           if (pg.textWidth(testLine) <= maxTextWidth) {
+            if (!currentLine) currentLineStart = token.start;
             currentLine = testLine;
           } else {
             if (currentLine) {
+              // Flush the current visual line; start a new one with this token
               lines.push(currentLine);
-              charMap.push(lineStartPos + currentLineStartOffset);
-              currentLineStartOffset += currentLine.length + 1; // +1 for the separator space between words
-              currentLine = word;
+              charMap.push(lineStartPos + currentLineStart);
+              currentLine = token.text;
+              currentLineStart = token.start;
             } else {
-              // Single word too wide — break by character
+              // Single token too wide — break by character while preserving indices
               let charLine = '';
-              for (const c of word) {
+              let charLineStart = token.start;
+              for (let ci = 0; ci < token.text.length; ci++) {
+                const c = token.text[ci];
                 if (pg.textWidth(charLine + c) <= maxTextWidth) {
                   charLine += c;
                 } else {
                   if (charLine) {
                     lines.push(charLine);
-                    charMap.push(lineStartPos + currentLineStartOffset);
-                    currentLineStartOffset += charLine.length;
+                    charMap.push(lineStartPos + charLineStart);
+                    charLineStart += charLine.length;
                   }
                   charLine = c;
                 }
               }
               currentLine = charLine;
+              currentLineStart = charLineStart;
             }
           }
         }
 
         if (currentLine) {
           lines.push(currentLine);
-          charMap.push(lineStartPos + currentLineStartOffset);
+          charMap.push(lineStartPos + currentLineStart);
         }
       }
 
@@ -494,7 +510,13 @@ class ExportManager {
 
       const c = (hl.color && typeof hl.color === 'object')
         ? hl.color : ColorPalette.TEXTBOX.DEFAULT_HIGHLIGHT;
-      pdf.setFillColor(c.r, c.g, c.b);
+      // PDF doesn't support true alpha; blend toward white to approximate transparency.
+      // Default ~180/255 ≈ 70% opacity matches the in-app semi-transparent highlight look.
+      const DEFAULT_HIGHLIGHT_ALPHA = 180;
+      const rawAlpha = (c && typeof c.a === 'number') ? c.a : DEFAULT_HIGHLIGHT_ALPHA;
+      const alpha = Math.max(0, Math.min(1, rawAlpha > 1 ? rawAlpha / 255 : rawAlpha));
+      const blendToWhite = ch => Math.round(255 * (1 - alpha) + ch * alpha);
+      pdf.setFillColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
 
       const startInfo = this.getLineAndPosFromChar(start, lines, charMap, text.length);
       const endInfo = this.getLineAndPosFromChar(end, lines, charMap, text.length);
@@ -692,15 +714,18 @@ class ExportManager {
 
           // Text (skip if image box)
           if (!box.imageUrl) {
-            const fontSize = box.fontSize || 14;
-            const padding = box.padding || 12;
+            const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
+            const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
+            const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
+            const fontSize = box.fontSize || defaultFontSize;
+            const padding = box.padding || defaultPadding;
             // Wrap using p5.js metrics so lines match the box's actual dimensions
             const maxTextWidth = box.width - padding * 2;
             const { lines, charMap } = this.wrapTextForExport(
               measureGraphics, box.text || '', maxTextWidth, fontSize);
 
             const pdfFontSize = fontSize * scale;
-            const pdfLineHeight = fontSize * 1.5 * scale;
+            const pdfLineHeight = fontSize * lineHeightMult * scale;
             const textX = bx + padding * scale;
             // y is the vertical center of each line (matches p5 textAlign CENTER)
             const startY = by + padding * scale + pdfLineHeight / 2;
