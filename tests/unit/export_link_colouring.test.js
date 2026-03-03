@@ -157,6 +157,19 @@ describe('PNG export – link colour', () => {
 
     const p5Mock = { createGraphics: jest.fn(() => pgMock) };
 
+    // Stub URL blob APIs that jsdom doesn't provide by default so that
+    // the download portion of exportPNG() doesn't throw.
+    if (typeof URL.createObjectURL !== 'function') {
+      URL.createObjectURL = jest.fn(() => 'blob:fake');
+    } else {
+      jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake');
+    }
+    if (typeof URL.revokeObjectURL !== 'function') {
+      URL.revokeObjectURL = jest.fn();
+    } else {
+      jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    }
+
     const box = {
       id: 1,
       x: 100, y: 100, width: 200, height: 60,

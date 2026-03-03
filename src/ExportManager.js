@@ -197,6 +197,8 @@ class ExportManager {
 
               // Draw text character-by-character to support bold/italic and link colouring
               const links = this.detectLinksInText(box.text || '');
+              const linkColor = ColorPalette.TEXTBOX.LINK_TEXT;
+              const blackColor = { r: 0, g: 0, b: 0 };
               pg.noStroke();
               for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
@@ -211,7 +213,6 @@ class ExportManager {
                   const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
                   const isInLink = this.getLinkAtIndex(links, absPos) !== null;
 
-                  const linkColor = ColorPalette.TEXTBOX.LINK_TEXT;
                   if (isInLink) {
                     pg.fill(linkColor.r, linkColor.g, linkColor.b);
                   } else {
@@ -221,7 +222,7 @@ class ExportManager {
                     xPos += pg.textWidth(' ');
                   } else {
                     if (isBold) {
-                      const strokeColor = isInLink ? linkColor : { r: 0, g: 0, b: 0 };
+                      const strokeColor = isInLink ? linkColor : blackColor;
                       pg.stroke(strokeColor.r, strokeColor.g, strokeColor.b);
                       pg.strokeWeight(boldWeight);
                     } else {
@@ -441,10 +442,14 @@ class ExportManager {
    */
   detectLinksInText(text) {
     if (!text) return [];
-    const src = (typeof TextBox !== 'undefined' && TextBox.URL_PATTERN)
+    const hasTextBoxPattern = typeof TextBox !== 'undefined' && TextBox && TextBox.URL_PATTERN instanceof RegExp;
+    const src = hasTextBoxPattern
       ? TextBox.URL_PATTERN.source
       : '(?:https?:\\/\\/|file:\\/\\/)[^\\s<>"\'\\)\\]]+|(?:\\.{0,2}\\/)[^\\s<>"\'\\)\\]]+';
-    const pattern = new RegExp(src, 'gi');
+    const patternFlags = hasTextBoxPattern && typeof TextBox.URL_PATTERN.flags === 'string' && TextBox.URL_PATTERN.flags.length
+      ? TextBox.URL_PATTERN.flags
+      : 'gi';
+    const pattern = new RegExp(src, patternFlags);
     const links = [];
     let match;
     while ((match = pattern.exec(text)) !== null) {
