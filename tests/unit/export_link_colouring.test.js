@@ -225,6 +225,7 @@ describe('PDF export – link colour and clickable annotations', () => {
       setFont: jest.fn(),
       text: jest.fn(),
       rect: jest.fn(),
+      roundedRect: jest.fn(),
       addImage: jest.fn(),
       getTextWidth: jest.fn(str => (str ? str.length * 6 : 0)),
       link: jest.fn((...args) => { linkCalls.push(args); }),
