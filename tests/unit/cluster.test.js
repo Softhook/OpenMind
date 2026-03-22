@@ -9,7 +9,7 @@
  * - Bounding box calculation
  * - containsBox / removeBox membership
  * - contains() hit-detection
- * - JSON serialisation / deserialisation round-trip
+ * - JSON serialization / deserialization round-trip
  * - MindMap.addCluster / deleteCluster integration
  * - Box deletion cleans up cluster membership
  * - Cluster is drawn before boxes in MindMap.draw()
@@ -506,7 +506,7 @@ describe('MindMap cluster integration', () => {
 
   // --------------------------------------------------------------------------
   describe('toJSON() / fromJSON() round-trip', () => {
-    test('serialises and restores clusters', () => {
+    test('serializes and restores clusters', () => {
       const b1 = addBox(  0, 0);
       const b2 = addBox(200, 0);
       mindMap.addCluster([b1, b2]);

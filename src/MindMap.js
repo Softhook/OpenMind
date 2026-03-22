@@ -1641,11 +1641,10 @@ class MindMap {
     // 2. Remove deleted boxes from any clusters they belong to;
     //    prune clusters that drop below 2 members.
     if (this.clusters && this.clusters.length > 0) {
-      const deletedSet = new Set(boxesToDelete);
       for (const cluster of this.clusters) {
         if (!cluster) continue;
         for (const box of boxesToDelete) {
-          if (deletedSet.has(box)) cluster.removeBox(box);
+          cluster.removeBox(box);
         }
       }
       // Remove clusters that now have fewer than 2 valid members
