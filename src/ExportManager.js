@@ -839,79 +839,96 @@ class ExportManager {
             // Each segment is a run of consecutive characters with the same style.
             const fontName = 'helvetica';
             const links = this.detectLinksInText(box.text || '');
-            lines.forEach((line, i) => {
-              const lineStartPos = charMap[i] || 0;
-              const y = startY + i * pdfLineHeight;
-              let x = textX;
 
-              // Collect segments: {text, bold, italic, link, url}
-              const segments = [];
-              let segText = '';
-              let segBold = false;
-              let segItalic = false;
-              let segLink = false;
-              let segUrl = '';
+            // When the box has no mixed formatting (no bold, italic, or links) emit all
+            // wrapped lines as a single pdf.text() call. jsPDF renders an array of strings
+            // as one BT/ET text block in the PDF stream, so Adobe Illustrator (and other
+            // vector editors) will treat the entire text box as a single editable unit.
+            const hasFormatting = (box.boldRanges && box.boldRanges.length > 0) ||
+                                  (box.italicRanges && box.italicRanges.length > 0) ||
+                                  links.length > 0;
 
-              for (let ci = 0; ci < line.length; ci++) {
-                const absPos = lineStartPos + ci;
-                const isBold = this.isIndexInRanges(box.boldRanges, absPos);
-                const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
-                const linkObj = this.getLinkAtIndex(links, absPos);
-                const isLink = linkObj !== null;
-                const linkUrl = linkObj ? linkObj.url : '';
-
-                if (ci === 0) {
-                  segBold = isBold;
-                  segItalic = isItalic;
-                  segLink = isLink;
-                  segUrl = linkUrl;
-                }
-
-                if (isBold !== segBold || isItalic !== segItalic || isLink !== segLink || linkUrl !== segUrl) {
-                  // Style changed — flush current segment
-                  if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
-                  segText = line[ci];
-                  segBold = isBold;
-                  segItalic = isItalic;
-                  segLink = isLink;
-                  segUrl = linkUrl;
-                } else {
-                  segText += line[ci];
-                }
-              }
-              if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
-
-              if (segments.length === 0) return;
-
-              const lc = ColorPalette.TEXTBOX.LINK_TEXT;
-              for (const seg of segments) {
-                // Normalize tab characters (jsPDF renders \t as zero-width)
-                const normalizedText = seg.text.replace(/\t/g, tabReplacement);
-
-                const style = seg.bold && seg.italic ? 'bolditalic'
-                  : seg.bold ? 'bold'
-                    : seg.italic ? 'italic'
-                      : 'normal';
-                pdf.setFont(fontName, style);
-                if (seg.link) {
-                  pdf.setTextColor(lc.r, lc.g, lc.b);
-                } else {
-                  pdf.setTextColor(0);
-                }
-                pdf.text(normalizedText, x, y, { baseline: 'middle' });
-                const segWidth = pdf.getTextWidth(normalizedText);
-                // Add a clickable annotation for each link segment so that
-                // multi-line URLs remain fully clickable across all wrapped lines.
-                if (seg.link && seg.url) {
-                  pdf.link(x, y - pdfLineHeight / 2, segWidth, pdfLineHeight, { url: seg.url });
-                }
-                x += segWidth;
-              }
-
-              // Reset to normal font and black text for next line
+            if (!hasFormatting && lines.length > 0) {
               pdf.setFont(fontName, 'normal');
               pdf.setTextColor(0);
-            });
+              const normalizedLines = lines.map(l => l.replace(/\t/g, tabReplacement));
+              pdf.text(normalizedLines, textX, startY,
+                { baseline: 'middle', lineHeightFactor: lineHeightMult });
+            } else {
+              lines.forEach((line, i) => {
+                const lineStartPos = charMap[i] || 0;
+                const y = startY + i * pdfLineHeight;
+                let x = textX;
+
+                // Collect segments: {text, bold, italic, link, url}
+                const segments = [];
+                let segText = '';
+                let segBold = false;
+                let segItalic = false;
+                let segLink = false;
+                let segUrl = '';
+
+                for (let ci = 0; ci < line.length; ci++) {
+                  const absPos = lineStartPos + ci;
+                  const isBold = this.isIndexInRanges(box.boldRanges, absPos);
+                  const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
+                  const linkObj = this.getLinkAtIndex(links, absPos);
+                  const isLink = linkObj !== null;
+                  const linkUrl = linkObj ? linkObj.url : '';
+
+                  if (ci === 0) {
+                    segBold = isBold;
+                    segItalic = isItalic;
+                    segLink = isLink;
+                    segUrl = linkUrl;
+                  }
+
+                  if (isBold !== segBold || isItalic !== segItalic || isLink !== segLink || linkUrl !== segUrl) {
+                    // Style changed — flush current segment
+                    if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
+                    segText = line[ci];
+                    segBold = isBold;
+                    segItalic = isItalic;
+                    segLink = isLink;
+                    segUrl = linkUrl;
+                  } else {
+                    segText += line[ci];
+                  }
+                }
+                if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
+
+                if (segments.length === 0) return;
+
+                const lc = ColorPalette.TEXTBOX.LINK_TEXT;
+                for (const seg of segments) {
+                  // Normalize tab characters (jsPDF renders \t as zero-width)
+                  const normalizedText = seg.text.replace(/\t/g, tabReplacement);
+
+                  const style = seg.bold && seg.italic ? 'bolditalic'
+                    : seg.bold ? 'bold'
+                      : seg.italic ? 'italic'
+                        : 'normal';
+                  pdf.setFont(fontName, style);
+                  if (seg.link) {
+                    pdf.setTextColor(lc.r, lc.g, lc.b);
+                  } else {
+                    pdf.setTextColor(0);
+                  }
+                  pdf.text(normalizedText, x, y, { baseline: 'middle' });
+                  const segWidth = pdf.getTextWidth(normalizedText);
+                  // Add a clickable annotation for each link segment so that
+                  // multi-line URLs remain fully clickable across all wrapped lines.
+                  if (seg.link && seg.url) {
+                    pdf.link(x, y - pdfLineHeight / 2, segWidth, pdfLineHeight, { url: seg.url });
+                  }
+                  x += segWidth;
+                }
+
+                // Reset to normal font and black text for next line
+                pdf.setFont(fontName, 'normal');
+                pdf.setTextColor(0);
+              });
+            }
           }
         }
       }
