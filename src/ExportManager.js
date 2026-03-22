@@ -151,10 +151,12 @@ class ExportManager {
 
             // Box background - use backgroundColor property
             const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
+            const cornerRadius = (typeof TextBox !== 'undefined' && TextBox.CORNER_RADIUS) || 6;
             pg.fill(bgColor.r, bgColor.g, bgColor.b);
             pg.stroke(100);
-            pg.strokeWeight(1);
-            pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height);
+            pg.strokeWeight(1); // matches TextBox.draw() strokeWeight(1 / zoomFactor) at normal zoom (zoomFactor = 1)
+            pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height,
+              box.imageUrl ? 0 : cornerRadius);
 
             // Draw image if present (using imageUrl/img properties)
             if (box.imageUrl && box.img) {
@@ -767,10 +769,15 @@ class ExportManager {
 
           // Box background - use backgroundColor property
           const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
+          const cornerRadius = (typeof TextBox !== 'undefined' && TextBox.CORNER_RADIUS) || 6;
           pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
           pdf.setDrawColor(100);
-          pdf.setLineWidth(0.5);
-          pdf.rect(bx, by, bw, bh, 'FD');
+          pdf.setLineWidth(scale); // 1px at zoom=1, scaled proportionally
+          if (box.imageUrl) {
+            pdf.rect(bx, by, bw, bh, 'FD');
+          } else {
+            pdf.roundedRect(bx, by, bw, bh, cornerRadius * scale, cornerRadius * scale, 'FD');
+          }
 
           // Image (using imageUrl property)
           if (box.imageUrl && imageCache.has(box.id)) {
