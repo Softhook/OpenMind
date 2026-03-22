@@ -116,16 +116,17 @@ class ExportManager {
             const connColor = ColorPalette.CONNECTION.NORMAL;
             pg.stroke(connColor.r, connColor.g, connColor.b);
             pg.strokeWeight(2);
-            pg.line(start.x, start.y, end.x, end.y);
 
-            // Arrow at target
+            // Arrow at target — tip placed exactly at the box edge (end)
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
             const arrowSize = 10;
-            const arrowX = end.x - Math.cos(angle) * 5;
-            const arrowY = end.y - Math.sin(angle) * 5;
+            // Shorten the line so it terminates inside the arrowhead, not beyond it
+            const shortenedEndX = end.x - Math.cos(angle) * arrowSize;
+            const shortenedEndY = end.y - Math.sin(angle) * arrowSize;
+            pg.line(start.x, start.y, shortenedEndX, shortenedEndY);
 
             pg.push();
-            pg.translate(arrowX, arrowY);
+            pg.translate(end.x, end.y);
             pg.rotate(angle);
             const arrowColor = ColorPalette.CONNECTION.NORMAL;
             pg.fill(arrowColor.r, arrowColor.g, arrowColor.b);
@@ -717,21 +718,22 @@ class ExportManager {
 
           pdf.setDrawColor(80);
           pdf.setLineWidth(1.5 * scale);
-          pdf.line(x1, y1, x2, y2);
 
-          // Arrow
+          // Arrow at target — tip placed exactly at the box edge (x2, y2)
           const angle = Math.atan2(y2 - y1, x2 - x1);
           const arrowSize = 10 * scale;
-          const arrowX = x2 - Math.cos(angle) * 5;
-          const arrowY = y2 - Math.sin(angle) * 5;
+          // Shorten the line so it terminates inside the arrowhead, not beyond it
+          const shortenedX2 = x2 - Math.cos(angle) * arrowSize;
+          const shortenedY2 = y2 - Math.sin(angle) * arrowSize;
+          pdf.line(x1, y1, shortenedX2, shortenedY2);
 
           pdf.setFillColor(80);
           const arrowPoints = [
-            [arrowX, arrowY],
-            [arrowX - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize / 2,
-            arrowY - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize / 2],
-            [arrowX - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize / 2,
-            arrowY - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize / 2]
+            [x2, y2],
+            [x2 - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize / 2,
+            y2 - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize / 2],
+            [x2 - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize / 2,
+            y2 - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize / 2]
           ];
           pdf.triangle(...arrowPoints[0], ...arrowPoints[1], ...arrowPoints[2], 'F');
         });
