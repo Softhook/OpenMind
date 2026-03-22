@@ -265,12 +265,19 @@ window.ExtensionBridge = {
 // the browser/OS doesn't auto-repeat these keys
 
 const KeyRepeat = {
-  // Only handle non-character deletion keys to avoid interfering with native typing.
+  // Handle deletion keys and arrow keys (arrow repeats are limited to text-editing mode).
   // Don't rely on p5's keyCode constants being pre-defined at load time.
   isTracked(code) {
     const BK = (typeof BACKSPACE !== 'undefined') ? BACKSPACE : 8;
     const DEL = (typeof DELETE !== 'undefined') ? DELETE : 46;
-    return code === BK || code === DEL;
+    return code === BK || code === DEL || this._isArrowKey(code);
+  },
+  _isArrowKey(code) {
+    const LA = (typeof LEFT_ARROW !== 'undefined') ? LEFT_ARROW : 37;
+    const UA = (typeof UP_ARROW !== 'undefined') ? UP_ARROW : 38;
+    const RA = (typeof RIGHT_ARROW !== 'undefined') ? RIGHT_ARROW : 39;
+    const DA = (typeof DOWN_ARROW !== 'undefined') ? DOWN_ARROW : 40;
+    return code === LA || code === UA || code === RA || code === DA;
   },
   initialDelay: 400, // ms before repeating starts (match typical OS behavior)
   repeatInterval: 50, // ms between repeats
@@ -320,6 +327,13 @@ const KeyRepeat = {
     // Iterate over keys that are in the state map (those we've seen pressed)
     for (const [keyCode, s] of this.state) {
       if (!s.active || !this.isTracked(keyCode)) continue;
+
+      // Arrow-key repeats only make sense while actively editing text inside a box.
+      // When not editing, arrow keys navigate between boxes – we don't want synthetic
+      // repeats for that (the user can press the key again deliberately).
+      if (this._isArrowKey(keyCode) && (!mindMap.selectedBox || !mindMap.selectedBox.isEditing)) {
+        continue;
+      }
 
       // Detect if browser is already delivering native repeats by checking time between consecutive keydowns
       // If we've seen two keydowns close together (faster than our threshold), browser is handling repeat
@@ -3938,5 +3952,10 @@ function drawSaveIndicator() {
 if (typeof module !== 'undefined') {
   module.exports = {
     attachDisplayNameInputHandlers,
+    KeyRepeat,
+    // Test-only helper: allows Jest tests to inject a mock mindMap so that
+    // KeyRepeat.update() (which reads the module-local mindMap variable) can
+    // be exercised without spinning up the full p5.js runtime.
+    _testSetMindMap: (mm) => { mindMap = mm; },
   };
 }
