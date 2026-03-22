@@ -35,7 +35,8 @@ global.push         = jest.fn();
 global.pop          = jest.fn();
 global.beginShape   = jest.fn();
 global.endShape     = jest.fn();
-global.curveVertex  = jest.fn();
+global.vertex       = jest.fn();
+global.curveVertex  = jest.fn(); // kept as stub; no longer called by Cluster.draw()
 global.CLOSE        = 2; // p5.js constant
 global.rect         = jest.fn();
 global.text         = jest.fn();
@@ -217,6 +218,25 @@ describe('Cluster', () => {
       const cluster = new Cluster([]);
       expect(cluster.contains(0, 0)).toBe(false);
     });
+
+    test('returns true for a point just outside the hull but within HIT_MARGIN', () => {
+      // Two horizontally separated boxes.
+      // The right boundary of the hull is at box2.x + box2.w/2 + PADDING
+      // = 200 + 50 + 30 = 280.  A point at x=290 is 10px outside, which is
+      // within HIT_MARGIN (20px).
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(200, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      expect(cluster.contains(290, 0)).toBe(true);
+    });
+
+    test('returns false for a point beyond HIT_MARGIN outside the hull', () => {
+      // 400 is 120px beyond the right edge (280) of the hull above.
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(200, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      expect(cluster.contains(400, 0)).toBe(false);
+    });
   });
 
   // --------------------------------------------------------------------------
@@ -261,15 +281,77 @@ describe('Cluster', () => {
   });
 
   // --------------------------------------------------------------------------
+  describe('_catmullRomPoints()', () => {
+    test('produces n * steps points for a closed polygon', () => {
+      const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+      const steps = 10;
+      const result = Cluster._catmullRomPoints(pts, steps);
+      expect(result).toHaveLength(pts.length * steps); // 4 segments * 10 steps
+    });
+
+    test('first computed point equals the first hull point', () => {
+      const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+      const result = Cluster._catmullRomPoints(pts, 10);
+      // At t=0 of segment 0, Catmull-Rom evaluates to p1 = pts[0]
+      expect(result[0].x).toBeCloseTo(pts[0].x, 5);
+      expect(result[0].y).toBeCloseTo(pts[0].y, 5);
+    });
+
+    test('last computed point is close to the first (curve closes)', () => {
+      const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+      const steps = 100;
+      const result = Cluster._catmullRomPoints(pts, steps);
+      const last = result[result.length - 1];
+      // At t = (steps-1)/steps the Catmull-Rom evaluates very close to pts[0].
+      // With 100 steps, the deviation is < 1 px, so use a 1-pixel tolerance.
+      expect(Math.abs(last.x - pts[0].x)).toBeLessThan(1);
+      expect(Math.abs(last.y - pts[0].y)).toBeLessThan(1);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('_isPointInExpandedHull()', () => {
+    // Simple CCW square: (0,0), (100,0), (100,100), (0,100)
+    // Note: Graham scan returns CCW, so for a square with bottom-left pivot the
+    // CCW order is: bottom-left, bottom-right, top-right, top-left.
+    const square = [
+      { x:   0, y:   0 },
+      { x: 100, y:   0 },
+      { x: 100, y: 100 },
+      { x:   0, y: 100 }
+    ];
+
+    test('returns true for a point clearly inside the hull', () => {
+      expect(Cluster._isPointInExpandedHull(50, 50, square, 0)).toBe(true);
+    });
+
+    test('returns false for a point outside the hull with margin=0', () => {
+      expect(Cluster._isPointInExpandedHull(110, 50, square, 0)).toBe(false);
+    });
+
+    test('returns true for a point just outside the hull but within margin', () => {
+      // 105 is 5px outside the right edge (100); margin=10 → should be true
+      expect(Cluster._isPointInExpandedHull(105, 50, square, 10)).toBe(true);
+    });
+
+    test('returns false for a point farther outside than the margin', () => {
+      // 120 is 20px outside the right edge; margin=10 → should be false
+      expect(Cluster._isPointInExpandedHull(120, 50, square, 10)).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   describe('draw()', () => {
-    test('calls beginShape / curveVertex / endShape when hull has ≥ 3 points', () => {
+    test('calls beginShape / vertex / endShape(CLOSE) when hull has ≥ 3 points', () => {
       const b1 = makeBox(  0, 0, 100, 50);
       const b2 = makeBox(200, 0, 100, 50);
       const cluster = new Cluster([b1, b2]);
       cluster.draw();
 
       expect(global.beginShape).toHaveBeenCalled();
-      expect(global.curveVertex).toHaveBeenCalled();
+      expect(global.vertex).toHaveBeenCalled();
+      // curveVertex must NOT be called (old approach caused artefacts)
+      expect(global.curveVertex).not.toHaveBeenCalled();
       expect(global.endShape).toHaveBeenCalledWith(global.CLOSE);
     });
 

@@ -7,13 +7,13 @@
  *
  * Key Features:
  * - Organic curved shape drawn around a set of TextBox objects using a
- *   padded convex hull and Catmull-Rom splines (p5.js curveVertex)
+ *   padded convex hull and Catmull-Rom splines (manual interpolation + vertex())
  * - Dynamically updates as member boxes move (references are live)
  * - Can be selected and deleted independently (does not delete member boxes)
  * - Persisted via JSON serialization (box IDs are stored, resolved on load)
  *
  * Dependencies:
- * - p5.js for drawing (beginShape, curveVertex, endShape, fill, stroke, etc.)
+ * - p5.js for drawing (beginShape, vertex, endShape, fill, stroke, etc.)
  * - Utils for UUID generation
  * - ColorPalette for cluster fill and stroke colors
  */
@@ -27,6 +27,12 @@ class Cluster {
 
   /** Stroke weight (px) when the cluster is selected */
   static STROKE_WEIGHT_SELECTED = 2;
+
+  /**
+   * Extra hit margin (px) outside the visible hull outline.
+   * Adds a wide border zone so the organic edge is easy to click.
+   */
+  static HIT_MARGIN = 20;
 
   // ============================================================================
   // CONSTRUCTOR
@@ -66,7 +72,10 @@ class Cluster {
 
   /**
    * Draws the cluster shape behind member boxes using a smooth convex-hull
-   * outline (Catmull-Rom splines via p5.js curveVertex).
+   * outline.  The spline is computed manually (Catmull-Rom) so that each
+   * segment is drawn with regular vertex() calls — this avoids the straight-
+   * line artefact that p5.js curveVertex produces when closing a shape with
+   * endShape(CLOSE).
    * Call this before drawing connections and boxes.
    */
   draw() {
@@ -86,16 +95,17 @@ class Cluster {
       noStroke();
     }
 
-    // Draw a closed Catmull-Rom curve through the hull points.
-    // p5.js requires the last point before and the second point after the
-    // sequence to act as control points for the start and end of the curve.
+    // Compute Catmull-Rom spline points manually and render with vertex().
+    // Using curveVertex() + endShape(CLOSE) causes p5.js to insert a straight
+    // line segment from the last interpolated vertex back to the first, which
+    // produces the overlapping-loop artefact.  With manual interpolation we
+    // control every drawn point, so endShape(CLOSE) only closes the tiny gap
+    // between the last and first interpolated positions (visually invisible).
+    const splinePts = Cluster._catmullRomPoints(hull);
     beginShape();
-    curveVertex(hull[hull.length - 1].x, hull[hull.length - 1].y); // control
-    for (const pt of hull) {
-      curveVertex(pt.x, pt.y);
+    for (const pt of splinePts) {
+      vertex(pt.x, pt.y);
     }
-    curveVertex(hull[0].x, hull[0].y);      // wrap-around control
-    curveVertex(hull[1].x, hull[1].y);      // wrap-around control
     endShape(CLOSE);
 
     pop();
@@ -106,16 +116,25 @@ class Cluster {
   // ============================================================================
 
   /**
-   * Returns true if (x, y) falls within the cluster's padded bounding box.
-   * Fast AABB check; sufficient because the visual shape is close to the AABB.
+   * Returns true if (x, y) is inside the cluster's hull or within HIT_MARGIN
+   * pixels of its boundary, making the organic edge easy to click.
+   *
+   * Uses a signed-distance test against each edge of the convex hull (CCW
+   * order), allowing points that are up to HIT_MARGIN outside the hull.
+   * Falls back to a padded AABB when the hull is degenerate.
+   *
    * @param {number} x
    * @param {number} y
    * @returns {boolean}
    */
   contains(x, y) {
-    const b = this.getBounds();
-    if (!b) return false;
-    return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+    const hull = this._getHullPoints();
+    if (!hull || hull.length < 3) {
+      const b = this.getBounds();
+      if (!b) return false;
+      return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+    }
+    return Cluster._isPointInExpandedHull(x, y, hull, Cluster.HIT_MARGIN);
   }
 
   // ============================================================================
@@ -211,13 +230,14 @@ class Cluster {
     [pts[0], pts[pivotIdx]] = [pts[pivotIdx], pts[0]];
     const pivot = pts[0];
 
-    // Sort by polar angle from pivot; ties broken by distance (farther first)
+    // Sort by polar angle from pivot; ties broken by distance (closer first so
+    // the farthest collinear point is pushed last and survives the Graham scan)
     const rest = pts.slice(1).sort((a, b) => {
       const cross = Cluster._cross(pivot, a, b);
       if (cross !== 0) return -cross; // counter-clockwise order
       const da = (a.x - pivot.x) ** 2 + (a.y - pivot.y) ** 2;
       const db = (b.x - pivot.x) ** 2 + (b.y - pivot.y) ** 2;
-      return db - da; // farther point first (eliminates collinear points naturally)
+      return da - db; // closer first: farthest collinear point is processed last and retained
     });
 
     // Graham scan
@@ -240,6 +260,81 @@ class Cluster {
    */
   static _cross(o, a, b) {
     return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  }
+
+  /**
+   * Computes the Catmull-Rom spline interpolation points for a closed polygon.
+   *
+   * For each segment i (hull[i] → hull[i+1]), the surrounding four control
+   * points are hull[i-1], hull[i], hull[i+1], hull[i+2] (wrapping around).
+   * Iterating over all n segments produces a smooth closed curve without any
+   * straight-line gap.
+   *
+   * @param {{x:number, y:number}[]} hull - Convex hull points (CCW order)
+   * @param {number} [steps=20] - Interpolation steps per segment
+   * @returns {{x:number, y:number}[]}
+   * @private
+   */
+  static _catmullRomPoints(hull, steps = 20) {
+    const n = hull.length;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const p0 = hull[(i - 1 + n) % n];
+      const p1 = hull[i];
+      const p2 = hull[(i + 1) % n];
+      const p3 = hull[(i + 2) % n];
+      for (let t = 0; t < steps; t++) {
+        const s  = t / steps;
+        const s2 = s * s;
+        const s3 = s2 * s;
+        const x = 0.5 * (
+          (2 * p1.x) +
+          (-p0.x + p2.x) * s +
+          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * s2 +
+          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * s3
+        );
+        const y = 0.5 * (
+          (2 * p1.y) +
+          (-p0.y + p2.y) * s +
+          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * s2 +
+          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * s3
+        );
+        pts.push({ x, y });
+      }
+    }
+    return pts;
+  }
+
+  /**
+   * Returns true if (x, y) is within `margin` pixels of the interior of the
+   * convex hull.  Hull points must be in counter-clockwise order.
+   *
+   * For each directed edge a→b the signed distance from (x, y) to the edge
+   * line is computed (positive = inside / left side for a CCW polygon).  The
+   * point is "within margin" of the hull when every signed distance is ≥ -margin,
+   * i.e. it is at most `margin` pixels outside each edge.
+   *
+   * @param {number} x
+   * @param {number} y
+   * @param {{x:number, y:number}[]} hull
+   * @param {number} margin - pixels of tolerance outside the hull
+   * @returns {boolean}
+   * @private
+   */
+  static _isPointInExpandedHull(x, y, hull, margin) {
+    const n = hull.length;
+    for (let i = 0; i < n; i++) {
+      const a  = hull[i];
+      const b  = hull[(i + 1) % n];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) continue;
+      // Signed distance: positive means left of a→b (inside for CCW hull)
+      const signedDist = (dx * (y - a.y) - dy * (x - a.x)) / len;
+      if (signedDist < -margin) return false;
+    }
+    return true;
   }
 
   // ============================================================================
