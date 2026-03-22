@@ -5,7 +5,7 @@
  * because the arrow tip was offset 5px back from the box edge instead of
  * being placed exactly at the box edge.
  *
- * Correct behaviour (matches Connection.draw()):
+ * Correct behaviour (matches Connection.draw() placement logic):
  *  1. Arrow TIP is placed at the box-edge connection point (`end`).
  *  2. The line is SHORTENED by arrowSize so it does not poke through the head.
  */
@@ -215,21 +215,38 @@ describe('PDF export – arrowhead placement', () => {
     await runExport(fromBox, toBox);
 
     expect(triangleCalls.length).toBeGreaterThan(0);
+    expect(lineCalls.length).toBeGreaterThan(0);
 
-    // The first argument to pdf.triangle() is x1 – the arrow tip.
-    // It must equal the scaled & offset position of `end`.
-    // We don't know the exact scale/offset chosen by the exporter, but we can
-    // verify the triangle tip is NOT 5 pixels before it by checking that the
-    // tip x coordinate is NOT equal to (x2 - 5) where x2 is the last line endpoint.
+    // Replicate the ExportManager scale/offset calculation so we can derive the
+    // exact scaled coordinates of the connection `end` point (toBox left edge).
+    //
+    // boxes: fromBox x=100,y=200,w=80,h=40  toBox x=300,y=200,w=80,h=40
+    // bounds: minX=60, maxX=340, minY=180, maxY=220  (box half-widths/heights)
+    // padding=10, margin=20 (default)
+    const exportPadding = 10;
+    const margin = 20;
+    const bounds = {
+      minX: fromBox.x - fromBox.width / 2,   // 60
+      maxX: toBox.x   + toBox.width  / 2,    // 340
+      minY: fromBox.y - fromBox.height / 2,  // 180
+      maxY: fromBox.y + fromBox.height / 2,  // 220
+    };
+    const contentWidth  = bounds.maxX - bounds.minX + 2 * exportPadding;   // 300
+    const contentHeight = bounds.maxY - bounds.minY + 2 * exportPadding;   // 60
+    const pageWidth  = 595 - 2 * margin;  // 555  (mock getWidth() = 595)
+    const pageHeight = 842 - 2 * margin;  // 802  (mock getHeight() = 842)
+    const scale = Math.min(pageWidth / contentWidth, pageHeight / contentHeight);
+    const offsetX = margin - bounds.minX * scale + exportPadding * scale;
+    const offsetY = margin - bounds.minY * scale + exportPadding * scale;
 
-    // `lineCalls` contains the connection line call; its endpoint is the shortened end.
-    // The triangle tip should be BEYOND that (i.e., closer to the box).
-    if (lineCalls.length > 0) {
-      const [,, lineX2, lineY2] = lineCalls[0];
-      const [tipX, tipY] = triangleCalls[0];
-      // Tip must be further along the direction of travel than the line end
-      expect(tipX).toBeGreaterThan(lineX2 - 1);
-    }
+    // The end point is the toBox left edge
+    const end = toBox.getConnectionPoint(fromBox);
+    const expectedTipX = end.x * scale + offsetX;
+    const expectedTipY = end.y * scale + offsetY;
+
+    const [tipX, tipY] = triangleCalls[0];
+    expect(tipX).toBeCloseTo(expectedTipX, 1);
+    expect(tipY).toBeCloseTo(expectedTipY, 1);
   });
 
   test('connection line endpoint is shortened, not reaching the box edge', async () => {
