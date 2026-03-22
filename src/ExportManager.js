@@ -154,7 +154,7 @@ class ExportManager {
             const cornerRadius = (typeof TextBox !== 'undefined' && TextBox.CORNER_RADIUS) || 6;
             pg.fill(bgColor.r, bgColor.g, bgColor.b);
             pg.stroke(100);
-            pg.strokeWeight(1.5); // matches TextBox.draw() strokeWeight(1/zoomFactor) at normal zoom
+            pg.strokeWeight(1); // matches TextBox.draw() strokeWeight(1 / zoomFactor) at normal zoom (zoomFactor = 1)
             pg.rect(box.x - box.width / 2, box.y - box.height / 2, box.width, box.height,
               box.imageUrl ? 0 : cornerRadius);
 
