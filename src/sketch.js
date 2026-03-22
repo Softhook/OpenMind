@@ -2215,11 +2215,21 @@ function mousePressed(e) {
         return false;
       }
 
-      // Multi-box selection when clicking in empty space with no box selected
+      // Multi-box selection when clicking in empty space with no box selected.
+      // Check for clusters first — if a cluster is under the cursor the user
+      // wants to select it, not start a rubber-band rectangle.
       if (noSelection && !isEditing && !overAny) {
+        const cursorWorldX = worldMouseX();
+        const cursorWorldY = worldMouseY();
+        const overCluster = mindMap.clusters && mindMap.clusters.length > 0 &&
+          mindMap.clusters.some(c => c && c.contains(cursorWorldX, cursorWorldY));
+        if (overCluster) {
+          mindMap.handleMousePressed();
+          return false;
+        }
         isSelectingMultiple = true;
-        selectionStartX = worldMouseX();
-        selectionStartY = worldMouseY();
+        selectionStartX = cursorWorldX;
+        selectionStartY = cursorWorldY;
         selectionCurrentX = selectionStartX;
         selectionCurrentY = selectionStartY;
         return false;
@@ -2653,6 +2663,40 @@ if (typeof window !== 'undefined') {
 // Prevent default context menu
 const preventContextMenu = (event) => event.preventDefault();
 addTrackedEventListener(document, 'contextmenu', preventContextMenu);
+
+// Fallback mouseup listener on the document.
+// p5.js binds mouseReleased to the canvas element, so when the user presses
+// on the canvas and releases over an HTML overlay (e.g. a menu button), the
+// canvas never receives the mouseup.  This leaves isDragging / isSelectingMultiple
+// in a stuck state that prevents normal interaction until the page is refreshed.
+// Listening at the document level catches those missed releases and resets state.
+addTrackedEventListener(document, 'mouseup', function _fallbackMouseUp(e) {
+  // Only act when the release was NOT on the canvas – those are already handled
+  // by p5.js's own mouseReleased callback.
+  if (e && e.target && e.target.tagName === 'CANVAS') return;
+
+  // Cancel any in-progress rubber-band selection
+  if (isSelectingMultiple) {
+    isSelectingMultiple = false;
+  }
+
+  // End any in-progress pan
+  if (CameraUtils && CameraUtils.isPanning) {
+    CameraUtils.endPan();
+  }
+
+  // Stop any boxes that are stuck in drag / resize state.
+  // Silently ignore errors here: this is a best-effort cleanup path for
+  // mouse-release events that missed the canvas, so individual failures
+  // should not surface as user-visible errors.
+  if (mindMap) {
+    try {
+      mindMap.handleMouseReleased();
+    } catch (err) {
+      console.warn('[fallbackMouseUp] handleMouseReleased error:', err);
+    }
+  }
+});
 
 /**
  * Creates a new text box at the cursor position or viewport center.
