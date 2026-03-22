@@ -110,6 +110,26 @@ class ColorPalette {
   };
 
   // ============================================================================
+  // CLUSTER COLORS
+  // ============================================================================
+
+  /**
+   * Soft pastel fill colors for visual grouping clusters.
+   * Clusters cycle through these colors as they are created.
+   */
+  static CLUSTER = {
+    FILLS: [
+      { r: 173, g: 216, b: 230, a: 80 }, // light blue
+      { r: 144, g: 238, b: 144, a: 80 }, // light green
+      { r: 255, g: 255, b: 153, a: 80 }, // light yellow
+      { r: 255, g: 182, b: 193, a: 80 }, // light pink
+      { r: 221, g: 160, b: 221, a: 80 }, // plum
+      { r: 255, g: 218, b: 185, a: 80 }  // peach
+    ],
+    SELECTED_STROKE: { r: 100, g: 150, b: 255, a: 200 }
+  };
+
+  // ============================================================================
   // MOBILE NAVIGATION COLORS
   // ============================================================================
 

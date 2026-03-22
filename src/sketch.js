@@ -2526,6 +2526,15 @@ function keyPressed() {
         return false; // prevent browser default
       }
 
+      // Handle CMD/CTRL+G for cluster creation (group selected boxes)
+      if (isCmd && (key === 'g' || key === 'G') && !isEditing) {
+        if (mindMap.selectedBoxes && mindMap.selectedBoxes.size >= 2) {
+          const boxes = Array.from(mindMap.selectedBoxes);
+          mindMap.addCluster(boxes);
+        }
+        return false;
+      }
+
       // Handle F key for fullscreen toggle (only when not editing)
       if (!isEditing && !isCmd && (key === 'f' || key === 'F')) {
         toggleFullScreen();
