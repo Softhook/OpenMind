@@ -95,6 +95,7 @@ class CollaborationManager {
         // Shared types
         this.yboxes = null;      // Y.Map<boxId, boxData>
         this.yconnections = null; // Y.Array<{fromId, toId}>
+        this.yclusters = null;   // Y.Map<clusterId, {id, colorIndex, boxIds}>
         this.undoManager = null;  // Y.UndoManager for undo/redo
 
         // Persistence
@@ -221,6 +222,7 @@ class CollaborationManager {
             // Initialize shared types
             this.yboxes = this.ydoc.getMap('boxes');
             this.yconnections = this.ydoc.getArray('connections');
+            this.yclusters = this.ydoc.getMap('clusters');
 
             // Create IndexedDB provider for automatic persistence
             // Use room-specific database name to ensure data isolation
@@ -239,7 +241,7 @@ class CollaborationManager {
             // We use ydoc.transact with undoManager as second parameter to mark trackable operations.
             // Empty trackedOrigins means it tracks nothing by default.
             // We use this.undoManager as the origin for our own trackable transactions.
-            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections], {
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections, this.yclusters], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
                 trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN]),
                 maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE
@@ -617,6 +619,7 @@ class CollaborationManager {
 
         this.yboxes = null;
         this.yconnections = null;
+        this.yclusters = null;
         this.isInitialized = false;
         this.isInitializing = false;
         this.initializationPromise = null;
@@ -735,6 +738,7 @@ class CollaborationManager {
             // Step 3: Now safe to clear Yjs state — no provider is listening
             this.yboxes.clear();
             this.yconnections.delete(0, this.yconnections.length);
+            if (this.yclusters) this.yclusters.clear();
 
             // Step 4: Small delay to ensure IndexedDB deletion completes
             // before creating a new database with the same name
@@ -1015,6 +1019,10 @@ class CollaborationManager {
             MindMap.onConnectionsChange = (skipTransactionWrapper = false) => {
                 this.syncConnectionsToYjs(skipTransactionWrapper);
             };
+
+            MindMap.onClustersChange = (skipTransactionWrapper = false) => {
+                this.syncClustersToYjs(skipTransactionWrapper);
+            };
         }
 
         // Set up TextBox callback to check for remote editing
@@ -1039,6 +1047,7 @@ class CollaborationManager {
             MindMap.onBoxChange = null;
             MindMap.onBoxDelete = null;
             MindMap.onConnectionsChange = null;
+            MindMap.onClustersChange = null;
         }
 
         // Clear TextBox callback
@@ -1120,6 +1129,15 @@ class CollaborationManager {
                                 toId: conn.toBox.id
                             }]);
                             existingConns.add(key);
+                        }
+                    }
+                }
+
+                // Sync clusters
+                if (this.yclusters && this.mindMap.clusters) {
+                    for (const cluster of this.mindMap.clusters) {
+                        if (cluster && cluster.id) {
+                            this.yclusters.set(cluster.id, cluster.toJSON());
                         }
                     }
                 }
@@ -1475,6 +1493,94 @@ class CollaborationManager {
     // ============================================================================
 
     /**
+     * Syncs local clusters to Yjs.
+     * Call this when clusters change.
+     * @param {boolean} skipTransactionWrapper - If true, sync directly (already inside a transaction)
+     */
+    syncClustersToYjs(skipTransactionWrapper = false) {
+        if (!this.yclusters || !this.mindMap || this.isSyncing) return;
+
+        if (skipTransactionWrapper) {
+            this._syncClustersToYjsImpl();
+            return;
+        }
+
+        if (this.ydoc && this.undoManager) {
+            this.transact(() => {
+                this._syncClustersToYjsImpl();
+            }, 'syncClusters');
+        } else if (this.ydoc) {
+            this.ydoc.transact(() => {
+                this._syncClustersToYjsImpl();
+            });
+        }
+    }
+
+    /**
+     * Internal implementation of cluster sync (called within a transaction).
+     * Performs a diff against the current yclusters state so only changed entries
+     * are written — avoids creating noisy undo entries when nothing changed.
+     * @private
+     */
+    _syncClustersToYjsImpl() {
+        if (!this.yclusters || !this.mindMap) return;
+
+        const localClusters = this.mindMap.clusters || [];
+        const localIds = new Set(localClusters.map(c => c && c.id).filter(Boolean));
+
+        // Remove Yjs clusters that are no longer local
+        this.yclusters.forEach((_, id) => {
+            if (!localIds.has(id)) {
+                this.yclusters.delete(id);
+            }
+        });
+
+        // Upsert local clusters (only write if data changed to minimise undo entries)
+        for (const cluster of localClusters) {
+            if (!cluster || !cluster.id) continue;
+            const next = cluster.toJSON();
+            const prev = this.yclusters.get(cluster.id);
+            // Simple equality check on serialised form
+            if (!prev ||
+                prev.colorIndex !== next.colorIndex ||
+                JSON.stringify(prev.boxIds) !== JSON.stringify(next.boxIds)) {
+                this.yclusters.set(cluster.id, next);
+            }
+        }
+    }
+
+    /**
+     * Rebuilds local mindMap.clusters from the current yclusters Yjs map.
+     * Must be called AFTER boxes are available in mindMap.boxes.
+     * @private
+     */
+    _rebuildClustersFromYjs() {
+        if (!this.mindMap || !this.yclusters || typeof Cluster === 'undefined') return;
+
+        const newClusters = [];
+        this.yclusters.forEach((data) => {
+            try {
+                const cluster = Cluster.fromJSON(data, this.mindMap.boxes);
+                if (cluster) newClusters.push(cluster);
+            } catch (e) {
+                console.warn('[Clusters] Error rebuilding cluster from Yjs:', e);
+            }
+        });
+
+        // Preserve the selected-cluster reference across the rebuild (match by ID)
+        const prevSelected = this.mindMap.selectedCluster;
+        this.mindMap.clusters = newClusters;
+
+        if (prevSelected) {
+            const matching = newClusters.find(c => c.id === prevSelected.id);
+            this.mindMap.selectedCluster = matching || null;
+            if (matching) matching.selected = true;
+        }
+
+        Utils.Logger.debug('[Clusters] Rebuilt', newClusters.length, 'clusters from Yjs');
+    }
+
+    /**
      * Sets up observers for Yjs changes
      * @private
      */
@@ -1513,7 +1619,11 @@ class CollaborationManager {
                 if (isUndoRedo) {
                     this._rebuildConnectionsFromYjs();
 
-                    // NOTE: We do NOT sync connections back to Yjs here.
+                    // Rebuild clusters after boxes and connections are available.
+                    // Same reasoning as connections: fire order is non-deterministic.
+                    this._rebuildClustersFromYjs();
+
+                    // NOTE: We do NOT sync connections/clusters back to Yjs here.
                     // The undo/redo operation already correctly reverts yconnections
                     // (box deletion + connection deletion are in the same transaction).
                     // Calling _syncConnectionsToYjsImpl here would create a NEW implicit
@@ -1522,7 +1632,7 @@ class CollaborationManager {
                     //   1. Phantom undo entries that corrupt the undo stack
                     //   2. State divergence between local and remote clients
                     //   3. Cascading observer re-fires that compound the issue
-                    // The Yjs CRDT already propagates the reverted yconnections to
+                    // The Yjs CRDT already propagates the reverted yconnections/yclusters to
                     // remote users via the standard sync protocol.
 
                     Utils.Logger.state('[Undo] Rebuilt', this.mindMap.connections.length, 'connections from Yjs state');
@@ -1636,6 +1746,31 @@ class CollaborationManager {
                 this.isSyncing = false;
             }
         });
+
+        // Observe cluster changes
+        if (this.yclusters) {
+            this.yclusters.observe((event) => {
+                const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
+                if (this.isSyncing && !isUndoRedo) return;
+                if (event.transaction.local && !isUndoRedo) return;
+
+                if (isUndoRedo) {
+                    // If boxes also changed (e.g. undoing a box deletion that pruned a cluster),
+                    // the yboxes observer already calls _rebuildClustersFromYjs after restoring
+                    // boxes — defer to it to avoid rebuilding before boxes are available.
+                    const hasBoxChanges = event.transaction.changed.has(this.yboxes);
+                    if (hasBoxChanges) return;
+                }
+
+                this.isSyncing = true;
+                try {
+                    this._rebuildClustersFromYjs();
+                    if (this.mindMap) this.mindMap.isDirty = true;
+                } finally {
+                    this.isSyncing = false;
+                }
+            });
+        }
     }
 
     /**
@@ -1803,6 +1938,9 @@ class CollaborationManager {
 
         // Mark for redraw
         this.mindMap.isDirty = true;
+
+        // Rebuild clusters after boxes are available
+        this._rebuildClustersFromYjs();
     }
 
     /**

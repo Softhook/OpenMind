@@ -71,6 +71,9 @@ class MindMap {
   /** @type {function():void|null} Called when connections change */
   static onConnectionsChange = null;
 
+  /** @type {function(boolean=):void|null} Called when clusters change (receives optional skipTransactionWrapper) */
+  static onClustersChange = null;
+
   // ============================================================================
   // CONSTRUCTOR & INITIALIZATION
   // ============================================================================
@@ -1657,6 +1660,12 @@ class MindMap {
       }
     }
 
+    // Sync updated cluster state to Yjs BEFORE box deletions so both land in the
+    // same outer transaction (enabling proper undo of cluster membership).
+    if (MindMap.onClustersChange) {
+      MindMap.onClustersChange(true);
+    }
+
     // 3. Unregister boxes and notify collaboration
     for (const box of boxesToDelete) {
       if (!box) continue;
@@ -2911,10 +2920,13 @@ class MindMap {
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
-      // Delete selected cluster (does NOT delete member boxes)
+      // Delete selected cluster (does NOT delete member boxes) — wrap in transaction for undo
       if (this.selectedCluster) {
-        this.deleteCluster(this.selectedCluster);
+        const clusterToDelete = this.selectedCluster;
         this.selectedCluster = null;
+        this._wrapInTransaction(() => {
+          this.deleteCluster(clusterToDelete);
+        });
       } else if (this.selectedBoxes && this.selectedBoxes.size > 0) {
         // Delete all selected boxes - wrap in transaction for single undo step
         const boxesToDelete = Array.from(this.selectedBoxes);
@@ -3267,8 +3279,13 @@ class MindMap {
 
     const cluster = new Cluster(boxes);
     if (!this.clusters) this.clusters = [];
-    this.clusters.push(cluster);
-    this.isSaved = false;
+
+    this._wrapInTransaction(() => {
+      this.clusters.push(cluster);
+      this.isSaved = false;
+      if (MindMap.onClustersChange) MindMap.onClustersChange(true);
+    });
+
     return cluster;
   }
 
@@ -3282,6 +3299,7 @@ class MindMap {
     if (idx !== -1) {
       this.clusters.splice(idx, 1);
       this.isSaved = false;
+      if (MindMap.onClustersChange) MindMap.onClustersChange(true);
     }
     if (this.selectedCluster === cluster) {
       this.selectedCluster = null;

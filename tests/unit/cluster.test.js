@@ -628,4 +628,68 @@ describe('MindMap cluster integration', () => {
     });
   });
 
+  // --------------------------------------------------------------------------
+  describe('onClustersChange callback (undo / collaboration integration)', () => {
+    test('addCluster fires onClustersChange', () => {
+      const callback = jest.fn();
+      MindMap.onClustersChange = callback;
+
+      const b1 = addBox(  0, 0);
+      const b2 = addBox(200, 0);
+      mindMap.addCluster([b1, b2]);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      MindMap.onClustersChange = null;
+    });
+
+    test('deleteCluster fires onClustersChange', () => {
+      const b1 = addBox(  0, 0);
+      const b2 = addBox(200, 0);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      const callback = jest.fn();
+      MindMap.onClustersChange = callback;
+      mindMap.deleteCluster(cluster);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      MindMap.onClustersChange = null;
+    });
+
+    test('_performBoxDeletion fires onClustersChange when a cluster is pruned', () => {
+      const b1 = addBox(  0, 0);
+      const b2 = addBox(200, 0);
+      mindMap.addCluster([b1, b2]);
+
+      const callback = jest.fn();
+      MindMap.onClustersChange = callback;
+      mindMap._performBoxDeletion([b1]);
+
+      // onClustersChange must be called (cluster was pruned)
+      expect(callback).toHaveBeenCalled();
+      MindMap.onClustersChange = null;
+    });
+
+    test('_performBoxDeletion fires onClustersChange even when no clusters exist', () => {
+      const b1 = addBox(  0, 0);
+      const callback = jest.fn();
+      MindMap.onClustersChange = callback;
+      mindMap._performBoxDeletion([b1]);
+      // Still fires (called unconditionally so Yjs state stays in sync)
+      expect(callback).toHaveBeenCalled();
+      MindMap.onClustersChange = null;
+    });
+
+    test('addCluster passes skipTransactionWrapper=true to the callback', () => {
+      let receivedArg;
+      MindMap.onClustersChange = (skip) => { receivedArg = skip; };
+
+      const b1 = addBox(  0, 0);
+      const b2 = addBox(200, 0);
+      mindMap.addCluster([b1, b2]);
+
+      expect(receivedArg).toBe(true);
+      MindMap.onClustersChange = null;
+    });
+  });
+
 });
