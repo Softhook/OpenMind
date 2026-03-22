@@ -2227,6 +2227,11 @@ function mousePressed(e) {
           mindMap.handleMousePressed();
           return false;
         }
+        // Clicked in empty space — deselect any cluster that was selected
+        if (mindMap.selectedCluster) {
+          mindMap.selectedCluster.selected = false;
+          mindMap.selectedCluster = null;
+        }
         isSelectingMultiple = true;
         selectionStartX = cursorWorldX;
         selectionStartY = cursorWorldY;
@@ -3793,6 +3798,11 @@ function completeMultiBoxSelection() {
     mindMap.clearBoxSelection();
     // Also clear existing connection selection when starting a fresh rectangle selection
     if (mindMap.clearConnectionSelection) mindMap.clearConnectionSelection();
+    // Also clear any selected cluster
+    if (mindMap.selectedCluster) {
+      mindMap.selectedCluster.selected = false;
+      mindMap.selectedCluster = null;
+    }
   }
 
   // Select all boxes that intersect the selection rectangle (any part of the box)

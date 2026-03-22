@@ -111,6 +111,32 @@ class Cluster {
     pop();
   }
 
+  /**
+   * Draws this cluster into a p5.js graphics buffer (for off-screen rendering,
+   * e.g. PNG export).  The logic mirrors draw() but uses pg.* methods instead
+   * of global p5 functions.
+   * @param {p5.Graphics} pg - A p5.js graphics buffer created with createGraphics()
+   */
+  drawToGraphics(pg) {
+    const hull = this._getHullPoints();
+    if (!hull || hull.length < 3) return;
+
+    pg.push();
+
+    const c = this.color;
+    pg.fill(c.r, c.g, c.b, c.a);
+    pg.noStroke();
+
+    const splinePts = Cluster._catmullRomPoints(hull);
+    pg.beginShape();
+    for (const pt of splinePts) {
+      pg.vertex(pt.x, pt.y);
+    }
+    pg.endShape(CLOSE);
+
+    pg.pop();
+  }
+
   // ============================================================================
   // HIT DETECTION
   // ============================================================================
