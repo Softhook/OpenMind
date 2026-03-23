@@ -3291,16 +3291,21 @@ class MindMap {
 
   /**
    * Removes a cluster without affecting its member boxes.
+   * Wraps in a transaction (like addCluster) so deletion is always tracked for undo
+   * whether called standalone or from within another transaction.
    * @param {Cluster} cluster
    */
   deleteCluster(cluster) {
     if (!cluster || !this.clusters) return;
     const idx = this.clusters.indexOf(cluster);
-    if (idx !== -1) {
+    if (idx === -1) return;
+
+    this._wrapInTransaction(() => {
       this.clusters.splice(idx, 1);
       this.isSaved = false;
       if (MindMap.onClustersChange) MindMap.onClustersChange(true);
-    }
+    });
+
     if (this.selectedCluster === cluster) {
       this.selectedCluster = null;
     }
