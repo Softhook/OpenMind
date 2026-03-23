@@ -642,6 +642,14 @@ class UIManager {
   }
 
   isKeyboardOverlayVisible() {
+    // Always read from the live KeyboardOverlay state so that direct calls to
+    // KeyboardOverlayManager.hide() (e.g. the overlay's own close button) are
+    // reflected here without needing to go through uiManager.hideKeyboardOverlay().
+    if (typeof KeyboardOverlay !== 'undefined' && typeof KeyboardOverlay.isVisible === 'function') {
+      const live = KeyboardOverlay.isVisible();
+      this.keyboardOverlayVisible = live; // keep cached flag in sync
+      return live;
+    }
     return this.keyboardOverlayVisible;
   }
 

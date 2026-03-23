@@ -96,6 +96,18 @@ class ExportManager {
       try {
         pg.translate(padding - bounds.minX, padding - bounds.minY);
 
+        // Draw clusters behind everything else
+        if (this.mindMap.clusters && this.mindMap.clusters.length > 0) {
+          for (const cluster of this.mindMap.clusters) {
+            if (!cluster) continue;
+            try {
+              cluster.drawToGraphics(pg);
+            } catch (e) {
+              console.warn('Error drawing cluster in PNG export:', e);
+            }
+          }
+        }
+
         // Draw connections first (behind boxes)
         if (this.mindMap.connections) {
           this.mindMap.connections.forEach(conn => {
@@ -705,6 +717,45 @@ class ExportManager {
     // Draw connections and boxes — measureGraphics provides p5 text metrics for line-wrapping
     const measureGraphics = this.p5Instance.createGraphics(100, 100);
     try {
+      // Draw clusters behind connections and boxes
+      if (this.mindMap.clusters && this.mindMap.clusters.length > 0 &&
+          typeof Cluster !== 'undefined') {
+        for (const cluster of this.mindMap.clusters) {
+          if (!cluster) continue;
+          try {
+            const hull = cluster._getHullPoints();
+            if (!hull || hull.length < 3) continue;
+            const splinePts = Cluster._catmullRomPoints(hull);
+            if (!splinePts || splinePts.length < 2) continue;
+
+            const c = cluster.color;
+            // PDF doesn't support true alpha; blend toward white to approximate
+            // the semi-transparent fill used in the live canvas.
+            const alpha = (typeof c.a === 'number') ? Math.max(0, Math.min(1, c.a / 255)) : 0.31;
+            const blendToWhite = ch => Math.round(255 * (1 - alpha) + ch * alpha);
+            pdf.setFillColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
+            pdf.setDrawColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
+            pdf.setLineWidth(0);
+
+            // Build relative line segments from the dense spline points
+            const absPoints = splinePts.map(pt => ({
+              x: pt.x * scale + offsetX,
+              y: pt.y * scale + offsetY
+            }));
+            const relLines = [];
+            for (let i = 1; i < absPoints.length; i++) {
+              relLines.push([
+                absPoints[i].x - absPoints[i - 1].x,
+                absPoints[i].y - absPoints[i - 1].y
+              ]);
+            }
+            pdf.lines(relLines, absPoints[0].x, absPoints[0].y, [1, 1], 'F', true);
+          } catch (e) {
+            console.warn('Error drawing cluster in PDF export:', e);
+          }
+        }
+      }
+
       // Draw connections
       if (this.mindMap.connections) {
         this.mindMap.connections.forEach(conn => {

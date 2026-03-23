@@ -71,6 +71,9 @@ class MindMap {
   /** @type {function():void|null} Called when connections change */
   static onConnectionsChange = null;
 
+  /** @type {function(boolean=):void|null} Called when clusters change (receives optional skipTransactionWrapper) */
+  static onClustersChange = null;
+
   // ============================================================================
   // CONSTRUCTOR & INITIALIZATION
   // ============================================================================
@@ -98,6 +101,10 @@ class MindMap {
     this.selectedBoxes = new Set();
     // Multi-selection of connections
     this.selectedConnections = new Set();
+
+    // Visual grouping clusters
+    this.clusters = [];
+    this.selectedCluster = null;
 
     // Clipboard for copying/pasting boxes and their connections
     this.copiedBoxes = [];
@@ -592,6 +599,14 @@ class MindMap {
     // Track the top-most box (last in render order) so its connections can render above lower boxes
     const topBox = (this.boxes && this.boxes.length > 0) ? this.boxes[this.boxes.length - 1] : null;
     const overlayConnections = [];
+
+    // Draw clusters behind everything (connections and boxes)
+    if (this.clusters && this.clusters.length > 0) {
+      for (const cluster of this.clusters) {
+        if (!cluster) continue;
+        try { cluster.draw(); } catch (e) { console.error('Error drawing cluster:', e); }
+      }
+    }
 
     // Draw existing connections (skip the one being reattached)
     if (this.connections) {
@@ -1626,7 +1641,32 @@ class MindMap {
     // 1. Bulk remove all related connections efficiently (O(Connections))
     this._removeConnectionsForBoxes(boxesToDelete);
 
-    // 2. Unregister boxes and notify collaboration
+    // 2. Remove deleted boxes from any clusters they belong to;
+    //    prune clusters that drop below 2 members.
+    if (this.clusters && this.clusters.length > 0) {
+      for (const cluster of this.clusters) {
+        if (!cluster) continue;
+        for (const box of boxesToDelete) {
+          cluster.removeBox(box);
+        }
+      }
+      // Remove clusters that now have fewer than 2 valid members
+      const pruned = this.clusters.filter(c => c && c.boxes.length >= 2);
+      const removed = this.clusters.length !== pruned.length;
+      this.clusters = pruned;
+      // Clear selectedCluster if it was pruned
+      if (removed && this.selectedCluster && !this.clusters.includes(this.selectedCluster)) {
+        this.selectedCluster = null;
+      }
+    }
+
+    // Sync updated cluster state to Yjs BEFORE box deletions so both land in the
+    // same outer transaction (enabling proper undo of cluster membership).
+    if (MindMap.onClustersChange) {
+      MindMap.onClustersChange(true);
+    }
+
+    // 3. Unregister boxes and notify collaboration
     for (const box of boxesToDelete) {
       if (!box) continue;
       this._unregisterBox(box);
@@ -1637,7 +1677,7 @@ class MindMap {
       }
     }
 
-    // 3. Notify collaboration system of connection changes once
+    // 4. Notify collaboration system of connection changes once
     if (MindMap.onConnectionsChange) {
       MindMap.onConnectionsChange(true);
     }
@@ -2160,6 +2200,11 @@ class MindMap {
 
         // Move this box to the end (on top) for Z-order
         this._bringBoxToTop(box);
+        // Deselect any active cluster when a box is clicked
+        if (this.selectedCluster) {
+          this.selectedCluster.selected = false;
+          this.selectedCluster = null;
+        }
         return;
       }
     }
@@ -2175,6 +2220,11 @@ class MindMap {
         }
         // Clear multi-selection of boxes
         this.clearBoxSelection();
+        // Deselect any active cluster
+        if (this.selectedCluster) {
+          this.selectedCluster.selected = false;
+          this.selectedCluster = null;
+        }
 
         // Clear any previous connection multi-selection and select this connection
         if (this.clearConnectionSelection) this.clearConnectionSelection();
@@ -2187,7 +2237,42 @@ class MindMap {
       }
     }
 
-    // Clicked outside all boxes and connections -> clear all selections
+    // Clicked outside all boxes and connections.
+    // Check if a cluster was clicked before clearing all selections.
+    let clickedCluster = null;
+    if (this.clusters && this.clusters.length > 0) {
+      for (let i = this.clusters.length - 1; i >= 0; i--) {
+        const cluster = this.clusters[i];
+        if (cluster && cluster.contains(mx, my)) {
+          clickedCluster = cluster;
+          break;
+        }
+      }
+    }
+
+    if (clickedCluster) {
+      // Select the cluster; clear box / connection selections
+      if (this.selectedBox) {
+        this.selectedBox.stopEditing();
+        this.selectedBox = null;
+      }
+      this.isArrowKeyNavigating = false;
+      this.clearBoxSelection();
+      if (this.clearConnectionSelection) this.clearConnectionSelection();
+      // Deselect any previously selected cluster
+      if (this.selectedCluster && this.selectedCluster !== clickedCluster) {
+        this.selectedCluster.selected = false;
+      }
+      this.selectedCluster = clickedCluster;
+      clickedCluster.selected = true;
+      return;
+    }
+
+    // No cluster was clicked — clear all selections including any selected cluster
+    if (this.selectedCluster) {
+      this.selectedCluster.selected = false;
+      this.selectedCluster = null;
+    }
     if (this.selectedBox) {
       this.selectedBox.stopEditing();
       this.selectedBox = null;
@@ -2835,8 +2920,14 @@ class MindMap {
       }
       // Nothing else to do here; top-level caller prevents default
     } else if (keyCode === BACKSPACE || keyCode === DELETE) {
-      // Delete selected boxes or connection(s)
-      if (this.selectedBoxes && this.selectedBoxes.size > 0) {
+      // Delete selected cluster (does NOT delete member boxes) — wrap in transaction for undo
+      if (this.selectedCluster) {
+        const clusterToDelete = this.selectedCluster;
+        this.selectedCluster = null;
+        this._wrapInTransaction(() => {
+          this.deleteCluster(clusterToDelete);
+        });
+      } else if (this.selectedBoxes && this.selectedBoxes.size > 0) {
         // Delete all selected boxes - wrap in transaction for single undo step
         const boxesToDelete = Array.from(this.selectedBoxes);
 
@@ -2915,6 +3006,9 @@ class MindMap {
     return {
       boxes: this.boxes.map(box => box.toJSON()),
       connections: this.connections.map(conn => conn.toJSON(this.boxes)),
+      clusters: this.clusters
+        ? this.clusters.filter(c => c).map(c => c.toJSON())
+        : [],
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -2935,6 +3029,8 @@ class MindMap {
     // Clean up existing references to prevent memory leaks
     this.boxes = [];
     this.connections = [];
+    this.clusters = [];
+    this.selectedCluster = null;
     if (this.boxIdMap) this.boxIdMap.clear();
     this.selectedBox = null;
 
@@ -2998,6 +3094,19 @@ class MindMap {
       }
     } else {
       console.warn('No connections data found');
+    }
+
+    // Load clusters with error handling (boxes must be loaded first)
+    if (Array.isArray(data.clusters) && typeof Cluster !== 'undefined') {
+      for (const clusterData of data.clusters) {
+        if (!clusterData) continue;
+        try {
+          const cluster = Cluster.fromJSON(clusterData, this.boxes);
+          if (cluster) this.clusters.push(cluster);
+        } catch (e) {
+          console.error('Failed to load cluster:', e);
+        }
+      }
     }
 
     this.isDirty = true;
@@ -3152,6 +3261,64 @@ class MindMap {
     // Seed autosave immediately after loading external data so the indicator shows saved
     try { this.saveToLocalStorage(); } catch (_) { }
     this.isSaved = true;
+  }
+
+  // ============================================================================
+  // CLUSTER MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Creates a new Cluster around the given boxes and registers it.
+   * Requires at least 2 boxes; silently returns null otherwise.
+   * @param {TextBox[]} boxes - Array of boxes to group
+   * @returns {Cluster|null}
+   */
+  addCluster(boxes) {
+    if (!boxes || boxes.length < 2) return null;
+    if (typeof Cluster === 'undefined') return null;
+
+    const cluster = new Cluster(boxes);
+    if (!this.clusters) this.clusters = [];
+
+    this._wrapInTransaction(() => {
+      this.clusters.push(cluster);
+      this.isSaved = false;
+      if (MindMap.onClustersChange) MindMap.onClustersChange(true);
+    });
+
+    return cluster;
+  }
+
+  /**
+   * Removes a cluster without affecting its member boxes.
+   * Wraps in a transaction (like addCluster) so deletion is always tracked for undo
+   * whether called standalone or from within another transaction.
+   * @param {Cluster} cluster
+   */
+  deleteCluster(cluster) {
+    if (!cluster || !this.clusters) return;
+    const idx = this.clusters.indexOf(cluster);
+    if (idx === -1) return;
+
+    this._wrapInTransaction(() => {
+      this.clusters.splice(idx, 1);
+      this.isSaved = false;
+      if (MindMap.onClustersChange) MindMap.onClustersChange(true);
+    });
+
+    if (this.selectedCluster === cluster) {
+      this.selectedCluster = null;
+    }
+  }
+
+  /**
+   * Returns the first cluster that contains the given box, or null.
+   * @param {TextBox} box
+   * @returns {Cluster|null}
+   */
+  getClusterForBox(box) {
+    if (!box || !this.clusters) return null;
+    return this.clusters.find(c => c && c.containsBox(box)) || null;
   }
 
   // ============================================================================
