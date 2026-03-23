@@ -60,6 +60,15 @@ class Cluster {
     this.colorIndex = Cluster._nextColorIndex;
     Cluster._nextColorIndex =
       (Cluster._nextColorIndex + 1) % ColorPalette.CLUSTER.FILLS.length;
+
+    // ── Geometry cache ────────────────────────────────────────────────────
+    // These are recomputed only when member boxes change position/size, not
+    // on every frame.  A Float64Array snapshot of (x,y,w,h) per box is used
+    // for a fast dirty check without heap allocation.
+    /** @private */ this._boxSnapshot  = null; // Float64Array [x0,y0,w0,h0, ...]
+    /** @private */ this._hullCache    = null; // {x,y}[] convex hull
+    /** @private */ this._splineCache  = null; // {x,y}[] catmull-rom spline
+    /** @private */ this._boundsCache  = null; // {left,top,right,bottom}
   }
 
   // ============================================================================
@@ -85,7 +94,8 @@ class Cluster {
    * Call this before drawing connections and boxes.
    */
   draw() {
-    const hull = this._getHullPoints();
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    const hull = this._hullCache;
     if (!hull || hull.length < 3) return;
 
     push();
@@ -101,13 +111,9 @@ class Cluster {
       noStroke();
     }
 
-    // Compute Catmull-Rom spline points manually and render with vertex().
-    // Using curveVertex() + endShape(CLOSE) causes p5.js to insert a straight
-    // line segment from the last interpolated vertex back to the first, which
-    // produces the overlapping-loop artefact.  With manual interpolation we
-    // control every drawn point, so endShape(CLOSE) only closes the tiny gap
-    // between the last and first interpolated positions (visually invisible).
-    const splinePts = Cluster._catmullRomPoints(hull);
+    // Use cached spline points — recomputed only when geometry is dirty.
+    const splinePts = this._splineCache;
+    if (!splinePts || splinePts.length === 0) { pop(); return; }
     beginShape();
     for (const pt of splinePts) {
       vertex(pt.x, pt.y);
@@ -124,7 +130,8 @@ class Cluster {
    * @param {p5.Graphics} pg - A p5.js graphics buffer created with createGraphics()
    */
   drawToGraphics(pg) {
-    const hull = this._getHullPoints();
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    const hull = this._hullCache;
     if (!hull || hull.length < 3) return;
 
     pg.push();
@@ -133,7 +140,8 @@ class Cluster {
     pg.fill(c.r, c.g, c.b, c.a);
     pg.noStroke();
 
-    const splinePts = Cluster._catmullRomPoints(hull);
+    const splinePts = this._splineCache;
+    if (!splinePts || splinePts.length === 0) { pg.pop(); return; }
     pg.beginShape();
     for (const pt of splinePts) {
       pg.vertex(pt.x, pt.y);
@@ -153,6 +161,8 @@ class Cluster {
    * pixels inside it.  Points that lie deep in the interior are rejected so
    * that only the outline area is selectable.
    *
+   * Uses a fast AABB pre-filter (cached bounds + margins) to reject obviously
+   * out-of-range points without running the per-edge hull test.
    * Falls back to a padded AABB check when the hull is degenerate.
    *
    * @param {number} x
@@ -160,12 +170,24 @@ class Cluster {
    * @returns {boolean}
    */
   contains(x, y) {
-    const hull = this._getHullPoints();
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    const hull = this._hullCache;
+
     if (!hull || hull.length < 3) {
-      const b = this.getBounds();
+      const b = this._boundsCache;
       if (!b) return false;
       return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
     }
+
+    // Fast AABB pre-filter: reject clicks clearly outside the expanded bounds.
+    const b = this._boundsCache;
+    if (b) {
+      const m = Cluster.HIT_MARGIN;
+      if (x < b.left - m || x > b.right + m || y < b.top - m || y > b.bottom + m) {
+        return false;
+      }
+    }
+
     return Cluster._isPointNearHullOutline(
       x, y, hull, Cluster.HIT_MARGIN, Cluster.INNER_HIT_MARGIN
     );
@@ -177,21 +199,12 @@ class Cluster {
 
   /**
    * Returns the padded axis-aligned bounding box enclosing all member boxes.
+   * The result is cached and recomputed only when member box geometry changes.
    * @returns {{left:number, top:number, right:number, bottom:number}|null}
    */
   getBounds() {
-    if (!this.boxes || this.boxes.length === 0) return null;
-    const P = Cluster.PADDING;
-    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
-    for (const box of this.boxes) {
-      if (!box) continue;
-      left   = Math.min(left,   box.x - box.width  / 2);
-      top    = Math.min(top,    box.y - box.height / 2);
-      right  = Math.max(right,  box.x + box.width  / 2);
-      bottom = Math.max(bottom, box.y + box.height / 2);
-    }
-    if (left === Infinity) return null;
-    return { left: left - P, top: top - P, right: right + P, bottom: bottom + P };
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    return this._boundsCache;
   }
 
   // ============================================================================
@@ -213,12 +226,71 @@ class Cluster {
    */
   removeBox(box) {
     const idx = this.boxes.indexOf(box);
-    if (idx !== -1) this.boxes.splice(idx, 1);
+    if (idx !== -1) {
+      this.boxes.splice(idx, 1);
+      this._boxSnapshot = null; // force geometry refresh
+    }
   }
 
   // ============================================================================
   // GEOMETRY HELPERS
   // ============================================================================
+
+  // ── Geometry cache helpers ────────────────────────────────────────────────
+
+  /**
+   * Returns true if any member box has moved or resized since the last
+   * geometry refresh.  Uses a compact Float64Array snapshot for the
+   * comparison to avoid allocations on the hot path.
+   * @returns {boolean}
+   * @private
+   */
+  _isGeometryDirty() {
+    const boxes = this.boxes;
+    if (!boxes) return true;
+    const n = boxes.length;
+    const snap = this._boxSnapshot;
+    if (!snap || snap.length !== n * 4) return true;
+    for (let i = 0, j = 0; i < n; i++, j += 4) {
+      const b = boxes[i];
+      if (!b) return true;
+      if (snap[j] !== b.x || snap[j + 1] !== b.y ||
+          snap[j + 2] !== b.width || snap[j + 3] !== b.height) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Recomputes the hull, spline, and AABB caches, then snapshots the current
+   * box positions/sizes so subsequent calls to `_isGeometryDirty()` are cheap.
+   * @private
+   */
+  _refreshGeometry() {
+    const boxes = this.boxes;
+    const n = boxes ? boxes.length : 0;
+
+    // Update position snapshot
+    if (!this._boxSnapshot || this._boxSnapshot.length !== n * 4) {
+      this._boxSnapshot = new Float64Array(n * 4);
+    }
+    for (let i = 0, j = 0; i < n; i++, j += 4) {
+      const b = boxes[i];
+      if (b) {
+        this._boxSnapshot[j]     = b.x;
+        this._boxSnapshot[j + 1] = b.y;
+        this._boxSnapshot[j + 2] = b.width;
+        this._boxSnapshot[j + 3] = b.height;
+      }
+    }
+
+    // Recompute hull and derived data
+    const hull = this._computeHullPoints();
+    this._hullCache   = hull;
+    this._splineCache = (hull && hull.length >= 3)
+      ? Cluster._catmullRomPoints(hull)
+      : [];
+    this._boundsCache = this._computeBounds();
+  }
 
   /**
    * Computes hull points for drawing: each member box contributes 4 expanded
@@ -226,7 +298,7 @@ class Cluster {
    * @returns {{x:number, y:number}[]}
    * @private
    */
-  _getHullPoints() {
+  _computeHullPoints() {
     if (!this.boxes || this.boxes.length === 0) return [];
     const P = Cluster.PADDING;
     const points = [];
@@ -240,6 +312,37 @@ class Cluster {
       points.push({ x: box.x - hw, y: box.y + hh }); // bottom-left
     }
     return Cluster._convexHull(points);
+  }
+
+  /**
+   * Computes the padded AABB directly from member boxes.
+   * Called by `_refreshGeometry()` — use `getBounds()` for the cached version.
+   * @returns {{left:number, top:number, right:number, bottom:number}|null}
+   * @private
+   */
+  _computeBounds() {
+    if (!this.boxes || this.boxes.length === 0) return null;
+    const P = Cluster.PADDING;
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const box of this.boxes) {
+      if (!box) continue;
+      left   = Math.min(left,   box.x - box.width  / 2);
+      top    = Math.min(top,    box.y - box.height / 2);
+      right  = Math.max(right,  box.x + box.width  / 2);
+      bottom = Math.max(bottom, box.y + box.height / 2);
+    }
+    if (left === Infinity) return null;
+    return { left: left - P, top: top - P, right: right + P, bottom: bottom + P };
+  }
+
+  /**
+   * Returns the cached hull points, refreshing if geometry is stale.
+   * @returns {{x:number, y:number}[]}
+   * @private
+   */
+  _getHullPoints() {
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    return this._hullCache || [];
   }
 
   /**
