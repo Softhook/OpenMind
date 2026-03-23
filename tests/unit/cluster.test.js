@@ -199,12 +199,24 @@ describe('Cluster', () => {
 
   // --------------------------------------------------------------------------
   describe('contains() hit-detection', () => {
-    test('returns true for a point inside the padded bounds', () => {
+    test('returns false for a point deep in the interior (outline-only selection)', () => {
+      // Hull for two 100×50 boxes at x=0 and x=200, PADDING=30:
+      // Rectangle from (-80,-55) to (280,55).
+      // Centre (100,0) is 55px from the nearest (top/bottom) edge — well beyond
+      // INNER_HIT_MARGIN (20px) — so it must NOT be selectable.
       const b1 = makeBox(0, 0, 100, 50);
       const b2 = makeBox(200, 0, 100, 50);
       const cluster = new Cluster([b1, b2]);
-      // centre between the two boxes — inside the padded hull
-      expect(cluster.contains(100, 0)).toBe(true);
+      expect(cluster.contains(100, 0)).toBe(false);
+    });
+
+    test('returns true for a point near the inner edge of the hull', () => {
+      // Hull top edge is at y = -55.  A point at y = -44 is 11px inside the top
+      // edge — within INNER_HIT_MARGIN (20px) — so it IS selectable.
+      const b1 = makeBox(0, 0, 100, 50);
+      const b2 = makeBox(200, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      expect(cluster.contains(100, -44)).toBe(true);
     });
 
     test('returns false for a point well outside the bounds', () => {

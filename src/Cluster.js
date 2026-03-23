@@ -30,9 +30,15 @@ class Cluster {
 
   /**
    * Extra hit margin (px) outside the visible hull outline.
-   * Adds a wide border zone so the organic edge is easy to click.
+   * Adds a border zone so the organic edge is easy to click.
    */
   static HIT_MARGIN = 20;
+
+  /**
+   * Inner hit margin (px) inside the visible hull outline.
+   * Only this ring around the border is selectable; the deep interior is not.
+   */
+  static INNER_HIT_MARGIN = 20;
 
   // ============================================================================
   // CONSTRUCTOR
@@ -142,12 +148,12 @@ class Cluster {
   // ============================================================================
 
   /**
-   * Returns true if (x, y) is inside the cluster's hull or within HIT_MARGIN
-   * pixels of its boundary, making the organic edge easy to click.
+   * Returns true if (x, y) is within the border ring of the cluster hull —
+   * i.e. within HIT_MARGIN pixels outside the outline OR within INNER_HIT_MARGIN
+   * pixels inside it.  Points that lie deep in the interior are rejected so
+   * that only the outline area is selectable.
    *
-   * Uses a signed-distance test against each edge of the convex hull (CCW
-   * order), allowing points that are up to HIT_MARGIN outside the hull.
-   * Falls back to a padded AABB when the hull is degenerate.
+   * Falls back to a padded AABB check when the hull is degenerate.
    *
    * @param {number} x
    * @param {number} y
@@ -160,7 +166,9 @@ class Cluster {
       if (!b) return false;
       return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
     }
-    return Cluster._isPointInExpandedHull(x, y, hull, Cluster.HIT_MARGIN);
+    return Cluster._isPointNearHullOutline(
+      x, y, hull, Cluster.HIT_MARGIN, Cluster.INNER_HIT_MARGIN
+    );
   }
 
   // ============================================================================
@@ -395,6 +403,49 @@ class Cluster {
     }
 
     return pts;
+  }
+
+  /**
+   * Returns true if (x, y) is within the border ring of the convex hull —
+   * within `outerMargin` pixels outside the outline OR within `innerMargin`
+   * pixels inside it.  Points deeper than `innerMargin` inside every edge are
+   * in the interior and return false.
+   *
+   * Algorithm:
+   *  1. For each directed CCW edge a→b, compute the signed distance from (x,y)
+   *     to the edge line (positive = inside / left side).
+   *  2. If the signed distance is less than -outerMargin for any edge, the
+   *     point is too far outside → false.
+   *  3. Track the minimum signed distance across all edges.  If that minimum
+   *     exceeds innerMargin the point is entirely inside the shrunken hull
+   *     (deep interior) → false.
+   *  4. Otherwise the point lies in the border ring → true.
+   *
+   * @param {number} x
+   * @param {number} y
+   * @param {{x:number, y:number}[]} hull - CCW convex hull points
+   * @param {number} outerMargin - tolerance outside the hull
+   * @param {number} innerMargin - tolerance inside the hull
+   * @returns {boolean}
+   * @private
+   */
+  static _isPointNearHullOutline(x, y, hull, outerMargin, innerMargin) {
+    const n = hull.length;
+    let minSignedDist = Infinity;
+    for (let i = 0; i < n; i++) {
+      const a  = hull[i];
+      const b  = hull[(i + 1) % n];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) continue;
+      // Signed distance: positive means left of a→b (inside for CCW hull)
+      const signedDist = (dx * (y - a.y) - dy * (x - a.x)) / len;
+      if (signedDist < -outerMargin) return false;
+      if (signedDist < minSignedDist) minSignedDist = signedDist;
+    }
+    // Reject points that are more than innerMargin inside every edge (deep interior)
+    return minSignedDist <= innerMargin;
   }
 
   /**
