@@ -628,8 +628,12 @@ class Cluster {
     // collaboration) does not cause subsequent user-created clusters to skip
     // palette entries.
     const savedColorIndex = Cluster._nextColorIndex;
-    const cluster = new Cluster(resolved);
-    Cluster._nextColorIndex = savedColorIndex;
+    let cluster;
+    try {
+      cluster = new Cluster(resolved);
+    } finally {
+      Cluster._nextColorIndex = savedColorIndex;
+    }
 
     if (data.id) cluster.id = data.id;
     if (typeof data.colorIndex === 'number') cluster.colorIndex = data.colorIndex;
