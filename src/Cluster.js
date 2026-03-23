@@ -356,26 +356,41 @@ class Cluster {
       // Emit steps + 1 points: t = t1 (= p1) up to and including t = t2 (= p2).
       // Including the endpoint means consecutive segments share the hull vertex
       // exactly, giving a perfectly closed curve.
+      // Scalar temporaries are used throughout to avoid allocating intermediate
+      // {x,y} objects on every step, which would create GC pressure in the
+      // per-frame draw path when many clusters are visible.
+      //
+      // The chord pre-computation (chords[i] ≥ 1e-10) guarantees that all knot
+      // intervals (t1-t0), (t2-t1), (t3-t2), and the level-2 spans (t2-t0) and
+      // (t3-t1) are strictly positive, so none of the divisions below can
+      // produce NaN or Infinity.
       for (let step = 0; step <= steps; step++) {
         const t = t1 + (t2 - t1) * (step / steps);
 
-        // Barry-Goldman recursive linear interpolation (non-uniform de Boor).
-        const mix = (a, b, ta, tb) => {
-          const k = (t - ta) / (tb - ta);
-          return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
-        };
+        // Barry-Goldman recursive linear interpolation (non-uniform de Boor),
+        // implemented with scalar temporaries to avoid per-step object churn.
+        const k01 = (t - t0) / (t1 - t0);
+        const k12 = (t - t1) / (t2 - t1);
+        const k23 = (t - t2) / (t3 - t2);
 
         // Level 1
-        const A1 = mix(p0, p1, t0, t1);
-        const A2 = mix(p1, p2, t1, t2);
-        const A3 = mix(p2, p3, t2, t3);
+        const A1x = p0.x + (p1.x - p0.x) * k01;
+        const A1y = p0.y + (p1.y - p0.y) * k01;
+        const A2x = p1.x + (p2.x - p1.x) * k12;
+        const A2y = p1.y + (p2.y - p1.y) * k12;
+        const A3x = p2.x + (p3.x - p2.x) * k23;
+        const A3y = p2.y + (p3.y - p2.y) * k23;
 
         // Level 2
-        const B1 = mix(A1, A2, t0, t2);
-        const B2 = mix(A2, A3, t1, t3);
+        const k02 = (t - t0) / (t2 - t0);
+        const k13 = (t - t1) / (t3 - t1);
+        const B1x = A1x + (A2x - A1x) * k02;
+        const B1y = A1y + (A2y - A1y) * k02;
+        const B2x = A2x + (A3x - A2x) * k13;
+        const B2y = A2y + (A3y - A2y) * k13;
 
-        // Level 3 — output point on the curve
-        pts.push(mix(B1, B2, t1, t2));
+        // Level 3 — output point on the curve (reuses k12 = (t-t1)/(t2-t1))
+        pts.push({ x: B1x + (B2x - B1x) * k12, y: B1y + (B2y - B1y) * k12 });
       }
     }
 
@@ -440,9 +455,16 @@ class Cluster {
    */
   static fromJSON(data, boxes) {
     if (!data || !Array.isArray(data.boxIds)) return null;
-    const resolved = data.boxIds
-      .map(id => (boxes || []).find(b => b && b.id === id))
-      .filter(b => !!b);
+
+    // Build a one-time id → box map for O(1) lookups per boxId instead of
+    // O(boxes) linear scans, which matters when loading maps with many boxes.
+    const boxArray = Array.isArray(boxes) ? boxes : [];
+    const boxMap = new Map();
+    for (const box of boxArray) {
+      if (box && box.id) boxMap.set(box.id, box);
+    }
+
+    const resolved = data.boxIds.map(id => boxMap.get(id)).filter(b => !!b);
     if (resolved.length < 2) return null;
 
     const cluster = new Cluster(resolved);

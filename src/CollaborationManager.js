@@ -1540,10 +1540,19 @@ class CollaborationManager {
             if (!cluster || !cluster.id) continue;
             const next = cluster.toJSON();
             const prev = this.yclusters.get(cluster.id);
-            // Simple equality check on serialised form
-            if (!prev ||
-                prev.colorIndex !== next.colorIndex ||
-                JSON.stringify(prev.boxIds) !== JSON.stringify(next.boxIds)) {
+
+            // Order-independent membership comparison: sort both id arrays once
+            // so that clusters whose boxIds are rebuilt in a different iteration
+            // order don't produce spurious Yjs writes.
+            let sameIds = false;
+            if (prev && Array.isArray(prev.boxIds) &&
+                prev.boxIds.length === next.boxIds.length) {
+                const sortedPrev = [...prev.boxIds].sort();
+                const sortedNext = [...next.boxIds].sort();
+                sameIds = sortedNext.every((id, i) => id === sortedPrev[i]);
+            }
+
+            if (!prev || prev.colorIndex !== next.colorIndex || !sameIds) {
                 this.yclusters.set(cluster.id, next);
             }
         }
