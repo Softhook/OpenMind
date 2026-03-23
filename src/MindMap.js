@@ -604,6 +604,19 @@ class MindMap {
     if (this.clusters && this.clusters.length > 0) {
       for (const cluster of this.clusters) {
         if (!cluster) continue;
+        // Viewport culling: skip clusters whose AABB is entirely off-screen
+        if (useCulling && viewportBounds) {
+          const b = cluster.getBounds();
+          if (b) {
+            const m = 50; // small extra margin so partially-visible clusters always draw
+            if (b.right  + m < viewportBounds.worldLeft  ||
+                b.left   - m > viewportBounds.worldRight  ||
+                b.bottom + m < viewportBounds.worldTop    ||
+                b.top    - m > viewportBounds.worldBottom) {
+              continue;
+            }
+          }
+        }
         try { cluster.draw(); } catch (e) { console.error('Error drawing cluster:', e); }
       }
     }
