@@ -282,30 +282,87 @@ describe('Cluster', () => {
 
   // --------------------------------------------------------------------------
   describe('_catmullRomPoints()', () => {
-    test('produces n * steps points for a closed polygon', () => {
+    test('returns an empty array for fewer than 3 hull points', () => {
+      expect(Cluster._catmullRomPoints([])).toHaveLength(0);
+      expect(Cluster._catmullRomPoints([{ x: 0, y: 0 }])).toHaveLength(0);
+      expect(Cluster._catmullRomPoints([{ x: 0, y: 0 }, { x: 100, y: 0 }])).toHaveLength(0);
+    });
+
+    test('returns a non-empty array of points for a valid hull', () => {
       const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
-      const steps = 10;
-      const result = Cluster._catmullRomPoints(pts, steps);
-      expect(result).toHaveLength(pts.length * steps); // 4 segments * 10 steps
+      const result = Cluster._catmullRomPoints(pts);
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    test('total point count is within adaptive-step bounds for a uniform hull', () => {
+      // Square hull: 4 segments, each 100 px.
+      // steps = ceil(100/15) = 7, clamped to [3,16] → 7 per segment, 8 pts each (step 0..7).
+      const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+      const result = Cluster._catmullRomPoints(pts);
+      const n = pts.length;
+      const MIN_STEPS = 3, MAX_STEPS = 16;
+      expect(result.length).toBeGreaterThanOrEqual(n * (MIN_STEPS + 1)); // +1 for inclusive endpoint
+      expect(result.length).toBeLessThanOrEqual(n * (MAX_STEPS + 1));
+    });
+
+    test('total point count is within adaptive-step bounds for a non-uniform hull', () => {
+      // Alternating long (800 px) and short (100 px) segments — the problematic
+      // aspect ratio that triggered the horn artefact.
+      const hull = [
+        { x: -430, y: -50 }, // TL: long horizontal follows
+        { x:  430, y: -50 }, // TR: short vertical follows
+        { x:  430, y:  50 }, // BR: long horizontal follows
+        { x: -430, y:  50 }, // BL: short vertical follows
+      ];
+      const result = Cluster._catmullRomPoints(hull);
+      const n = hull.length;
+      const MIN_STEPS = 3, MAX_STEPS = 16;
+      expect(result.length).toBeGreaterThanOrEqual(n * (MIN_STEPS + 1));
+      expect(result.length).toBeLessThanOrEqual(n * (MAX_STEPS + 1));
+      // For this hull: long segs get ceil(860/15)=57→capped at 16, short segs get ceil(100/15)=7.
+      // Expected total = 2*(16+1) + 2*(7+1) = 34 + 16 = 50
+      expect(result.length).toBe(50);
     });
 
     test('first computed point equals the first hull point', () => {
       const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
-      const result = Cluster._catmullRomPoints(pts, 10);
-      // At t=0 of segment 0, Catmull-Rom evaluates to p1 = pts[0]
+      const result = Cluster._catmullRomPoints(pts);
+      // At t = t1 (step=0 of segment 0), centripetal CR evaluates exactly to pts[0].
       expect(result[0].x).toBeCloseTo(pts[0].x, 5);
       expect(result[0].y).toBeCloseTo(pts[0].y, 5);
     });
 
-    test('last computed point is close to the first (curve closes)', () => {
+    test('last computed point exactly equals first hull point (curve closes perfectly)', () => {
       const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
-      const steps = 100;
-      const result = Cluster._catmullRomPoints(pts, steps);
+      const result = Cluster._catmullRomPoints(pts);
       const last = result[result.length - 1];
-      // At t = (steps-1)/steps the Catmull-Rom evaluates very close to pts[0].
-      // With 100 steps, the deviation is < 1 px, so use a 1-pixel tolerance.
-      expect(Math.abs(last.x - pts[0].x)).toBeLessThan(1);
-      expect(Math.abs(last.y - pts[0].y)).toBeLessThan(1);
+      // The endpoint of the last segment is hull[0] exactly (step = steps → t = t2 → p2 = hull[0]).
+      expect(last.x).toBeCloseTo(pts[0].x, 5);
+      expect(last.y).toBeCloseTo(pts[0].y, 5);
+    });
+
+    test('centripetal CR eliminates the large x-overshoot at short vertical edges (no horn)', () => {
+      // Wide text box: hull is 860 px wide × 100 px tall (800w + 2×30 pad, 40h + 2×30 pad).
+      // With uniform Catmull-Rom the short vertical segments overshoot by 107 px in x
+      // (creating the visible horn).  Centripetal CR must reduce that to < 25 px.
+      const P = 30, bw = 800, bh = 40;
+      const hw = bw / 2 + P, hh = bh / 2 + P;
+      // Hull in CCW order (as produced by _convexHull → Graham scan): TL, TR, BR, BL
+      const hull = [
+        { x: -hw, y: -hh }, // TL
+        { x:  hw, y: -hh }, // TR
+        { x:  hw, y:  hh }, // BR
+        { x: -hw, y:  hh }, // BL
+      ];
+      const result = Cluster._catmullRomPoints(hull);
+      const maxX = Math.max(...result.map(p => p.x));
+      const minX = Math.min(...result.map(p => p.x));
+      // Centripetal CR rounds corners smoothly; x-overshoot at the short right / left
+      // vertical edges (which caused the visible horn) must be well below 25 px.
+      // Uniform CR produced 107 px of x-overshoot here.
+      const X_TOLERANCE = 25;
+      expect(maxX).toBeLessThan(hw + X_TOLERANCE);
+      expect(minX).toBeGreaterThan(-hw - X_TOLERANCE);
     });
   });
 

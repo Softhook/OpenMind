@@ -289,45 +289,96 @@ class Cluster {
   }
 
   /**
-   * Computes the Catmull-Rom spline interpolation points for a closed polygon.
+   * Computes centripetal Catmull-Rom spline points for a closed polygon.
    *
-   * For each segment i (hull[i] → hull[i+1]), the surrounding four control
-   * points are hull[i-1], hull[i], hull[i+1], hull[i+2] (wrapping around).
-   * Iterating over all n segments produces a smooth closed curve without any
-   * straight-line gap.
+   * Uses the centripetal parameterisation (α = 0.5) via the Barry-Goldman
+   * recursive formula.  Unlike the uniform parameterisation (α = 0), the
+   * centripetal variant is mathematically guaranteed to be loop-free and
+   * cusp-free regardless of control-point spacing.  This eliminates the
+   * "horn" artefacts that occurred when a long hull edge is adjacent to a
+   * short one (e.g. a wide text box with a tall aspect ratio).
+   *
+   * Each segment emits `steps + 1` points (t = t1 … t2 inclusive) so the
+   * endpoint of segment i exactly equals the start of segment i+1.  The last
+   * point of the final segment is exactly hull[0], giving perfect closure
+   * without relying on endShape(CLOSE) to bridge a visible gap.
+   *
+   * Step count is adaptive: one step per {@link PIXELS_PER_STEP} pixels of
+   * chord length, clamped to [MIN_STEPS, MAX_STEPS].  This keeps the total
+   * vertex count proportional to the visible curve length rather than the
+   * number of hull edges, improving performance for large maps.
    *
    * @param {{x:number, y:number}[]} hull - Convex hull points (CCW order)
-   * @param {number} [steps=20] - Interpolation steps per segment
    * @returns {{x:number, y:number}[]}
    * @private
    */
-  static _catmullRomPoints(hull, steps = 20) {
+  static _catmullRomPoints(hull) {
     const n = hull.length;
+    if (n < 3) return [];
+
+    const ALPHA         = 0.5;  // centripetal — prevents loops and cusps
+    const MIN_STEPS     = 3;    // minimum interpolation steps per segment
+    const MAX_STEPS     = 16;   // maximum interpolation steps per segment
+    const PIXELS_PER_STEP = 15; // ~1 step per 15 px of chord length
+
+    // Centripetal knot spacing: t_{k+1} = t_k + ||P_{k+1} - P_k||^alpha
+    const chord = (a, b) =>
+      Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+
+    // Pre-compute chord lengths for all hull edges to avoid repeated sqrt calls
+    // in the inner loop.  chords[i] = ||hull[i] - hull[(i-1+n)%n]||
+    const chords = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      chords[i] = Math.max(chord(hull[(i - 1 + n) % n], hull[i]), 1e-10);
+    }
+
     const pts = [];
+
     for (let i = 0; i < n; i++) {
       const p0 = hull[(i - 1 + n) % n];
       const p1 = hull[i];
       const p2 = hull[(i + 1) % n];
       const p3 = hull[(i + 2) % n];
-      for (let t = 0; t < steps; t++) {
-        const s  = t / steps;
-        const s2 = s * s;
-        const s3 = s2 * s;
-        const x = 0.5 * (
-          (2 * p1.x) +
-          (-p0.x + p2.x) * s +
-          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * s2 +
-          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * s3
-        );
-        const y = 0.5 * (
-          (2 * p1.y) +
-          (-p0.y + p2.y) * s +
-          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * s2 +
-          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * s3
-        );
-        pts.push({ x, y });
+
+      // Build the four non-uniform knot values for this segment using the
+      // pre-computed chord lengths.  A tiny floor (1e-10, already applied
+      // above) prevents division-by-zero if two hull points coincide.
+      const t0 = 0;
+      const t1 = t0 + Math.pow(chords[i],           ALPHA);
+      const t2 = t1 + Math.pow(chords[(i + 1) % n], ALPHA);
+      const t3 = t2 + Math.pow(chords[(i + 2) % n], ALPHA);
+
+      // Adaptive step count proportional to this segment's chord length.
+      const segLen = chords[(i + 1) % n];
+      const steps  = Math.max(MIN_STEPS, Math.min(MAX_STEPS,
+                       Math.ceil(segLen / PIXELS_PER_STEP)));
+
+      // Emit steps + 1 points: t = t1 (= p1) up to and including t = t2 (= p2).
+      // Including the endpoint means consecutive segments share the hull vertex
+      // exactly, giving a perfectly closed curve.
+      for (let step = 0; step <= steps; step++) {
+        const t = t1 + (t2 - t1) * (step / steps);
+
+        // Barry-Goldman recursive linear interpolation (non-uniform de Boor).
+        const mix = (a, b, ta, tb) => {
+          const k = (t - ta) / (tb - ta);
+          return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+        };
+
+        // Level 1
+        const A1 = mix(p0, p1, t0, t1);
+        const A2 = mix(p1, p2, t1, t2);
+        const A3 = mix(p2, p3, t2, t3);
+
+        // Level 2
+        const B1 = mix(A1, A2, t0, t2);
+        const B2 = mix(A2, A3, t1, t3);
+
+        // Level 3 — output point on the curve
+        pts.push(mix(B1, B2, t1, t2));
       }
     }
+
     return pts;
   }
 
