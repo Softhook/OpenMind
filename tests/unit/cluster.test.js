@@ -498,6 +498,46 @@ describe('Cluster', () => {
       expect(json.boxIds).toHaveLength(1);
       expect(json.boxIds[0]).toBe(b1.id);
     });
+
+    test('fromJSON does not advance _nextColorIndex (no color-counter pollution)', () => {
+      // Bug: every new Cluster() in the constructor increments _nextColorIndex.
+      // fromJSON always overrides colorIndex with the stored value, so advancing
+      // the counter is a side effect that skips palette entries for subsequent
+      // user-created clusters.  The fix saves/restores the counter.
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(100, 0);
+      const c = new Cluster([b1, b2]);
+      c.colorIndex = 4;
+      const json = c.toJSON();
+
+      const before = Cluster._nextColorIndex;
+      Cluster.fromJSON(json, [b1, b2]);
+      expect(Cluster._nextColorIndex).toBe(before); // must not advance
+
+      // Calling fromJSON multiple times (as _rebuildClustersFromYjs does) must
+      // not change the counter.
+      Cluster.fromJSON(json, [b1, b2]);
+      Cluster.fromJSON(json, [b1, b2]);
+      expect(Cluster._nextColorIndex).toBe(before);
+    });
+
+    test('new user-created cluster after fromJSON gets the correct color', () => {
+      // Create two clusters so _nextColorIndex is at 2.
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(100, 0);
+      const b3 = makeBox(200, 0);
+      const b4 = makeBox(300, 0);
+      const c1 = new Cluster([b1, b2]); // colorIndex 0, _next → 1
+      const c2 = new Cluster([b3, b4]); // colorIndex 1, _next → 2
+
+      // Deserialize c1 (simulates _rebuildClustersFromYjs)
+      const json1 = c1.toJSON();
+      Cluster.fromJSON(json1, [b1, b2]);
+
+      // _nextColorIndex must still be 2, so the next new cluster gets 2.
+      const c3 = new Cluster([b1, b3]);
+      expect(c3.colorIndex).toBe(2);
+    });
   });
 
 });

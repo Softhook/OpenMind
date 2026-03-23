@@ -3124,8 +3124,9 @@ class MindMap {
 
     this.isDirty = true;
 
-    // Sync loaded boxes and connections to Yjs (for unified undo)
-    // This ensures loaded data is tracked by UndoManager
+    // Sync loaded boxes, connections, and clusters to Yjs (for unified undo).
+    // This ensures loaded data is tracked by UndoManager and visible to
+    // collaborators who are already in the room when the file is loaded.
     if (MindMap.onBoxChange) {
       for (const box of this.boxes) {
         if (box && box.id) {
@@ -3135,6 +3136,9 @@ class MindMap {
     }
     if (MindMap.onConnectionsChange) {
       MindMap.onConnectionsChange();
+    }
+    if (MindMap.onClustersChange) {
+      MindMap.onClustersChange();
     }
   }
 

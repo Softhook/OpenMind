@@ -508,4 +508,63 @@ describe('Cluster remote collaboration (two-doc simulation)', () => {
         expect(rebuildSpy).not.toHaveBeenCalled();
         rebuildSpy.mockRestore();
     });
+
+    // ── 16. remote cluster deletion clears selectedCluster on receiving peer ───
+    test('remote cluster deletion clears selectedCluster on the receiving peer', () => {
+        const boxId1 = 'box-r1';
+        const boxId2 = 'box-r2';
+        const clusterId = 'cluster-r1';
+
+        // Bootstrap both peers with boxes and a cluster
+        cmA.ydoc.transact(() => {
+            cmA.yboxes.set(boxId1, { id: boxId1, x: 0,   y: 0, text: 'A', width: 100, height: 40 });
+            cmA.yboxes.set(boxId2, { id: boxId2, x: 200, y: 0, text: 'B', width: 100, height: 40 });
+            cmA.yclusters.set(clusterId, { id: clusterId, colorIndex: 0, boxIds: [boxId1, boxId2] });
+        }, null);
+        sync(cmA, cmB);
+        expect(mindMapB.clusters).toHaveLength(1);
+
+        // Peer B selects the cluster
+        const clusterOnB = mindMapB.clusters[0];
+        mindMapB.selectedCluster = clusterOnB;
+        clusterOnB.selected = true;
+
+        // Peer A remotely deletes the cluster
+        cmA.ydoc.transact(() => {
+            cmA.yclusters.delete(clusterId);
+        }, null);
+        applyTo(cmB.ydoc, cmA.ydoc);
+
+        // Peer B must have no clusters and no selected cluster
+        expect(mindMapB.clusters).toHaveLength(0);
+        expect(mindMapB.selectedCluster).toBeNull();
+    });
+
+    // ── 17. _rebuildClustersFromYjs does not pollute _nextColorIndex ───────────
+    test('_rebuildClustersFromYjs does not advance Cluster._nextColorIndex', () => {
+        // Bug: every new Cluster() call in the constructor advances
+        // Cluster._nextColorIndex.  fromJSON (used inside _rebuildClustersFromYjs)
+        // previously did not restore the counter, so every remote sync event
+        // caused subsequent user-created clusters to skip palette entries.
+        const boxId1 = 'box-ni1';
+        const boxId2 = 'box-ni2';
+
+        cmA.ydoc.transact(() => {
+            cmA.yboxes.set(boxId1, { id: boxId1, x: 0,   y: 0, text: 'A', width: 100, height: 40 });
+            cmA.yboxes.set(boxId2, { id: boxId2, x: 200, y: 0, text: 'B', width: 100, height: 40 });
+            cmA.yclusters.set('ni-cluster', { id: 'ni-cluster', colorIndex: 2, boxIds: [boxId1, boxId2] });
+        }, null);
+
+        // Sync to peer B: this triggers _rebuildClustersFromYjs on B
+        const before = Cluster._nextColorIndex;
+        applyTo(cmB.ydoc, cmA.ydoc);
+
+        // _rebuildClustersFromYjs must not have advanced the counter
+        expect(Cluster._nextColorIndex).toBe(before);
+
+        // Rebuild again to confirm repeated calls are also idempotent
+        cmB._rebuildClustersFromYjs();
+        cmB._rebuildClustersFromYjs();
+        expect(Cluster._nextColorIndex).toBe(before);
+    });
 });

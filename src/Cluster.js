@@ -621,7 +621,16 @@ class Cluster {
     const resolved = data.boxIds.map(id => boxMap.get(id)).filter(b => !!b);
     if (resolved.length < 2) return null;
 
+    // Preserve the shared color-cycle counter: the constructor advances it for
+    // every `new Cluster()` call, but fromJSON always overrides colorIndex with
+    // the stored value anyway.  Restoring the counter ensures that
+    // deserialization (e.g. repeated _rebuildClustersFromYjs calls during
+    // collaboration) does not cause subsequent user-created clusters to skip
+    // palette entries.
+    const savedColorIndex = Cluster._nextColorIndex;
     const cluster = new Cluster(resolved);
+    Cluster._nextColorIndex = savedColorIndex;
+
     if (data.id) cluster.id = data.id;
     if (typeof data.colorIndex === 'number') cluster.colorIndex = data.colorIndex;
     return cluster;

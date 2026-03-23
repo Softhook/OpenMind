@@ -390,6 +390,38 @@ describe('C. JSON forward/backward compatibility', () => {
         // Cluster needs ≥ 2 boxes → skipped
         expect(mindMap.clusters).toHaveLength(0);
     });
+
+    test('fromJSON calls onClustersChange when collaboration callback is set', () => {
+        // Bug: fromJSON synced boxes and connections to Yjs via their callbacks,
+        // but silently skipped clusters.  Collaborators already in the room would
+        // not see clusters loaded by another peer using File > Open.
+        const b1 = makeBox(0,   0, mindMap);
+        const b2 = makeBox(200, 0, mindMap);
+        mindMap.addCluster([b1, b2]);
+        const json = mindMap.toJSON();
+
+        const mm2 = new MindMap();
+        const callback = jest.fn();
+        MindMap.onClustersChange = callback;
+
+        mm2.fromJSON(json);
+
+        expect(callback).toHaveBeenCalled();
+        MindMap.onClustersChange = null;
+    });
+
+    test('fromJSON calls onClustersChange even when no clusters are loaded (clears stale yclusters)', () => {
+        // When loading a legacy file with no clusters field, the callback should
+        // still fire so any stale yclusters entries can be cleared by the
+        // collaboration manager's diff-based sync.
+        const callback = jest.fn();
+        MindMap.onClustersChange = callback;
+
+        mindMap.fromJSON({ boxes: [], connections: [] });
+
+        expect(callback).toHaveBeenCalled();
+        MindMap.onClustersChange = null;
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
