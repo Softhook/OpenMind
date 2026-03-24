@@ -1093,6 +1093,91 @@ describe('MindMap cluster integration', () => {
   });
 
   // --------------------------------------------------------------------------
+  describe('_updateClusterDragHighlights()', () => {
+    function makeAndRegister(x, y, w, h) {
+      const box = makeBox(x, y, w, h);
+      mindMap._registerBox(box);
+      return box;
+    }
+
+    /** Sets _dragStartHull on every cluster that has a dragging member. */
+    function snapshotHulls() {
+      for (const c of mindMap.clusters) {
+        if (c._isGeometryDirty()) c._refreshGeometry();
+        c._dragStartHull = c._hullCache ? [...c._hullCache] : null;
+      }
+    }
+
+    test('sets dragRemoveHighlight when a member box is far outside the snapshot hull', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+      snapshotHulls();
+
+      b1.x = -2000; // far outside
+      mindMap._updateClusterDragHighlights([b1]);
+
+      expect(cluster.dragRemoveHighlight).toBe(true);
+      expect(cluster.dragAddHighlight).toBe(false);
+    });
+
+    test('sets dragAddHighlight for a free box dragged fully inside a cluster', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Small free box centred at (0,100) — fully inside the cluster hull.
+      const free = makeAndRegister(0, 100, 40, 20);
+
+      mindMap._updateClusterDragHighlights([free]);
+
+      expect(cluster.dragAddHighlight).toBe(true);
+      expect(cluster.dragRemoveHighlight).toBe(false);
+    });
+
+    test('does NOT set dragAddHighlight for a box that already belongs to another cluster', () => {
+      // Cluster A: large, positioned so its hull covers (0..600, -60..260)
+      const aLeft  = makeAndRegister(  0, 100, 100, 50);
+      const aRight = makeAndRegister(600, 100, 100, 50);
+      const clusterA = mindMap.addCluster([aLeft, aRight]);
+
+      // Cluster B: small, positioned at the left side inside A's hull
+      const bInner1 = makeAndRegister(100,  80, 60, 30);
+      const bInner2 = makeAndRegister(100, 130, 60, 30);
+      const clusterB = mindMap.addCluster([bInner1, bInner2]);
+
+      // boxInA is a member of cluster A.  Geometrically its position sits
+      // inside cluster B's hull so _isBoxFullyEnclosed would be true for B.
+      const boxInA = makeAndRegister(100, 105, 40, 20);
+      clusterA.addBox(boxInA);
+
+      // Verify the test precondition: boxInA really is enclosed in B
+      expect(clusterB.isBoxFullyEnclosed(boxInA)).toBe(true);
+
+      mindMap._updateClusterDragHighlights([boxInA]);
+
+      // B must NOT show add-highlight — the box is attached to A so no add
+      // would happen on release, making a highlight a false cue.
+      expect(clusterB.dragAddHighlight).toBe(false);
+      // A should also not show remove-highlight (no snapshot → isBoxFarOutside=false)
+      expect(clusterA.dragRemoveHighlight).toBe(false);
+    });
+
+    test('resets all flags to false when called with an empty box list', () => {
+      const b1 = makeAndRegister(0,   0, 100, 50);
+      const b2 = makeAndRegister(0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+      cluster.dragAddHighlight    = true;
+      cluster.dragRemoveHighlight = true;
+
+      mindMap._updateClusterDragHighlights([]);
+
+      expect(cluster.dragAddHighlight).toBe(false);
+      expect(cluster.dragRemoveHighlight).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   describe('_clearClusterDragHighlights()', () => {
     test('resets all drag highlight flags and hull snapshots', () => {
       const b1 = makeBox(  0,   0, 100, 50); mindMap._registerBox(b1);

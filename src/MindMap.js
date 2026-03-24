@@ -3409,6 +3409,15 @@ class MindMap {
 
     if (!draggingBoxes || draggingBoxes.length === 0) return;
 
+    // Pre-compute which boxes already belong to at least one cluster.
+    // A box that is already in another cluster cannot be drag-added (the
+    // nowInCluster guard in _updateClusterMembership prevents it), so showing
+    // dragAddHighlight for such a box would be a false visual cue.
+    const boxesInAnyClusters = new Set();
+    for (const c of this.clusters) {
+      if (c) for (const b of c.boxes) boxesInAnyClusters.add(b);
+    }
+
     for (const cluster of this.clusters) {
       if (!cluster) continue;
       for (const box of draggingBoxes) {
@@ -3416,7 +3425,8 @@ class MindMap {
           if (cluster.isBoxFarOutside(box)) {
             cluster.dragRemoveHighlight = true;
           }
-        } else {
+        } else if (!boxesInAnyClusters.has(box)) {
+          // Only offer drag-add highlight for boxes that are free of all clusters.
           if (cluster.isBoxFullyEnclosed(box)) {
             cluster.dragAddHighlight = true;
           }
