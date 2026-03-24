@@ -2395,20 +2395,22 @@ class MindMap {
         if (changedBoxes.length > 0) {
           this._notifyBoxesChanged(changedBoxes, true); // already in a transaction
         }
+
+        // Resolve cluster membership changes inside the same Yjs transaction so
+        // that a drag that moves a box out of (or into) a cluster produces a single
+        // undo entry covering BOTH the position change and the membership change.
+        // Yjs nests the inner ydoc.transact() call inside _updateClusterMembership
+        // into this outer transaction, making the two sets of writes atomic.
+        // This must run after stopDrag() so boxes have their final positions.
+        this._updateClusterMembership(boxesThatWereDragging);
       }, 'dragRelease');
 
-      // Close the undo boundary to ensure the transaction is captured as a single undo item
-      // This is important when captureTimeout=0 (action-based undo)
+      // Close the combined undo boundary (position changes + any membership changes).
       if (typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
 
       this.isArrowKeyNavigating = false;
-
-      // Resolve cluster membership changes (add / remove boxes) for all boxes
-      // that were dragged.  This must happen after stopDrag() so the boxes have
-      // their final positions.
-      this._updateClusterMembership(boxesThatWereDragging);
     }
 
     // Clear drag-interaction highlights on all clusters regardless of whether

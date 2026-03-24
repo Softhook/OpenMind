@@ -686,4 +686,54 @@ describe('Cluster drag membership (collaboration integration)', () => {
         expect(rebuilt.dragAddHighlight).toBe(true);
         expect(rebuilt.dragRemoveHighlight).toBe(true);
     });
+
+    // ── 22. drag-position + membership form ONE undo step when combined ────────
+    test('position change and membership change inside a single _wrapInTransaction form one undo entry', () => {
+        // This validates that the handleMouseReleased refactor (moving
+        // _updateClusterMembership inside the outer _wrapInTransaction) produces
+        // a single undo entry for the entire drag gesture.  With captureTimeout=0
+        // each ydoc.transact() call is its own undo entry; the only way to merge
+        // them is to run both inside the SAME outer ydoc.transact(), which Yjs
+        // achieves by nesting inner transact() calls into the outer one.
+        const b1 = makeBox(  0,   0, mindMap);
+        const b2 = makeBox(  0, 400, mindMap);
+        const b3 = makeBox(200, 200, mindMap);
+        const cluster = mindMap.addCluster([b1, b2, b3]);
+
+        // Seed initial box positions in yboxes (untracked) so the undo manager
+        // can later restore them.
+        cm.ydoc.transact(() => {
+            cm.yboxes.set(b1.id, cm._boxToYjsData(b1));
+            cm.yboxes.set(b2.id, cm._boxToYjsData(b2));
+            cm.yboxes.set(b3.id, cm._boxToYjsData(b3));
+        }, null); // null origin → not tracked by UndoManager
+        cm.undoManager.clear(); // start clean — only track the drag gesture
+
+        snapshotHull(cluster);
+        b1.x = -2000; // simulate the box having been dragged far away
+
+        // ── Simulate the new handleMouseReleased combined transaction ──────────
+        // Both the position write (simulated here by setting yboxes directly) and
+        // the membership update run inside ONE outer _wrapInTransaction call.
+        mindMap._wrapInTransaction(() => {
+            // Represent _notifyBoxesChanged: write b1's new position to yboxes.
+            cm.yboxes.set(b1.id, cm._boxToYjsData(b1));
+            // Membership update in the same outer transaction (Yjs-nesting merges it).
+            mindMap._updateClusterMembership([b1]);
+        });
+        collaborationManager.stopCapturing(); // close the combined undo entry
+
+        expect(cluster.containsBox(b1)).toBe(false); // b1 removed from cluster
+        // ONE undo entry covers both the position write AND the membership change.
+        expect(cm.undoManager.undoStack.length).toBe(1);
+
+        // ── Single undo must restore BOTH membership AND position ─────────────
+        cm.undo();
+
+        // Membership: yclusters is reverted; _rebuildClustersFromYjs restores b1
+        expect(mindMap.clusters).toHaveLength(1);
+        expect(mindMap.clusters[0].boxes.map(b => b.id)).toContain(b1.id);
+        // Position: yboxes is reverted; _applyBoxFromYjs (snapToPosition) restores b1.x
+        expect(cm.yboxes.get(b1.id).x).toBe(0); // original x
+    });
 });
