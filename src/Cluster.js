@@ -40,6 +40,13 @@ class Cluster {
    */
   static INNER_HIT_MARGIN = 20;
 
+  /**
+   * Minimum distance (px) a member box must travel outside the cluster's
+   * remaining-member hull before it is removed on drag-end.  Large enough
+   * to prevent accidental removal during small adjustments.
+   */
+  static REMOVAL_DISTANCE = 80;
+
   // ============================================================================
   // CONSTRUCTOR
   // ============================================================================
@@ -69,6 +76,25 @@ class Cluster {
     /** @private */ this._hullCache    = null; // {x,y}[] convex hull
     /** @private */ this._splineCache  = null; // {x,y}[] catmull-rom spline
     /** @private */ this._boundsCache  = null; // {left,top,right,bottom}
+
+    // ── Drag-interaction state ────────────────────────────────────────────
+    /** Set to true while a non-member box being dragged is fully inside this
+     *  cluster's hull.  Cleared on mouse release. */
+    this.dragAddHighlight    = false;
+    /** Set to true while a member box being dragged is far enough outside
+     *  the remaining cluster hull to trigger removal on release.
+     *  Cleared on mouse release. */
+    this.dragRemoveHighlight = false;
+    /**
+     * Snapshot of the hull points taken at the very start of a drag gesture,
+     * before any member box has moved.  Used by {@link isBoxFarOutside} so
+     * the removal threshold is measured relative to the cluster's *original*
+     * visible boundary rather than the (deformed) live hull.
+     * Set by MindMap._captureDragStartClusterSnapshots() and cleared by
+     * MindMap._clearClusterDragHighlights().
+     * @private
+     */
+    this._dragStartHull = null;
   }
 
   // ============================================================================
@@ -103,7 +129,15 @@ class Cluster {
     const c = this.color;
     fill(c.r, c.g, c.b, c.a);
 
-    if (this.selected) {
+    if (this.dragRemoveHighlight) {
+      const rc = ColorPalette.CLUSTER.DRAG_REMOVE_STROKE;
+      stroke(rc.r, rc.g, rc.b, rc.a);
+      strokeWeight(Cluster.STROKE_WEIGHT_SELECTED);
+    } else if (this.dragAddHighlight) {
+      const ac = ColorPalette.CLUSTER.DRAG_ADD_STROKE;
+      stroke(ac.r, ac.g, ac.b, ac.a);
+      strokeWeight(Cluster.STROKE_WEIGHT_SELECTED);
+    } else if (this.selected) {
       const sc = ColorPalette.CLUSTER.SELECTED_STROKE;
       stroke(sc.r, sc.g, sc.b, sc.a);
       strokeWeight(Cluster.STROKE_WEIGHT_SELECTED);
@@ -230,6 +264,72 @@ class Cluster {
       this.boxes.splice(idx, 1);
       this._boxSnapshot = null; // force geometry refresh
     }
+  }
+
+  /**
+   * Adds a box to this cluster if it is not already a member.
+   * Forces a geometry cache refresh so the hull/spline/bounds are recomputed
+   * on the next draw call.
+   * @param {TextBox} box
+   */
+  addBox(box) {
+    if (!box || this.boxes.includes(box)) return;
+    this.boxes.push(box);
+    this._boxSnapshot = null; // force geometry refresh
+  }
+
+  /**
+   * Returns true when every corner of `box` lies inside this cluster's current
+   * convex hull.  Used during a drag to decide whether the box can be added.
+   *
+   * The hull is already padded by {@link Cluster.PADDING} around its member
+   * boxes, so a dragged box only needs all four of its own corners (no extra
+   * padding) to be strictly inside that region.
+   *
+   * @param {TextBox} box - The box to test (may or may not be a member)
+   * @returns {boolean}
+   */
+  isBoxFullyEnclosed(box) {
+    if (!box) return false;
+    if (this._isGeometryDirty()) this._refreshGeometry();
+    const hull = this._hullCache;
+    if (!hull || hull.length < 3) return false;
+
+    const hw = box.width  / 2;
+    const hh = box.height / 2;
+    return (
+      Cluster._isPointInExpandedHull(box.x - hw, box.y - hh, hull, 0) &&
+      Cluster._isPointInExpandedHull(box.x + hw, box.y - hh, hull, 0) &&
+      Cluster._isPointInExpandedHull(box.x + hw, box.y + hh, hull, 0) &&
+      Cluster._isPointInExpandedHull(box.x - hw, box.y + hh, hull, 0)
+    );
+  }
+
+  /**
+   * Returns true when a *member* box has been dragged far enough outside the
+   * cluster that it should be removed on mouse release.
+   *
+   * Requires a pre-drag hull snapshot (`_dragStartHull`) to be set by
+   * MindMap._captureDragStartClusterSnapshots() before the drag begins.
+   * The removal threshold is measured relative to the cluster's *original*
+   * visible boundary so that boxes which were already far apart when the
+   * cluster was created do not get removed by small adjustments.
+   *
+   * Returns false (conservatively keeps the box) when no snapshot is present
+   * (e.g. in unit tests that do not simulate the full drag lifecycle).
+   *
+   * @param {TextBox} box - A member box being tested for removal
+   * @returns {boolean}
+   */
+  isBoxFarOutside(box) {
+    if (!box) return false;
+
+    const referenceHull = this._dragStartHull;
+    if (!referenceHull || referenceHull.length < 3) return false;
+
+    return !Cluster._isPointInExpandedHull(
+      box.x, box.y, referenceHull, Cluster.REMOVAL_DISTANCE
+    );
   }
 
   // ============================================================================

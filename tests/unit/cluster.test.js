@@ -198,6 +198,151 @@ describe('Cluster', () => {
   });
 
   // --------------------------------------------------------------------------
+  describe('addBox()', () => {
+    test('adds a non-member box to the cluster', () => {
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(200, 0);
+      const b3 = makeBox(100, 0);
+      const cluster = new Cluster([b1, b2]);
+      cluster.addBox(b3);
+      expect(cluster.boxes).toContain(b3);
+      expect(cluster.boxes).toHaveLength(3);
+    });
+
+    test('is a no-op when the box is already a member', () => {
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(200, 0);
+      const cluster = new Cluster([b1, b2]);
+      cluster.addBox(b1);
+      expect(cluster.boxes).toHaveLength(2); // unchanged
+    });
+
+    test('forces a geometry cache refresh', () => {
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(200, 0);
+      const b3 = makeBox(100, 0, 50, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Warm up cache
+      cluster.getBounds();
+      expect(cluster._boxSnapshot).not.toBeNull();
+      cluster.addBox(b3);
+      expect(cluster._boxSnapshot).toBeNull(); // cache invalidated
+    });
+
+    test('is a no-op for null/undefined', () => {
+      const b1 = makeBox(0, 0);
+      const b2 = makeBox(200, 0);
+      const cluster = new Cluster([b1, b2]);
+      expect(() => cluster.addBox(null)).not.toThrow();
+      expect(() => cluster.addBox(undefined)).not.toThrow();
+      expect(cluster.boxes).toHaveLength(2);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('isBoxFullyEnclosed()', () => {
+    // Two boxes 400 px apart create a wide cluster hull.
+    // Hull corners (PADDING = 30):
+    //   B1 (x=0, w=100, h=50): padded corners at (-80,-55) and (80,55)
+    //   B2 (x=400, w=100, h=50): padded corners at (320,-55) and (480,55)
+    //   Combined hull: rectangle from (-80,-55) to (480,55)
+
+    test('returns true when all box corners are inside the hull', () => {
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Small box at center, well within the hull
+      const inner = makeBox(200, 0, 50, 20);
+      expect(cluster.isBoxFullyEnclosed(inner)).toBe(true);
+    });
+
+    test('returns false when any corner is outside the hull', () => {
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Box that extends far above (top edge at y = -200-30 = -230 < -55)
+      const tall = makeBox(200, 0, 50, 500);
+      expect(cluster.isBoxFullyEnclosed(tall)).toBe(false);
+    });
+
+    test('returns false when box is completely outside the hull', () => {
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      const outside = makeBox(1000, 0, 50, 20);
+      expect(cluster.isBoxFullyEnclosed(outside)).toBe(false);
+    });
+
+    test('returns false when cluster has no hull (empty boxes)', () => {
+      const cluster = new Cluster([]);
+      expect(cluster.isBoxFullyEnclosed(makeBox(0, 0, 50, 20))).toBe(false);
+    });
+
+    test('returns false for null input', () => {
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      expect(cluster.isBoxFullyEnclosed(null)).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('isBoxFarOutside()', () => {
+    // Cluster: B1 at (0,0) w=100 h=50, B2 at (0,200) w=100 h=50
+    // Hull spans from (-80,-55) to (80,255).
+    // B1 centre at (0,0) — inside the hull.
+    // With _dragStartHull set to this hull, B1 is "far outside" only when its
+    // centre is more than REMOVAL_DISTANCE (80) px outside the hull boundary.
+
+    function makeClusterWithSnapshot() {
+      const b1 = makeBox(0,   0, 100, 50);
+      const b2 = makeBox(0, 200, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Force geometry computation and take a snapshot as MindMap would
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+      return { cluster, b1, b2 };
+    }
+
+    test('returns false when the member box is still inside the drag-start hull', () => {
+      const { cluster, b1 } = makeClusterWithSnapshot();
+      // b1 centre at (0,0) is inside the hull — not far outside
+      expect(cluster.isBoxFarOutside(b1)).toBe(false);
+    });
+
+    test('returns true when the member box has moved past REMOVAL_DISTANCE outside the hull', () => {
+      const { cluster, b1 } = makeClusterWithSnapshot();
+      // Hull top edge at y = -55.  Moving b1 centre to y = -200 puts it
+      // 145 px above the top edge, well beyond REMOVAL_DISTANCE (80).
+      b1.y = -200;
+      expect(cluster.isBoxFarOutside(b1)).toBe(true);
+    });
+
+    test('returns false when box is just outside hull but within REMOVAL_DISTANCE', () => {
+      const { cluster, b1 } = makeClusterWithSnapshot();
+      // Hull top edge at y = -55.  Move b1 centre to y = -100 (45 px outside).
+      b1.y = -100;
+      expect(cluster.isBoxFarOutside(b1)).toBe(false);
+    });
+
+    test('returns false for null input', () => {
+      const { cluster } = makeClusterWithSnapshot();
+      expect(cluster.isBoxFarOutside(null)).toBe(false);
+    });
+
+    test('returns false when no drag-start hull snapshot is set', () => {
+      // Without a snapshot, isBoxFarOutside always returns false to avoid
+      // incorrectly removing boxes that started far apart in the cluster.
+      const b1 = makeBox(0, 0, 100, 50);
+      const b2 = makeBox(0, 200, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // _dragStartHull is null by default
+      b1.x = 1000; // very far from b2, but no snapshot → conservative false
+      expect(cluster.isBoxFarOutside(b1)).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   describe('contains() hit-detection', () => {
     test('returns false for a point deep in the interior (outline-only selection)', () => {
       // Hull for two 100×50 boxes at x=0 and x=200, PADDING=30:
@@ -798,6 +943,171 @@ describe('MindMap cluster integration', () => {
 
       expect(receivedArg).toBe(true);
       MindMap.onClustersChange = null;
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('_updateClusterMembership()', () => {
+    // Cluster geometry reference:
+    //   b1 at (0, 0) w=100 h=50:   padded corners (-80,-55) to (80,55)
+    //   b2 at (0, 200) w=100 h=50: padded corners (-80,145) to (80,255)
+    //   Combined hull: rectangle from (-80,-55) to (80,255)
+    //
+    // A 40×20 box centred at (0,100) has corners (-20,90),(20,90),(20,110),(-20,110)
+    // — all inside the hull → isBoxFullyEnclosed returns true.
+
+    function makeAndRegister(x, y, w, h) {
+      const box = makeBox(x, y, w, h);
+      mindMap._registerBox(box);
+      return box;
+    }
+
+    test('adds a box to a cluster when it is fully enclosed', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Small box that fits entirely inside the cluster hull
+      const inner = makeAndRegister(0, 100, 40, 20);
+
+      mindMap._updateClusterMembership([inner]);
+
+      expect(cluster.containsBox(inner)).toBe(true);
+    });
+
+    test('does NOT add a box that is only partially inside the hull', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Box that extends far beyond the hull boundary (hull right at x=80)
+      const outside = makeAndRegister(0, 100, 500, 20);
+
+      mindMap._updateClusterMembership([outside]);
+
+      expect(cluster.containsBox(outside)).toBe(false);
+    });
+
+    test('removes a member box that is beyond REMOVAL_DISTANCE outside the drag-start hull', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Snapshot the hull as MindMap would at drag-start (b1 at its original position)
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+
+      // Move b1 far to the left — 1000 px outside the original boundary
+      b1.x = -1000;
+
+      mindMap._updateClusterMembership([b1]);
+
+      expect(cluster.containsBox(b1)).toBe(false);
+    });
+
+    test('does NOT remove a member box that is still within REMOVAL_DISTANCE of the hull', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Snapshot the hull (hull left edge at x=-80; REMOVAL_DISTANCE=80)
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+
+      // Move b1 centre to x=-120 → 40 px outside the hull left edge (< REMOVAL_DISTANCE=80)
+      b1.x = -120;
+
+      mindMap._updateClusterMembership([b1]);
+
+      expect(cluster.containsBox(b1)).toBe(true);
+    });
+
+    test('prunes cluster when it drops below 2 members after removal', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      mindMap.addCluster([b1, b2]);
+
+      // Snapshot hull and move both boxes far away
+      for (const c of mindMap.clusters) {
+        if (c._isGeometryDirty()) c._refreshGeometry();
+        c._dragStartHull = c._hullCache ? [...c._hullCache] : null;
+      }
+      b1.x = -2000; b2.x = 2000;
+
+      mindMap._updateClusterMembership([b1, b2]);
+
+      // Both boxes removed → cluster has < 2 members → pruned
+      expect(mindMap.clusters).toHaveLength(0);
+    });
+
+    test('fires onClustersChange when membership changes', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+      b1.x = -2000;
+
+      const callback = jest.fn();
+      MindMap.onClustersChange = callback;
+      mindMap._updateClusterMembership([b1]);
+
+      expect(callback).toHaveBeenCalled();
+      MindMap.onClustersChange = null;
+    });
+
+    test('is a no-op when there are no clusters', () => {
+      const b1 = addBox(0, 0);
+      expect(() => mindMap._updateClusterMembership([b1])).not.toThrow();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('_captureDragStartClusterSnapshots()', () => {
+    test('snapshots the hull of a cluster whose member is dragging', () => {
+      const b1 = makeBox(  0,   0, 100, 50); mindMap._registerBox(b1);
+      const b2 = makeBox(  0, 200, 100, 50); mindMap._registerBox(b2);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Simulate b1 starting a drag
+      b1.isDragging = true;
+
+      mindMap._captureDragStartClusterSnapshots();
+
+      expect(cluster._dragStartHull).not.toBeNull();
+      expect(Array.isArray(cluster._dragStartHull)).toBe(true);
+      expect(cluster._dragStartHull.length).toBeGreaterThanOrEqual(3);
+    });
+
+    test('sets _dragStartHull to null when no member is dragging', () => {
+      const b1 = makeBox(  0,   0, 100, 50); mindMap._registerBox(b1);
+      const b2 = makeBox(  0, 200, 100, 50); mindMap._registerBox(b2);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // No box is dragging
+      mindMap._captureDragStartClusterSnapshots();
+
+      expect(cluster._dragStartHull).toBeNull();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  describe('_clearClusterDragHighlights()', () => {
+    test('resets all drag highlight flags and hull snapshots', () => {
+      const b1 = makeBox(  0,   0, 100, 50); mindMap._registerBox(b1);
+      const b2 = makeBox(  0, 200, 100, 50); mindMap._registerBox(b2);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      cluster.dragAddHighlight    = true;
+      cluster.dragRemoveHighlight = true;
+      cluster._dragStartHull      = [{ x: 0, y: 0 }];
+
+      mindMap._clearClusterDragHighlights();
+
+      expect(cluster.dragAddHighlight).toBe(false);
+      expect(cluster.dragRemoveHighlight).toBe(false);
+      expect(cluster._dragStartHull).toBeNull();
     });
   });
 
