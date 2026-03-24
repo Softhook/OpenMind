@@ -42,8 +42,9 @@ class Cluster {
 
   /**
    * Minimum distance (px) a member box must travel outside the cluster's
-   * remaining-member hull before it is removed on drag-end.  Large enough
-   * to prevent accidental removal during small adjustments.
+   * original drag-start hull (pre-drag snapshot) before it is removed on
+   * drag-end.  Large enough to prevent accidental removal during small
+   * adjustments.
    */
   static REMOVAL_DISTANCE = 80;
 
@@ -82,8 +83,8 @@ class Cluster {
      *  cluster's hull.  Cleared on mouse release. */
     this.dragAddHighlight    = false;
     /** Set to true while a member box being dragged is far enough outside
-     *  the remaining cluster hull to trigger removal on release.
-     *  Cleared on mouse release. */
+     *  the pre-drag hull snapshot (`_dragStartHull`) to trigger removal on
+     *  release.  Cleared on mouse release. */
     this.dragRemoveHighlight = false;
     /**
      * Snapshot of the hull points taken at the very start of a drag gesture,

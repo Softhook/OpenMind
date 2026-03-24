@@ -3389,7 +3389,8 @@ class MindMap {
    * - `dragAddHighlight` → true when a non-member box is fully enclosed in
    *   the cluster's hull (signalling it would be added on release).
    * - `dragRemoveHighlight` → true when a member box is far enough outside
-   *   the remaining-member hull (signalling it would be removed on release).
+   *   the pre-drag hull snapshot used by {@link Cluster#isBoxFarOutside}
+   *   (signalling it would be removed on release).
    *
    * @param {TextBox[]} draggingBoxes
    * @private
@@ -3442,8 +3443,9 @@ class MindMap {
    * Resolves cluster membership after a drag ends.
    *
    * For each dragged box:
-   *  - If the box belongs to a cluster and is now far enough outside the
-   *    remaining-member hull, it is removed from that cluster.
+   *  - If the box belongs to a cluster and, relative to the drag-start hull
+   *    snapshot captured at drag begin (see `_dragStartHull`), is now far
+   *    enough outside that hull, it is removed from that cluster.
    *  - If the box does not belong to any cluster and every one of its corners
    *    lies inside a cluster's hull, it is added to that cluster.
    *
