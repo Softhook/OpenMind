@@ -2218,6 +2218,9 @@ class MindMap {
           this.selectedCluster.selected = false;
           this.selectedCluster = null;
         }
+        // Snapshot cluster hulls so _updateClusterMembership can measure removal
+        // distance from the pre-drag boundary rather than the live (deformed) hull.
+        if (onEdge) this._captureDragStartClusterSnapshots();
         return;
       }
     }
@@ -2392,16 +2395,27 @@ class MindMap {
         if (changedBoxes.length > 0) {
           this._notifyBoxesChanged(changedBoxes, true); // already in a transaction
         }
+
+        // Resolve cluster membership changes inside the same Yjs transaction so
+        // that a drag that moves a box out of (or into) a cluster produces a single
+        // undo entry covering BOTH the position change and the membership change.
+        // Yjs nests the inner ydoc.transact() call inside _updateClusterMembership
+        // into this outer transaction, making the two sets of writes atomic.
+        // This must run after stopDrag() so boxes have their final positions.
+        this._updateClusterMembership(boxesThatWereDragging);
       }, 'dragRelease');
 
-      // Close the undo boundary to ensure the transaction is captured as a single undo item
-      // This is important when captureTimeout=0 (action-based undo)
+      // Close the combined undo boundary (position changes + any membership changes).
       if (typeof collaborationManager !== 'undefined' && collaborationManager) {
         collaborationManager.stopCapturing();
       }
 
       this.isArrowKeyNavigating = false;
     }
+
+    // Clear drag-interaction highlights on all clusters regardless of whether
+    // any box actually moved.
+    this._clearClusterDragHighlights();
 
     // Stop selecting on all boxes (this doesn't need transaction wrapping)
     for (let box of this.boxes) {
@@ -2454,6 +2468,9 @@ class MindMap {
     // Apply gentle snap-to-grid only when the grid overlay is visible
     this._applyGridSnapping(draggingBoxes);
     this._applyGridSnappingDuringResize(resizingBoxes);
+
+    // Update visual drag-interaction highlights on all clusters
+    this._updateClusterDragHighlights(draggingBoxes);
   }
 
   /**
@@ -3336,6 +3353,172 @@ class MindMap {
   getClusterForBox(box) {
     if (!box || !this.clusters) return null;
     return this.clusters.find(c => c && c.containsBox(box)) || null;
+  }
+
+  /**
+   * Snapshots the convex hull of every cluster that has at least one member
+   * currently being dragged.  The snapshot is stored as
+   * `cluster._dragStartHull` so that {@link Cluster#isBoxFarOutside} can
+   * measure the removal threshold against the *pre-drag* cluster boundary
+   * rather than the live (deformed) hull.
+   *
+   * Must be called immediately after `box.startDrag()` in
+   * `handleMousePressed`, before any movement has occurred.
+   * @private
+   */
+  _captureDragStartClusterSnapshots() {
+    if (!this.clusters || this.clusters.length === 0) return;
+
+    const draggingBoxes = this.boxes ? this.boxes.filter(b => b && b.isDragging) : [];
+
+    for (const cluster of this.clusters) {
+      if (!cluster) continue;
+      const hasDraggingMember = draggingBoxes.some(b => cluster.containsBox(b));
+      if (hasDraggingMember) {
+        // Ensure geometry is fresh before snapshotting
+        if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+        cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+      } else {
+        cluster._dragStartHull = null;
+      }
+    }
+  }
+
+  /**
+   * Updates the `dragAddHighlight` / `dragRemoveHighlight` flags on every
+   * cluster while boxes are being dragged.  Called from `handleMouseDragged`.
+   *
+   * - `dragAddHighlight` → true when a non-member box is fully enclosed in
+   *   the cluster's hull (signalling it would be added on release).
+   * - `dragRemoveHighlight` → true when a member box is far enough outside
+   *   the pre-drag hull snapshot used by {@link Cluster#isBoxFarOutside}
+   *   (signalling it would be removed on release).
+   *
+   * @param {TextBox[]} draggingBoxes
+   * @private
+   */
+  _updateClusterDragHighlights(draggingBoxes) {
+    if (!this.clusters || this.clusters.length === 0) return;
+
+    // Reset all flags first
+    for (const cluster of this.clusters) {
+      if (!cluster) continue;
+      cluster.dragAddHighlight    = false;
+      cluster.dragRemoveHighlight = false;
+    }
+
+    if (!draggingBoxes || draggingBoxes.length === 0) return;
+
+    // Pre-compute which boxes already belong to at least one cluster.
+    // A box that is already in another cluster cannot be drag-added (the
+    // nowInCluster guard in _updateClusterMembership prevents it), so showing
+    // dragAddHighlight for such a box would be a false visual cue.
+    const boxesInAnyClusters = new Set();
+    for (const c of this.clusters) {
+      if (c) for (const b of c.boxes) boxesInAnyClusters.add(b);
+    }
+
+    for (const cluster of this.clusters) {
+      if (!cluster) continue;
+      for (const box of draggingBoxes) {
+        if (cluster.containsBox(box)) {
+          if (cluster.isBoxFarOutside(box)) {
+            cluster.dragRemoveHighlight = true;
+          }
+        } else if (!boxesInAnyClusters.has(box)) {
+          // Only offer drag-add highlight for boxes that are free of all clusters.
+          if (cluster.isBoxFullyEnclosed(box)) {
+            cluster.dragAddHighlight = true;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Clears `dragAddHighlight`, `dragRemoveHighlight`, and `_dragStartHull` on
+   * every cluster.  Called from `handleMouseReleased` once drag-end processing
+   * is complete.
+   * @private
+   */
+  _clearClusterDragHighlights() {
+    if (!this.clusters) return;
+    for (const cluster of this.clusters) {
+      if (!cluster) continue;
+      cluster.dragAddHighlight    = false;
+      cluster.dragRemoveHighlight = false;
+      cluster._dragStartHull      = null;
+    }
+  }
+
+  /**
+   * Resolves cluster membership after a drag ends.
+   *
+   * For each dragged box:
+   *  - If the box belongs to a cluster and, relative to the drag-start hull
+   *    snapshot captured at drag begin (see `_dragStartHull`), is now far
+   *    enough outside that hull, it is removed from that cluster.
+   *  - If the box does not belong to any cluster and every one of its corners
+   *    lies inside a cluster's hull, it is added to that cluster.
+   *
+   * Clusters that drop below two members are deleted.
+   * The whole operation is wrapped in a single undo transaction and triggers
+   * `MindMap.onClustersChange` if anything changed.
+   *
+   * @param {TextBox[]} draggedBoxes - Boxes whose positions may have changed
+   * @private
+   */
+  _updateClusterMembership(draggedBoxes) {
+    if (!this.clusters || !draggedBoxes || draggedBoxes.length === 0) return;
+
+    let changed = false;
+
+    this._wrapInTransaction(() => {
+      for (const box of draggedBoxes) {
+        // ── Removal check ─────────────────────────────────────────────────
+        for (const cluster of this.clusters) {
+          if (!cluster) continue;
+          if (cluster.containsBox(box) && cluster.isBoxFarOutside(box)) {
+            cluster.removeBox(box);
+            changed = true;
+          }
+        }
+
+        // ── Addition check ────────────────────────────────────────────────
+        // Only consider adding if the box is not (or is no longer) in any cluster
+        const nowInCluster = this.clusters.some(c => c && c.containsBox(box));
+        if (!nowInCluster) {
+          for (const cluster of this.clusters) {
+            if (!cluster) continue;
+            if (cluster.isBoxFullyEnclosed(box)) {
+              cluster.addBox(box);
+              changed = true;
+              break; // add to the first matching cluster only
+            }
+          }
+        }
+      }
+
+      if (changed) {
+        // Prune clusters that no longer have at least two members
+        const valid = this.clusters.filter(c => c && c.boxes.length >= 2);
+        if (valid.length !== this.clusters.length) {
+          if (this.selectedCluster && !valid.includes(this.selectedCluster)) {
+            this.selectedCluster = null;
+          }
+          this.clusters = valid;
+        }
+
+        this.isSaved = false;
+        if (MindMap.onClustersChange) MindMap.onClustersChange(true);
+      }
+    }, 'clusterMembership');
+
+    if (changed) {
+      if (typeof collaborationManager !== 'undefined' && collaborationManager) {
+        collaborationManager.stopCapturing();
+      }
+    }
   }
 
   // ============================================================================

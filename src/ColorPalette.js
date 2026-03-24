@@ -126,7 +126,9 @@ class ColorPalette {
       { r: 221, g: 160, b: 221, a: 80 }, // plum
       { r: 255, g: 218, b: 185, a: 80 }  // peach
     ],
-    SELECTED_STROKE: { r: 100, g: 150, b: 255, a: 200 }
+    SELECTED_STROKE: { r: 100, g: 150, b: 255, a: 200 },
+    DRAG_ADD_STROKE: { r: 60, g: 200, b: 80, a: 230 },
+    DRAG_REMOVE_STROKE: { r: 220, g: 80, b: 60, a: 230 }
   };
 
   // ============================================================================
