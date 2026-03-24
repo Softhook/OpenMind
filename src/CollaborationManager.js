@@ -1566,11 +1566,31 @@ class CollaborationManager {
     _rebuildClustersFromYjs() {
         if (!this.mindMap || !this.yclusters || typeof Cluster === 'undefined') return;
 
+        // Build an ID→cluster map of the current objects so we can transfer
+        // transient drag state (hull snapshot and highlight flags) to the
+        // freshly-deserialized replacements.  Without this, a remote Yjs update
+        // arriving mid-drag would silently drop the pre-drag hull snapshot,
+        // causing isBoxFarOutside() to conservatively return false and the user's
+        // removal gesture to be ignored for the remainder of the drag.
+        const oldById = new Map(
+            (this.mindMap.clusters || []).filter(c => c && c.id).map(c => [c.id, c])
+        );
+
         const newClusters = [];
         this.yclusters.forEach((data) => {
             try {
                 const cluster = Cluster.fromJSON(data, this.mindMap.boxes);
-                if (cluster) newClusters.push(cluster);
+                if (cluster) {
+                    // Preserve in-flight drag state so that a mid-drag remote
+                    // update does not silently cancel the local removal gesture.
+                    const old = oldById.get(cluster.id);
+                    if (old) {
+                        cluster._dragStartHull      = old._dragStartHull;
+                        cluster.dragAddHighlight    = old.dragAddHighlight;
+                        cluster.dragRemoveHighlight = old.dragRemoveHighlight;
+                    }
+                    newClusters.push(cluster);
+                }
             } catch (e) {
                 console.warn('[Clusters] Error rebuilding cluster from Yjs:', e);
             }

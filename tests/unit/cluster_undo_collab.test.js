@@ -568,3 +568,122 @@ describe('Cluster remote collaboration (two-doc simulation)', () => {
         expect(Cluster._nextColorIndex).toBe(before);
     });
 });
+
+// =============================================================================
+// GROUP 4: Drag-based cluster membership — collaboration integration
+// Verifies that _updateClusterMembership writes to yclusters, is undoable,
+// and that _rebuildClustersFromYjs preserves transient drag state so that a
+// remote update arriving mid-drag cannot silently cancel a removal gesture.
+// =============================================================================
+
+describe('Cluster drag membership (collaboration integration)', () => {
+    let mindMap, cm;
+
+    beforeEach(() => {
+        Cluster._nextColorIndex = 0;
+        jest.clearAllMocks();
+        MindMap.onClustersChange = null;
+        mindMap = new MindMap();
+        cm = makeCollab(mindMap);
+        global.collaborationManager = cm;
+    });
+
+    afterEach(() => {
+        cm._clearMindMapCallbacks();
+        MindMap.onClustersChange = null;
+        global.collaborationManager = undefined;
+    });
+
+    /** Capture the pre-drag hull snapshot on a cluster, as MindMap would at drag-start. */
+    function snapshotHull(cluster) {
+        if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+        cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+    }
+
+    // ── 18. drag-add writes new member to yclusters ───────────────────────────
+    test('_updateClusterMembership (drag-add) writes new membership to yclusters', () => {
+        // b1 and b2 are far apart vertically; an inner box centred between them
+        // fits entirely inside the cluster hull.
+        const b1 = makeBox(  0,   0, mindMap);
+        const b2 = makeBox(  0, 400, mindMap);
+        const cluster = mindMap.addCluster([b1, b2]);
+
+        // inner is centred at (0, 200) with the default w=150 h=40.
+        // Hull (PADDING=30): x ∈ [-105, 105], y ∈ [-50, 450].
+        // inner corners: (±75, 180..220) — all inside the hull.
+        const inner = makeBox(0, 200, mindMap);
+        cm.undoManager.clear(); // track only the membership change
+
+        mindMap._updateClusterMembership([inner]);
+
+        expect(cluster.containsBox(inner)).toBe(true);
+        const stored = cm.yclusters.get(cluster.id);
+        expect(stored).toBeDefined();
+        expect(stored.boxIds).toContain(inner.id);
+    });
+
+    // ── 19. drag-remove removes member from yclusters ─────────────────────────
+    test('_updateClusterMembership (drag-remove) removes member from yclusters', () => {
+        const b1 = makeBox(  0,   0, mindMap);
+        const b2 = makeBox(  0, 400, mindMap);
+        const b3 = makeBox(200, 200, mindMap);
+        const cluster = mindMap.addCluster([b1, b2, b3]);
+
+        snapshotHull(cluster);
+        b1.x = -2000; // far beyond REMOVAL_DISTANCE (80 px) outside the hull
+
+        mindMap._updateClusterMembership([b1]);
+
+        expect(cluster.containsBox(b1)).toBe(false);
+        const stored = cm.yclusters.get(cluster.id);
+        expect(stored).toBeDefined();
+        expect(stored.boxIds).not.toContain(b1.id);
+        expect(stored.boxIds).toContain(b2.id);
+        expect(stored.boxIds).toContain(b3.id);
+    });
+
+    // ── 20. undo after drag-remove restores membership ────────────────────────
+    test('undo after drag-remove restores membership in both local state and yclusters', () => {
+        const b1 = makeBox(  0,   0, mindMap);
+        const b2 = makeBox(  0, 400, mindMap);
+        const b3 = makeBox(200, 200, mindMap);
+        const cluster = mindMap.addCluster([b1, b2, b3]);
+        cm.undoManager.clear(); // track only the membership change
+
+        snapshotHull(cluster);
+        b1.x = -2000;
+        mindMap._updateClusterMembership([b1]);
+
+        expect(cluster.containsBox(b1)).toBe(false);
+        expect(cm.yclusters.get(cluster.id).boxIds).not.toContain(b1.id);
+
+        cm.undo();
+
+        // yclusters is restored; the observer rebuilds local state
+        expect(cm.yclusters.get(cluster.id).boxIds).toContain(b1.id);
+        expect(mindMap.clusters[0].boxes.map(b => b.id)).toContain(b1.id);
+    });
+
+    // ── 21. _rebuildClustersFromYjs preserves in-flight drag state ────────────
+    test('_rebuildClustersFromYjs transfers _dragStartHull and highlight flags to rebuilt clusters', () => {
+        const b1 = makeBox(0,   0, mindMap);
+        const b2 = makeBox(0, 200, mindMap);
+        const cluster = mindMap.addCluster([b1, b2]);
+
+        // Simulate the state set by _captureDragStartClusterSnapshots at drag-start
+        snapshotHull(cluster);
+        const savedHull             = cluster._dragStartHull;
+        cluster.dragAddHighlight    = true;
+        cluster.dragRemoveHighlight = true;
+
+        // Trigger a rebuild as if a remote Yjs update arrived mid-drag
+        cm._rebuildClustersFromYjs();
+
+        expect(mindMap.clusters).toHaveLength(1);
+        const rebuilt = mindMap.clusters[0];
+        expect(rebuilt).not.toBe(cluster);              // new object from fromJSON
+        expect(rebuilt._dragStartHull).toEqual(savedHull);
+        expect(rebuilt.dragAddHighlight).toBe(true);
+        expect(rebuilt.dragRemoveHighlight).toBe(true);
+    });
+});
