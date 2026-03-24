@@ -298,6 +298,17 @@ class Cluster {
 
     const hw = box.width  / 2;
     const hh = box.height / 2;
+
+    // Cheap AABB pre-reject: if any corner of `box` lies outside the cluster's
+    // axis-aligned bounding box, it cannot possibly be inside the hull.
+    // `_boundsCache` is always populated by `_refreshGeometry()` above.
+    const bounds = this._boundsCache;
+    if (bounds &&
+        (box.x - hw < bounds.left  || box.x + hw > bounds.right ||
+         box.y - hh < bounds.top   || box.y + hh > bounds.bottom)) {
+      return false;
+    }
+
     return (
       Cluster._isPointInExpandedHull(box.x - hw, box.y - hh, hull, 0) &&
       Cluster._isPointInExpandedHull(box.x + hw, box.y - hh, hull, 0) &&
@@ -656,10 +667,16 @@ class Cluster {
    * Returns true if (x, y) is within `margin` pixels of the interior of the
    * convex hull.  Hull points must be in counter-clockwise order.
    *
-   * For each directed edge a→b the signed distance from (x, y) to the edge
-   * line is computed (positive = inside / left side for a CCW polygon).  The
-   * point is "within margin" of the hull when every signed distance is ≥ -margin,
-   * i.e. it is at most `margin` pixels outside each edge.
+   * For each directed edge a→b the raw cross-product
+   *   cross = dx*(y - a.y) - dy*(x - a.x)
+   * gives the numerator of the signed distance (positive = left of a→b = inside
+   * for a CCW polygon).  The rejection condition `signedDist < -margin` becomes:
+   *
+   *   cross < 0  AND  cross² > margin² × len²     (squaring avoids Math.sqrt)
+   *
+   * For margin = 0 the squared test reduces to `cross < 0`, so no multiplication
+   * is needed.  Degenerate edges (len = 0 ↔ dx = dy = 0) produce cross = 0,
+   * which never satisfies `cross < 0`, so the implicit `continue` is preserved.
    *
    * @param {number} x
    * @param {number} y
@@ -670,16 +687,20 @@ class Cluster {
    */
   static _isPointInExpandedHull(x, y, hull, margin) {
     const n = hull.length;
+    const marginSquared = margin * margin; // precomputed; 0 when margin = 0
     for (let i = 0; i < n; i++) {
       const a  = hull[i];
       const b  = hull[(i + 1) % n];
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len === 0) continue;
-      // Signed distance: positive means left of a→b (inside for CCW hull)
-      const signedDist = (dx * (y - a.y) - dy * (x - a.x)) / len;
-      if (signedDist < -margin) return false;
+      // Raw cross-product (signed-distance numerator before dividing by len).
+      // Positive ⟹ inside (left side of CCW edge).
+      const cross = dx * (y - a.y) - dy * (x - a.x);
+      if (cross >= 0) continue; // clearly inside or on this edge — keep going
+      // cross < 0: point is on the outside of this edge.
+      // Reject if it is farther outside than `margin`:
+      //   |cross / len| > margin  ↔  cross² > margin² * len²  (both sides ≥ 0)
+      if (margin === 0 || cross * cross > marginSquared * (dx * dx + dy * dy)) return false;
     }
     return true;
   }

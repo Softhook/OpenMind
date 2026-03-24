@@ -284,6 +284,30 @@ describe('Cluster', () => {
       const cluster = new Cluster([b1, b2]);
       expect(cluster.isBoxFullyEnclosed(null)).toBe(false);
     });
+
+    // ── AABB pre-check ───────────────────────────────────────────────────────
+    // Verifies that the AABB rejection path fires correctly and that it does
+    // not produce false negatives for boxes that genuinely fit inside the hull.
+
+    test('AABB pre-check: returns false quickly when box extends beyond cluster bounds', () => {
+      // Hull bounds: left=-80, right=480, top=-55, bottom=55
+      // Box right edge at 480 + 1 = 481 > bounds.right → AABB reject
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Box centred at x=460 with w=50 → right edge = 460+25 = 485 > 480
+      const overEdge = makeBox(460, 0, 50, 20);
+      expect(cluster.isBoxFullyEnclosed(overEdge)).toBe(false);
+    });
+
+    test('AABB pre-check: does not produce false negative for a box inside bounds', () => {
+      const b1 = makeBox(  0, 0, 100, 50);
+      const b2 = makeBox(400, 0, 100, 50);
+      const cluster = new Cluster([b1, b2]);
+      // Box at (200, 0) with w=40, h=20 — all corners inside hull
+      const inside = makeBox(200, 0, 40, 20);
+      expect(cluster.isBoxFullyEnclosed(inside)).toBe(true);
+    });
   });
 
   // --------------------------------------------------------------------------
@@ -551,6 +575,31 @@ describe('Cluster', () => {
     test('returns false for a point farther outside than the margin', () => {
       // 120 is 20px outside the right edge; margin=10 → should be false
       expect(Cluster._isPointInExpandedHull(120, 50, square, 10)).toBe(false);
+    });
+
+    // ── Sqrt-free implementation boundary checks ────────────────────────────
+    // These verify the squared-comparison path produces the same answer as the
+    // original sqrt+division path at the exact margin boundary.
+
+    test('returns true for a point exactly on the margin boundary (margin=10)', () => {
+      // Point at (110, 50) is exactly 10 px outside the right edge (x=100).
+      // signedDist = -10 = -margin → the condition is signedDist >= -margin → true
+      expect(Cluster._isPointInExpandedHull(110, 50, square, 10)).toBe(true);
+    });
+
+    test('returns false for a point one pixel past the margin boundary (margin=10)', () => {
+      // Point at (111, 50) is 11 px outside the right edge — beyond margin=10.
+      expect(Cluster._isPointInExpandedHull(111, 50, square, 10)).toBe(false);
+    });
+
+    test('handles a degenerate (zero-length) edge without throwing', () => {
+      // A hull with two coincident points produces a degenerate edge.
+      // The function must not divide by zero or throw.
+      const degenerate = [
+        { x: 0, y: 0 }, { x: 0, y: 0 }, // degenerate
+        { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }
+      ];
+      expect(() => Cluster._isPointInExpandedHull(50, 50, degenerate, 0)).not.toThrow();
     });
   });
 
