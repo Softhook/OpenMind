@@ -3409,6 +3409,8 @@ class MindMap {
 
     if (!draggingBoxes || draggingBoxes.length === 0) return;
 
+    const draggingSet = new Set(draggingBoxes);
+
     // Pre-compute which boxes already belong to at least one cluster.
     // A box that is already in another cluster cannot be drag-added (the
     // nowInCluster guard in _updateClusterMembership prevents it), so showing
@@ -3420,9 +3422,16 @@ class MindMap {
 
     for (const cluster of this.clusters) {
       if (!cluster) continue;
+
+      // If every member of this cluster is currently being dragged, they are
+      // moving together (the cluster is being moved) so we should NOT show
+      // a removal highlight even if they are far from the original hull.
+      const allMembersDragging = cluster.boxes.length > 0 &&
+                                 cluster.boxes.every(b => draggingSet.has(b));
+
       for (const box of draggingBoxes) {
         if (cluster.containsBox(box)) {
-          if (cluster.isBoxFarOutside(box)) {
+          if (!allMembersDragging && cluster.isBoxFarOutside(box)) {
             cluster.dragRemoveHighlight = true;
           }
         } else if (!boxesInAnyClusters.has(box)) {
@@ -3474,13 +3483,28 @@ class MindMap {
     let changed = false;
 
     this._wrapInTransaction(() => {
+      // Pre-identify clusters that are being moved entirely (all members dragged).
+      // These are immune to removal checks because they are moving with their boxes.
+      const draggedSet = new Set(draggedBoxes);
+      const clustersMovingEntirely = new Set();
+      if (this.clusters) {
+        for (const cluster of this.clusters) {
+          if (cluster && cluster.boxes.length > 0 &&
+              cluster.boxes.every(b => draggedSet.has(b))) {
+            clustersMovingEntirely.add(cluster);
+          }
+        }
+      }
+
       for (const box of draggedBoxes) {
         // ── Removal check ─────────────────────────────────────────────────
         for (const cluster of this.clusters) {
           if (!cluster) continue;
-          if (cluster.containsBox(box) && cluster.isBoxFarOutside(box)) {
-            cluster.removeBox(box);
-            changed = true;
+          if (cluster.containsBox(box)) {
+            if (!clustersMovingEntirely.has(cluster) && cluster.isBoxFarOutside(box)) {
+              cluster.removeBox(box);
+              changed = true;
+            }
           }
         }
 
