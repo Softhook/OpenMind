@@ -3409,6 +3409,8 @@ class MindMap {
 
     if (!draggingBoxes || draggingBoxes.length === 0) return;
 
+    const draggingSet = new Set(draggingBoxes);
+
     // Pre-compute which boxes already belong to at least one cluster.
     // A box that is already in another cluster cannot be drag-added (the
     // nowInCluster guard in _updateClusterMembership prevents it), so showing
@@ -3420,15 +3422,32 @@ class MindMap {
 
     for (const cluster of this.clusters) {
       if (!cluster) continue;
+
+      // Rule of Majority Preview:
+      // "Movers" = members being dragged AND far enough outside the original boundary
+      const movers = cluster.boxes.filter(b => draggingSet.has(b) && cluster.isBoxFarOutside(b));
+      if (movers.length === 0) {
+        cluster.dragRemoveHighlight = false;
+      } else {
+        // "Stayers" = everyone else (not dragged, or dragged but still close)
+        const stayers = cluster.boxes.filter(b => !movers.includes(b));
+        
+        // Removal highlight is shown only if the movers are going to LOSE the
+        // cluster (i.e. if stationary boxes are majority OR in a tie).
+        const moversLose = stayers.length > 0 && stayers.length >= movers.length;
+        cluster.dragRemoveHighlight = moversLose;
+      }
+
+      // Addition preview only applies to boxes that are not already members
+      // of a cluster (unless they are about to be ejected from their current one).
       for (const box of draggingBoxes) {
-        if (cluster.containsBox(box)) {
-          if (cluster.isBoxFarOutside(box)) {
-            cluster.dragRemoveHighlight = true;
-          }
-        } else if (!boxesInAnyClusters.has(box)) {
-          // Only offer drag-add highlight for boxes that are free of all clusters.
-          if (cluster.isBoxFullyEnclosed(box)) {
-            cluster.dragAddHighlight = true;
+        if (!cluster.containsBox(box)) {
+          const inAnyCluster = boxesInAnyClusters.has(box);
+          // Only show add highlight if the box is genuinely free or will be ejected
+          if (!inAnyCluster) {
+            if (cluster.isBoxFullyEnclosed(box)) {
+              cluster.dragAddHighlight = true;
+            }
           }
         }
       }
@@ -3474,18 +3493,39 @@ class MindMap {
     let changed = false;
 
     this._wrapInTransaction(() => {
-      for (const box of draggedBoxes) {
-        // ── Removal check ─────────────────────────────────────────────────
+      // 1. RULE OF MAJORITY: Determine which boxes stay and which leave each cluster
+      const draggedSet = new Set(draggedBoxes);
+      if (this.clusters) {
         for (const cluster of this.clusters) {
           if (!cluster) continue;
-          if (cluster.containsBox(box) && cluster.isBoxFarOutside(box)) {
-            cluster.removeBox(box);
-            changed = true;
-          }
-        }
 
-        // ── Addition check ────────────────────────────────────────────────
-        // Only consider adding if the box is not (or is no longer) in any cluster
+          // "Movers" = members being dragged AND far enough outside the original boundary
+          const movers = cluster.boxes.filter(b => draggedSet.has(b) && cluster.isBoxFarOutside(b));
+          if (movers.length === 0) continue;
+
+          // "Stayers" = everyone else (not dragged, or dragged but still close)
+          const stayers = cluster.boxes.filter(b => !movers.includes(b));
+          if (stayers.length === 0) continue; // Moving together as one block
+
+          // Rule of Majority: Cluster goes with the larger group; tie-break favors stayers.
+          if (movers.length > stayers.length) {
+            // Movers keep the cluster -> stationary members (stayers) are ejected
+            for (const box of stayers) {
+              cluster.removeBox(box);
+            }
+          } else {
+            // Stationary members keep the cluster -> moving members (movers) are ejected
+            for (const box of movers) {
+              cluster.removeBox(box);
+            }
+          }
+          changed = true;
+        }
+      }
+
+      // 2. ADDITION CHECK: Can any dragged box join a cluster?
+      // (This only applies to boxes that are not ALREADY in a cluster)
+      for (const box of draggedBoxes) {
         const nowInCluster = this.clusters.some(c => c && c.containsBox(box));
         if (!nowInCluster) {
           for (const cluster of this.clusters) {

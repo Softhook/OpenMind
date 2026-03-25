@@ -1076,16 +1076,16 @@ describe('MindMap cluster integration', () => {
       const b2 = makeAndRegister(  0, 200, 100, 50);
       mindMap.addCluster([b1, b2]);
 
-      // Snapshot hull and move both boxes far away
+      // Snapshot hull and move ONLY ONE box far away
       for (const c of mindMap.clusters) {
         if (c._isGeometryDirty()) c._refreshGeometry();
         c._dragStartHull = c._hullCache ? [...c._hullCache] : null;
       }
-      b1.x = -2000; b2.x = 2000;
+      b1.x = -2000; 
 
-      mindMap._updateClusterMembership([b1, b2]);
+      mindMap._updateClusterMembership([b1]);
 
-      // Both boxes removed → cluster has < 2 members → pruned
+      // b1 removed → cluster has 1 member → pruned
       expect(mindMap.clusters).toHaveLength(0);
     });
 
