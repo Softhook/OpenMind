@@ -1790,6 +1790,25 @@ function updateCursorForHover() {
     cursor('text');
     return;
   }
+
+  // Check for cluster hover (clusters are usually behind boxes, so we check last)
+  if (mindMap && mindMap.clusters) {
+    if (mindMap.draggingCluster || mindMap._potentialClusterDrag) {
+      cursor('grabbing');
+      return;
+    }
+    const wx = worldMouseX();
+    const wy = worldMouseY();
+    // Check if any cluster contains the mouse (near its border)
+    for (let i = mindMap.clusters.length - 1; i >= 0; i--) {
+      const cluster = mindMap.clusters[i];
+      if (cluster && cluster.contains(wx, wy)) {
+        cursor('grab');
+        return;
+      }
+    }
+  }
+
   cursor('default');
 }
 

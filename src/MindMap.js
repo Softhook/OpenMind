@@ -2275,12 +2275,19 @@ class MindMap {
       this.isArrowKeyNavigating = false;
       this.clearBoxSelection();
       if (this.clearConnectionSelection) this.clearConnectionSelection();
+
       // Deselect any previously selected cluster
       if (this.selectedCluster && this.selectedCluster !== clickedCluster) {
         this.selectedCluster.selected = false;
       }
       this.selectedCluster = clickedCluster;
       clickedCluster.selected = true;
+
+      // Set potential drag state - do NOT select boxes yet
+      this._potentialClusterDrag = clickedCluster;
+      this._dragStartWorldX = mx;
+      this._dragStartWorldY = my;
+
       return;
     }
 
@@ -2413,6 +2420,10 @@ class MindMap {
       this.isArrowKeyNavigating = false;
     }
 
+    // Always clear cluster-drag state on release
+    this.draggingCluster = null;
+    this._potentialClusterDrag = null;
+
     // Clear drag-interaction highlights on all clusters regardless of whether
     // any box actually moved.
     this._clearClusterDragHighlights();
@@ -2433,10 +2444,9 @@ class MindMap {
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
-    // If any gesture is in progress (dragging/resizing/connecting), mark as unsaved continuously
-    // This ensures autosave doesn’t flip to saved mid-gesture and miss later changes in the same gesture.
+    // Continuous mark as unsaved for gestures
     try {
-      let gestureActive = !!this.connectingFrom || !!this.draggingConnection;
+      let gestureActive = !!this.connectingFrom || !!this.draggingConnection || !!this._potentialClusterDrag;
       if (!gestureActive) {
         for (let b of this.boxes) {
           if (b && (b.isDragging || b.isResizing)) { gestureActive = true; break; }
@@ -2444,6 +2454,36 @@ class MindMap {
       }
       if (gestureActive) this.isSaved = false;
     } catch (_) { }
+
+    // Refined Cluster Dragging: Trigger actual box selection/drag start only after a threshold
+    if (this._potentialClusterDrag) {
+      const d = dist(mx, my, this._dragStartWorldX, this._dragStartWorldY);
+      if (d > 3) {
+        const cluster = this._potentialClusterDrag;
+        this._potentialClusterDrag = null;
+
+        // Check if any box in the cluster is locked by a remote user
+        const lockedBox = cluster.boxes.find(b => b.isLockedByRemoteEdit && b.isLockedByRemoteEdit());
+        if (lockedBox) {
+          if (typeof TextBox !== 'undefined' && TextBox.getRemoteEditingState) {
+            const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
+            if (remoteState && lockedBox._showEditingBlockedNotification) {
+              lockedBox._showEditingBlockedNotification(remoteState);
+            }
+          }
+          return;
+        }
+
+        // officially start the drag for all boxes
+        for (const box of cluster.boxes) {
+          this.addBoxToSelection(box);
+          box.startDrag(this._dragStartWorldX, this._dragStartWorldY);
+          this._bringBoxToTop(box);
+        }
+        this.draggingCluster = cluster;
+        this._captureDragStartClusterSnapshots();
+      }
+    }
 
     const draggingBoxes = [];
     const resizingBoxes = [];
