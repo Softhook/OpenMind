@@ -2556,8 +2556,13 @@ class MindMap {
    */
   _isAnyBoxLocked(boxes) {
     if (!boxes) return null;
-    const boxArray = Array.isArray(boxes) ? boxes : Array.from(boxes);
-    return boxArray.find(b => b && b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()) || null;
+    // Iterate directly over Set or Array to avoid allocation
+    for (const b of boxes) {
+      if (b && b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()) {
+        return b;
+      }
+    }
+    return null;
   }
 
   /**
