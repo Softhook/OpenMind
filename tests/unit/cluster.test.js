@@ -1074,19 +1074,41 @@ describe('MindMap cluster integration', () => {
     test('prunes cluster when it drops below 2 members after removal', () => {
       const b1 = makeAndRegister(  0,   0, 100, 50);
       const b2 = makeAndRegister(  0, 200, 100, 50);
-      mindMap.addCluster([b1, b2]);
+      const cluster = mindMap.addCluster([b1, b2]);
+
+      // Snapshot hull
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+      
+      // Move ONLY one box far away (simulates b1 being dragged out, b2 is static)
+      b1.x = -2000;
+
+      // Update for b1 only. Since b2 is NOT in this list, it's not dragging,
+      // so the cluster is NOT "moving entirely".
+      mindMap._updateClusterMembership([b1]);
+
+      // b1 removed -> cluster has < 2 members (only b2) -> pruned
+      expect(mindMap.clusters).toHaveLength(0);
+    });
+
+    test('does NOT prune cluster when all members are moved together', () => {
+      const b1 = makeAndRegister(  0,   0, 100, 50);
+      const b2 = makeAndRegister(  0, 200, 100, 50);
+      const cluster = mindMap.addCluster([b1, b2]);
 
       // Snapshot hull and move both boxes far away
-      for (const c of mindMap.clusters) {
-        if (c._isGeometryDirty()) c._refreshGeometry();
-        c._dragStartHull = c._hullCache ? [...c._hullCache] : null;
-      }
+      if (cluster._isGeometryDirty()) cluster._refreshGeometry();
+      cluster._dragStartHull = cluster._hullCache ? [...cluster._hullCache] : null;
+
       b1.x = -2000; b2.x = 2000;
 
+      // Both boxes moved together -> cluster "moves entirely" with them
       mindMap._updateClusterMembership([b1, b2]);
 
-      // Both boxes removed → cluster has < 2 members → pruned
-      expect(mindMap.clusters).toHaveLength(0);
+      // Cluster is preserved
+      expect(mindMap.clusters).toHaveLength(1);
+      expect(cluster.boxes).toContain(b1);
+      expect(cluster.boxes).toContain(b2);
     });
 
     test('fires onClustersChange when membership changes', () => {

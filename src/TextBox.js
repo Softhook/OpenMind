@@ -1882,6 +1882,26 @@ class TextBox {
   }
 
   /**
+   * Gets the currently selected text along with its formatting metadata.
+   * @returns {Object|null} {text, metadata} or null if no selection
+   */
+  getFormattedSelection() {
+    const selection = this._getOrderedSelection(true);
+    if (!selection) return null;
+
+    const { start, end } = selection;
+    const text = this.text.slice(start, end);
+
+    const metadata = {
+      highlights: this._getRangesInRange(this.highlights, start, end),
+      boldRanges: this._getRangesInRange(this.boldRanges, start, end),
+      italicRanges: this._getRangesInRange(this.italicRanges, start, end)
+    };
+
+    return { text, metadata };
+  }
+
+  /**
    * Deletes the currently selected text
    */
   deleteSelection() {
@@ -1902,12 +1922,26 @@ class TextBox {
    * @param {string} pastedText - Text to paste
    */
   pasteText(pastedText) {
+    this.pasteFormattedText(pastedText, null);
+  }
+
+  /**
+   * Pastes text at the cursor position with optional formatting metadata.
+   * @param {string} pastedText - Text to paste
+   * @param {Object} [metadata] - Optional formatting metadata
+   */
+  pasteFormattedText(pastedText, metadata) {
     // Validate pasted text
     if (pastedText === null || pastedText === undefined) {
       return;
     }
 
     this._ensureText();
+
+    // Ensure formatting arrays exist before pushing to them
+    if (!Array.isArray(this.highlights)) this.highlights = [];
+    if (!Array.isArray(this.boldRanges)) this.boldRanges = [];
+    if (!Array.isArray(this.italicRanges)) this.italicRanges = [];
 
     // Sanitize pasted text to normalize line endings and remove invisible characters
     pastedText = Utils.sanitizeText(pastedText);
@@ -1917,6 +1951,7 @@ class TextBox {
 
     // If there's a selection, replace it
     const hasSelection = this._hasSelection(true);
+    let insertPos = this.cursorPosition;
 
     if (hasSelection) {
       const selection = this._getOrderedSelection(true);
@@ -1924,18 +1959,58 @@ class TextBox {
       const end = selection ? selection.end : 0;
       const removedLen = end - start;
       const addedLen = pastedText.length;
+      insertPos = start;
       this.applyEditDelta(start, removedLen, addedLen);
       this.text = this.text.slice(0, start) + pastedText + this.text.slice(end);
       this.cursorPosition = start + pastedText.length;
       this._clearSelection();
     } else {
       // No selection, insert at cursor position
-      const insertPos = this.cursorPosition;
       const addedLen = pastedText.length;
       this.applyEditDelta(insertPos, 0, addedLen);
       this.text = this.text.slice(0, insertPos) + pastedText + this.text.slice(insertPos);
       this.cursorPosition += pastedText.length;
     }
+
+    // Apply formatting metadata if provided
+    if (metadata) {
+      const textLen = this.text.length;
+      if (Array.isArray(metadata.highlights)) {
+        for (const h of metadata.highlights) {
+          if (!h || typeof h.start !== 'number' || typeof h.end !== 'number') continue;
+          const hStart = Math.max(0, Math.min(textLen, Math.floor(h.start + insertPos)));
+          const hEnd = Math.max(0, Math.min(textLen, Math.floor(h.end + insertPos)));
+          if (hEnd <= hStart) continue;
+
+          this.highlights.push({
+            start: hStart,
+            end: hEnd,
+            color: h.color || { r: 255, g: 255, b: 0, a: 180 }
+          });
+        }
+      }
+      if (Array.isArray(metadata.boldRanges)) {
+        for (const r of metadata.boldRanges) {
+          if (!r) continue;
+          this.boldRanges.push({
+            start: r.start + insertPos,
+            end: r.end + insertPos
+          });
+        }
+        this.boldRanges = this._mergeRanges(this.boldRanges, textLen);
+      }
+      if (Array.isArray(metadata.italicRanges)) {
+        for (const r of metadata.italicRanges) {
+          if (!r) continue;
+          this.italicRanges.push({
+            start: r.start + insertPos,
+            end: r.end + insertPos
+          });
+        }
+        this.italicRanges = this._mergeRanges(this.italicRanges, textLen);
+      }
+    }
+
     this.updateDimensions();
   }
 
@@ -2157,6 +2232,34 @@ class TextBox {
       if (idx >= r.start && idx < r.end) return true;
     }
     return false;
+  }
+
+  /**
+   * Extracts formatting ranges that overlap with the given text range [start, end)
+   * and offsets them to be relative to the start of the range.
+   * @param {Array<Object>} ranges - Original ranges array
+   * @param {number} start - Start of the selection
+   * @param {number} end - End of the selection
+   * @returns {Array<Object>} Extracted and offset ranges
+   * @private
+   */
+  _getRangesInRange(ranges, start, end) {
+    if (!Array.isArray(ranges)) return [];
+    const result = [];
+    for (const r of ranges) {
+      if (!r) continue;
+      const rStart = Math.max(start, r.start);
+      const rEnd = Math.min(end, r.end);
+      if (rStart < rEnd) {
+        const entry = {
+          start: rStart - start,
+          end: rEnd - start
+        };
+        if (r.color) entry.color = { ...r.color }; // Deep copy color
+        result.push(entry);
+      }
+    }
+    return result;
   }
 
   /**

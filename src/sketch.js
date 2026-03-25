@@ -1894,29 +1894,58 @@ function handleVisibilityChange() {
 function handleNativePaste(e) {
   try {
     if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
-    let data = e && e.clipboardData ? e.clipboardData.getData('text/plain') : null;
-    const doPaste = (text) => {
-      if (!text) return;
+    
+    // Attempt to get formatted data first
+    let formattedData = e && e.clipboardData ? e.clipboardData.getData('application/x-openmind-formatted-v1') : null;
+    let plainText = e && e.clipboardData ? e.clipboardData.getData('text/plain') : null;
+    
+    const doPaste = (text, metadata) => {
+      if (!text || !mindMap.selectedBox) return;
+      
       mindMap.isSaved = false; // Mark as unsaved
-      // If a stray 'v' character was inserted just before paste, remove it deterministically
-      try {
+      
+      // Wrap in transaction so text + all formatting updates are a single undo step
+      mindMap._wrapInTransaction(() => {
+        // Deterministic removal of 'v' if it was just typed as part of Cmd+V
         const box = mindMap.selectedBox;
-        const hasSelection = (box.selectionStart !== -1 && box.selectionEnd !== -1 && box.selectionStart !== box.selectionEnd);
+        const hasSelection = box._hasSelection(true);
         if (!hasSelection && box.cursorPosition > 0 && box.text && (box.text[box.cursorPosition - 1] === 'v' || box.text[box.cursorPosition - 1] === 'V')) {
           box.removeChar();
         }
-      } catch (_) { }
-      mindMap.selectedBox.pasteText(text);
-      // Prevent the browser from attempting to paste into a non-editable canvas
-      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+        if (metadata) {
+          box.pasteFormattedText(text, metadata);
+        } else {
+          box.pasteText(text);
+        }
+        
+        // Notify collaboration system immediately
+        // Pass skipTransactionWrapper=true since we're already in a transaction
+        if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+          MindMap.onBoxChange(box, true);
+        }
+      }, 'paste');
     };
 
-    if (data && data.length > 0) {
-      doPaste(data);
+    // Prevent the browser from attempting to paste into a non-editable canvas
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+    if (formattedData) {
+      try {
+        const metadata = JSON.parse(formattedData);
+        doPaste(plainText, metadata);
+        return;
+      } catch (err) {
+        console.warn('Failed to parse formatted clipboard data:', err);
+      }
+    }
+
+    if (plainText && plainText.length > 0) {
+      doPaste(plainText);
     } else if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
       // Fallback for browsers that don't populate event.clipboardData
       navigator.clipboard.readText().then(txt => doPaste(txt)).catch(() => {
-        // As a last resort, do nothing and allow default (though canvas has no default target)
+        // Silent catch for clipboard permission denied or other errors
       });
     }
   } catch (_) { }
@@ -1925,10 +1954,19 @@ function handleNativePaste(e) {
 function handleNativeCopy(e) {
   try {
     if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
-    const text = mindMap.selectedBox.getSelectedText ? mindMap.selectedBox.getSelectedText() : '';
-    if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
-      e.clipboardData.setData('text/plain', text);
+    const box = mindMap.selectedBox;
+    const formattedSelection = box.getFormattedSelection ? box.getFormattedSelection() : null;
+    
+    if (formattedSelection && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+      e.clipboardData.setData('text/plain', formattedSelection.text);
+      e.clipboardData.setData('application/x-openmind-formatted-v1', JSON.stringify(formattedSelection.metadata));
       if (typeof e.preventDefault === 'function') e.preventDefault();
+    } else {
+      const text = box.getSelectedText ? box.getSelectedText() : '';
+      if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+        e.clipboardData.setData('text/plain', text);
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+      }
     }
   } catch (_) { }
 }
@@ -1962,12 +2000,23 @@ async function convertDataUrlToWebP(dataUrl, options = {}) {
 function handleNativeCut(e) {
   try {
     if (!mindMap || !mindMap.selectedBox || !mindMap.selectedBox.isEditing) return;
-    const text = mindMap.selectedBox.getSelectedText ? mindMap.selectedBox.getSelectedText() : '';
-    if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
-      e.clipboardData.setData('text/plain', text);
+    const box = mindMap.selectedBox;
+    const formattedSelection = box.getFormattedSelection ? box.getFormattedSelection() : null;
+    
+    if (formattedSelection && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+      e.clipboardData.setData('text/plain', formattedSelection.text);
+      e.clipboardData.setData('application/x-openmind-formatted-v1', JSON.stringify(formattedSelection.metadata));
       if (typeof e.preventDefault === 'function') e.preventDefault();
       mindMap.isSaved = false; // Mark as unsaved
-      if (typeof mindMap.selectedBox.deleteSelection === 'function') mindMap.selectedBox.deleteSelection();
+      if (typeof box.deleteSelection === 'function') box.deleteSelection();
+    } else {
+      const text = box.getSelectedText ? box.getSelectedText() : '';
+      if (text && e && e.clipboardData && typeof e.clipboardData.setData === 'function') {
+        e.clipboardData.setData('text/plain', text);
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        mindMap.isSaved = false; // Mark as unsaved
+        if (typeof box.deleteSelection === 'function') box.deleteSelection();
+      }
     }
   } catch (_) { }
 }

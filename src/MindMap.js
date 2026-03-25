@@ -2700,28 +2700,9 @@ class MindMap {
           }
           return;
         } else if (key === 'v' || key === 'V') {
-          // Paste from clipboard
-          try {
-            if (navigator.clipboard && navigator.clipboard.readText) {
-              navigator.clipboard.readText().then(text => {
-                if (text && this.selectedBox) {
-                  // Wrap in transaction to make paste a discrete operation
-                  this._wrapInTransaction(() => {
-                    this.selectedBox.pasteText(text);
-                    // Notify collaboration system
-                    // Pass skipTransactionWrapper=true since we're in a transaction
-                    if (MindMap.onBoxChange && this.selectedBox) {
-                      MindMap.onBoxChange(this.selectedBox, true);
-                    }
-                  });
-                }
-              }).catch(err => {
-                console.error('Failed to paste text: ', err);
-              });
-            }
-          } catch (e) {
-            console.error('Clipboard paste not supported:', e);
-          }
+          // Paste is handled via the native 'paste' event in sketch.js
+          // to support rich formatting and better browser compatibility.
+          // We return early here to prevent 'v' from being added as a character.
           return;
         } else if (key === 'u' || key === 'U') {
           // Highlight selected text (toggle) with Cmd/Ctrl+U
