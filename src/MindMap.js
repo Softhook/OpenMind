@@ -2103,6 +2103,12 @@ class MindMap {
     // Check if clicking on resize handle
     for (let box of this.boxes) {
       if (box.isMouseOverResizeHandle()) {
+        // Check if box is locked before starting resize
+        if (box.isLockedByRemoteEdit && box.isLockedByRemoteEdit()) {
+          const remoteState = TextBox.getRemoteEditingState(box.id);
+          box._showEditingBlockedNotification(remoteState);
+          return;
+        }
         this.isArrowKeyNavigating = false; // Clear navigation when resizing
         this.selectedBox = box;
         // Single select this box when resizing
@@ -2120,6 +2126,14 @@ class MindMap {
       if (!conn || !conn.isMouseOverArrowHead || !conn.getArrowHeadPosition) continue;
       try {
         if (conn.isMouseOverArrowHead()) {
+          // Drag Lock Protection: Check if either end of the connection is locked
+          const lockedBox = this._isAnyBoxLocked([conn.fromBox, conn.toBox]);
+          if (lockedBox) {
+            const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
+            lockedBox._showEditingBlockedNotification(remoteState);
+            return;
+          }
+
           // Begin dragging the arrow head to a new target
           this.isArrowKeyNavigating = false; // Clear navigation when reattaching
           this.draggingConnection = { conn, originalTo: conn.toBox };
@@ -2176,6 +2190,16 @@ class MindMap {
 
           // Stop editing to avoid text interaction while dragging
           box.stopEditing();
+
+          // Drag Lock Protection: Check if ANY selected box is locked before starting the drag.
+          // This prevents "fragmented" dragging where some boxes move and others stay.
+          const boxesToDrag = (hasMultipleSelected && boxInSelection) ? Array.from(this.selectedBoxes) : [box];
+          const lockedBox = this._isAnyBoxLocked(boxesToDrag);
+          if (lockedBox) {
+            const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
+            lockedBox._showEditingBlockedNotification(remoteState);
+            return;
+          }
 
           // Start drag for all selected boxes if we have multiple, otherwise just this one
           if (hasMultipleSelected && boxInSelection) {
@@ -2330,7 +2354,17 @@ class MindMap {
         const duplicate = this.connections.some(c => c !== conn && c.fromBox === conn.fromBox && c.toBox === droppedOn);
         if (!duplicate) {
           if (droppedOn !== originalTo) {
-            changed = true;
+            // Drag Lock Protection: Check if the new target box is locked
+            if (droppedOn && droppedOn.isLockedByRemoteEdit && droppedOn.isLockedByRemoteEdit()) {
+              const remoteState = TextBox.getRemoteEditingState(droppedOn.id);
+              if (droppedOn._showEditingBlockedNotification) {
+                droppedOn._showEditingBlockedNotification(remoteState);
+              }
+              // Reset drag state or just don't apply the change
+              changed = false;
+            } else {
+              changed = true;
+            }
 
             // Wrap connection reattachment in transaction for proper undo tracking
             this._wrapInTransaction(() => {
@@ -2463,7 +2497,7 @@ class MindMap {
         this._potentialClusterDrag = null;
 
         // Check if any box in the cluster is locked by a remote user
-        const lockedBox = cluster.boxes.find(b => b.isLockedByRemoteEdit && b.isLockedByRemoteEdit());
+        const lockedBox = this._isAnyBoxLocked(cluster.boxes);
         if (lockedBox) {
           if (typeof TextBox !== 'undefined' && TextBox.getRemoteEditingState) {
             const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
@@ -2511,6 +2545,19 @@ class MindMap {
 
     // Update visual drag-interaction highlights on all clusters
     this._updateClusterDragHighlights(draggingBoxes);
+  }
+
+  /**
+   * Helper to check if any of the given boxes are locked by remote editing.
+   * Returns the first locked box found, or null if none are locked.
+   * @param {Array<TextBox>|Set<TextBox>} boxes 
+   * @returns {TextBox|null}
+   * @private
+   */
+  _isAnyBoxLocked(boxes) {
+    if (!boxes) return null;
+    const boxArray = Array.isArray(boxes) ? boxes : Array.from(boxes);
+    return boxArray.find(b => b && b.isLockedByRemoteEdit && b.isLockedByRemoteEdit()) || null;
   }
 
   /**
@@ -2981,6 +3028,16 @@ class MindMap {
       } else if (this.selectedBoxes && this.selectedBoxes.size > 0) {
         // Delete all selected boxes - wrap in transaction for single undo step
         const boxesToDelete = Array.from(this.selectedBoxes);
+
+        // Drag Lock Protection: Check if ANY selected box is locked before deletion
+        const lockedBox = this._isAnyBoxLocked(boxesToDelete);
+        if (lockedBox) {
+          const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
+          if (lockedBox._showEditingBlockedNotification) {
+            lockedBox._showEditingBlockedNotification(remoteState);
+          }
+          return;
+        }
 
         this._wrapInTransaction(() => {
           this._performBoxDeletion(boxesToDelete);
