@@ -1470,239 +1470,66 @@ function draw() {
     }
   }
 
-  // Draw loading overlay on top of everything when fetching/loading maps
+  // Updated to use DOM-based RoomTransitionOverlay
   if (isMapLoading) {
-    const overlay = UI_COLORS.LOADING_OVERLAY;
-    const { r, g, b, a } = overlay.bg;
-    push();
-    // Screen-space overlay
-    resetMatrix && resetMatrix();
-    noStroke();
-    fill(r, g, b, a);
-    rect(0, 0, width, height);
-
-    // Loading text
-    fill(ColorPalette.toCSS(overlay.text));
-    textAlign(CENTER, CENTER);
-    textSize(20);
-    text('Loading map...', width / 2, height / 2 - 10);
-
-    // Small spinner below the text
-    push();
-    translate(width / 2, height / 2 + 18);
-    rotate(frameCount * 0.08);
-    stroke(ColorPalette.toCSS(overlay.spinner));
-    strokeWeight(3);
-    noFill();
-    arc(0, 0, 28, 28, 0, PI * 0.8);
-    pop();
-    pop();
+    RoomTransitionOverlay.update('loading');
     cursor('wait');
+    return; // Don't draw anything else while loading
   }
 
-  // Draw sync overlay when collaboration is connecting/syncing
+  // Updated to use DOM-based RoomTransitionOverlay
   if (syncStatus && !isMapLoading) {
-    push();
-    resetMatrix && resetMatrix();
-    noStroke();
-    // Semi-transparent overlay - Opaque enough to hide room flicker
-    fill(40, 40, 60, 245);
-    rect(0, 0, width, height);
-
-    // State-specific messages
-    let mainMessage, subMessage;
-    let showSpinner = true;
-    let showRefreshButton = false;
-
-    if (syncStatus === 'incompatible') {
-      mainMessage = 'Update Required';
-      const mismatchInfo = collaborationManager && collaborationManager.versionMismatchInfo;
-      if (mismatchInfo) {
-        subMessage = `Your version (v${mismatchInfo.localVersion}) is incompatible with peers (v${mismatchInfo.peerVersion})`;
-      } else {
-        subMessage = 'Please refresh to get the latest version';
+    const mismatchInfo = collaborationManager && collaborationManager.versionMismatchInfo;
+    RoomTransitionOverlay.update(syncStatus, {
+      localVersion: mismatchInfo ? mismatchInfo.localVersion : null,
+      peerVersion: mismatchInfo ? mismatchInfo.peerVersion : null,
+      onCancel: () => {
+        // Implementation of cancel logic from legacy mousePressed
+        if (collaborationManager) collaborationManager.disconnect();
+        syncStatus = null;
+        if (typeof window !== 'undefined') window.location.hash = '';
       }
-      showSpinner = false;
-      showRefreshButton = true;
-    } else if (syncStatus === 'connecting') {
-      mainMessage = 'Connecting to server';
-      subMessage = 'Establishing WebSocket connection...';
-    } else if (syncStatus === 'server_starting') {
-      mainMessage = 'Server is starting up';
-      subMessage = 'This may take up to a minute on first load...';
-    } else if (syncStatus === 'syncing') {
-      mainMessage = 'Synchronizing';
-      subMessage = 'Receiving mind map content from peers...';
-    } else {
-      mainMessage = 'Connecting';
-      subMessage = 'Preparing collaboration environment...';
-    }
-
-    // App name and version at top
-    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
-    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
-    fill(120);
-    textAlign(CENTER, TOP);
-    textSize(11);
-    text(`${appName} v${versionStr}`, width / 2, 20);
-
-    // Main message
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(18);
-    text(mainMessage, width / 2, height / 2 - 20);
-
-    // Animated dots (only if not incompatible)
-    if (showSpinner) {
-      const dots = '.'.repeat((Math.floor(frameCount / 20) % 4));
-      text(dots, width / 2 + textWidth(mainMessage) / 2 + 5, height / 2 - 20);
-    }
-
-    // Subtitle
-    textSize(12);
-    fill(180);
-    text(subMessage, width / 2, height / 2 + 10);
-
-    // Show a "Cancel / Go Back" button if it's taking too long
-    // or if the user is stuck on this screen
-    const showCancelSync = (syncStatus === 'syncing' || syncStatus === 'server_starting' || syncStatus === 'connecting');
-    const cancelSyncButtonY = height / 2 + 80;
-    const isOverCancelSync = mouseX >= width / 2 - 60 && mouseX <= width / 2 + 60 &&
-      mouseY >= cancelSyncButtonY && mouseY <= cancelSyncButtonY + 30;
-
-    if (showCancelSync) {
-      push();
-      if (isOverCancelSync) fill(100, 100, 120);
-      else fill(70, 70, 90);
-      rect(width / 2 - 60, cancelSyncButtonY, 120, 30, 4);
-      fill(255);
-      textSize(11);
-      textAlign(CENTER, CENTER);
-      text('Cancel / Go Back', width / 2, cancelSyncButtonY + 15);
-      pop();
-    }
-    if (showSpinner) {
-      push();
-      translate(width / 2, height / 2 + 45);
-      rotate(frameCount * 0.05);
-      stroke(100, 180, 255);
-      strokeWeight(2);
-      noFill();
-      arc(0, 0, 24, 24, 0, PI * 0.7);
-      pop();
-    } else if (showRefreshButton) {
-      // Show refresh instruction
-      fill(100, 180, 255);
-      textSize(14);
-      text('Press F5 or ⌘R to refresh', width / 2, height / 2 + 50);
-    }
-
-    pop();
+    });
+    return; // Don't draw anything else while syncing
   }
 
   // Draw room join confirmation overlay when user is about to lose local work
+  // Updated to use DOM-based RoomTransitionOverlay
   if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    push();
-    resetMatrix && resetMatrix();
-    noStroke();
+    RoomTransitionOverlay.update('confirmation', {
+      boxCount: roomJoinConfirmation.boxCount,
+      onSync: () => {
+        const { roomName } = roomJoinConfirmation;
+        roomJoinConfirmation = null;
+        syncStatus = 'syncing';
+        _proceedWithRoomJoin(roomName, 'sync').catch(e => {
+          console.error('[Room] Sync failed:', e);
+          syncStatus = null;
+          RoomTransitionOverlay.update(null);
+        });
+      },
+      onKeep: () => {
+        const { roomName } = roomJoinConfirmation;
+        roomJoinConfirmation = null;
+        syncStatus = 'connecting';
+        _proceedWithRoomJoin(roomName, 'delete').catch(e => {
+          console.error('[Room] Join fresh failed:', e);
+          syncStatus = null;
+          RoomTransitionOverlay.update(null);
+        });
+      },
+      onCancel: () => {
+        roomJoinConfirmation = null;
+        if (typeof window !== 'undefined') window.location.hash = '';
+        RoomTransitionOverlay.update(null);
+      }
+    });
+    return; // Don't draw anything else while confirming
+  }
 
-    // Semi-transparent overlay (same as sync overlay)
-    fill(40, 40, 60, 180);
-    rect(0, 0, width, height);
-
-    // App name and version at top
-    const versionStr = (typeof APP_VERSION !== 'undefined') ? APP_VERSION.toString() : '1.0.0';
-    const appName = (typeof APP_NAME !== 'undefined') ? APP_NAME : 'OpenMind';
-    fill(120);
-    textAlign(CENTER, TOP);
-    textSize(11);
-    text(`${appName} v${versionStr}`, width / 2, 20);
-
-    // Warning icon (⚠️) - this is a critical choice that can lead to data loss
-    fill(255, 200, 0);
-    textAlign(CENTER, CENTER);
-    textSize(32);
-    text('⚠️', width / 2, height / 2 - 90);
-
-    // Main message
-    fill(255);
-    textSize(18);
-    text('Joining Collaboration Room', width / 2, height / 2 - 40);
-
-    // Info message
-    textSize(13);
-    fill(200, 200, 200);
-    const boxCount = roomJoinConfirmation.boxCount || 0;
-    const boxText = boxCount === 1 ? '1 box' : `${boxCount} boxes`;
-    text(`You currently have ${boxText} on screen`, width / 2, height / 2 - 10);
-
-    // Subtitle
-    textSize(12);
-    fill(180);
-    text('Choose how to join this online room', width / 2, height / 2 + 15);
-
-    // Three buttons in a row
-    const buttonWidth = 140;
-    const buttonHeight = 40;
-    const buttonGap = 15;
-    const totalWidth = buttonWidth * 3 + buttonGap * 2;
-    const syncButtonX = width / 2 - totalWidth / 2;
-    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
-    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
-    const buttonY = height / 2 + 50;
-
-    // Check which button mouse is over
-    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-
-    // Merge button (green)
-    if (isOverSync) {
-      fill(60, 180, 100); // Hover state
-    } else {
-      fill(50, 160, 80); // Normal state
-    }
-    rect(syncButtonX, buttonY, buttonWidth, buttonHeight, 4);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(13);
-    text('Bring Local Work', syncButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
-
-    // Start Fresh button (red)
-    if (isOverDelete) {
-      fill(220, 60, 60); // Hover state
-    } else {
-      fill(200, 40, 40); // Normal state
-    }
-    rect(deleteButtonX, buttonY, buttonWidth, buttonHeight, 4);
-    fill(255);
-    text('Join Fresh', deleteButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
-
-    // Cancel button (gray)
-    if (isOverCancel) {
-      fill(100, 100, 100); // Hover state
-    } else {
-      fill(80, 80, 80); // Normal state
-    }
-    rect(cancelButtonX, buttonY, buttonWidth, buttonHeight, 4);
-    fill(255);
-    text('Cancel', cancelButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
-
-    // Helper text
-    textSize(11);
-    fill(150);
-    if (isOverSync) {
-      text('Merge current boxes into the room\'s state.', width / 2, buttonY + buttonHeight + 25);
-    } else if (isOverDelete) {
-      text('Discard current boxes and load the room as it is on the server.', width / 2, buttonY + buttonHeight + 25);
-    } else {
-      text('Local work is stored separately for each room.', width / 2, buttonY + buttonHeight + 25);
-    }
-
-    pop();
+  // Clear transition overlay if none of the above are active
+  if (!isMapLoading && !syncStatus && !roomJoinConfirmation) {
+    RoomTransitionOverlay.update(null);
   }
 }
 
@@ -1711,30 +1538,6 @@ function draw() {
    * Sets appropriate cursors for resizing, moving, editing, and other interactions.
    */
 function updateCursorForHover() {
-  // PRIORITY: Check if hovering over room join confirmation buttons
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    const buttonWidth = 140;
-    const buttonHeight = 40;
-    const buttonGap = 15;
-    const totalWidth = buttonWidth * 3 + buttonGap * 2;
-    const syncButtonX = width / 2 - totalWidth / 2;
-    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
-    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
-    const buttonY = height / 2 + 50;
-
-    const isOverSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const isOverCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-
-    if (isOverSync || isOverDelete || isOverCancel) {
-      cursor('pointer');
-      return;
-    }
-  }
-
   if (!mindMap || !mindMap.boxes) { cursor('default'); return; }
   const validMouse = Number.isFinite(mouseX) && Number.isFinite(mouseY);
   if (!validMouse) { cursor('default'); return; }
@@ -2154,7 +1957,7 @@ function handlePageBecameVisible() {
  * Handles mouse press events
  */
 function mousePressed(e) {
-  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
+  if (uiManager && uiManager.isAnyOverlayVisible()) return false;
 
   // Ignore clicks on UI elements (buttons, inputs, etc.)
   // Only handle clicks directly on the canvas
@@ -2170,109 +1973,6 @@ function mousePressed(e) {
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
       document.activeElement.blur();
     }
-  }
-
-  // PRIORITY: Handle room join confirmation dialog before anything else
-  if (roomJoinConfirmation && !syncStatus && !isMapLoading) {
-    // Check if click is on any of the three buttons
-    const buttonWidth = 140;
-    const buttonHeight = 40;
-    const buttonGap = 15;
-    const totalWidth = buttonWidth * 3 + buttonGap * 2;
-    const syncButtonX = width / 2 - totalWidth / 2;
-    const deleteButtonX = syncButtonX + buttonWidth + buttonGap;
-    const cancelButtonX = deleteButtonX + buttonWidth + buttonGap;
-    const buttonY = height / 2 + 50;
-
-    const clickedSync = mouseX >= syncButtonX && mouseX <= syncButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const clickedDelete = mouseX >= deleteButtonX && mouseX <= deleteButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-    const clickedCancel = mouseX >= cancelButtonX && mouseX <= cancelButtonX + buttonWidth &&
-      mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
-
-    if (clickedSync) {
-      // User chose to synchronise local data with room
-      Utils.Logger.state('[Room] User chose to synchronise data with room');
-
-      const { roomName } = roomJoinConfirmation;
-      roomJoinConfirmation = null; // Clear confirmation dialog
-
-      // FIX ISSUE #3: Show progress indicator immediately
-      syncStatus = 'syncing';
-
-      // FIX CRITICAL ISSUE #1 & #2: Proceed with connection using user's choice
-      // Data is NOT cleared - it will be merged via Yjs CRDT
-      try {
-        _proceedWithRoomJoin(roomName, 'sync').catch(error => {
-          console.error('[Room] Failed to join room:', error);
-          syncStatus = null;
-        });
-      } catch (error) {
-        console.error('[Room] Error proceeding with room join:', error);
-        syncStatus = null;
-      }
-      return;
-
-    } else if (clickedDelete) {
-      // User chose to join fresh (load from room, ignore current state)
-      Utils.Logger.state('[Room] User chose to join fresh');
-
-      const { roomName } = roomJoinConfirmation;
-      roomJoinConfirmation = null; // Clear confirmation dialog
-
-      // Show progress indicator immediately
-      syncStatus = 'connecting';
-
-      // Use a background task to avoid blocking the UI thread
-      (async () => {
-        try {
-          await _proceedWithRoomJoin(roomName, 'delete');
-        } catch (error) {
-          console.error('[Room] Failed to join room fresh:', error);
-          syncStatus = null;
-        }
-      })();
-      return;
-
-    } else if (clickedCancel) {
-      // User chose to cancel - preserve local data
-      Utils.Logger.state('[Room] User cancelled joining room');
-
-      roomJoinConfirmation = null; // Clear confirmation dialog
-
-      // FIX CRITICAL ISSUE #2: Don't navigate away - just cancel the dialog
-      // This preserves local data instead of potentially losing it
-      // Just clear the hash to stay on current page with local data intact
-      if (typeof window !== 'undefined') {
-        window.location.hash = '';
-      }
-      return;
-    }
-  }
-
-  // Handle interaction for the sync overlay buttons (e.g. Cancel / Go Back)
-  if (syncStatus) {
-    const cancelSyncButtonY = height / 2 + 80;
-    const isOverCancelSync = mouseX >= width / 2 - 60 && mouseX <= width / 2 + 60 &&
-      mouseY >= cancelSyncButtonY && mouseY <= cancelSyncButtonY + 30;
-
-    if (isOverCancelSync) {
-      Utils.Logger.state('[Sync] User cancelled connection overlay');
-      if (collaborationManager) {
-        collaborationManager.disconnect();
-      }
-      syncStatus = null;
-      // Also clear the hash to prevent auto-reconnect
-      if (typeof window !== 'undefined') window.location.hash = '';
-
-      // Update UI buttons after disconnection
-      if (uiManager && typeof uiManager.updateCollaborationState === 'function') {
-        uiManager.updateCollaborationState();
-      }
-      return;
-    }
-    return;
   }
 
   if (mindMap) {

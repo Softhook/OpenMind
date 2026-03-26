@@ -311,3 +311,65 @@
 .om-menu-input::placeholder {
     color: rgba(0, 0, 0, 0.3);
 }
+
+/* Spinner & Loading Utilities */
+@keyframes om-spin {
+    to { transform: rotate(360deg); }
+}
+
+.om-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--om-color-primary);
+    border-radius: 50%;
+    animation: om-spin 0.8s linear infinite;
+    margin: 20px auto;
+}
+
+.om-overlay-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px 20px;
+}
+
+.om-overlay-icon {
+    font-size: 48px;
+    margin-bottom: 24px;
+    display: block;
+}
+
+.om-overlay-main-msg {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--om-overlay-text);
+}
+
+.om-overlay-sub-msg {
+    font-size: 14px;
+    color: var(--om-overlay-text-dim);
+    line-height: 1.6;
+    max-width: 400px;
+}
+
+.om-btn-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    width: 100%;
+}
+
+.om-text-warning {
+    color: #f59e0b;
+}
+
+/* Specific adjustments for smaller content */
+/* Specialized background for room transitions to hide background content more effectively */
+#room-transition.om-overlay {
+    background: rgba(20, 25, 40, 0.96);
+    backdrop-filter: blur(8px);
+}
