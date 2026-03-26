@@ -531,6 +531,12 @@ function _clearLocalState() {
  */
 async function initializeCollaboration(roomName) {
   if (!mindMap || !roomName) return;
+
+  // Record room in history as early as possible (catches manual URL entry)
+  if (typeof RoomHistoryManager !== 'undefined') {
+    RoomHistoryManager.addRoom(roomName);
+  }
+
   if (typeof CollaborationManager === 'undefined') {
     console.warn('CollaborationManager not loaded');
     return;

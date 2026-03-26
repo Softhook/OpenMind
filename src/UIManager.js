@@ -21,6 +21,7 @@ class UIManager {
     this.exportTextButton = null;
     this.keyboardControlsButton = null;
     this.inviteButton = null;
+    this.recentRoomsButton = null;
     this.displayNameInput = null;
 
     // File input elements
@@ -78,6 +79,7 @@ class UIManager {
 
     this.setupButtons();
     this.setupKeyboardOverlay();
+    this.setupRoomHistoryOverlay();
 
     // Layout buttons after creation to prevent overlap
     // Use setTimeout to ensure DOM elements are fully created
@@ -135,6 +137,13 @@ class UIManager {
     this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS));
     this.inviteButton.style('color', ColorPalette.toCSS(ColorPalette.BASE.WHITE));
     this.inviteButton.mousePressed(() => this.handleShareSessionClick());
+
+    // Recent Rooms button
+    this.recentRoomsButton = p5.createButton('Recent Rooms');
+    this.recentRoomsButton.position(700, 10);
+    this.recentRoomsButton.mousePressed(() => this.toggleRoomHistoryOverlay());
+    this.recentRoomsButton.attribute('aria-label', 'Toggle recent rooms list');
+    this.recentRoomsButton.attribute('aria-expanded', 'false');
 
     // Display name input (for collaboration)
     this.displayNameInput = p5.createInput('');
@@ -252,6 +261,38 @@ class UIManager {
     };
     input.addEventListener('input', inputHandler);
     this.eventListenerRefs.push({ element: input, event: 'input', handler: inputHandler });
+  }
+
+  /**
+   * Setup room history overlay
+   */
+  setupRoomHistoryOverlay() {
+    console.log('UIManager: Setting up Room History Overlay');
+    const overlay = window.RoomHistoryOverlay;
+    if (overlay && typeof overlay.setup === 'function') {
+      overlay.setup({ recentRoomsButton: this.recentRoomsButton });
+      console.log('UIManager: Room History Overlay setup complete');
+    } else {
+      console.warn('UIManager: RoomHistoryOverlay not available during setup');
+    }
+  }
+
+  /**
+   * Toggle room history overlay visibility
+   */
+  toggleRoomHistoryOverlay() {
+    console.log('UIManager: Toggling Room History Overlay');
+    const overlay = window.RoomHistoryOverlay;
+    console.log('UIManager: RoomHistoryOverlay check:', { 
+      'window.RoomHistoryOverlay': !!overlay,
+      'hasToggle': overlay && typeof overlay.toggle === 'function'
+    });
+    
+    if (overlay && overlay.toggle) {
+      overlay.toggle();
+    } else {
+      console.warn('UIManager: RoomHistoryOverlay not available even on window');
+    }
   }
 
   /**
@@ -391,6 +432,7 @@ class UIManager {
     if (this.exportPDFButton) this.exportPDFButton.style('display', 'inline-block');
     if (this.exportTextButton) this.exportTextButton.style('display', 'inline-block');
     if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'inline-block');
+    if (this.recentRoomsButton) this.recentRoomsButton.style('display', 'inline-block');
 
     // Always show invite button (text changes based on connection state)
     if (this.inviteButton) {
@@ -429,6 +471,7 @@ class UIManager {
     if (this.exportPDFButton) this.exportPDFButton.style('display', 'none');
     if (this.exportTextButton) this.exportTextButton.style('display', 'none');
     if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'none');
+    if (this.recentRoomsButton) this.recentRoomsButton.style('display', 'none');
     if (this.inviteButton) this.inviteButton.style('display', 'none');
     if (this.displayNameInput) this.displayNameInput.style('display', 'none');
   }
@@ -466,6 +509,7 @@ class UIManager {
       this.exportPDFButton,
       this.exportTextButton,
       this.keyboardControlsButton,
+      this.recentRoomsButton,
       this.inviteButton // Always include invite button (text/color change based on state)
     ];
 
@@ -498,6 +542,7 @@ class UIManager {
     positionButton(this.exportPDFButton);
     positionButton(this.exportTextButton);
     positionButton(this.keyboardControlsButton);
+    positionButton(this.recentRoomsButton);
 
     // Handle invite button and display name input based on connection state
     if (isConnected) {
@@ -714,6 +759,7 @@ class UIManager {
     removeIfExists(this.exportPDFButton);
     removeIfExists(this.exportTextButton);
     removeIfExists(this.keyboardControlsButton);
+    removeIfExists(this.recentRoomsButton);
     removeIfExists(this.inviteButton);
     removeIfExists(this.displayNameInput);
     removeIfExists(this.fileInput);
