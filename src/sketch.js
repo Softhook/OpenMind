@@ -3447,7 +3447,7 @@ function windowResized() {
  * @returns {boolean} false to prevent default browser behavior
  */
 function mouseWheel(event) {
-  if (uiManager && uiManager.isKeyboardOverlayVisible()) return false;
+  if (uiManager && uiManager.isAnyOverlayVisible()) return;
   // Only when over the canvas area
   const overCanvas = mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
   if (!overCanvas) return;

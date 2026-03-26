@@ -443,7 +443,7 @@ class UIManager {
     // Also suppress menu if keyboard overlay or room history are active
     const isAnyOverlayVisible = options.forceHide || 
                                this.isKeyboardOverlayVisible() || 
-                               (typeof roomHistoryOverlay !== 'undefined' && roomHistoryOverlay && roomHistoryOverlay.isVisible && roomHistoryOverlay.isVisible());
+                               (typeof RoomHistoryOverlay !== 'undefined' && RoomHistoryOverlay && RoomHistoryOverlay.isVisible && RoomHistoryOverlay.isVisible());
 
     if (isAnyOverlayVisible) {
       this.hideButtons();
@@ -628,6 +628,14 @@ class UIManager {
       return live;
     }
     return this.keyboardOverlayVisible;
+  }
+
+  isAnyOverlayVisible() {
+    return this.isKeyboardOverlayVisible() || 
+           (typeof RoomHistoryOverlay !== 'undefined' && RoomHistoryOverlay && RoomHistoryOverlay.isVisible && RoomHistoryOverlay.isVisible()) ||
+           (typeof roomJoinConfirmation !== 'undefined' && roomJoinConfirmation !== null) ||
+           (typeof syncStatus !== 'undefined' && syncStatus !== null && syncStatus !== 'connected') ||
+           (typeof isMapLoading !== 'undefined' && isMapLoading);
   }
 
   // ==========================================================================
