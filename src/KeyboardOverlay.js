@@ -43,41 +43,26 @@ class KeyboardOverlayManager extends BaseOverlay {
     onPopulateHeader(header) {
         const title = createElement('h2', 'Open Mind <span style="font-size: 0.6em; color: grey;">Christian Nold, 2025</span>');
         title.parent(header);
-        title.style('margin', '0');
-        title.style('font-size', '20px');
-        title.style('font-weight', '600');
     }
 
     onPopulateContent(scrollArea) {
         const hint = createElement('p');
         hint.html('Timed autosaves to browser. Box hierarchy: <span style="color: red;">Red</span> > <span style="color: orange;">Orange</span> > White');
         hint.parent(scrollArea);
-        hint.style('margin', '0 0 20px 0');
-        hint.style('font-size', '13px');
-        hint.style('line-height', '1.4');
-        hint.style('color', '#666');
+        hint.addClass('om-hint-text');
 
         for (const item of KEYBOARD_SHORTCUTS) {
             const row = createDiv();
             row.parent(scrollArea);
-            row.style('display', 'flex');
-            row.style('align-items', 'flex-start');
-            row.style('gap', '24px');
-            row.style('margin-bottom', '10px');
-            row.style('font-size', '13px');
+            row.addClass('om-shortcut-row');
 
             const keyLabel = createSpan(item.keys);
             keyLabel.parent(row);
-            keyLabel.style('font-family', 'monospace');
-            keyLabel.style('font-weight', '700');
-            keyLabel.style('flex', '0 0 130px');
-            keyLabel.style('text-align', 'right');
-            keyLabel.style('color', '#2d3748');
+            keyLabel.addClass('om-shortcut-keys');
 
             const description = createSpan(item.description);
             description.parent(row);
-            description.style('flex', '1');
-            description.style('color', '#4a5568');
+            description.addClass('om-shortcut-desc');
         }
     }
 
