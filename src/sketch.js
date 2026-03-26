@@ -1450,8 +1450,10 @@ function draw() {
 
 
 
-    // Draw save indicator (in screen space, not world space)
-    drawSaveIndicator();
+    // Update status indicator in menu bar (every frame for real-time connection status)
+    if (uiManager) {
+      uiManager.updateStatusIndicator();
+    }
 
     // Update mouse cursor based on hover context
     try {
@@ -4027,63 +4029,6 @@ function startAutosave() {
   }, CONFIG.AUTOSAVE.INTERVAL);
 }
 
-// Draw save indicator at far left of menu when visible
-function drawSaveIndicator() {
-  if (!mindMap || !menuIsVisible) return;
-
-  const size = CONFIG.UI.SAVE_INDICATOR_SIZE;
-  const x = CONFIG.UI.SAVE_INDICATOR_X;
-  const y = CONFIG.UI.SAVE_INDICATOR_Y;
-  const colors = UI_COLORS.SAVE_INDICATOR;
-
-  push();
-  noStroke();
-
-  let statusColor;
-  let statusText = '';
-
-  // Determine if we are in active collaboration mode
-  const isCollaborating = collaborationManager && collaborationManager.provider && collaborationManager.roomName;
-
-  if (isCollaborating) {
-    // Collaboration Mode
-    if (!collaborationManager.isConnected) {
-      statusColor = colors.unsaved; // Red
-      statusText = 'Offline (Reconnecting...)';
-    } else {
-      // Connected Logic:
-      if (syncStatus === null) {
-        statusColor = colors.saved; // Green
-        statusText = 'All changes saved & synced';
-      } else if (syncStatus === 'incompatible' || syncStatus === 'error') {
-        statusColor = colors.unsaved; // Red
-        statusText = 'Sync Error / Incompatible Version';
-      } else {
-        // connecting, server_starting, syncing
-        statusColor = colors.syncing; // Yellow
-        statusText = syncStatus === 'server_starting' ? 'Waking up server...' : 'Syncing...';
-      }
-    }
-  } else {
-    // Local Mode Logic
-    if (mindMap.isSaved) {
-      statusColor = colors.saved; // Green
-      statusText = 'Saved locally';
-    } else {
-      statusColor = colors.syncing; // Yellow for unsaved changes
-      statusText = 'Unsaved changes...';
-    }
-  }
-
-  // Update canvas title for tooltip accessibility
-  if (canvas && canvas.elt && canvas.elt.title !== statusText) {
-    canvas.elt.title = statusText;
-  }
-
-  Utils.applyFill(statusColor);
-  circle(x, y, size);
-  pop();
-}
 
 // Export helpers for testing in Node/Jest without impacting browser usage
 if (typeof module !== 'undefined') {

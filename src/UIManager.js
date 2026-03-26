@@ -23,6 +23,8 @@ class UIManager {
     this.inviteButton = null;
     this.recentRoomsButton = null;
     this.displayNameInput = null;
+    this.menuBar = null;
+    this.statusIndicator = null;
 
     // File input elements
     this.fileInput = null;
@@ -94,68 +96,81 @@ class UIManager {
   setupButtons() {
     const p5 = this.p5Instance;
 
+    // Create menu bar container
+    this.menuBar = p5.createDiv();
+    this.menuBar.id('om-top-menu-bar');
+    this.menuBar.addClass('om-menu-bar');
+
+    // Status indicator circle
+    this.statusIndicator = p5.createDiv();
+    this.statusIndicator.parent(this.menuBar);
+    this.statusIndicator.addClass('om-status-indicator');
+
     // Load button
     this.loadButton = p5.createButton('Load');
-    this.loadButton.position(100, 10);
+    this.loadButton.parent(this.menuBar);
+    this.loadButton.addClass('om-btn om-menu-btn');
     this.loadButton.mousePressed(() => this.handleLoadButtonClick());
 
     // Save button
     this.saveButton = p5.createButton('Save');
-    this.saveButton.position(150, 10);
+    this.saveButton.parent(this.menuBar);
+    this.saveButton.addClass('om-btn om-menu-btn');
     this.saveButton.mousePressed(() => this.handleSaveButtonClick());
 
     // Import text button
     this.importTextButton = p5.createButton('Import Text');
-    this.importTextButton.position(200, 10);
+    this.importTextButton.parent(this.menuBar);
+    this.importTextButton.addClass('om-btn om-menu-btn');
     this.importTextButton.mousePressed(() => this.handleImportTextClick());
 
     // Export PNG button
     this.exportPNGButton = p5.createButton('Export PNG');
-    this.exportPNGButton.position(300, 10);
+    this.exportPNGButton.parent(this.menuBar);
+    this.exportPNGButton.addClass('om-btn om-menu-btn');
     this.exportPNGButton.mousePressed(() => this.handleExportPNGClick());
 
     // Export PDF button
     this.exportPDFButton = p5.createButton('Export PDF');
-    this.exportPDFButton.position(400, 10);
+    this.exportPDFButton.parent(this.menuBar);
+    this.exportPDFButton.addClass('om-btn om-menu-btn');
     this.exportPDFButton.mousePressed(() => this.handleExportPDFClick());
 
     // Export text button
     this.exportTextButton = p5.createButton('Export Text');
-    this.exportTextButton.position(500, 10);
+    this.exportTextButton.parent(this.menuBar);
+    this.exportTextButton.addClass('om-btn om-menu-btn');
     this.exportTextButton.mousePressed(() => this.handleExportTextClick());
 
     // Keyboard controls button
     this.keyboardControlsButton = p5.createButton('Keyboard Controls');
-    this.keyboardControlsButton.position(600, 10);
+    this.keyboardControlsButton.parent(this.menuBar);
+    this.keyboardControlsButton.addClass('om-btn om-menu-btn');
     this.keyboardControlsButton.mousePressed(() => this.toggleKeyboardOverlay());
     this.keyboardControlsButton.attribute('aria-label', 'Toggle keyboard controls');
     this.keyboardControlsButton.attribute('aria-expanded', 'false');
 
     // Invite/Share button
     this.inviteButton = p5.createButton('Start Collaboration');
-    this.inviteButton.position(650, 10);
-    this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS));
-    this.inviteButton.style('color', ColorPalette.toCSS(ColorPalette.BASE.WHITE));
+    this.inviteButton.parent(this.menuBar);
+    this.inviteButton.addClass('om-btn om-menu-btn om-btn-success');
     this.inviteButton.mousePressed(() => this.handleShareSessionClick());
 
     // Recent Rooms button
     this.recentRoomsButton = p5.createButton('Recent Rooms');
-    this.recentRoomsButton.position(700, 10);
+    this.recentRoomsButton.parent(this.menuBar);
+    this.recentRoomsButton.addClass('om-btn om-menu-btn');
     this.recentRoomsButton.mousePressed(() => this.toggleRoomHistoryOverlay());
     this.recentRoomsButton.attribute('aria-label', 'Toggle recent rooms list');
     this.recentRoomsButton.attribute('aria-expanded', 'false');
 
     // Display name input (for collaboration)
     this.displayNameInput = p5.createInput('');
+    this.displayNameInput.parent(this.menuBar);
     this.displayNameInput.attribute('placeholder', 'Your Name');
-    this.displayNameInput.position(750, 10);
+    this.displayNameInput.addClass('om-menu-input');
+    // We'll manage display/visibility via collaboration state
     this.displayNameInput.style('display', 'none');
-    this.displayNameInput.style('padding', '5px');
-    this.displayNameInput.style('border', `1px solid ${ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)}`);
-    this.displayNameInput.style('border-radius', '3px');
-    this.displayNameInput.style('font-size', '14px');
-    this.displayNameInput.style('outline', 'none');
-    this.displayNameInput.style('transition', 'border-color 0.2s');
 
     // Attach display name input handlers
     this.attachDisplayNameInputHandlers();
@@ -180,7 +195,7 @@ class UIManager {
     // this.importTextFileInput.style('display', 'none'); // Removed to ensure programmatic click works
     this.importTextFileInput.attribute('accept', '.txt,.md,.text');
 
-    // Initially hide all buttons
+    // Initially hide the entire menu bar
     this.hideButtons();
   }
 
@@ -194,14 +209,14 @@ class UIManager {
 
     // Focus handler
     const focusHandler = () => {
-      this.displayNameInput.style('border-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY));
+      // Styling handled by CSS :focus
     };
     input.addEventListener('focus', focusHandler);
     this.eventListenerRefs.push({ element: input, event: 'focus', handler: focusHandler });
 
     // Blur handler
     const blurHandler = () => {
-      this.displayNameInput.style('border-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS));
+      // Styling handled by CSS
 
       // Clear any pending debounced update
       clearTimeout(this.displayNameDebounceTimer);
@@ -361,6 +376,58 @@ class UIManager {
   }
 
   /**
+   * Update the status indicator circle based on connection and sync state
+   */
+  updateStatusIndicator() {
+    if (!this.statusIndicator) return;
+
+    // Check connection state
+    const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
+    const isCollaborating = activeManager && activeManager.provider && activeManager.roomName;
+    const isConnected = activeManager && activeManager.isConnected;
+
+    let statusColor;
+    let statusText = '';
+
+    const colors = ColorPalette.UI.SAVE_INDICATOR;
+
+    if (isCollaborating) {
+      if (!isConnected) {
+        statusColor = ColorPalette.toCSS(colors.unsaved); // Red
+        statusText = 'Offline (Reconnecting...)';
+      } else {
+        // Use global syncStatus from sketch.js
+        const currentSyncStatus = (typeof syncStatus !== 'undefined') ? syncStatus : null;
+        
+        if (currentSyncStatus === null) {
+          statusColor = ColorPalette.toCSS(colors.saved); // Green
+          statusText = 'All changes saved & synced';
+        } else if (currentSyncStatus === 'incompatible' || currentSyncStatus === 'error') {
+          statusColor = ColorPalette.toCSS(colors.unsaved); // Red
+          statusText = 'Sync Error / Incompatible Version';
+        } else {
+          // connecting, server_starting, syncing
+          statusColor = ColorPalette.toCSS(colors.syncing); // Yellow
+          statusText = currentSyncStatus === 'server_starting' ? 'Waking up server...' : 'Syncing...';
+        }
+      }
+    } else {
+      // Local Mode
+      const isSaved = this.mindMap ? this.mindMap.isSaved : true;
+      if (isSaved) {
+        statusColor = ColorPalette.toCSS(colors.saved); // Green
+        statusText = 'Saved locally';
+      } else {
+        statusColor = ColorPalette.toCSS(colors.syncing); // Yellow
+        statusText = 'Unsaved changes...';
+      }
+    }
+
+    this.statusIndicator.style('background-color', statusColor);
+    this.statusIndicator.attribute('title', statusText);
+  }
+
+  /**
    * Update menu visibility based on mouse position and overlay state
    * @param {number} mouseX - Current mouse X position
    * @param {number} mouseY - Current mouse Y position
@@ -373,7 +440,12 @@ class UIManager {
     if (typeof mouseY !== 'number' || !isFinite(mouseY)) mouseY = 0;
 
     // Force hide buttons when overlays are showing (room confirmation, sync status, etc.)
-    if (options.forceHide) {
+    // Also suppress menu if keyboard overlay or room history are active
+    const isAnyOverlayVisible = options.forceHide || 
+                               this.isKeyboardOverlayVisible() || 
+                               (typeof roomHistoryOverlay !== 'undefined' && roomHistoryOverlay && roomHistoryOverlay.isVisible && roomHistoryOverlay.isVisible());
+
+    if (isAnyOverlayVisible) {
       this.hideButtons();
       return;
     }
@@ -418,42 +490,35 @@ class UIManager {
    */
   showButtons() {
     this.menuIsVisible = true;
+    if (this.menuBar) {
+      this.menuBar.addClass('om-visible');
+    }
 
-    // Check connection state from global collaborationManager (not cached reference)
-    // This is important because collaborationManager can be recreated when switching rooms
+    // Refresh status indicator when showing
+    this.updateStatusIndicator();
+
+    // Check connection state from global collaborationManager
     const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
     const isConnected = activeManager && activeManager.isConnected;
 
-    // Always show these buttons
-    if (this.loadButton) this.loadButton.style('display', 'inline-block');
-    if (this.saveButton) this.saveButton.style('display', 'inline-block');
-    if (this.importTextButton) this.importTextButton.style('display', 'inline-block');
-    if (this.exportPNGButton) this.exportPNGButton.style('display', 'inline-block');
-    if (this.exportPDFButton) this.exportPDFButton.style('display', 'inline-block');
-    if (this.exportTextButton) this.exportTextButton.style('display', 'inline-block');
-    if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'inline-block');
-    if (this.recentRoomsButton) this.recentRoomsButton.style('display', 'inline-block');
-
-    // Always show invite button (text changes based on connection state)
+    // Update invite button and display name input based on connection state
     if (this.inviteButton) {
-      this.inviteButton.style('display', 'inline-block');
       if (isConnected) {
-        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY)); // Blue for share
+        this.inviteButton.removeClass('om-btn-success');
+        this.inviteButton.addClass('om-btn-primary');
         this.inviteButton.html('Copy Room Link');
       } else {
-        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)); // Green for start
+        this.inviteButton.removeClass('om-btn-primary');
+        this.inviteButton.addClass('om-btn-success');
         this.inviteButton.html('Start Collaboration');
       }
     }
 
-    // Show display name input only when connected
     if (this.displayNameInput) {
       if (isConnected) {
         this.displayNameInput.style('display', 'inline-block');
-        this.displayNameInput.style('visibility', 'visible');
       } else {
         this.displayNameInput.style('display', 'none');
-        this.displayNameInput.style('visibility', 'hidden');
       }
     }
   }
@@ -463,154 +528,21 @@ class UIManager {
    */
   hideButtons() {
     this.menuIsVisible = false;
-
-    if (this.loadButton) this.loadButton.style('display', 'none');
-    if (this.saveButton) this.saveButton.style('display', 'none');
-    if (this.importTextButton) this.importTextButton.style('display', 'none');
-    if (this.exportPNGButton) this.exportPNGButton.style('display', 'none');
-    if (this.exportPDFButton) this.exportPDFButton.style('display', 'none');
-    if (this.exportTextButton) this.exportTextButton.style('display', 'none');
-    if (this.keyboardControlsButton) this.keyboardControlsButton.style('display', 'none');
-    if (this.recentRoomsButton) this.recentRoomsButton.style('display', 'none');
-    if (this.inviteButton) this.inviteButton.style('display', 'none');
-    if (this.displayNameInput) this.displayNameInput.style('display', 'none');
+    if (this.menuBar) {
+      this.menuBar.removeClass('om-visible');
+    }
   }
 
   /**
    * Layout and position all menu buttons
    */
   layoutButtons() {
-    // Guard against uninitialized state
-    if (!this.loadButton || !this.saveButton) {
-      console.warn('layoutButtons called before initialization complete');
-      return;
+    // Flexbox manages the internal layout now.
+    // We update the menuRightEdge for hover detection in sketch.js manually or here
+    if (this.menuBar && this.menuBar.elt) {
+      const rect = this.menuBar.elt.getBoundingClientRect();
+      this.menuRightEdge = rect.right + 20;
     }
-
-    const startX = this.config?.UI?.BUTTON_START_X || 40;
-    const buttonY = this.config?.UI?.BUTTON_Y || 10;
-    const buttonGap = this.config?.UI?.BUTTON_GAP || 5;
-
-    let x = startX;
-
-    // Check if we're connected to collaboration
-    // Use global collaborationManager (not cached reference) as it can be recreated when switching rooms
-    const activeManager = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
-    const isConnected = activeManager && activeManager.isConnected;
-
-    // Store original display states to restore after measurement
-    const originalStates = new Map();
-
-    // Temporarily show buttons for measurement (but keep them hidden visually)
-    const buttonsToLayout = [
-      this.loadButton,
-      this.saveButton,
-      this.importTextButton,
-      this.exportPNGButton,
-      this.exportPDFButton,
-      this.exportTextButton,
-      this.keyboardControlsButton,
-      this.recentRoomsButton,
-      this.inviteButton // Always include invite button (text/color change based on state)
-    ];
-
-    // Make visible for measurement with correct p5.js API
-    buttonsToLayout.forEach(btn => {
-      if (btn && btn.elt) {
-        originalStates.set(btn, {
-          display: btn.elt.style.display,
-          visibility: btn.elt.style.visibility
-        });
-        btn.style('visibility', 'hidden');
-        btn.style('display', 'inline-block');
-      }
-    });
-
-    // Helper to position a button and advance x
-    const positionButton = (button) => {
-      if (button && button.elt) {
-        button.position(x, buttonY);
-        const width = button.elt.offsetWidth || 80; // Fallback width
-        x += width + buttonGap;
-      }
-    };
-
-    // Position all buttons in order
-    positionButton(this.loadButton);
-    positionButton(this.saveButton);
-    positionButton(this.importTextButton);
-    positionButton(this.exportPNGButton);
-    positionButton(this.exportPDFButton);
-    positionButton(this.exportTextButton);
-    positionButton(this.keyboardControlsButton);
-    positionButton(this.recentRoomsButton);
-
-    // Handle invite button and display name input based on connection state
-    if (isConnected) {
-      // When connected: change button to "Copy Room Link" and show display name input
-      if (this.inviteButton) {
-        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.PRIMARY)); // Blue for share action
-        this.inviteButton.html('Copy Room Link');
-        positionButton(this.inviteButton);
-      }
-
-      if (this.displayNameInput) {
-        const inputWidth = 120;
-
-        this.displayNameInput.style('width', `${inputWidth}px`);
-        this.displayNameInput.style('display', 'inline-block');
-        this.displayNameInput.style('visibility', 'visible'); // Ensure visible
-
-        // Get button height for vertical centering
-        let buttonHeight = 30;
-        if (this.loadButton && this.loadButton.elt) {
-          buttonHeight = this.loadButton.elt.offsetHeight;
-        }
-
-        const inputHeight = this.displayNameInput.elt ?
-          this.displayNameInput.elt.offsetHeight : 30;
-        const yNudge = Math.floor((buttonHeight - inputHeight) / 2);
-
-        this.displayNameInput.position(x, buttonY + yNudge);
-        x += inputWidth + buttonGap;
-
-        // Pre-populate with current username if available
-        // Use global collaborationManager as it can be recreated when switching rooms
-        const managerForUsername = (typeof collaborationManager !== 'undefined') ? collaborationManager : this.collaborationManager;
-        if (managerForUsername &&
-          typeof managerForUsername.getUserName === 'function') {
-          const currentName = managerForUsername.getUserName();
-          if (currentName && this.displayNameInput.value() !== currentName) {
-            this.displayNameInput.value(currentName);
-          }
-        }
-      }
-    } else {
-      // When not connected: show "Start Collaboration" button, hide display name input
-      if (this.inviteButton) {
-        this.inviteButton.style('background-color', ColorPalette.toCSS(ColorPalette.BASE.SUCCESS)); // Green for start action
-        this.inviteButton.html('Start Collaboration');
-        positionButton(this.inviteButton);
-      }
-
-      if (this.displayNameInput) {
-        this.displayNameInput.style('display', 'none');
-        this.displayNameInput.style('visibility', 'hidden');
-      }
-    }
-
-    // Restore visibility - show if menu is visible, hide if not
-    buttonsToLayout.forEach(btn => {
-      if (btn && btn.elt) {
-        btn.style('visibility', 'visible');
-        // Restore display state based on whether menu should be shown
-        if (!this.menuIsVisible) {
-          btn.style('display', 'none');
-        }
-      }
-    });
-
-    // Update menu right edge for hover detection
-    this.menuRightEdge = x + 10;
   }
 
   // ==========================================================================
@@ -764,6 +696,7 @@ class UIManager {
     removeIfExists(this.displayNameInput);
     removeIfExists(this.fileInput);
     removeIfExists(this.importTextFileInput);
+    removeIfExists(this.menuBar);
 
     // Clean up keyboard overlay
     if (this.keyboardOverlay) {
