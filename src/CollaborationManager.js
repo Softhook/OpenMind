@@ -1214,7 +1214,9 @@ class CollaborationManager {
                 : null,
             italicRanges: Array.isArray(box.italicRanges) && box.italicRanges.length > 0
                 ? box.italicRanges.map(r => ({ start: r.start, end: r.end }))
-                : null
+                : null,
+            // Sync health only if damaged to minimize network bytes
+            health: (box.health < 5) ? box.health : undefined
         };
     }
 
@@ -1877,6 +1879,15 @@ class CollaborationManager {
             } else if (data.italicRanges === null && (forceApply || !box.isEditing)) {
                 box.italicRanges = [];
             }
+
+            // Sync health: only apply if provided in the payload (minimizes property bloat)
+            if (typeof data.health === 'number') {
+                box.health = data.health;
+            } else if (box.health !== undefined) {
+                // If it was damaged but now the server says it's full (missing health), reset to full
+                box.health = 5;
+            }
+
             box.updateDimensions();
 
             // Restore pending targets when we only want interpolation (avoid reset inside updateDimensions)

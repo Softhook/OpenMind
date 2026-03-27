@@ -53,8 +53,8 @@ class ThrustGame {
   };
 
   static HEALTH = {
-    RECOVERY_DELAY: 1000,      // Time (ms) since last hit before recovery starts
-    RECOVERY_RATE: 60000        // Time (ms) between recovery increments (1 HP per 60s)
+    RECOVERY_DELAY: 10000,      // Time (ms) since last hit before recovery starts (Match recovery rate)
+    RECOVERY_RATE: 10000        // Time (ms) between recovery increments (1 HP per 10s)
   };
 
   static BULLET = {
@@ -1178,8 +1178,8 @@ class ThrustGame {
         continue;
       }
 
-      if (box.health < 5 && box.lastHitTime > 0) {
-        if (now - box.lastHitTime > ThrustGame.HEALTH.RECOVERY_DELAY) {
+      if (box.health !== undefined && box.health < 5 && box.lastHitTime > 0) {
+        if (now - box.lastHitTime >= ThrustGame.HEALTH.RECOVERY_DELAY) {
           // Increment health
           box.health++;
 
@@ -1187,6 +1187,11 @@ class ThrustGame {
           box.lastHitTime = now - (ThrustGame.HEALTH.RECOVERY_DELAY - ThrustGame.HEALTH.RECOVERY_RATE);
 
           Utils.Logger.debug(`[Box] Recovered health to ${box.health} for box ${box.id}`);
+
+          // Trigger persistent sync for health recovery
+          if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+            MindMap.onBoxChange(box);
+          }
 
           // If fully recovered, mark for removal from tracking set
           if (box.health >= 5) {
@@ -1295,6 +1300,12 @@ class ThrustGame {
     // Reduce box health
     if (typeof box.reduceHealth === 'function') {
       box.reduceHealth();
+      
+      // Trigger persistent sync for health reduction (only if still alive)
+      if (box.health > 0 && typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+        MindMap.onBoxChange(box);
+      }
+
       // Track damaged box for optimized recovery loop and broadcasting
       if (box.health < 5) {
         this.damagedBoxIds.add(box.id);
@@ -2061,29 +2072,8 @@ class ThrustGame {
           }
         }
 
-        // Apply health updates to mind map boxes from remote awareness
-        if (state.thrustGame.boxHealths && typeof state.thrustGame.boxHealths === 'object') {
-          Object.entries(state.thrustGame.boxHealths).forEach(([boxId, health]) => {
-            const box = this.mindMap.getBoxById(boxId);
-            if (box && typeof health === 'number') {
-              // Only update if the remote health is LOWER than ours to prevent jitter 
-              // (but allow higher if ours is 0 or something weird, though 5 is max)
-              // Actually, simply taking the remote value is standard for awareness
-              if (box.health !== health) {
-                box.health = health;
-                // Update lastHitTime so we don't start recovery immediately if we just saw damage
-                box.lastHitTime = Date.now();
-
-                // Track for local recovery logic
-                if (health < 5) {
-                  this.damagedBoxIds.add(boxId);
-                } else {
-                  this.damagedBoxIds.delete(boxId);
-                }
-              }
-            }
-          });
-        }
+        // Health updates are now handled via persistent Yjs maps in CollaborationManager
+        // Remote awareness health updates are deprecated to ensure persistence for new players
       }
     });
 
@@ -2188,18 +2178,8 @@ class ThrustGame {
         vy: Math.round(b.vy * 10) / 10,
         lifetime: b.lifetime
       })).filter(b => Number.isFinite(b.x) && Number.isFinite(b.y)),
-      hitNotifications: this.pendingHitNotifications || [],
-      // Include health of all damaged boxes in the broadcast
-      // Optimized: only iterate over known damaged boxes
-      boxHealths: this.damagedBoxIds.size > 0
-        ? Array.from(this.damagedBoxIds).reduce((acc, id) => {
-          const b = this.mindMap.getBoxById(id);
-          if (b && b.health < 5) {
-            acc[id] = b.health;
-          }
-          return acc;
-        }, {})
-        : {}
+      hitNotifications: this.pendingHitNotifications || []
+      // Note: boxHealths removed from awareness; now handled via persistent Yjs maps
     };
 
     // Update awareness with thrust game state

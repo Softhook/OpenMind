@@ -145,7 +145,7 @@ class TextBox {
     this.selected = false;
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = ColorPalette.getBoxBackgroundPalette();
-    this.health = 5; // Health points for game mechanics (5 = full)
+    // Health and lastHitTime are lazy-initialized only when damaged to ensure zero overhead
 
     // Text features
     this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
@@ -2738,7 +2738,8 @@ class TextBox {
       backgroundColor: this.backgroundColor,
       highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined,
       boldRanges: Array.isArray(this.boldRanges) && this.boldRanges.length > 0 ? this.boldRanges.map(r => ({ start: r.start, end: r.end })) : undefined,
-      italicRanges: Array.isArray(this.italicRanges) && this.italicRanges.length > 0 ? this.italicRanges.map(r => ({ start: r.start, end: r.end })) : undefined
+      italicRanges: Array.isArray(this.italicRanges) && this.italicRanges.length > 0 ? this.italicRanges.map(r => ({ start: r.start, end: r.end })) : undefined,
+      health: this.health < 5 ? this.health : undefined
     };
   }
 
@@ -2851,7 +2852,7 @@ class TextBox {
       }
     }
 
-    // Load health if present
+    // Load health if present (lazy-loaded)
     if (isValid(data.health)) {
       box.health = Math.max(0, Math.min(5, Math.floor(data.health)));
     }
@@ -3207,6 +3208,7 @@ class TextBox {
    * Syncs change to collaborators.
    */
   reduceHealth() {
+    if (this.health === undefined) this.health = 5;
     this.health--;
     this.lastHitTime = Date.now();
     Utils.Logger.debug(`[Box] Health reduced to ${this.health} for box ${this.id}`);
@@ -3214,13 +3216,20 @@ class TextBox {
     if (this.health <= 0) {
       if (typeof mindMap !== 'undefined' && mindMap._performBoxDeletion) {
         // High-level deletion method that handles local state, connections, and collaboration sync
-        mindMap._performBoxDeletion([this]);
+        // Wrap in transaction to match delete key behavior (enables unified undo)
+        if (mindMap._wrapInTransaction) {
+          mindMap._wrapInTransaction(() => {
+            mindMap._performBoxDeletion([this]);
+          }, 'Box Destroyed');
+        } else {
+          mindMap._performBoxDeletion([this]);
+        }
       } else if (typeof MindMap !== 'undefined' && MindMap.onBoxDelete) {
         // Fallback: direct collaborative deletion if instance not available
         MindMap.onBoxDelete(this.id);
       }
     }
-    // Health synchronization is now handled via awareness in ThrustGame.js
+    // Health synchronization is now handled via persistent Yjs maps in CollaborationManager
   }
 
   /**
@@ -3229,7 +3238,8 @@ class TextBox {
    * Filled dots represent remaining health, empty circles represent lost health.
    */
   drawHealthDots() {
-    if (this.health >= 5) return;
+    // Zero overhead: early exit if health is full or not yet initialized
+    if (this.health === undefined || this.health >= 5) return;
 
     const dotCount = 5;
     const dotRadius = 3;
@@ -3247,15 +3257,18 @@ class TextBox {
     // Use semantic danger color for health indicators
     const dotColor = ColorPalette.BASE.DANGER;
 
+    // Filled dots represent damage taken (hits), empty circles represent remaining health
+    const hits = 5 - this.health;
+
     for (let i = 0; i < dotCount; i++) {
       const x = startX + i * dotGap;
       
-      if (i < this.health) {
-        // Full health dot
+      if (i < hits) {
+        // Damage dot (filled)
         Utils.applyFill(dotColor);
         noStroke();
       } else {
-        // Empty health dot
+        // Remaining health dot (empty circle)
         noFill();
         Utils.applyStroke(dotColor);
       }
