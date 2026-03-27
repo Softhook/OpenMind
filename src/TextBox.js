@@ -145,6 +145,8 @@ class TextBox {
     this.selected = false;
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = ColorPalette.getBoxBackgroundPalette();
+    this.health = 5; // Health points for game mechanics (5 = full)
+    this.lastHitTime = 0; // Timestamp of the last time this box was hit (for recovery)
 
     // Text features
     this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
@@ -788,6 +790,9 @@ class TextBox {
 
     // Only the top-most hovered box should display hover visuals/rollovers
     const isTopHover = (typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox === this);
+
+    // Draw health indicators if damaged
+    this.drawHealthDots();
 
     // Draw box with appropriate styling based on state
     Utils.applyFill(this.backgroundColor);
@@ -2847,6 +2852,11 @@ class TextBox {
       }
     }
 
+    // Load health if present
+    if (isValid(data.health)) {
+      box.health = Math.max(0, Math.min(5, Math.floor(data.health)));
+    }
+
     // Load faux-italic ranges
     if (Array.isArray(data.italicRanges)) {
       box.italicRanges = [];
@@ -3190,6 +3200,70 @@ class TextBox {
     }
 
     return { lineIndex, posInLine };
+  }
+
+  /**
+   * Reduces the box health.
+   * If health reaches zero, the box is deleted.
+   * Syncs change to collaborators.
+   */
+  reduceHealth() {
+    this.health--;
+    this.lastHitTime = Date.now();
+    Utils.Logger.debug(`[Box] Health reduced to ${this.health} for box ${this.id}`);
+
+    if (this.health <= 0) {
+      if (typeof mindMap !== 'undefined' && mindMap._performBoxDeletion) {
+        // High-level deletion method that handles local state, connections, and collaboration sync
+        mindMap._performBoxDeletion([this]);
+      } else if (typeof MindMap !== 'undefined' && MindMap.onBoxDelete) {
+        // Fallback: direct collaborative deletion if instance not available
+        MindMap.onBoxDelete(this.id);
+      }
+    }
+    // Health synchronization is now handled via awareness in ThrustGame.js
+  }
+
+  /**
+   * Draws 5 circular health dots at the top-left above the box.
+   * Only displays if damage has occurred (health < 5).
+   * Filled dots represent remaining health, empty circles represent lost health.
+   */
+  drawHealthDots() {
+    if (this.health >= 5) return;
+
+    const dotCount = 5;
+    const dotRadius = 3;
+    const dotGap = 8;
+    const verticalOffset = 12; // Distance above the box
+    
+    // Position dots at the top-left corner above the box
+    const startX = this.x - this.width / 2 + dotRadius + 2;
+    const topY = this.y - this.height / 2 - verticalOffset;
+
+    push();
+    const zoomFactor = Utils.getClampedZoomFactor();
+    strokeWeight(1 / zoomFactor);
+    
+    // Use semantic danger color for health indicators
+    const dotColor = ColorPalette.BASE.DANGER;
+
+    for (let i = 0; i < dotCount; i++) {
+      const x = startX + i * dotGap;
+      
+      if (i < this.health) {
+        // Full health dot
+        Utils.applyFill(dotColor);
+        noStroke();
+      } else {
+        // Empty health dot
+        noFill();
+        Utils.applyStroke(dotColor);
+      }
+      
+      circle(x, topY, dotRadius * 2);
+    }
+    pop();
   }
 }
 
