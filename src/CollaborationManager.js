@@ -1215,8 +1215,9 @@ class CollaborationManager {
             italicRanges: Array.isArray(box.italicRanges) && box.italicRanges.length > 0
                 ? box.italicRanges.map(r => ({ start: r.start, end: r.end }))
                 : null,
-            // Sync health only if damaged to minimize network bytes
-            health: (box.health < 5) ? box.health : undefined
+            // Sync health and hit time only if damaged and still alive
+            health: (box.health > 0 && box.health < 5) ? box.health : undefined,
+            lastHitTime: (box.health > 0 && box.health < 5) ? box.lastHitTime : undefined
         };
     }
 
@@ -1882,10 +1883,17 @@ class CollaborationManager {
 
             // Sync health: only apply if provided in the payload (minimizes property bloat)
             if (typeof data.health === 'number') {
+                if (data.health <= 0) {
+                    Utils.Logger.debug(`[Sync] Received health <= 0 for box ${box.id}, triggering remote deletion`);
+                    this._deleteBoxFromLocal(box.id);
+                    return;
+                }
                 box.health = data.health;
+                box.lastHitTime = data.lastHitTime || Date.now();
             } else if (box.health !== undefined) {
                 // If it was damaged but now the server says it's full (missing health), reset to full
                 box.health = 5;
+                box.lastHitTime = 0;
             }
 
             box.updateDimensions();
@@ -1898,6 +1906,10 @@ class CollaborationManager {
         } else {
             // Create new box
             if (typeof TextBox !== 'undefined') {
+                if (typeof data.health === 'number' && data.health <= 0) {
+                    Utils.Logger.debug(`[Sync] Skipping creation of already destroyed box ${data.id}`);
+                    return;
+                }
                 const box = TextBox.fromJSON(data);
                 if (box) {
                     this.mindMap._registerBox(box);

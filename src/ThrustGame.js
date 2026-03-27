@@ -1164,7 +1164,17 @@ class ThrustGame {
     if (now - this.lastHealthRecoveryCheck < 1000) return;
     this.lastHealthRecoveryCheck = now;
 
-    if (!this.mindMap || this.damagedBoxIds.size === 0) return;
+    if (!this.mindMap) return;
+    
+    // Proactive tracking: Ensure any boxes damaged by others are added to our local tracking
+    // This allows this client to take over healing if the original attacker disconnects.
+    this.mindMap.boxes.forEach(box => {
+      if (box && box.health !== undefined && box.health < 5 && !this.damagedBoxIds.has(box.id)) {
+        this.damagedBoxIds.add(box.id);
+      }
+    });
+
+    if (this.damagedBoxIds.size === 0) return;
 
     // Track boxes that have fully recovered
     const recoveredIds = [];
