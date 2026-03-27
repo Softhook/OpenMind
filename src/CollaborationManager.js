@@ -1215,9 +1215,9 @@ class CollaborationManager {
             italicRanges: Array.isArray(box.italicRanges) && box.italicRanges.length > 0
                 ? box.italicRanges.map(r => ({ start: r.start, end: r.end }))
                 : null,
-            // Sync health and hit time only if damaged and still alive
-            health: (box.health > 0 && box.health < 5) ? box.health : undefined,
-            lastHitTime: (box.health > 0 && box.health < 5) ? box.lastHitTime : undefined
+            // Health synchronization for Thrust mini-game
+            health: box.health,
+            lastHitTime: box.lastHitTime
         };
     }
 
@@ -1240,6 +1240,13 @@ class CollaborationManager {
      */
     syncBoxToYjs(box, skipTransactionWrapper = false) {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
+
+        // AUTHORITATIVE EXISTENCE GUARD:
+        // Only sync boxes that are still part of the local mind map registry.
+        // This cleanly prevents "zombie" re-creations across all deletion paths (delete key, shooting, etc).
+        if (this.mindMap && !this.mindMap.getBoxById(box.id)) {
+            return;
+        }
 
         // Debounce text sync during active editing to reduce network traffic
         // AND group text edits for meaningful undo boundaries
@@ -1883,11 +1890,6 @@ class CollaborationManager {
 
             // Sync health: only apply if provided in the payload (minimizes property bloat)
             if (typeof data.health === 'number') {
-                if (data.health <= 0) {
-                    Utils.Logger.debug(`[Sync] Received health <= 0 for box ${box.id}, triggering remote deletion`);
-                    this._deleteBoxFromLocal(box.id);
-                    return;
-                }
                 box.health = data.health;
                 box.lastHitTime = data.lastHitTime || Date.now();
             } else if (box.health !== undefined) {
@@ -1906,10 +1908,6 @@ class CollaborationManager {
         } else {
             // Create new box
             if (typeof TextBox !== 'undefined') {
-                if (typeof data.health === 'number' && data.health <= 0) {
-                    Utils.Logger.debug(`[Sync] Skipping creation of already destroyed box ${data.id}`);
-                    return;
-                }
                 const box = TextBox.fromJSON(data);
                 if (box) {
                     this.mindMap._registerBox(box);

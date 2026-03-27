@@ -1188,7 +1188,7 @@ class ThrustGame {
         continue;
       }
 
-      if (box.health !== undefined && box.health < 5 && box.lastHitTime > 0) {
+      if (box.health !== undefined && box.health > 0 && box.health < 5 && box.lastHitTime > 0) {
         if (now - box.lastHitTime >= ThrustGame.HEALTH.RECOVERY_DELAY) {
           // Increment health
           box.health++;
