@@ -53,8 +53,8 @@ class ThrustGame {
   };
 
   static HEALTH = {
-    RECOVERY_DELAY: 5000,      // Time (ms) since last hit before recovery starts
-    RECOVERY_RATE: 2000        // Time (ms) between recovery increments (1 HP per 2s)
+    RECOVERY_DELAY: 1000,      // Time (ms) since last hit before recovery starts
+    RECOVERY_RATE: 60000        // Time (ms) between recovery increments (1 HP per 60s)
   };
 
   static BULLET = {
@@ -1171,7 +1171,7 @@ class ThrustGame {
 
     for (const boxId of this.damagedBoxIds) {
       const box = this.mindMap.getBoxById(boxId);
-      
+
       // Clean up if box was deleted externally or doesn't exist
       if (!box) {
         recoveredIds.push(boxId);
@@ -1182,12 +1182,12 @@ class ThrustGame {
         if (now - box.lastHitTime > ThrustGame.HEALTH.RECOVERY_DELAY) {
           // Increment health
           box.health++;
-          
+
           // Adjust lastHitTime to schedule the next recovery point based on RECOVERY_RATE
           box.lastHitTime = now - (ThrustGame.HEALTH.RECOVERY_DELAY - ThrustGame.HEALTH.RECOVERY_RATE);
-          
+
           Utils.Logger.debug(`[Box] Recovered health to ${box.health} for box ${box.id}`);
-          
+
           // If fully recovered, mark for removal from tracking set
           if (box.health >= 5) {
             recoveredIds.push(boxId);
@@ -2055,7 +2055,7 @@ class ThrustGame {
                 if (this.processedHits.size > 100) this.processedHits.clear();
               }
 
-            this.handlePlayerDeath();
+              this.handlePlayerDeath();
               break;
             }
           }
@@ -2073,7 +2073,7 @@ class ThrustGame {
                 box.health = health;
                 // Update lastHitTime so we don't start recovery immediately if we just saw damage
                 box.lastHitTime = Date.now();
-                
+
                 // Track for local recovery logic
                 if (health < 5) {
                   this.damagedBoxIds.add(boxId);
@@ -2191,14 +2191,14 @@ class ThrustGame {
       hitNotifications: this.pendingHitNotifications || [],
       // Include health of all damaged boxes in the broadcast
       // Optimized: only iterate over known damaged boxes
-      boxHealths: this.damagedBoxIds.size > 0 
+      boxHealths: this.damagedBoxIds.size > 0
         ? Array.from(this.damagedBoxIds).reduce((acc, id) => {
-            const b = this.mindMap.getBoxById(id);
-            if (b && b.health < 5) {
-              acc[id] = b.health;
-            }
-            return acc;
-          }, {})
+          const b = this.mindMap.getBoxById(id);
+          if (b && b.health < 5) {
+            acc[id] = b.health;
+          }
+          return acc;
+        }, {})
         : {}
     };
 

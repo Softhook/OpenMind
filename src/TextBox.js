@@ -146,7 +146,6 @@ class TextBox {
     this.backgroundColor = { r: 255, g: 255, b: 255 };
     this.colorPalette = ColorPalette.getBoxBackgroundPalette();
     this.health = 5; // Health points for game mechanics (5 = full)
-    this.lastHitTime = 0; // Timestamp of the last time this box was hit (for recovery)
 
     // Text features
     this.highlights = [];       // Array of {start, end, color:{r,g,b,a?}}
