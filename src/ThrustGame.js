@@ -1166,13 +1166,10 @@ class ThrustGame {
 
     if (!this.mindMap) return;
     
-    // Proactive tracking: Ensure any boxes damaged by others are added to our local tracking
-    // This allows this client to take over healing if the original attacker disconnects.
-    this.mindMap.boxes.forEach(box => {
-      if (box && box.health !== undefined && box.health < 5 && !this.damagedBoxIds.has(box.id)) {
-        this.damagedBoxIds.add(box.id);
-      }
-    });
+    // ZERO OVERHEAD: We no longer scan all boxes (O(N)) every second.
+    // Instead, we rely on event-driven notifications from CollaborationManager
+    // or local hits to populate this.damagedBoxIds. This ensures health recovery
+    // logic only consumes CPU cycles proportional to actual damage (O(D)).
 
     if (this.damagedBoxIds.size === 0) return;
 
@@ -1217,6 +1214,26 @@ class ThrustGame {
     // Remove recovered/deleted boxes from tracking
     for (const id of recoveredIds) {
       this.damagedBoxIds.delete(id);
+    }
+  }
+
+  /**
+   * Notifies the game that a box's health has changed (e.g. from a remote update).
+   * This allows the game to track damaged boxes without expensive full-map scans.
+   * @param {string} boxId - ID of the box
+   * @param {number} health - Current health value
+   */
+  notifyBoxHealthChanged(boxId, health) {
+    if (health !== undefined && health < 5) {
+      if (!this.damagedBoxIds.has(boxId)) {
+        Utils.Logger.debug(`[ThrustGame] Started tracking damaged box ${boxId} (health: ${health})`);
+        this.damagedBoxIds.add(boxId);
+      }
+    } else {
+      if (this.damagedBoxIds.has(boxId)) {
+        Utils.Logger.debug(`[ThrustGame] Stopped tracking box ${boxId} (fully healed or reset)`);
+        this.damagedBoxIds.delete(boxId);
+      }
     }
   }
 

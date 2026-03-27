@@ -1892,10 +1892,21 @@ class CollaborationManager {
             if (typeof data.health === 'number') {
                 box.health = data.health;
                 box.lastHitTime = data.lastHitTime || Date.now();
+                
+                // NOTIFY THRUST GAME: Ensure recovery starts even if we didn't deal the damage
+                // This replaces the expensive full-map scan with a targeted update.
+                if (typeof ThrustGame !== 'undefined' && ThrustGame.instance) {
+                    ThrustGame.instance.notifyBoxHealthChanged(boxId, data.health);
+                }
             } else if (box.health !== undefined) {
                 // If it was damaged but now the server says it's full (missing health), reset to full
                 box.health = 5;
                 box.lastHitTime = 0;
+                
+                // NOTIFY THRUST GAME: Stop tracking if fully healed
+                if (typeof ThrustGame !== 'undefined' && ThrustGame.instance) {
+                    ThrustGame.instance.notifyBoxHealthChanged(boxId, 5);
+                }
             }
 
             box.updateDimensions();

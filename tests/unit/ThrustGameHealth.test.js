@@ -249,4 +249,25 @@ describe('ThrustGame Health and Healing', () => {
         // Should NOT call onBoxChange because it was deleted
         expect(sandbox.MindMap.onBoxChange).not.toHaveBeenCalled();
     });
+
+    test('should start tracking damaged box via notifyBoxHealthChanged', () => {
+        expect(game.damagedBoxIds.has(box.id)).toBe(false);
+        
+        // Simulate remote damage notification
+        game.notifyBoxHealthChanged(box.id, 4);
+        
+        expect(game.damagedBoxIds.has(box.id)).toBe(true);
+        expect(game.damagedBoxIds.size).toBe(1);
+    });
+
+    test('should stop tracking box via notifyBoxHealthChanged when healed', () => {
+        game.damagedBoxIds.add(box.id);
+        expect(game.damagedBoxIds.has(box.id)).toBe(true);
+        
+        // Simulate remote heal notification (health = 5)
+        game.notifyBoxHealthChanged(box.id, 5);
+        
+        expect(game.damagedBoxIds.has(box.id)).toBe(false);
+        expect(game.damagedBoxIds.size).toBe(0);
+    });
 });
