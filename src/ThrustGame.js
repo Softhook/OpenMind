@@ -1195,18 +1195,24 @@ class ThrustGame {
 
           Utils.Logger.debug(`[Box] Recovered health to ${box.health} for box ${box.id}`);
 
+          // If fully recovered, restore lazy-init state (zero overhead for undamaged boxes)
+          if (box.health >= 5) {
+            delete box.health;
+            delete box.lastHitTime;
+            recoveredIds.push(boxId);
+          }
+
           // Trigger persistent sync for health recovery
           if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
             MindMap.onBoxChange(box);
           }
-
-          // If fully recovered, mark for removal from tracking set
-          if (box.health >= 5) {
-            recoveredIds.push(boxId);
-          }
         }
-      } else if (box.health >= 5) {
-        // Just in case it was reset elsewhere
+      } else if (box.health === undefined || box.health >= 5) {
+        // Already healed or reset elsewhere — clean up tracking
+        if (box.health !== undefined) {
+          delete box.health;
+          delete box.lastHitTime;
+        }
         recoveredIds.push(boxId);
       }
     }

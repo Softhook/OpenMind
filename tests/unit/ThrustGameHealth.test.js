@@ -1,5 +1,6 @@
 /**
  * Unit tests for ThrustGame health and healing logic
+ * Covers: lazy-init, damage, recovery, deletion, sync, and zero-overhead guarantees
  */
 
 const vm = require('vm');
@@ -116,6 +117,10 @@ describe('ThrustGame Health and Healing', () => {
         jest.useRealTimers();
     });
 
+    // =========================================================================
+    // LAZY INITIALIZATION
+    // =========================================================================
+
     test('should lazy-initialize health and lastHitTime only when damaged', () => {
         expect(box.health).toBeUndefined();
         expect(box.lastHitTime).toBeUndefined();
@@ -125,6 +130,16 @@ describe('ThrustGame Health and Healing', () => {
         expect(box.health).toBe(4);
         expect(box.lastHitTime).toBe(Date.now());
     });
+
+    test('health property must not exist on fresh boxes', () => {
+        const fresh = new TextBox(200, 200, "Fresh");
+        expect('health' in fresh).toBe(false);
+        expect('lastHitTime' in fresh).toBe(false);
+    });
+
+    // =========================================================================
+    // HEALTH DOTS RENDERING
+    // =========================================================================
 
     test('should show 1 filled red dot after 1 hit (reverse logic)', () => {
         box.health = 4;
@@ -154,6 +169,16 @@ describe('ThrustGame Health and Healing', () => {
         expect(sandbox.circle).not.toHaveBeenCalled();
     });
 
+    test('should hide health dots when health is undefined (never damaged)', () => {
+        // health is undefined by default on fresh boxes
+        box.drawHealthDots();
+        expect(sandbox.circle).not.toHaveBeenCalled();
+    });
+
+    // =========================================================================
+    // HEALING / RECOVERY
+    // =========================================================================
+
     test('should heal 1 HP every 10 seconds (robust)', () => {
         const delay = ThrustGame.HEALTH.RECOVERY_DELAY;
         
@@ -167,7 +192,7 @@ describe('ThrustGame Health and Healing', () => {
         game.updateHealthRecovery();
         
         // Should have healed at least once
-        expect(box.health).toBeGreaterThan(3);
+        expect(box.health === undefined || box.health > 3).toBe(true);
         expect(sandbox.MindMap.onBoxChange).toHaveBeenCalled();
     });
 
@@ -217,15 +242,37 @@ describe('ThrustGame Health and Healing', () => {
         jest.advanceTimersByTime(5000);
         game.updateHealthRecovery();
         
-        expect(box.health).toBe(5); // Box 1 heals
+        // Box 1 was fully healed (health cleared back to undefined for lazy-init purity)
+        expect(box.health).toBeUndefined();
         expect(box2.health).toBe(4); // Box 2 NOT yet (only 5s since hit)
 
         // 5 more seconds later (T+15s)
         jest.advanceTimersByTime(5000);
         game.updateHealthRecovery();
         
-        expect(box2.health).toBe(5); // Box 2 heals now
+        // Box 2 also fully healed
+        expect(box2.health).toBeUndefined();
     });
+
+    test('should restore lazy-init state when fully healed', () => {
+        box.health = 4;
+        box.lastHitTime = Date.now();
+        game.damagedBoxIds.add(box.id);
+
+        // Heal past recovery delay
+        jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+        game.updateHealthRecovery();
+
+        // Should have deleted the properties entirely, not set to 5
+        expect(box.health).toBeUndefined();
+        expect(box.lastHitTime).toBeUndefined();
+        expect('health' in box).toBe(false);
+        expect('lastHitTime' in box).toBe(false);
+    });
+
+    // =========================================================================
+    // DELETION
+    // =========================================================================
 
     test('should trigger box deletion when health reaches 0 (with transaction)', () => {
         box.health = 1;
@@ -250,6 +297,10 @@ describe('ThrustGame Health and Healing', () => {
         expect(sandbox.MindMap.onBoxChange).not.toHaveBeenCalled();
     });
 
+    // =========================================================================
+    // TRACKED SET (damagedBoxIds)
+    // =========================================================================
+
     test('should start tracking damaged box via notifyBoxHealthChanged', () => {
         expect(game.damagedBoxIds.has(box.id)).toBe(false);
         
@@ -269,5 +320,200 @@ describe('ThrustGame Health and Healing', () => {
         
         expect(game.damagedBoxIds.has(box.id)).toBe(false);
         expect(game.damagedBoxIds.size).toBe(0);
+    });
+
+    test('should stop tracking box via notifyBoxHealthChanged when health is undefined', () => {
+        game.damagedBoxIds.add(box.id);
+        
+        // Simulate reset (undefined health = never damaged)
+        game.notifyBoxHealthChanged(box.id, undefined);
+        
+        expect(game.damagedBoxIds.has(box.id)).toBe(false);
+    });
+
+    test('should not track box at full health', () => {
+        game.notifyBoxHealthChanged(box.id, 5);
+        expect(game.damagedBoxIds.has(box.id)).toBe(false);
+    });
+
+    // =========================================================================
+    // ZERO-OVERHEAD WHEN DORMANT
+    // =========================================================================
+
+    test('updateHealthRecovery should exit immediately when no damaged boxes', () => {
+        // No damaged boxes
+        expect(game.damagedBoxIds.size).toBe(0);
+        
+        // Force throttle timer to pass
+        jest.advanceTimersByTime(2000);
+        
+        const getMock = mockMindMap.getBoxById;
+        getMock.mockClear();
+        
+        game.updateHealthRecovery();
+        
+        // getBoxById should never be called
+        expect(getMock).not.toHaveBeenCalled();
+    });
+
+    test('updateHealthRecovery is throttled to once per second', () => {
+        box.health = 3;
+        box.lastHitTime = Date.now();
+        game.damagedBoxIds.add(box.id);
+        
+        // First call should run
+        jest.advanceTimersByTime(1100);
+        game.updateHealthRecovery();
+        const firstCallCount = mockMindMap.getBoxById.mock.calls.length;
+        expect(firstCallCount).toBeGreaterThan(0);
+        
+        // Immediate second call should be throttled
+        mockMindMap.getBoxById.mockClear();
+        game.updateHealthRecovery();
+        expect(mockMindMap.getBoxById).not.toHaveBeenCalled();
+        
+        // After 1 second, should run again
+        jest.advanceTimersByTime(1100);
+        game.updateHealthRecovery();
+        expect(mockMindMap.getBoxById).toHaveBeenCalled();
+    });
+
+    test('drawHealthDots is zero-overhead for undamaged boxes', () => {
+        // Verify no draw calls for fresh box
+        sandbox.push.mockClear();
+        sandbox.circle.mockClear();
+        
+        box.drawHealthDots();
+        
+        // Should not even call push/pop for rendering setup
+        expect(sandbox.push).not.toHaveBeenCalled();
+        expect(sandbox.circle).not.toHaveBeenCalled();
+    });
+
+    // =========================================================================
+    // CLEANUP ON DELETED BOXES
+    // =========================================================================
+
+    test('should remove deleted boxes from damagedBoxIds during recovery', () => {
+        game.damagedBoxIds.add('deleted-box');
+        game.damagedBoxIds.add(box.id);
+        box.health = 3;
+        box.lastHitTime = Date.now();
+        
+        // Advance past throttle
+        jest.advanceTimersByTime(1100);
+        game.updateHealthRecovery();
+        
+        // Deleted box should be removed from tracking
+        expect(game.damagedBoxIds.has('deleted-box')).toBe(false);
+        // Live damaged box should remain
+        expect(game.damagedBoxIds.has(box.id)).toBe(true);
+    });
+
+    // =========================================================================
+    // EDGE CASES & STABILITY
+    // =========================================================================
+
+    test('reduceHealth handles repeated hits below zero gracefully', () => {
+        box.health = 1;
+        box.reduceHealth();
+        expect(box.health).toBe(0);
+        
+        // Second hit on dead box should not crash
+        mockMindMap._wrapInTransaction.mockClear();
+        box.reduceHealth();
+        expect(box.health).toBe(-1);
+        // Transaction should fire again (box is already dead, but no crash)
+        expect(mockMindMap._wrapInTransaction).toHaveBeenCalled();
+    });
+
+    test('applyBulletForceToBox handles null box gracefully', () => {
+        const bullet = { x: 100, y: 100, vx: 5, vy: 0 };
+        // Should not throw
+        expect(() => game.applyBulletForceToBox(null, bullet)).not.toThrow();
+    });
+
+    test('applyBulletForceToBox handles zero-velocity bullet', () => {
+        const bullet = { x: 100, y: 100, vx: 0, vy: 0 };
+        const origHealth = box.health;
+        
+        // Should not throw or reduce health (velocity epsilon check)
+        game.applyBulletForceToBox(box, bullet);
+        expect(box.health).toBe(origHealth);
+    });
+
+    test('multiple bullets hitting same box in one frame deduct correct health', () => {
+        const bullet1 = { x: 100, y: 100, vx: 5, vy: 0 };
+        const bullet2 = { x: 100, y: 100, vx: -5, vy: 0 };
+        
+        game.applyBulletForceToBox(box, bullet1);
+        expect(box.health).toBe(4);
+        
+        game.applyBulletForceToBox(box, bullet2);
+        expect(box.health).toBe(3);
+    });
+
+    test('notifyBoxHealthChanged is idempotent for repeated calls', () => {
+        game.notifyBoxHealthChanged(box.id, 3);
+        game.notifyBoxHealthChanged(box.id, 3);
+        game.notifyBoxHealthChanged(box.id, 3);
+        
+        expect(game.damagedBoxIds.size).toBe(1);
+        
+        game.notifyBoxHealthChanged(box.id, 5);
+        game.notifyBoxHealthChanged(box.id, 5);
+        
+        expect(game.damagedBoxIds.size).toBe(0);
+    });
+
+    // =========================================================================
+    // STRESS / PERFORMANCE CHARACTERISTICS
+    // =========================================================================
+
+    test('recovery loop handles large number of damaged boxes efficiently', () => {
+        const DAMAGED_COUNT = 100;
+        const hitTime = Date.now();
+        
+        for (let i = 0; i < DAMAGED_COUNT; i++) {
+            const b = new TextBox(i * 50, 100, `Box ${i}`);
+            b.id = `stress-box-${i}`;
+            b.health = 3;
+            b.lastHitTime = hitTime;
+            mockMindMap.boxes.push(b);
+            game.damagedBoxIds.add(b.id);
+        }
+        
+        expect(game.damagedBoxIds.size).toBe(DAMAGED_COUNT);
+        
+        // Advance time past recovery delay
+        jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+        
+        const start = performance.now();
+        game.updateHealthRecovery();
+        const elapsed = performance.now() - start;
+        
+        // Should complete in well under 50ms for 100 boxes
+        expect(elapsed).toBeLessThan(50);
+        
+        // All boxes should have recovered by 1 HP
+        for (let i = 0; i < DAMAGED_COUNT; i++) {
+            const b = mockMindMap.boxes.find(b => b.id === `stress-box-${i}`);
+            expect(b.health).toBe(4);
+        }
+    });
+
+    test('damagedBoxIds stays clean after full cycle (damage -> heal -> done)', () => {
+        box.health = 4;
+        box.lastHitTime = Date.now();
+        game.damagedBoxIds.add(box.id);
+        
+        // Wait for full recovery (2 recovery ticks: 4 -> 5)
+        jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+        game.updateHealthRecovery();
+        
+        // After healing to 5, should be removed from tracking and properties cleaned
+        expect(game.damagedBoxIds.has(box.id)).toBe(false);
+        expect(game.damagedBoxIds.size).toBe(0);
+        expect(box.health).toBeUndefined();
     });
 });

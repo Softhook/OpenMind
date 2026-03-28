@@ -1216,8 +1216,9 @@ class CollaborationManager {
                 ? box.italicRanges.map(r => ({ start: r.start, end: r.end }))
                 : null,
             // Health synchronization for Thrust mini-game
-            health: box.health,
-            lastHitTime: box.lastHitTime
+            // Only serialize when damaged to avoid permanent property bloat on undamaged boxes
+            health: (box.health !== undefined && box.health < 5) ? box.health : undefined,
+            lastHitTime: (box.health !== undefined && box.health < 5) ? box.lastHitTime : undefined
         };
     }
 
@@ -1899,9 +1900,9 @@ class CollaborationManager {
                     ThrustGame.instance.notifyBoxHealthChanged(boxId, data.health);
                 }
             } else if (box.health !== undefined) {
-                // If it was damaged but now the server says it's full (missing health), reset to full
-                box.health = 5;
-                box.lastHitTime = 0;
+                // If it was damaged but now the server says it's full (missing health), restore lazy-init state
+                delete box.health;
+                delete box.lastHitTime;
                 
                 // NOTIFY THRUST GAME: Stop tracking if fully healed
                 if (typeof ThrustGame !== 'undefined' && ThrustGame.instance) {
