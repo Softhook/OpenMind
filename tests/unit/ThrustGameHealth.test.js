@@ -40,10 +40,10 @@ const sandbox = {
     console,
     get Date() { return Date; }, // Use getter to follow Jest's fake timers
     Math,
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
+    get setTimeout() { return setTimeout; },
+    get clearTimeout() { return clearTimeout; },
+    get setInterval() { return setInterval; },
+    get clearInterval() { return clearInterval; },
     module: { exports: {} },
     globalThis: {},
     window: {},
@@ -146,6 +146,11 @@ describe('ThrustGame Health and Healing', () => {
 
     afterEach(() => {
         if (game && game.active) game.stop();
+        // Clear any static healing interval left by stop() to prevent cross-test bleed
+        if (ThrustGame._healingInterval !== null) {
+            clearInterval(ThrustGame._healingInterval);
+            ThrustGame._healingInterval = null;
+        }
         jest.useRealTimers();
     });
 
@@ -811,6 +816,118 @@ describe('ThrustGame Health and Healing', () => {
             expect(sandbox.circle).not.toHaveBeenCalled();
             // Must complete in << 1ms
             expect(elapsed).toBeLessThan(5);
+        });
+    });
+
+    // =========================================================================
+    // POST-SESSION HEALING LOOP (_startHealingLoop)
+    // =========================================================================
+
+    describe('Post-session healing loop (after all users exit thrust mode)', () => {
+        test('stop() arms the static interval when damaged boxes remain', () => {
+            box.health = 3;
+            box.lastHitTime = Date.now();
+            game.damagedBoxIds.add(box.id);
+
+            expect(ThrustGame._healingInterval).toBeNull();
+            game.stop();
+            expect(ThrustGame._healingInterval).not.toBeNull();
+        });
+
+        test('stop() does NOT arm interval when no boxes are damaged', () => {
+            // damagedBoxIds is empty
+            expect(game.damagedBoxIds.size).toBe(0);
+            game.stop();
+            expect(ThrustGame._healingInterval).toBeNull();
+        });
+
+        test('healing loop recovers a box after recovery delay and removes itself', () => {
+            MindMapStatic.onBoxChange = jest.fn();
+            box.health = 4;
+            box.lastHitTime = Date.now();
+            game.damagedBoxIds.add(box.id);
+            game.stop();
+
+            expect(ThrustGame._healingInterval).not.toBeNull();
+
+            // Advance past recovery delay — interval ticks every 1000ms
+            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+
+            // Box should be fully healed and interval removed
+            expect(box.health).toBeUndefined();
+            expect('health' in box).toBe(false);
+            expect(ThrustGame._healingInterval).toBeNull();
+            expect(MindMapStatic.onBoxChange).toHaveBeenCalled();
+        });
+
+        test('healing loop defers to a live active instance', () => {
+            box.health = 4;
+            box.lastHitTime = Date.now();
+            game.damagedBoxIds.add(box.id);
+            game.stop();
+
+            // Simulate a second user opening thrust mode (live instance exists)
+            const liveGame = new ThrustGame(null, mockMindMap);
+            liveGame.start();
+            ThrustGame.instance = liveGame;
+
+            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+
+            // The static loop deferred to the live instance — it did NOT heal directly
+            // (box.health remains 4; the live instance's updateHealthRecovery owns it)
+            expect(box.health).toBe(4);
+
+            // Interval removes itself because it yielded all its IDs
+            expect(ThrustGame._healingInterval).toBeNull();
+
+            // Fully heal before stopping so stop() doesn't re-arm
+            delete box.health;
+            delete box.lastHitTime;
+            liveGame.damagedBoxIds.clear();
+            liveGame.stop();
+            ThrustGame.instance = null;
+        });
+
+        test('healing loop cleans up missing/deleted boxes without throwing', () => {
+            const phantomId = 'phantom-box-id';
+            // Do NOT add to mockMindMap.boxes, so getBoxById returns undefined
+            game.damagedBoxIds.add(phantomId);
+            game.stop();
+
+            expect(() => {
+                jest.advanceTimersByTime(2000);
+            }).not.toThrow();
+
+            // Phantom removed, interval self-cancels
+            expect(ThrustGame._healingInterval).toBeNull();
+        });
+
+        test('a new stop() with damage replaces a prior static healing loop', () => {
+            // First session with damaged box
+            box.health = 3;
+            box.lastHitTime = Date.now();
+            game.damagedBoxIds.add(box.id);
+            game.stop();
+            const firstHandle = ThrustGame._healingInterval;
+            expect(firstHandle).not.toBeNull();
+
+            // Second session starts and stops with a new damaged box
+            const box2 = new TextBox(300, 300, 'Box 2');
+            box2.id = 'box-2';
+            box2.health = 2;
+            box2.lastHitTime = Date.now();
+            mockMindMap.boxes.push(box2);
+
+            const game2 = new ThrustGame(null, mockMindMap);
+            game2.start();
+            game2.damagedBoxIds.add(box2.id);
+            game2.stop();
+
+            // The new interval must replace the old one
+            expect(ThrustGame._healingInterval).not.toBe(firstHandle);
+            expect(ThrustGame._healingInterval).not.toBeNull();
+
+            game = game2; // let afterEach not fail
         });
     });
 });

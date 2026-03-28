@@ -122,6 +122,7 @@ class ThrustGame {
   static instance = null;
   static hasRemotePlayers = false;
   static _activeManager = null; // Track which manager we are currently listening to
+  static _healingInterval = null; // setInterval handle for post-session box healing
 
   /**
    * Main game loop - handles updates, drawing, and lifecycle.
@@ -772,6 +773,13 @@ class ThrustGame {
       MindMap.onBoxHealthChanged = null;
     }
 
+    // HEAL HANDOFF: If damaged boxes remain, delegate recovery to a self-removing
+    // static interval so healing continues after the instance is destroyed.
+    // We pass the mindMap reference now because it will be nulled on destroy().
+    if (this.damagedBoxIds && this.damagedBoxIds.size > 0 && this.mindMap) {
+      ThrustGame._startHealingLoop(this.mindMap, new Set(this.damagedBoxIds));
+    }
+
     // Clear multiplayer state from awareness
     if (this.collaborationManager && this.collaborationManager.awareness) {
       this.collaborationManager.awareness.setLocalStateField('thrustGame', null);
@@ -808,6 +816,126 @@ class ThrustGame {
     ThrustGame.hasRemotePlayers = false;
 
     Utils.Logger.collab('[ThrustGame] Stopped and cleaned up');
+  }
+
+  /**
+   * Starts a lightweight static interval that continues health recovery after the
+   * game instance has been destroyed. The interval ticks once per second to match
+   * normal recovery cadence and removes itself automatically once all tracked boxes
+   * are fully healed — no external cleanup required.
+   *
+   * Design notes:
+   * - Static so it survives instance destruction.
+   * - Receives a snapshot of damagedBoxIds so the destroyed instance's Set can be GC'd.
+   * - If a new session starts before healing is complete, start() seeds damagedBoxIds
+   *   from the live map state, making the two paths naturally idempotent.
+   * - Only a single interval runs at a time; a pre-existing one is cleared before
+   *   starting a new one to prevent duplicate ticks.
+   *
+   * @param {MindMap} mindMap - Live MindMap reference (held only for this interval's life)
+   * @param {Set<string>} boxIds - Snapshot of IDs that still need healing
+   */
+  static _startHealingLoop(mindMap, boxIds) {
+    // Cancel any previous healing loop from an earlier session.
+    if (ThrustGame._healingInterval !== null) {
+      clearInterval(ThrustGame._healingInterval);
+      ThrustGame._healingInterval = null;
+    }
+
+    if (!mindMap || boxIds.size === 0) return;
+
+    Utils.Logger.debug(`[ThrustGame] Handing off healing for ${boxIds.size} box(es) to static loop`);
+
+    // FIX #5: Capture the handle locally so the self-cancel inside the callback
+    // always refers to THIS interval. If _startHealingLoop is called again before
+    // we self-cancel, the static field will point to the new interval; using
+    // the local `handle` here means we can't accidentally kill a replacement.
+    let handle;
+    handle = setInterval(() => {
+      // FIX #3: Validate mindMap BEFORE the loop. A stale/gone reference cancels
+      // the interval cleanly without falsely draining unhealed IDs from boxIds.
+      if (!mindMap || typeof mindMap.getBoxById !== 'function') {
+        clearInterval(handle);
+        if (ThrustGame._healingInterval === handle) ThrustGame._healingInterval = null;
+        Utils.Logger.debug('[HealingLoop] MindMap reference gone — interval cancelled');
+        return;
+      }
+
+      const now = Date.now();
+      const recoveredIds = [];
+
+      for (const boxId of boxIds) {
+        // If an active instance exists it owns recovery — drain our IDs and
+        // self-cancel so we stay out of the way.
+        if (ThrustGame.instance && ThrustGame.instance.active) {
+          recoveredIds.push(boxId);
+          continue;
+        }
+
+        const box = mindMap.getBoxById(boxId);
+
+        // FIX #1: Dead (health <= 0), missing, or deleted boxes must be drained
+        // so the interval can always self-cancel. Previously, health === 0 boxes
+        // matched neither branch and stayed in the Set forever.
+        if (!box || box.isDeleted || (box.health !== undefined && box.health <= 0)) {
+          recoveredIds.push(boxId);
+          continue;
+        }
+
+        if (box.health === undefined || box.health >= 5) {
+          // Box was healed externally (e.g. via Yjs sync from another client).
+          if (box.health !== undefined) {
+            delete box.health;
+            delete box.lastHitTime;
+            // FIX #4: Push the property deletion back to Yjs so the document
+            // and the in-memory object don't diverge after a remote heal.
+            if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+              MindMap.onBoxChange(box);
+            }
+          }
+          recoveredIds.push(boxId);
+          continue;
+        }
+
+        if (box.health > 0 && box.lastHitTime > 0 &&
+            now - box.lastHitTime >= ThrustGame.HEALTH.RECOVERY_DELAY) {
+          box.health++;
+          box.lastHitTime = now - (ThrustGame.HEALTH.RECOVERY_DELAY - ThrustGame.HEALTH.RECOVERY_RATE);
+
+          Utils.Logger.debug(`[HealingLoop] Box ${box.id} recovered to health ${box.health}`);
+
+          if (box.health >= 5) {
+            delete box.health;
+            delete box.lastHitTime;
+            recoveredIds.push(boxId);
+          }
+
+          // FIX #2: Persist via the collaboration channel when online.
+          // When offline (MindMap.onBoxChange is null), the in-memory mutation is
+          // the only state that can be saved; this matches the behaviour of the live
+          // updateHealthRecovery, and is a documented gap: a hard refresh while
+          // offline will read stale health from localStorage until Yjs reconciles.
+          if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+            MindMap.onBoxChange(box);
+          }
+        }
+      }
+
+      for (const id of recoveredIds) {
+        boxIds.delete(id);
+      }
+
+      // Self-destruct once all boxes are handled.
+      // FIX #5: Use the locally-captured `handle`, not ThrustGame._healingInterval,
+      // so a concurrent restart can't cause us to cancel the replacement interval.
+      if (boxIds.size === 0) {
+        clearInterval(handle);
+        if (ThrustGame._healingInterval === handle) ThrustGame._healingInterval = null;
+        Utils.Logger.debug('[HealingLoop] All boxes healed — interval removed');
+      }
+    }, 1000); // Tick once per second, matching normal recovery cadence
+
+    ThrustGame._healingInterval = handle;
   }
 
   /**
