@@ -847,8 +847,9 @@ class CollaborationManager {
      * All Yjs changes within the callback are grouped as a single undo step.
      * Use this for atomic operations like creating/deleting boxes, alignment, etc.
      * @param {Function} callback - Function to execute within the transaction
+     * @param {string|null} origin - Origin of the transaction. If null, change is NOT tracked in undo.
      */
-    transact(callback, label = '') {
+    transact(callback, origin = CollaborationManager.TRACKED_ORIGIN) {
         if (typeof callback !== 'function') {
             throw new TypeError('transact() requires a function callback');
         }
@@ -859,12 +860,9 @@ class CollaborationManager {
             this._closeTextEditUndoGroup();
         }
 
-        if (this.ydoc && this.undoManager) {
-            // Set origin to specialized TRACKED_ORIGIN so it knows to track this transaction
-            this.ydoc.transact(callback, CollaborationManager.TRACKED_ORIGIN);
-        } else if (this.ydoc) {
-            // Fallback without undo manager
-            this.ydoc.transact(callback);
+        if (this.ydoc) {
+            // Use the provided origin (or null for untracked changes)
+            this.ydoc.transact(callback, origin);
         } else {
             // Fallback: just execute the callback if ydoc is not available
             callback();
@@ -1008,8 +1006,8 @@ class CollaborationManager {
         // When a box changes locally, sync to Yjs
         // Note: Using arrow functions which capture `this` automatically
         if (typeof MindMap !== 'undefined') {
-            MindMap.onBoxChange = (box, skipTransactionWrapper = false) => {
-                this.syncBoxToYjs(box, skipTransactionWrapper);
+            MindMap.onBoxChange = (box, skipTransactionWrapper = false, origin = CollaborationManager.TRACKED_ORIGIN) => {
+                this.syncBoxToYjs(box, skipTransactionWrapper, origin);
             };
 
             MindMap.onBoxDelete = (boxId) => {
@@ -1239,9 +1237,10 @@ class CollaborationManager {
      * Updates a single box in Yjs
      * Call this when a box is created or modified locally
      * @param {TextBox} box 
-     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations that will call stopCapturing)
+     * @param {boolean} skipTransactionWrapper - If true, don't wrap in transaction (for continuous operations)
+     * @param {string|null} origin - Origin of the transaction (defaults to TRACKED_ORIGIN)
      */
-    syncBoxToYjs(box, skipTransactionWrapper = false) {
+    syncBoxToYjs(box, skipTransactionWrapper = false, origin = CollaborationManager.TRACKED_ORIGIN) {
         if (!this.yboxes || !box || !box.id || this.isSyncing) return;
 
         // AUTHORITATIVE EXISTENCE GUARD:
@@ -1319,13 +1318,13 @@ class CollaborationManager {
         }
 
         // For non-editing changes (atomic operations), sync immediately with transaction origin
-        if (this.ydoc && this.undoManager) {
+        if (this.ydoc) {
             this.transact(() => {
                 const nextData = this._boxToYjsData(box);
                 const prevData = this.yboxes.get(box.id);
                 if (this._boxDataEquals(prevData, nextData)) return;
                 this.yboxes.set(box.id, nextData);
-            }, 'syncBoxToYjs');
+            }, origin);
         } else {
             // Fallback without undo tracking
             const nextData = this._boxToYjsData(box);

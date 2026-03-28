@@ -890,7 +890,7 @@ class ThrustGame {
             // FIX #4: Push the property deletion back to Yjs so the document
             // and the in-memory object don't diverge after a remote heal.
             if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-              MindMap.onBoxChange(box);
+              MindMap.onBoxChange(box, false, null);
             }
           }
           recoveredIds.push(boxId);
@@ -916,7 +916,7 @@ class ThrustGame {
           // updateHealthRecovery, and is a documented gap: a hard refresh while
           // offline will read stale health from localStorage until Yjs reconciles.
           if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-            MindMap.onBoxChange(box);
+            MindMap.onBoxChange(box, false, null);
           }
         }
       }
@@ -1362,7 +1362,7 @@ class ThrustGame {
 
           // Trigger persistent sync for health recovery
           if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-            MindMap.onBoxChange(box);
+            MindMap.onBoxChange(box, false, null);
           }
         }
       } else if (box.health === undefined || box.health >= 5) {
@@ -1513,14 +1513,14 @@ class ThrustGame {
     // Fallback to MindMap.onBoxChange when not connected (offline/solo play).
     if (this.collaborationManager && this.collaborationManager.isConnected) {
       if (box.health > 0) {
-        // Box is still alive: sync position + updated health together
-        this.collaborationManager.syncBoxToYjs(box, false);
+        // Box is still alive: sync position + updated health together (untracked)
+        this.collaborationManager.syncBoxToYjs(box, false, null);
       }
       // If box.health === 0, reduceHealth() already triggered deletion via _performBoxDeletion.
       // syncBoxToYjs would be a no-op anyway (box removed from register), but skip it explicitly.
     } else if (box.health > 0 && typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-      // Offline fallback: notify any local listener of the position/health change
-      MindMap.onBoxChange(box);
+      // Offline fallback: notify any local listener of the position/health change (untracked)
+      MindMap.onBoxChange(box, false, null);
     }
   }
 
