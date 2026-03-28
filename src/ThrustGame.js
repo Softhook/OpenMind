@@ -47,9 +47,15 @@ class ThrustGame {
   };
 
   static EXPLOSION = {
-    DURATION: 800,           // Explosion animation duration in ms
-    MAX_RADIUS: 40,          // Maximum radius of explosion circle
-    FADE_START: 0.4          // Start fading at 40% of animation
+    DURATION: 1200,          // Longer animation for more impact
+    MAX_RADIUS: 120,         // Much larger shockwave
+    FADE_START: 0.2,         // Start fading sooner for smoother trails
+    SHRAPNEL_COUNT: 40,      // Massive debris field
+    SHRAPNEL_SPEED_MIN: 4,   // Faster initial blast
+    SHRAPNEL_SPEED_MAX: 14,  // High-velocity fragments
+    SPARK_COUNT: 25,         // Extra tiny light particles
+    SPARK_SPEED_MIN: 8,      // Very fast sparks
+    SPARK_SPEED_MAX: 20      // Energy streaks
   };
 
   static HEALTH = {
@@ -1405,14 +1411,66 @@ class ThrustGame {
    * Creates an explosion at the specified location
    * @param {number} x - World X coordinate
    * @param {number} y - World Y coordinate
+   * @param {string} type - 'player' or 'box'
+   * @param {Object} color - Optional color for the explosion (e.g. box background)
+   * @param {number} scale - Optional scale factor (defaults to 1.0)
    */
-  createExplosion(x, y) {
-    this.explosions.push({
+  createExplosion(x, y, type = 'player', color = null, scale = 1.0) {
+    const explosion = {
       x: x,
       y: y,
+      type: type,
       startTime: Date.now(),
-      duration: ThrustGame.EXPLOSION.DURATION
-    });
+      duration: ThrustGame.EXPLOSION.DURATION,
+      color: color,
+      scale: scale, // Store scale for drawing logic
+      particles: [],
+      sparks: []
+    };
+
+    const baseCount = type === 'box' ? ThrustGame.EXPLOSION.SHRAPNEL_COUNT : 20;
+    const baseSparkCount = type === 'box' ? ThrustGame.EXPLOSION.SPARK_COUNT : 15;
+    
+    // Scale counts (clamped for performance)
+    const count = Math.min(100, Math.floor(baseCount * scale));
+    const sparkCount = Math.min(80, Math.floor(baseSparkCount * scale));
+
+    // Create main debris (shrapnel)
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const baseSpeed = ThrustGame.EXPLOSION.SHRAPNEL_SPEED_MIN + 
+                       Math.random() * (ThrustGame.EXPLOSION.SHRAPNEL_SPEED_MAX - ThrustGame.EXPLOSION.SHRAPNEL_SPEED_MIN);
+      const speed = baseSpeed * (0.8 + 0.4 * scale); // Speed also scales slightly
+      
+      // Box pieces fly out further and are larger
+      explosion.particles.push({
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        w: (6 + Math.random() * 14) * Math.sqrt(scale), // Scale width/height with sqrt(area scale)
+        h: (6 + Math.random() * 14) * Math.sqrt(scale),
+        angle: Math.random() * Math.PI * 2,
+        va: (Math.random() - 0.5) * 0.4,
+        color: color || (type === 'box' ? { r: 200, g: 200, b: 200 } : { r: 255, g: 100, b: 50 }),
+        sizeScale: 0.8 + Math.random() * 0.4
+      });
+    }
+
+    // Create energy sparks (extravagant tiny light pieces)
+    for (let i = 0; i < sparkCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const baseSparkSpeed = ThrustGame.EXPLOSION.SPARK_SPEED_MIN + 
+                   Math.random() * (ThrustGame.EXPLOSION.SPARK_SPEED_MAX - ThrustGame.EXPLOSION.SPARK_SPEED_MIN);
+      const sparkSpeed = baseSparkSpeed * (0.9 + 0.2 * scale);
+      
+      explosion.sparks.push({
+        vx: Math.cos(angle) * sparkSpeed,
+        vy: Math.sin(angle) * sparkSpeed,
+        length: (8 + Math.random() * 20) * scale,
+        color: { r: 255, g: 255, b: 180 + Math.random() * 75 } // White-yellow energy
+      });
+    }
+
+    this.explosions.push(explosion);
   }
 
   /**
@@ -1490,7 +1548,20 @@ class ThrustGame {
 
     // Reduce box health
     if (typeof box.reduceHealth === 'function') {
+      // Capture health state before reduction to detect destruction
+      const wasAlive = (box.health === undefined || box.health > 0);
+      
       box.reduceHealth();
+
+      // TRIGGER EXPLOSION: Only if destroyed by this shot (box.health reached 0)
+      const isDead = (box.health !== undefined && box.health <= 0);
+      if (wasAlive && isDead) {
+        // Calculate explosion scale based on box dimensions (standard box is ~200x80 = 16000 area)
+        const area = (box.width || 100) * (box.height || 40);
+        const scale = Math.sqrt(area / 16000); // Sqrt makes it linear with perceived size
+        
+        this.createExplosion(box.x, box.y, 'box', box.backgroundColor, scale);
+      }
 
       // Track damaged box for optimized recovery loop
       if (box.health !== undefined && box.health < 5) {
@@ -2040,36 +2111,93 @@ class ThrustGame {
     const now = Date.now();
 
     for (const explosion of this.explosions) {
-      // Skip explosions outside viewport for performance
-      if (isInViewport && !isInViewport(explosion.x, explosion.y)) continue;
+      if (isInViewport && !isInViewport(explosion.x, explosion.y) && explosion.type !== 'box') continue;
 
       const elapsed = now - explosion.startTime;
-      const progress = elapsed / explosion.duration; // 0 to 1
+      const progress = elapsed / explosion.duration; 
 
-      // Calculate expanding radius
-      const radius = ThrustGame.EXPLOSION.MAX_RADIUS * progress;
-
-      // Calculate fade effect (starts fading at FADE_START progress)
+      // Calculate fade effect
       let alpha = 255;
       if (progress > ThrustGame.EXPLOSION.FADE_START) {
         const fadeProgress = (progress - ThrustGame.EXPLOSION.FADE_START) /
           (1 - ThrustGame.EXPLOSION.FADE_START);
-        alpha = 255 * (1 - fadeProgress);
+        alpha = 255 * (1 - Math.pow(fadeProgress, 2)); // Curved fade for smoother exit
       }
 
-      // Draw expanding red circle
       push();
-      noFill();
-      stroke(255, 0, 0, alpha); // Red with alpha
-      strokeWeight(3);
-      circle(explosion.x, explosion.y, radius * 2);
+      translate(explosion.x, explosion.y);
 
-      // Inner circle for more impact
-      if (progress < 0.5) {
-        strokeWeight(2);
-        stroke(255, 100, 0, alpha * 0.7); // Orange
-        circle(explosion.x, explosion.y, radius * 1.5);
+      // Layer 1: Shockwaves
+      if (explosion.type === 'box') {
+        const baseRadius = ThrustGame.EXPLOSION.MAX_RADIUS * (explosion.scale || 1.0);
+        const shockSize = baseRadius * (1 - Math.pow(1 - progress, 3));
+        noFill();
+        stroke(255, 255, 255, alpha * 0.4);
+        strokeWeight(4 * (1 - progress));
+        circle(0, 0, shockSize * 1.5);
+        
+        stroke(255, 200, 100, alpha * 0.2);
+        circle(0, 0, shockSize * 2.2);
       }
+
+      // Layer 2: Sparks (Energy streaks)
+      if (explosion.sparks) {
+        strokeCap(ROUND);
+        for (const s of explosion.sparks) {
+          const sx = s.vx * (elapsed / 16);
+          const sy = s.vy * (elapsed / 16);
+          const sAngle = Math.atan2(s.vy, s.vx);
+          
+          push();
+          translate(sx, sy);
+          rotate(sAngle);
+          stroke(s.color.r, s.color.g, s.color.b, alpha);
+          strokeWeight(2);
+          line(0, 0, s.length * (1 - progress), 0);
+          pop();
+        }
+      }
+
+      // Layer 3: Main Shrapnel (Debris)
+      if (explosion.particles) {
+        rectMode(CENTER);
+        for (const p of explosion.particles) {
+          const px = p.vx * (elapsed / 16);
+          const py = p.vy * (elapsed / 16);
+          const pAngle = p.angle + p.va * (elapsed / 16);
+          const pScale = p.sizeScale * (1 - progress * 0.5);
+
+          push();
+          translate(px, py);
+          rotate(pAngle);
+          
+          // Draw with black outline for visibility
+          stroke(0, alpha);
+          strokeWeight(1);
+          fill(p.color.r, p.color.g, p.color.b, alpha);
+          rect(0, 0, p.w * pScale, p.h * pScale);
+          
+          // Add a tiny bit of additive glow to pieces
+          if (progress < 0.4) {
+             noStroke();
+             fill(255, 255, 255, alpha * 0.3);
+             rect(0, 0, p.w * pScale * 0.5, p.h * pScale * 0.5);
+          }
+          pop();
+        }
+      }
+
+      // Layer 4: Central Flash
+      if (progress < 0.2) {
+        const baseRadius = ThrustGame.EXPLOSION.MAX_RADIUS * (explosion.scale || 1.0);
+        const flashRadius = baseRadius * (1 - progress * 5);
+        noStroke();
+        fill(255, 255, 255, 255);
+        circle(0, 0, flashRadius * 0.8);
+        fill(255, 255, 150, 180);
+        circle(0, 0, flashRadius * 1.5);
+      }
+
       pop();
     }
   }
