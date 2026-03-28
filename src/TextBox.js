@@ -85,6 +85,9 @@ class TextBox {
     // Content
     this.text = Utils.sanitizeText(text);
 
+    // Mini-game state (transient)
+    this.wasExploded = false; // Prevents multiple explosions for the same box death
+
     // Image attachment state
     this.imageUrl = null;
     this.img = null;

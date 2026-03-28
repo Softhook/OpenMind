@@ -227,34 +227,42 @@ window.ExtensionBridge = {
   _loading: new Map(),
 
   /**
-   * Lazily loads an extension script if not already loaded or loading.
+   * Lazily loads one or more extension scripts if not already loaded or loading.
    * @param {string} name - Internal name for tracking
-   * @param {string} path - Path to the JS file
-   * @param {Function} [onLoad] - Optional callback after loading
+   * @param {string|string[]} paths - Path(s) to the JS file(s)
+   * @param {Function} [onLoad] - Optional callback after loading all scripts
    */
-  load: function (name, path, onLoad) {
+  load: function (name, paths, onLoad) {
     if (window[name]) {
       if (onLoad) onLoad();
       return;
     }
-    if (this._loading.has(name)) {
-      // If already loading, we could queue the callback, but for now just ignore
-      return;
-    }
+    if (this._loading.has(name)) return;
     this._loading.set(name, true);
-    console.info(`[ExtensionBridge] Lazily loading ${name} from ${path}...`);
-    const script = document.createElement('script');
-    script.src = path;
-    script.onload = () => {
-      this._loading.set(name, false);
-      console.info(`[ExtensionBridge] ${name} loaded successfully.`);
-      if (onLoad) onLoad();
+
+    const pathList = Array.isArray(paths) ? paths : [paths];
+
+    console.info(`[ExtensionBridge] Lazily loading ${name} (${pathList.length} files)...`);
+
+    const loadNext = (index) => {
+      if (index >= pathList.length) {
+        this._loading.set(name, false);
+        console.info(`[ExtensionBridge] ${name} loaded successfully.`);
+        if (onLoad) onLoad();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = pathList[index];
+      script.onload = () => loadNext(index + 1);
+      script.onerror = (e) => {
+        this._loading.delete(name);
+        console.error(`[ExtensionBridge] Failed to load ${name} at ${pathList[index]}:`, e);
+      };
+      document.body.appendChild(script);
     };
-    script.onerror = (e) => {
-      this._loading.delete(name);
-      console.error(`[ExtensionBridge] Failed to load ${name}:`, e);
-    };
-    document.body.appendChild(script);
+
+    loadNext(0);
   }
 };
 
@@ -996,7 +1004,14 @@ function drawRemoteCursors() {
 
           // Auto-load ThrustGame if we see remote activity but it's not loaded yet
           if (typeof ThrustGame === 'undefined') {
-            ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
+            ExtensionBridge.load('ThrustGame', [
+              'src/ThrustConstants.js',
+              'src/ThrustUtils.js',
+              'src/ThrustShip.js',
+              'src/ThrustBullet.js',
+              'src/ThrustExplosion.js',
+              'src/ThrustGame.js'
+            ], () => {
               // Remote activity detected: Attach the loop so we can render it.
               // We do this manually here because we removed the auto-attach from the script
               // to prevent the "Double Cleanup" issue on local start.
@@ -2162,7 +2177,14 @@ function keyPressed() {
   // PRIORITY: Handle Easter egg thrust game toggle (Ctrl+T)
   if ((key === 't' || key === 'T') && isCtrl) {
     if (typeof ThrustGame === 'undefined') {
-      ExtensionBridge.load('ThrustGame', 'src/ThrustGame.js', () => {
+      ExtensionBridge.load('ThrustGame', [
+        'src/ThrustConstants.js',
+        'src/ThrustUtils.js',
+        'src/ThrustShip.js',
+        'src/ThrustBullet.js',
+        'src/ThrustExplosion.js',
+        'src/ThrustGame.js'
+      ], () => {
         // Toggle the game once loaded
         if (typeof ThrustGame !== 'undefined') {
           ThrustGame.handleInput(key, keyCode, mindMap, { isCtrl });
