@@ -26,6 +26,23 @@ class ThrustExplosion {
     const count = Math.min(100, Math.floor(baseCount * this.scale));
     const sparkCount = Math.min(80, Math.floor(baseSparkCount * this.scale));
 
+    // Handle hex string color
+    let particleColor = this.color;
+    if (typeof particleColor === 'string') {
+      const hex = particleColor.replace('#', '');
+      if (hex.length === 6) {
+        particleColor = {
+          r: parseInt(hex.slice(0, 2), 16),
+          g: parseInt(hex.slice(2, 4), 16),
+          b: parseInt(hex.slice(4, 6), 16)
+        };
+      } else {
+        particleColor = null; // Fallback to default
+      }
+    }
+
+    const defaultColor = this.type === 'box' ? { r: 200, g: 200, b: 200 } : { r: 255, g: 100, b: 50 };
+
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const baseSpeed = ThrustConstants.EXPLOSION.SHRAPNEL_SPEED_MIN + 
@@ -39,7 +56,7 @@ class ThrustExplosion {
         h: (6 + Math.random() * 14) * Math.sqrt(this.scale),
         angle: Math.random() * Math.PI * 2,
         va: (Math.random() - 0.5) * 0.4,
-        color: this.color || (this.type === 'box' ? { r: 200, g: 200, b: 200 } : { r: 255, g: 100, b: 50 }),
+        color: particleColor || defaultColor,
         sizeScale: 0.8 + Math.random() * 0.4
       });
     }

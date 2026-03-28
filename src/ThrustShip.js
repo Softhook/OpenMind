@@ -16,6 +16,7 @@ class ThrustShip {
     this.name = options.name || '';
     this.color = options.color || '#FFFFFF';
     this.thrusting = options.thrusting || false;
+    this.wasExploded = false;
 
     // Interpolation targets for remote ships
     this.targetX = this.x;

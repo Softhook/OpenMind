@@ -388,17 +388,24 @@ class ThrustGame {
   }
 
   checkCollisions() {
-    for (const b of this.bullets) {
+    // Check local bullets hitting remote players
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const b = this.bullets[i];
       if (b.scored) continue;
       for (const [id, remote] of this.remotePlayers) {
         if (remote.alive && b.checkHit(remote.x, remote.y)) {
-          this.score++; b.scored = true;
-          this.createExplosion(remote.x, remote.y);
+          this.score++;
+          b.scored = true;
+          this.createExplosion(remote.x, remote.y, 'player', remote.color);
+          remote.wasExploded = true;
           this.broadcastHit(id);
+          this.bullets.splice(i, 1);
+          break;
         }
       }
     }
 
+    // Check remote bullets hitting local player
     if (this.player.alive && Date.now() > this.player.invulnerableUntil) {
       for (const [id, b] of this.remoteBullets) {
         if (b.checkHit(this.player.x, this.player.y)) {
@@ -411,10 +418,12 @@ class ThrustGame {
   }
 
   handlePlayerDeath() {
+    if (!this.player.alive || this.player.wasExploded) return;
     this.player.alive = false;
     this.player.respawnTime = Date.now() + ThrustConstants.PLAYER.RESPAWN_TIME;
+    this.player.wasExploded = true;
     this.deaths++;
-    this.createExplosion(this.player.x, this.player.y);
+    this.createExplosion(this.player.x, this.player.y, 'player', this.player.color);
     if (this.collaborationManager) this.broadcastPlayerState(true);
   }
 
@@ -537,7 +546,14 @@ class ThrustGame {
         p = new ThrustShip({ x: tg.x, y: tg.y, vx: tg.vx, vy: tg.vy, angle: tg.angle, name: state.user?.name, color: state.user?.color });
         this.remotePlayers.set(id, p);
       }
-      if (p.alive && tg.alive === false) this.createExplosion(p.x, p.y, 'player', p.color);
+      
+      if (p.alive && tg.alive === false && !p.wasExploded) {
+        this.createExplosion(p.x, p.y, 'player', p.color);
+        p.wasExploded = true;
+      } else if (tg.alive !== false) {
+        p.wasExploded = false;
+      }
+      
       p.targetX = tg.x; p.targetY = tg.y; p.targetAngle = tg.angle;
       p.vx = tg.vx || 0; p.vy = tg.vy || 0; p.alive = tg.alive !== false;
       p.thrusting = !!tg.thrusting; p.isInvulnerable = !!tg.isInvulnerable;
