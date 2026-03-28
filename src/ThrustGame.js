@@ -61,25 +61,34 @@ class ThrustGame {
       return false;
     }
 
+    const awareness = manager.awareness;
     const checkActivity = () => {
-      const states = manager.awareness.getStates();
-      const myClientId = manager.awareness.clientID;
-      let foundRemote = false;
-      for (const [clientId, state] of states) {
-        if (clientId !== myClientId && state.thrustGame) {
-          foundRemote = true;
-          break;
+      // Use the captured awareness reference directly for maximum safety
+      if (!awareness || awareness._destroyed) return;
+      
+      try {
+        const states = awareness.getStates();
+        const myClientId = awareness.clientID;
+        let foundRemote = false;
+        for (const [clientId, state] of states) {
+          if (clientId !== myClientId && state.thrustGame) {
+            foundRemote = true;
+            break;
+          }
         }
-      }
-      ThrustGame.hasRemotePlayers = foundRemote;
+        ThrustGame.hasRemotePlayers = foundRemote;
 
-      if (foundRemote && window.ExtensionBridge && !window.ExtensionBridge.draw) {
-        window.ExtensionBridge.draw = ThrustGame.loop;
-        ThrustGame.loop(manager, null);
+        if (foundRemote && window.ExtensionBridge && !window.ExtensionBridge.draw) {
+          window.ExtensionBridge.draw = ThrustGame.loop;
+          ThrustGame.loop(manager, null);
+        }
+      } catch (e) {
+        // Fallback for destroyed awareness
+        ThrustGame.hasRemotePlayers = false;
       }
     };
 
-    manager.awareness.on('change', checkActivity);
+    awareness.on('change', checkActivity);
     checkActivity();
 
     if (ThrustGame.hasRemotePlayers && window.ExtensionBridge) {
@@ -87,7 +96,9 @@ class ThrustGame {
     }
 
     ThrustGame._cleanupListener = () => {
-      if (manager && manager.awareness) manager.awareness.off('change', checkActivity);
+      try {
+        awareness.off('change', checkActivity);
+      } catch (e) {}
       ThrustGame.hasRemotePlayers = false;
     };
 
