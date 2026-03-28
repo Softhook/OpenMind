@@ -74,6 +74,14 @@ class MindMap {
   /** @type {function(boolean=):void|null} Called when clusters change (receives optional skipTransactionWrapper) */
   static onClustersChange = null;
 
+  /**
+   * Called when a box's health changes from a remote Yjs update.
+   * Registered by ThrustGame to track damaged boxes without CollaborationManager
+   * needing any direct knowledge of ThrustGame.
+   * @type {function(string, number|undefined):void|null}
+   */
+  static onBoxHealthChanged = null;
+
   // ============================================================================
   // CONSTRUCTOR & INITIALIZATION
   // ============================================================================

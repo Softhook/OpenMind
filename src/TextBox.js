@@ -2739,7 +2739,10 @@ class TextBox {
       highlights: Array.isArray(this.highlights) && this.highlights.length > 0 ? this.highlights.map(h => ({ start: h.start, end: h.end, color: h.color })) : undefined,
       boldRanges: Array.isArray(this.boldRanges) && this.boldRanges.length > 0 ? this.boldRanges.map(r => ({ start: r.start, end: r.end })) : undefined,
       italicRanges: Array.isArray(this.italicRanges) && this.italicRanges.length > 0 ? this.italicRanges.map(r => ({ start: r.start, end: r.end })) : undefined,
-      health: this.health < 5 ? this.health : undefined
+      health: this.health < 5 ? this.health : undefined,
+      // lastHitTime is saved alongside health so healing resumes correctly after hard refresh.
+      // Only serialized when the box is actually damaged (same condition as health).
+      lastHitTime: (this.health !== undefined && this.health < 5) ? this.lastHitTime : undefined
     };
   }
 
@@ -2855,6 +2858,9 @@ class TextBox {
     // Load health if present (lazy-loaded)
     if (isValid(data.health)) {
       box.health = Math.max(0, Math.min(5, Math.floor(data.health)));
+      // Restore lastHitTime if saved; fall back to Date.now() so healing is immediately
+      // eligible on next tick (handles maps saved before lastHitTime was serialized).
+      box.lastHitTime = isValid(data.lastHitTime) ? data.lastHitTime : Date.now();
     }
 
     // Load faux-italic ranges

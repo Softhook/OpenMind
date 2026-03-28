@@ -725,6 +725,30 @@ class ThrustGame {
     this.isIdle = false;
     this.lastBroadcastState = null;
 
+    // ENCAPSULATION: Register health-change callback on MindMap so CollaborationManager
+    // can notify us of remote health updates without knowing about ThrustGame.
+    // This is the only correct place: ThrustGame owns this registration.
+    if (typeof MindMap !== 'undefined') {
+      MindMap.onBoxHealthChanged = (boxId, health) => {
+        this.notifyBoxHealthChanged(boxId, health);
+      };
+    }
+
+    // HEAL RESUME: Seed damagedBoxIds from existing map state.
+    // When a player exits and re-enters thrust mode, a fresh instance is created
+    // with an empty damagedBoxIds set — damaged boxes from the previous session
+    // would never heal. One O(N) scan at start() catches them all.
+    if (this.mindMap && this.mindMap.boxes) {
+      for (const box of this.mindMap.boxes) {
+        if (box && box.health !== undefined && box.health < 5) {
+          this.damagedBoxIds.add(box.id);
+        }
+      }
+      if (this.damagedBoxIds.size > 0) {
+        Utils.Logger.debug(`[ThrustGame] Resuming health recovery for ${this.damagedBoxIds.size} pre-damaged box(es)`);
+      }
+    }
+
     // Setup multiplayer if connected (may not have been connected at construction time)
     if (this.collaborationManager && this.collaborationManager.isConnected) {
       this.setupMultiplayer();
@@ -741,6 +765,12 @@ class ThrustGame {
 
     // Set inactive first
     this.active = false;
+
+    // ENCAPSULATION: Deregister our health-change callback so CollaborationManager
+    // does not try to call into a destroyed instance.
+    if (typeof MindMap !== 'undefined' && MindMap.onBoxHealthChanged) {
+      MindMap.onBoxHealthChanged = null;
+    }
 
     // Clear multiplayer state from awareness
     if (this.collaborationManager && this.collaborationManager.awareness) {
@@ -1333,14 +1363,9 @@ class ThrustGame {
     // Reduce box health
     if (typeof box.reduceHealth === 'function') {
       box.reduceHealth();
-      
-      // Trigger persistent sync for health reduction (only if still alive)
-      if (box.health > 0 && typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
-        MindMap.onBoxChange(box);
-      }
 
-      // Track damaged box for optimized recovery loop and broadcasting
-      if (box.health < 5) {
+      // Track damaged box for optimized recovery loop
+      if (box.health !== undefined && box.health < 5) {
         this.damagedBoxIds.add(box.id);
       } else {
         this.damagedBoxIds.delete(box.id);
@@ -1354,10 +1379,20 @@ class ThrustGame {
       box.targetY = box.y;
     }
 
-    // Sync the pushed box position to collaboration if available
-    // Use false for skipTransactionWrapper to ensure proper transaction
+    // Sync position + health in a SINGLE Yjs write via collaborationManager.
+    // _boxToYjsData bundles all box state (position, health) so this one call
+    // is authoritative. The guard inside syncBoxToYjs handles deleted boxes safely.
+    // Fallback to MindMap.onBoxChange when not connected (offline/solo play).
     if (this.collaborationManager && this.collaborationManager.isConnected) {
-      this.collaborationManager.syncBoxToYjs(box, false);
+      if (box.health > 0) {
+        // Box is still alive: sync position + updated health together
+        this.collaborationManager.syncBoxToYjs(box, false);
+      }
+      // If box.health === 0, reduceHealth() already triggered deletion via _performBoxDeletion.
+      // syncBoxToYjs would be a no-op anyway (box removed from register), but skip it explicitly.
+    } else if (box.health > 0 && typeof MindMap !== 'undefined' && MindMap.onBoxChange) {
+      // Offline fallback: notify any local listener of the position/health change
+      MindMap.onBoxChange(box);
     }
   }
 

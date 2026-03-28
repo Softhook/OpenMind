@@ -1048,6 +1048,8 @@ class CollaborationManager {
             MindMap.onBoxDelete = null;
             MindMap.onConnectionsChange = null;
             MindMap.onClustersChange = null;
+            // Note: onBoxHealthChanged is owned by ThrustGame, not CollaborationManager.
+            // ThrustGame registers/deregisters it independently via start()/stop().
         }
 
         // Clear TextBox callback
@@ -1894,19 +1896,19 @@ class CollaborationManager {
                 box.health = data.health;
                 box.lastHitTime = data.lastHitTime || Date.now();
                 
-                // NOTIFY THRUST GAME: Ensure recovery starts even if we didn't deal the damage
-                // This replaces the expensive full-map scan with a targeted update.
-                if (typeof ThrustGame !== 'undefined' && ThrustGame.instance) {
-                    ThrustGame.instance.notifyBoxHealthChanged(boxId, data.health);
+                // Notify any listener (e.g. ThrustGame) that a box's health changed remotely.
+                // CollaborationManager does not reference ThrustGame directly — full encapsulation.
+                if (typeof MindMap !== 'undefined' && MindMap.onBoxHealthChanged) {
+                    MindMap.onBoxHealthChanged(boxId, data.health);
                 }
             } else if (box.health !== undefined) {
                 // If it was damaged but now the server says it's full (missing health), restore lazy-init state
                 delete box.health;
                 delete box.lastHitTime;
                 
-                // NOTIFY THRUST GAME: Stop tracking if fully healed
-                if (typeof ThrustGame !== 'undefined' && ThrustGame.instance) {
-                    ThrustGame.instance.notifyBoxHealthChanged(boxId, 5);
+                // Notify listener that this box is fully healed
+                if (typeof MindMap !== 'undefined' && MindMap.onBoxHealthChanged) {
+                    MindMap.onBoxHealthChanged(boxId, undefined);
                 }
             }
 
