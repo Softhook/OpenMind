@@ -595,6 +595,7 @@ class ThrustGame {
           bIds.add(bData.id);
           const exX = bData.x + bData.vx * latFrames, exY = bData.y + bData.vy * latFrames, lt = bData.lifetime - latFrames;
           if (lt <= 0) continue;
+          let b = this.remoteBullets.get(bData.id);
           if (!b) {
             b = new ThrustBullet({ id: bData.id, x: exX, y: exY, vx: bData.vx, vy: bData.vy, lifetime: lt, clientId: id });
             this.remoteBullets.set(bData.id, b);
