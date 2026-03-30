@@ -5,20 +5,54 @@
 class ThrustAudio {
   static context = null;
   static whiteNoiseBuffer = null;
-  static thrustNode = null;
   static thrustGain = null;
   static initPromise = null;
+  static lastFireTime = 0;
+  static lastLandingTime = 0;
+
+  /**
+   * Safe helper to calculate distance attenuation without hard crashing
+   * on missing globals like CameraUtils, width, or height.
+   */
+  static _getSpatialData(x, y, maxDistance = 3000) {
+    if (x === undefined || y === undefined) return 1.0;
+    
+    try {
+      // Safely access globals with fallbacks
+      const w = (typeof width !== 'undefined') ? width : 800;
+      const h = (typeof height !== 'undefined') ? height : 600;
+      
+      if (typeof CameraUtils === 'undefined' || typeof CameraUtils.worldX !== 'function') {
+        return 1.0; // Fail gracefully if camera is missing
+      }
+
+      const centerX = CameraUtils.worldX(w / 2);
+      const centerY = CameraUtils.worldY(h / 2);
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      const attenuation = Math.max(0, 1 - (distance / maxDistance));
+      return Math.pow(attenuation, 1.5);
+    } catch (e) {
+      return 1.0; // Ultimate fallback
+    }
+  }
 
   static init() {
     if (this.initPromise) return this.initPromise;
     
     this.initPromise = (async () => {
-      if (this.context) {
-        if (this.context.state === 'suspended') await this.context.resume().catch(() => {});
-        return this.context;
-      }
-
       try {
+        if (this.context && this.context.state === 'closed') {
+          this.context = null;
+        }
+
+        if (this.context) {
+          if (this.context.state === 'suspended') await this.context.resume().catch(() => {});
+          return this.context;
+        }
+
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (!AudioContext) return null;
         this.context = new AudioContext();
@@ -32,6 +66,7 @@ class ThrustAudio {
         }
       } catch (e) {
         console.warn('ThrustAudio: Initialization failed', e);
+        this.initPromise = null; // Allow re-init after failure
         return null;
       }
       return this.context;
@@ -50,25 +85,8 @@ class ThrustAudio {
       await ctx.resume().catch(() => {});
     }
 
-    // Distance attenuation - explosions further away are quieter
-    let attenuation = 1.0;
-    if (x !== undefined && y !== undefined && typeof CameraUtils !== 'undefined' && typeof width !== 'undefined') {
-      const centerX = CameraUtils.worldX(width / 2);
-      const centerY = CameraUtils.worldY(height / 2);
-      const dx = x - centerX;
-      const dy = y - centerY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Fall off over 3000 pixels
-      const maxDistance = 3000;
-      attenuation = Math.max(0, 1 - (distance / maxDistance));
-      
-      // Early exit if too far to hear
-      if (attenuation <= 0.05) return;
-      
-      // Logarithmic-ish falloff feels more natural
-      attenuation = Math.pow(attenuation, 1.5);
-    }
+    const attenuation = this._getSpatialData(x, y, 3000);
+    if (attenuation <= 0.05) return;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -93,6 +111,7 @@ class ThrustAudio {
       source.buffer = this.whiteNoiseBuffer;
       const noiseGain = ctx.createGain();
       const noiseFilter = ctx.createBiquadFilter();
+      
       noiseFilter.type = 'lowpass';
       noiseFilter.frequency.setValueAtTime(startFreq, ctx.currentTime);
       noiseFilter.frequency.exponentialRampToValueAtTime(10, ctx.currentTime + duration);
@@ -103,6 +122,15 @@ class ThrustAudio {
       source.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
+      
+      source.onended = () => {
+        try {
+          source.disconnect();
+          noiseFilter.disconnect();
+          noiseGain.disconnect();
+        } catch (_) {}
+      };
+      
       source.start();
       source.stop(ctx.currentTime + duration);
 
@@ -119,6 +147,14 @@ class ThrustAudio {
         
         osc.connect(oscGain);
         oscGain.connect(ctx.destination);
+        
+        osc.onended = () => {
+          try {
+            osc.disconnect();
+            oscGain.disconnect();
+          } catch (_) {}
+        };
+        
         osc.start();
         osc.stop(ctx.currentTime + duration * 0.8);
       }
@@ -132,15 +168,8 @@ class ThrustAudio {
     const ctx = await this.init();
     if (!ctx || !this.whiteNoiseBuffer) return;
 
-    let attenuation = 1.0;
-    if (x !== undefined && y !== undefined && typeof CameraUtils !== 'undefined' && typeof width !== 'undefined') {
-      const centerX = CameraUtils.worldX(width / 2);
-      const centerY = CameraUtils.worldY(height / 2);
-      const distance = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
-      attenuation = Math.max(0, 1 - (distance / 2000));
-      if (attenuation <= 0.05) return;
-      attenuation = Math.pow(attenuation, 1.5);
-    }
+    const attenuation = this._getSpatialData(x, y, 2000);
+    if (attenuation <= 0.05) return;
 
     try {
       const source = ctx.createBufferSource();
@@ -163,6 +192,14 @@ class ThrustAudio {
       filter.connect(gain);
       gain.connect(ctx.destination);
 
+      source.onended = () => {
+        try {
+          source.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        } catch (_) {}
+      };
+
       source.start();
       source.stop(ctx.currentTime + 0.05);
     } catch (e) {}
@@ -174,7 +211,13 @@ class ThrustAudio {
       return;
     }
     
-    const ctx = await this.init();
+    // Performance optimization: check synchronously if context is already active
+    // This avoids one micro-task delay per frame in the 60fps update loop
+    let ctx = this.context;
+    if (!ctx || ctx.state === 'closed' || !this.whiteNoiseBuffer) {
+      ctx = await this.init();
+    }
+    
     if (!ctx || !this.whiteNoiseBuffer) return;
 
     if (active) {
@@ -210,25 +253,29 @@ class ThrustAudio {
     }
   }
 
-  static stopThrust() {
+  static stopThrust(immediate = false) {
     if (this.thrustGain && this.context) {
       try {
         const ctx = this.context;
         const gain = this.thrustGain;
         const node = this.thrustNode;
         
-        const currentVal = gain.gain.value;
-        gain.gain.cancelScheduledValues(ctx.currentTime);
-        gain.gain.setValueAtTime(currentVal, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
-        
-        setTimeout(() => {
-          try {
-            node.stop();
-            node.disconnect();
-            gain.disconnect();
-          } catch (e) {}
-        }, 150);
+        if (immediate) {
+          try { node.stop(); node.disconnect(); gain.disconnect(); } catch (_) {}
+        } else {
+          const currentVal = gain.gain.value;
+          gain.gain.cancelScheduledValues(ctx.currentTime);
+          gain.gain.setValueAtTime(currentVal, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
+          
+          setTimeout(() => {
+            try {
+              node.stop();
+              node.disconnect();
+              gain.disconnect();
+            } catch (e) {}
+          }, 150);
+        }
       } catch (e) {}
     }
     this.thrustNode = null;
@@ -237,54 +284,129 @@ class ThrustAudio {
 
   static async playFire(x, y) {
     if (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO && !ThrustConstants.AUDIO.ENABLED) return;
+    
     const ctx = await this.init();
     if (!ctx || !this.whiteNoiseBuffer) return;
+
+    const now = ctx.currentTime;
+    if (now - this.lastFireTime < 0.05) return; // Limit to ~20 fires per second
+    this.lastFireTime = now;
 
     if (ctx.state === 'suspended') {
       await ctx.resume().catch(() => {});
     }
 
-    let attenuation = 1.0;
-    if (x !== undefined && y !== undefined && typeof CameraUtils !== 'undefined' && typeof width !== 'undefined') {
-      const centerX = CameraUtils.worldX(width / 2);
-      const centerY = CameraUtils.worldY(height / 2);
-      const distance = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
-      attenuation = Math.max(0, 1 - (distance / 2500));
-      if (attenuation <= 0.01) return;
-      attenuation = Math.pow(attenuation, 2);
-    }
+    const attenuation = this._getSpatialData(x, y, 2500);
+    if (attenuation <= 0.01) return;
 
     try {
       const source = ctx.createBufferSource();
       source.buffer = this.whiteNoiseBuffer;
-      const filter = ctx.createBiquadFilter();
-      const gain = ctx.createGain();
+      const noiseFilter = ctx.createBiquadFilter();
+      const noiseGain = ctx.createGain();
 
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1200, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
-      filter.Q.value = 5;
+      // Layer 1: High-frequency noise crack
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.setValueAtTime(1200, ctx.currentTime);
+      noiseFilter.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+      noiseFilter.Q.value = 5;
 
       const baseVol = (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO) 
                       ? ThrustConstants.AUDIO.FIRE_VOLUME 
                       : 0.12;
       
-      gain.gain.setValueAtTime(baseVol * attenuation, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      noiseGain.gain.setValueAtTime(baseVol * attenuation, ctx.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
 
-      source.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
+      source.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+
+      // Layer 2: The "Pew" (Pitch-swept oscillator)
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.type = 'triangle'; // Softer than square, punchier than sine
+      osc.frequency.setValueAtTime(2000, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.12);
+      
+      oscGain.gain.setValueAtTime(baseVol * 0.8 * attenuation, ctx.currentTime);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+
+      source.onended = () => {
+        try {
+          source.disconnect();
+          noiseFilter.disconnect();
+          noiseGain.disconnect();
+        } catch (_) {}
+      };
+
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          oscGain.disconnect();
+        } catch (_) {}
+      };
 
       source.start();
       source.stop(ctx.currentTime + 0.1);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
     } catch (e) {
       console.warn('ThrustAudio: Fire failed', e);
     }
   }
 
+  static async playLanding(x, y) {
+    if (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO && !ThrustConstants.AUDIO.ENABLED) return;
+    const ctx = await this.init();
+    if (!ctx || !this.whiteNoiseBuffer) return;
+
+    const now = ctx.currentTime;
+    if (now - this.lastLandingTime < 0.5) return; // "Big delay" (500ms) to prevent bounce spam
+    this.lastLandingTime = now;
+
+    const attenuation = this._getSpatialData(x, y, 2000);
+    if (attenuation <= 0.05) return;
+
+    try {
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      const source = ctx.createBufferSource();
+      source.buffer = this.whiteNoiseBuffer;
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.15);
+
+      const baseVol = (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO) 
+                      ? (ThrustConstants.AUDIO.LANDING_VOLUME || 0.2) 
+                      : 0.2;
+      
+      gain.gain.setValueAtTime(baseVol * attenuation, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      source.onended = () => {
+        try {
+          source.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        } catch (_) {}
+      };
+
+      source.start();
+      source.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+  }
+
   static cleanup() {
-    this.stopThrust();
+    this.stopThrust(true); // Immediate stop
     if (this.context) {
       try {
         this.context.close().catch(() => {});
@@ -292,6 +414,8 @@ class ThrustAudio {
       this.context = null;
       this.whiteNoiseBuffer = null;
       this.initPromise = null;
+      this.lastFireTime = 0;
+      this.lastLandingTime = 0;
     }
   }
 }

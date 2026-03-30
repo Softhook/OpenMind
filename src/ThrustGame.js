@@ -288,7 +288,13 @@ class ThrustGame {
     }
 
     if (this.player.alive) {
-      this.player.updatePhysics(this.keys, this.mindMap);
+      const wasGrounded = this.player.grounded;
+    this.player.updatePhysics(this.keys, this.mindMap);
+    
+    // Play landing sound on touchdown
+    if (!wasGrounded && this.player.grounded) {
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding(this.player.x, this.player.y);
+    }
       if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && !CameraUtils.isPanning) {
         CameraUtils.centerOn(this.player.x, this.player.y, width, height);
       }
