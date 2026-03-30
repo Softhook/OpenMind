@@ -861,6 +861,16 @@ class CollaborationManager {
         }
 
         if (this.ydoc) {
+            // Ensure any non-null origin (like descriptive labels from MindMap)
+            // is tracked by the UndoManager by adding it to the whitelist.
+            // This restores undo functionality for labeled actions while
+            // still allowing ThrustGame to exclude actions by passing null.
+            if (origin !== null && this.undoManager && this.undoManager.trackedOrigins) {
+                if (!this.undoManager.trackedOrigins.has(origin)) {
+                    this.undoManager.trackedOrigins.add(origin);
+                }
+            }
+
             // Use the provided origin (or null for untracked changes)
             this.ydoc.transact(callback, origin);
         } else {
@@ -1360,10 +1370,10 @@ class CollaborationManager {
         // Wrap in transaction with origin to track in undo
         if (this.ydoc && this.undoManager) {
             this.transact(() => {
-                // Delete the box
+                // Logic: Delete the box
                 this.yboxes.delete(boxId);
 
-                // Delete all connections involving this box
+                // Logic: Delete all connections involving this box
                 // Must do this in the same transaction for proper undo behavior
                 if (this.yconnections) {
                     const conns = this.yconnections.toArray();
@@ -1384,7 +1394,7 @@ class CollaborationManager {
 
                     Utils.Logger.debug(`[Undo] Deleted box ${boxId} and ${indicesToDelete.length} associated connections`);
                 }
-            }, 'deleteBox');
+            }, CollaborationManager.TRACKED_ORIGIN);
         } else {
             // Fallback without undo tracking
             this.yboxes.delete(boxId);
@@ -1431,7 +1441,7 @@ class CollaborationManager {
         if (this.ydoc && this.undoManager) {
             this.transact(() => {
                 this._syncConnectionsToYjsImpl(localConns);
-            }, 'syncConnections');
+            }, CollaborationManager.TRACKED_ORIGIN);
         } else if (this.ydoc) {
             // Fallback without undo tracking
             this.ydoc.transact(() => {
@@ -1520,7 +1530,7 @@ class CollaborationManager {
         if (this.ydoc && this.undoManager) {
             this.transact(() => {
                 this._syncClustersToYjsImpl();
-            }, 'syncClusters');
+            }, CollaborationManager.TRACKED_ORIGIN);
         } else if (this.ydoc) {
             this.ydoc.transact(() => {
                 this._syncClustersToYjsImpl();

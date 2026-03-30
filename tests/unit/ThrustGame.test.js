@@ -8,13 +8,23 @@ const path = require('path');
 
 // Create a sandbox context with ThrustGame
 const ColorPalette = require('../../src/ColorPalette');
+const ThrustConstants = require('../../src/ThrustConstants');
+const ThrustUtils = require('../../src/ThrustUtils');
+const ThrustShip = require('../../src/ThrustShip');
+const ThrustBullet = require('../../src/ThrustBullet');
+const ThrustExplosion = require('../../src/ThrustExplosion');
 const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
 
 // Create a sandbox context with ThrustGame
 const sandbox = {
   ColorPalette: ColorPalette,
+  ThrustConstants: ThrustConstants,
+  ThrustUtils: ThrustUtils,
+  ThrustShip: ThrustShip,
+  ThrustBullet: ThrustBullet,
+  ThrustExplosion: ThrustExplosion,
   console: console,
-  Date: Date,
+  get Date() { return Date; },
   Math: Math,
   module: { exports: {} },
   window: {},
@@ -53,10 +63,14 @@ script.runInNewContext(sandbox);
 const ThrustGame = sandbox.module.exports;
 
 describe('ThrustGame Collision Detection', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2024-03-27T10:00:00Z'));
+  });
   describe('getShipTriangleVertices', () => {
     test('should return 3 vertices for a ship at origin with 0 angle', () => {
       const player = { x: 0, y: 0, angle: 0 };
-      const vertices = ThrustGame.getShipTriangleVertices(player);
+      const vertices = ThrustUtils.getShipTriangleVertices(player, 15); // Size was 15 in old code
 
       expect(vertices).toHaveLength(3);
       expect(vertices[0].x).toBeCloseTo(15, 1); // Front tip
@@ -69,7 +83,7 @@ describe('ThrustGame Collision Detection', () => {
 
     test('should rotate vertices correctly for 90 degree angle', () => {
       const player = { x: 0, y: 0, angle: Math.PI / 2 };
-      const vertices = ThrustGame.getShipTriangleVertices(player);
+      const vertices = ThrustUtils.getShipTriangleVertices(player, 15);
 
       expect(vertices).toHaveLength(3);
       expect(vertices[0].x).toBeCloseTo(0, 1); // Front tip rotated
@@ -78,7 +92,7 @@ describe('ThrustGame Collision Detection', () => {
 
     test('should translate vertices to player position', () => {
       const player = { x: 100, y: 200, angle: 0 };
-      const vertices = ThrustGame.getShipTriangleVertices(player);
+      const vertices = ThrustUtils.getShipTriangleVertices(player, 15);
 
       expect(vertices[0].x).toBeCloseTo(115, 1); // 100 + 15
       expect(vertices[0].y).toBeCloseTo(200, 1);
@@ -94,7 +108,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const point = { x: 5, y: 5 };
 
-      expect(ThrustGame.pointInTriangle(point, triangle)).toBe(true);
+      expect(ThrustUtils.pointInTriangle(point, triangle)).toBe(true);
     });
 
     test('should return false for point outside triangle', () => {
@@ -105,7 +119,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const point = { x: 20, y: 20 };
 
-      expect(ThrustGame.pointInTriangle(point, triangle)).toBe(false);
+      expect(ThrustUtils.pointInTriangle(point, triangle)).toBe(false);
     });
 
     test('should return false for point on edge (boundary case)', () => {
@@ -117,7 +131,7 @@ describe('ThrustGame Collision Detection', () => {
       const point = { x: 5, y: 0 }; // On bottom edge
 
       // Edge points might be slightly inside or outside due to floating point
-      const result = ThrustGame.pointInTriangle(point, triangle);
+      const result = ThrustUtils.pointInTriangle(point, triangle);
       expect(typeof result).toBe('boolean');
     });
   });
@@ -131,7 +145,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const box = { x: 50, y: 50, width: 40, height: 40 };
 
-      expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
+      expect(ThrustUtils.triangleBoxCollision(triangle, box)).toBe(true);
     });
 
     test('should detect collision when box corner is inside triangle', () => {
@@ -142,7 +156,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const box = { x: 50, y: 20, width: 10, height: 10 }; // Small box inside triangle
 
-      expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
+      expect(ThrustUtils.triangleBoxCollision(triangle, box)).toBe(true);
     });
 
     test('should return false when triangle and box do not overlap', () => {
@@ -153,7 +167,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const box = { x: 100, y: 100, width: 20, height: 20 };
 
-      expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(false);
+      expect(ThrustUtils.triangleBoxCollision(triangle, box)).toBe(false);
     });
 
     test('should detect collision when triangle edge crosses box edge', () => {
@@ -164,7 +178,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const box = { x: 50, y: 60, width: 20, height: 20 };
 
-      expect(ThrustGame.triangleBoxCollision(triangle, box)).toBe(true);
+      expect(ThrustUtils.triangleBoxCollision(triangle, box)).toBe(true);
     });
   });
 
@@ -175,7 +189,7 @@ describe('ThrustGame Collision Detection', () => {
       const p3 = { x: 0, y: 10 };
       const p4 = { x: 10, y: 0 };
 
-      expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(true);
+      expect(ThrustUtils.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(true);
     });
 
     test('should return false for non-intersecting segments', () => {
@@ -184,7 +198,7 @@ describe('ThrustGame Collision Detection', () => {
       const p3 = { x: 0, y: 10 };
       const p4 = { x: 10, y: 10 };
 
-      expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
+      expect(ThrustUtils.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
     });
 
     test('should return false for parallel segments', () => {
@@ -193,7 +207,7 @@ describe('ThrustGame Collision Detection', () => {
       const p3 = { x: 0, y: 5 };
       const p4 = { x: 10, y: 5 };
 
-      expect(ThrustGame.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
+      expect(ThrustUtils.lineSegmentsIntersect(p1, p2, p3, p4)).toBe(false);
     });
   });
 
@@ -203,7 +217,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 0, y: 0, width: 20, height: 20 }
       ];
 
-      expect(ThrustGame.isValidSpawnPosition(100, 100, boxes, 30)).toBe(true);
+      expect(ThrustUtils.isValidSpawnPosition(100, 100, boxes, 30)).toBe(true);
     });
 
     test('should return false for position inside box', () => {
@@ -211,7 +225,7 @@ describe('ThrustGame Collision Detection', () => {
         { x: 50, y: 50, width: 40, height: 40 }
       ];
 
-      expect(ThrustGame.isValidSpawnPosition(50, 50, boxes, 0)).toBe(false);
+      expect(ThrustUtils.isValidSpawnPosition(50, 50, boxes, 0)).toBe(false);
     });
 
     test('should return false for position too close to box', () => {
@@ -220,7 +234,7 @@ describe('ThrustGame Collision Detection', () => {
       ];
 
       // Position is just outside box but within minDistance
-      expect(ThrustGame.isValidSpawnPosition(75, 50, boxes, 30)).toBe(false);
+      expect(ThrustUtils.isValidSpawnPosition(75, 50, boxes, 30)).toBe(false);
     });
 
     test('should return true for position just beyond minDistance from box', () => {
@@ -229,12 +243,12 @@ describe('ThrustGame Collision Detection', () => {
       ];
 
       // Position is just beyond the edge (box right edge is at 70, plus minDistance 30 = 100, so 100.1 is valid)
-      expect(ThrustGame.isValidSpawnPosition(100.1, 50, boxes, 30)).toBe(true);
+      expect(ThrustUtils.isValidSpawnPosition(100.1, 50, boxes, 30)).toBe(true);
     });
 
     test('should return true when no boxes exist', () => {
-      expect(ThrustGame.isValidSpawnPosition(50, 50, [], 30)).toBe(true);
-      expect(ThrustGame.isValidSpawnPosition(50, 50, null, 30)).toBe(true);
+      expect(ThrustUtils.isValidSpawnPosition(50, 50, [], 30)).toBe(true);
+      expect(ThrustUtils.isValidSpawnPosition(50, 50, null, 30)).toBe(true);
     });
   });
 });
@@ -320,6 +334,10 @@ describe('ThrustGame Spawn Logic', () => {
 });
 
 describe('ThrustGame Integration', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2024-03-27T10:00:00Z'));
+  });
   test('should handle respawn with new spawn logic', () => {
     const mockMindMap = {
       boxes: [
@@ -328,12 +346,17 @@ describe('ThrustGame Integration', () => {
     };
 
     const game = new ThrustGame(null, mockMindMap);
-    game.player.alive = false;
-    game.respawnPlayer();
+    game.active = true; // game must be active to process update() and respawn
+    game.handlePlayerDeath(); // kills player and sets respawnTime
+    
+    // Fast-forward time past the respawn delay
+    jest.advanceTimersByTime(ThrustConstants.PLAYER.RESPAWN_TIME + 2000);
+    game.update(); // triggers respawn check
 
     expect(game.player.alive).toBe(true);
     expect(game.player.vx).toBe(0);
-    expect(game.player.vy).toBe(0);
+    // After one update frame, vy will have one frame of gravity applied: 0.03 * 0.98 = 0.0294
+    expect(game.player.vy).toBeCloseTo(0.0294, 4);
 
     // Should not be inside the box
     const box = mockMindMap.boxes[0];

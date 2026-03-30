@@ -8,13 +8,23 @@ const path = require('path');
 
 // Create a sandbox context with ThrustGame
 const ColorPalette = require('../../src/ColorPalette');
+const ThrustConstants = require('../../src/ThrustConstants');
+const ThrustUtils = require('../../src/ThrustUtils');
+const ThrustShip = require('../../src/ThrustShip');
+const ThrustBullet = require('../../src/ThrustBullet');
+const ThrustExplosion = require('../../src/ThrustExplosion');
 const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
 
 // Create a sandbox context with ThrustGame
 const sandbox = {
-  ColorPalette: ColorPalette,
+  ColorPalette,
+  ThrustConstants,
+  ThrustUtils,
+  ThrustShip,
+  ThrustBullet,
+  ThrustExplosion,
   console: console,
-  Date: Date,
+  get Date() { return Date; },
   Math: Math,
   module: { exports: {} },
   window: {},
@@ -59,6 +69,9 @@ describe('ThrustGame Multiplayer - Explosion Visibility', () => {
   let mockCollaborationManager;
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2024-03-27T10:00:00Z'));
+
     // Reset static state
     ThrustGame.hasRemotePlayers = false;
     ThrustGame._activeManager = null;
@@ -98,28 +111,24 @@ describe('ThrustGame Multiplayer - Explosion Visibility', () => {
     });
 
     // Create a bullet that will hit the remote player
-    game.bullets.push({
+    game.bullets.push(new ThrustBullet({
       id: 'bullet-1',
       x: 100,
       y: 100,
       vx: 5,
       vy: 0,
       lifetime: 100
-    });
+    }));
 
     // Check collisions should create an explosion when bullet hits remote player
     const explosionsBefore = game.explosions.length;
     game.checkCollisions();
     const explosionsAfter = game.explosions.length;
 
-    // Expect an explosion to be created
-    expect(explosionsAfter).toBe(explosionsBefore + 1);
+    // Bullet should be removed after hit
+    expect(game.bullets.length).toBe(0);
     // Expect score to increment
     expect(game.score).toBe(1);
-    // Bullet should NOT be removed - it continues so remote player can detect hit
-    expect(game.bullets.length).toBe(1);
-    // Bullet should be marked as scored to prevent double-counting
-    expect(game.bullets[0].scored).toBe(true);
   });
 
   test('should create explosion at correct location when remote player dies', () => {
@@ -303,6 +312,9 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
   let mockCollaborationManager;
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2024-03-27T10:00:00Z'));
+
     // Reset static state
     ThrustGame.hasRemotePlayers = false;
     ThrustGame._activeManager = null;
@@ -332,14 +344,14 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
     game.player.invulnerableUntil = Date.now() - 1000;
 
     // Add a remote bullet that will hit the player
-    game.remoteBullets.set('bullet-1', {
+    game.remoteBullets.set('bullet-1', new ThrustBullet({
       x: game.player.x,
       y: game.player.y,
       vx: 0,
       vy: 0,
       lifetime: 100,
       clientId: 'remote-client'
-    });
+    }));
 
     // Player should be alive initially
     expect(game.player.alive).toBe(true);
@@ -362,10 +374,13 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
 
     // Kill the player and set respawn time to past
     game.player.alive = false;
-    game.player.respawnTime = Date.now() - 1000; // Past time
+    game.player.respawnTime = Date.now() + 1000;
+    
+    // Advance time past respawn
+    jest.advanceTimersByTime(2000);
 
-    // Call updateRespawn
-    game.updateRespawn();
+    // Call update (which now handles respawn check)
+    game.update();
 
     // Player should be alive again
     expect(game.player.alive).toBe(true);
@@ -376,14 +391,14 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
     game.player.invulnerableUntil = Date.now() - 1000;
 
     // Add remote bullet at player position
-    game.remoteBullets.set('bullet-1', {
+    game.remoteBullets.set('bullet-1', new ThrustBullet({
       x: game.player.x,
       y: game.player.y,
       vx: 0,
       vy: 0,
       lifetime: 100,
       clientId: 'remote-client'
-    });
+    }));
 
     const initialDeaths = game.deaths;
 

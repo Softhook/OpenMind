@@ -30,12 +30,23 @@ const Utils = {
     isValidNumber: (v) => typeof v === 'number' && isFinite(v)
 };
 
+const ThrustConstants = require('../../src/ThrustConstants');
+const ThrustUtils = require('../../src/ThrustUtils');
+const ThrustShip = require('../../src/ThrustShip');
+const ThrustBullet = require('../../src/ThrustBullet');
+const ThrustExplosion = require('../../src/ThrustExplosion');
+
 const thrustGameCode = fs.readFileSync(path.join(__dirname, '../../src/ThrustGame.js'), 'utf8');
 const textBoxCode = fs.readFileSync(path.join(__dirname, '../../src/TextBox.js'), 'utf8');
 
 // Create a sandbox context
 const sandbox = {
     ColorPalette,
+    ThrustConstants,
+    ThrustUtils,
+    ThrustShip,
+    ThrustBullet,
+    ThrustExplosion,
     Utils,
     console,
     get Date() { return Date; }, // Use getter to follow Jest's fake timers
@@ -243,7 +254,7 @@ describe('ThrustGame Health and Healing', () => {
 
             // Must sync exactly ONCE per hit (position + health bundled)
             expect(syncSpy).toHaveBeenCalledTimes(1);
-            expect(syncSpy).toHaveBeenCalledWith(box, false);
+            expect(syncSpy).toHaveBeenCalledWith(box, false, null);
         });
 
         test('applyBulletForceToBox does NOT call MindMap.onBoxChange when connected', () => {
@@ -270,7 +281,7 @@ describe('ThrustGame Health and Healing', () => {
             box.health = 3;
             game.applyBulletForceToBox(box, bullet);
 
-            expect(onBoxChangeSpy).toHaveBeenCalledWith(box);
+            expect(onBoxChangeSpy).toHaveBeenCalledWith(box, false, null);
         });
 
         test('applyBulletForceToBox does NOT sync dead box via syncBoxToYjs', () => {
@@ -349,7 +360,7 @@ describe('ThrustGame Health and Healing', () => {
 
     describe('Health recovery', () => {
         test('should heal 1 HP every 10 seconds (robust)', () => {
-            const delay = ThrustGame.HEALTH.RECOVERY_DELAY;
+            const delay = ThrustConstants.HEALTH.RECOVERY_DELAY;
             MindMapStatic.onBoxChange = jest.fn(); // must be a spy for assertion
             
             box.health = 3;
@@ -364,7 +375,7 @@ describe('ThrustGame Health and Healing', () => {
         });
 
         test('should reset healing timer when box is hit again', () => {
-            const delay = ThrustGame.HEALTH.RECOVERY_DELAY;
+            const delay = ThrustConstants.HEALTH.RECOVERY_DELAY;
             box.health = 4;
             box.lastHitTime = Date.now();
             game.damagedBoxIds.add(box.id);
@@ -417,7 +428,7 @@ describe('ThrustGame Health and Healing', () => {
             box.lastHitTime = Date.now();
             game.damagedBoxIds.add(box.id);
 
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             game.updateHealthRecovery();
 
             expect(box.health).toBeUndefined();
@@ -432,7 +443,7 @@ describe('ThrustGame Health and Healing', () => {
             expect(game.damagedBoxIds.has(box.id)).toBe(true);
 
             // Wait for recovery
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             game.updateHealthRecovery();
 
             // Health increased by 1 (3→4)
@@ -595,7 +606,7 @@ describe('ThrustGame Health and Healing', () => {
             box.lastHitTime = Date.now();
             game.damagedBoxIds.add(box.id);
             
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             game.updateHealthRecovery();
             
             expect(game.damagedBoxIds.has(box.id)).toBe(false);
@@ -625,7 +636,7 @@ describe('ThrustGame Health and Healing', () => {
             expect(freshGame.damagedBoxIds.size).toBe(1);
 
             // Advance time and verify healing resumes
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             freshGame.updateHealthRecovery();
 
             expect(box.health).toBe(4); // Healed once
@@ -702,7 +713,7 @@ describe('ThrustGame Health and Healing', () => {
             game.damagedBoxIds.add(box.id);
 
             // Advance past recovery delay
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             game.updateHealthRecovery();
 
             expect(box.health).toBe(4); // healed by 1
@@ -783,7 +794,7 @@ describe('ThrustGame Health and Healing', () => {
             
             expect(game.damagedBoxIds.size).toBe(DAMAGED_COUNT);
             
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
             
             const start = performance.now();
             game.updateHealthRecovery();
@@ -851,7 +862,7 @@ describe('ThrustGame Health and Healing', () => {
             expect(ThrustGame._healingInterval).not.toBeNull();
 
             // Advance past recovery delay — interval ticks every 1000ms
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
 
             // Box should be fully healed and interval removed
             expect(box.health).toBeUndefined();
@@ -871,7 +882,7 @@ describe('ThrustGame Health and Healing', () => {
             liveGame.start();
             ThrustGame.instance = liveGame;
 
-            jest.advanceTimersByTime(ThrustGame.HEALTH.RECOVERY_DELAY + 1000);
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
 
             // The static loop deferred to the live instance — it did NOT heal directly
             // (box.health remains 4; the live instance's updateHealthRecovery owns it)

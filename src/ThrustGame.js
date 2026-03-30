@@ -264,17 +264,19 @@ class ThrustGame {
   }
 
   update() {
-    if (!this.active) return;
+    if (!this.player.alive && Date.now() >= this.player.respawnTime) {
+      this.player = this.createPlayer();
+      if (this.collaborationManager) this.broadcastPlayerState(true);
+    }
+
+    if (!this.active && !ThrustGame.hasRemotePlayers) return;
+
     this.syncKeyboardState();
 
     if (this.player.alive && this.keys.up) {
       if (typeof ThrustAudio !== 'undefined') ThrustAudio.setThrust(true);
     } else {
       if (typeof ThrustAudio !== 'undefined') ThrustAudio.setThrust(false);
-    }
-    if (!this.player.alive && Date.now() >= this.player.respawnTime) {
-      this.player = this.createPlayer();
-      if (this.collaborationManager) this.broadcastPlayerState(true);
     }
 
     this.updateBullets();
