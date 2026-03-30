@@ -9,6 +9,7 @@ class ThrustAudio {
   static initPromise = null;
   static lastFireTime = 0;
   static lastLandingTime = 0;
+  static lastBounceTime = 0;
 
   /**
    * Safe helper to calculate distance attenuation without hard crashing
@@ -405,6 +406,53 @@ class ThrustAudio {
     } catch (e) {}
   }
 
+  static async playBounce(x, y) {
+    if (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO && !ThrustConstants.AUDIO.ENABLED) return;
+    const ctx = await this.init();
+    if (!ctx || !this.whiteNoiseBuffer) return;
+
+    const now = ctx.currentTime;
+    if (now - this.lastBounceTime < 0.15) return; // Shorter delay (150ms) for bounces
+    this.lastBounceTime = now;
+
+    const attenuation = this._getSpatialData(x, y, 2500);
+    if (attenuation <= 0.05) return;
+
+    try {
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      const source = ctx.createBufferSource();
+      source.buffer = this.whiteNoiseBuffer;
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+      filter.Q.value = 5;
+
+      const baseVol = (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO) 
+                      ? (ThrustConstants.AUDIO.BOUNCE_VOLUME || 0.12) 
+                      : 0.12;
+      
+      gain.gain.setValueAtTime(baseVol * attenuation, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      source.onended = () => {
+        try {
+          source.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        } catch (_) {}
+      };
+
+      source.start();
+      source.stop(ctx.currentTime + 0.1);
+    } catch (e) {}
+  }
+
   static cleanup() {
     this.stopThrust(true); // Immediate stop
     if (this.context) {
@@ -416,6 +464,7 @@ class ThrustAudio {
       this.initPromise = null;
       this.lastFireTime = 0;
       this.lastLandingTime = 0;
+      this.lastBounceTime = 0;
     }
   }
 }

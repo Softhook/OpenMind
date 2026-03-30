@@ -17,6 +17,7 @@ class ThrustShip {
     this.color = options.color || '#FFFFFF';
     this.thrusting = options.thrusting || false;
     this.wasExploded = false;
+    this.justBounced = false;
 
     // Interpolation targets for remote ships
     this.targetX = this.x;
@@ -29,6 +30,7 @@ class ThrustShip {
    */
   updatePhysics(keys, mindMap) {
     if (!this.alive) return;
+    this.justBounced = false; // Reset every frame
 
     const phys = ThrustConstants.PHYSICS;
     const prevX = this.x;
@@ -121,6 +123,7 @@ class ThrustShip {
               this.vy = 0;
             }
             this.grounded = false;
+            this.justBounced = true;
           }
         } else {
           this.x = prevX;
@@ -128,6 +131,7 @@ class ThrustShip {
           this.vx *= -phys.BOUNCE_AMOUNT;
           this.vy *= -phys.BOUNCE_AMOUNT;
           this.grounded = false;
+          this.justBounced = true;
         }
         break; 
       }

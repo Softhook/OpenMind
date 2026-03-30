@@ -296,6 +296,8 @@ class ThrustGame {
     // Play landing sound on touchdown
     if (!wasGrounded && this.player.grounded) {
       if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding(this.player.x, this.player.y);
+    } else if (this.player.justBounced) {
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playBounce(this.player.x, this.player.y);
     }
       if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && !CameraUtils.isPanning) {
         CameraUtils.centerOn(this.player.x, this.player.y, width, height);
