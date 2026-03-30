@@ -253,13 +253,25 @@ class ThrustGame {
 
   destroy() {
     this.stop();
-    if (ThrustGame.instance === this) ThrustGame.instance = null;
+    if (ThrustGame.instance === this) {
+      ThrustGame.instance = null;
+      if (typeof ThrustAudio !== 'undefined') {
+        ThrustAudio.setThrust(false);
+        ThrustAudio.cleanup();
+      }
+    }
     this.collaborationManager = null; this.mindMap = null;
   }
 
   update() {
     if (!this.active) return;
     this.syncKeyboardState();
+
+    if (this.player.alive && this.keys.up) {
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.setThrust(true);
+    } else {
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.setThrust(false);
+    }
     if (!this.player.alive && Date.now() >= this.player.respawnTime) {
       this.player = this.createPlayer();
       if (this.collaborationManager) this.broadcastPlayerState(true);
@@ -369,6 +381,10 @@ class ThrustGame {
         box.wasExploded = true;
         const scale = Math.sqrt((box.width * box.height) / 16000);
         this.createExplosion(box.x, box.y, 'box', box.backgroundColor, scale);
+      } else if (newHealth > 0) {
+        if (typeof ThrustAudio !== 'undefined') {
+          ThrustAudio.playImpact(box.x, box.y);
+        }
       }
       
       if (newHealth < 5) this.damagedBoxIds.add(box.id);
@@ -385,6 +401,9 @@ class ThrustGame {
 
   createExplosion(x, y, type = 'player', color = null, scale = 1.0) {
     this.explosions.push(new ThrustExplosion({ x, y, type, color, scale }));
+    if (typeof ThrustAudio !== 'undefined') {
+      ThrustAudio.playExplosion(type, scale, x, y);
+    }
   }
 
   checkCollisions() {
@@ -466,6 +485,9 @@ class ThrustGame {
       vy: Math.sin(this.player.angle) * ThrustConstants.BULLET.SPEED + this.player.vy
     });
     this.bullets.push(b);
+    if (typeof ThrustAudio !== 'undefined') {
+      ThrustAudio.playFire(this.player.x, this.player.y);
+    }
   }
 
   draw() {
@@ -567,10 +589,12 @@ class ThrustGame {
           bIds.add(bData.id);
           const exX = bData.x + bData.vx * latFrames, exY = bData.y + bData.vy * latFrames, lt = bData.lifetime - latFrames;
           if (lt <= 0) continue;
-          let b = this.remoteBullets.get(bData.id);
           if (!b) {
             b = new ThrustBullet({ id: bData.id, x: exX, y: exY, vx: bData.vx, vy: bData.vy, lifetime: lt, clientId: id });
             this.remoteBullets.set(bData.id, b);
+            if (typeof ThrustAudio !== 'undefined') {
+              ThrustAudio.playFire(tg.x, tg.y);
+            }
           }
           b.targetX = exX; b.targetY = exY; b.vx = bData.vx; b.vy = bData.vy; b.lifetime = lt;
         }
@@ -679,6 +703,7 @@ class ThrustGame {
     ThrustGame._healingInterval = handle;
   }
 }
+
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) module.exports = ThrustGame;

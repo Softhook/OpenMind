@@ -1010,6 +1010,7 @@ function drawRemoteCursors() {
               'src/ThrustShip.js',
               'src/ThrustBullet.js',
               'src/ThrustExplosion.js',
+              'src/ThrustAudio.js',
               'src/ThrustGame.js'
             ], () => {
               // Remote activity detected: Attach the loop so we can render it.
@@ -2183,6 +2184,7 @@ function keyPressed() {
         'src/ThrustShip.js',
         'src/ThrustBullet.js',
         'src/ThrustExplosion.js',
+        'src/ThrustAudio.js',
         'src/ThrustGame.js'
       ], () => {
         // Toggle the game once loaded

@@ -92,6 +92,15 @@ const ThrustConstants = {
     MAX_ATTEMPTS: 50,
     SEARCH_RADIUS: 150,
     MIN_DISTANCE_FROM_BOX: 40
+  },
+
+  AUDIO: {
+    ENABLED: true,
+    EXPLOSION_VOLUME: 0.45,
+    BOX_EXPLOSION_VOLUME: 0.25,
+    FIRE_VOLUME: 0.12,
+    IMPACT_VOLUME: 0.1,
+    THRUST_VOLUME: 0.15
   }
 };
 
