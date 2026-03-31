@@ -1,5 +1,9 @@
 /**
- * ThrustConstants.js - Configuration for the Thrust mini-game
+ * ThrustConstants.js - Configuration for the Thrust mini-game.
+ *
+ * All tunable values live here. No game logic or specialization belongs here.
+ * Audio volumes are normalised to the range [0, 1] and should be perceptually
+ * balanced — test at comfortable listening levels before adjusting.
  */
 
 const ThrustConstants = {
@@ -86,7 +90,7 @@ const ThrustConstants = {
   },
 
   DEFAULT_PLAYER_NAME: 'Player',
-  DEFAULT_PLAYER_COLOR: '#FF6464', // Red fallback from ColorPalette helper
+  DEFAULT_PLAYER_COLOR: '#FF6464',
 
   SPAWN: {
     MAX_ATTEMPTS: 50,
@@ -95,14 +99,22 @@ const ThrustConstants = {
   },
 
   AUDIO: {
+    /** Set to false to silence all Thrust audio. */
     ENABLED: true,
-    EXPLOSION_VOLUME: 0.5,
-    BOX_EXPLOSION_VOLUME: 0.85,
-    FIRE_VOLUME: 0.01,
-    IMPACT_VOLUME: 0.1,
-    THRUST_VOLUME: 0.18,
-    LANDING_VOLUME: 0.1,
-    BOUNCE_VOLUME: 0.12
+
+    // ── Per-sound volumes [0–1] ─────────────────────────────────────────────
+    /** Explosion (player death / box destruction). Scale is applied on top. */
+    EXPLOSION_VOLUME: 0.65,
+    /** Bullet-hits-box impact click. */
+    IMPACT_VOLUME:    0.35,
+    /** Continuous engine rumble while thrusting. */
+    THRUST_VOLUME:    0.28,
+    /** Fire/shoot sound per bullet. */
+    FIRE_VOLUME:      0.20,
+    /** Gentle thud when the ship touches down. */
+    LANDING_VOLUME:   0.22,
+    /** Sharp crack when the ship bounces off a box. */
+    BOUNCE_VOLUME:    0.25
   }
 };
 

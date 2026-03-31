@@ -295,9 +295,9 @@ class ThrustGame {
     
     // Play landing sound on touchdown
     if (!wasGrounded && this.player.grounded) {
-      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding(this.player.x, this.player.y);
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding();
     } else if (this.player.justBounced) {
-      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playBounce(this.player.x, this.player.y);
+      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playBounce();
     }
       if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && !CameraUtils.isPanning) {
         CameraUtils.centerOn(this.player.x, this.player.y, width, height);
@@ -393,7 +393,7 @@ class ThrustGame {
         this.createExplosion(box.x, box.y, 'box', box.backgroundColor, scale);
       } else if (newHealth > 0) {
         if (typeof ThrustAudio !== 'undefined') {
-          ThrustAudio.playImpact(box.x, box.y);
+          ThrustAudio.playImpact();
         }
       }
       
@@ -412,7 +412,7 @@ class ThrustGame {
   createExplosion(x, y, type = 'player', color = null, scale = 1.0) {
     this.explosions.push(new ThrustExplosion({ x, y, type, color, scale }));
     if (typeof ThrustAudio !== 'undefined') {
-      ThrustAudio.playExplosion(type, scale, x, y);
+      ThrustAudio.playExplosion(scale);
     }
   }
 
@@ -496,7 +496,7 @@ class ThrustGame {
     });
     this.bullets.push(b);
     if (typeof ThrustAudio !== 'undefined') {
-      ThrustAudio.playFire(this.player.x, this.player.y);
+      ThrustAudio.playFire();
     }
   }
 
@@ -604,7 +604,7 @@ class ThrustGame {
             b = new ThrustBullet({ id: bData.id, x: exX, y: exY, vx: bData.vx, vy: bData.vy, lifetime: lt, clientId: id });
             this.remoteBullets.set(bData.id, b);
             if (typeof ThrustAudio !== 'undefined') {
-              ThrustAudio.playFire(tg.x, tg.y);
+              ThrustAudio.playFire();
             }
           }
           b.targetX = exX; b.targetY = exY; b.vx = bData.vx; b.vy = bData.vy; b.lifetime = lt;
