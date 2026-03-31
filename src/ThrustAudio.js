@@ -9,6 +9,7 @@
  *  • All public methods are safe to call without guards — they fail silently if
  *    audio is unavailable or disabled.
  *  • Every allocated AudioNode is disconnected on completion to prevent leaks.
+ *  • Voice limiting prevents node accumulation during rapid or burst events.
  */
 
 class ThrustAudio {
@@ -27,6 +28,10 @@ class ThrustAudio {
   static _lastFireTime   = 0;
   static _lastLandTime   = 0;
   static _lastBounceTime = 0;
+
+  // Voice limiter — tracks active concurrent one-shot nodes.
+  static _activeVoices = 0;
+  static _MAX_VOICES   = 12;
 
   // ── Config ────────────────────────────────────────────────────────────────
 
@@ -120,37 +125,45 @@ class ThrustAudio {
   }
 
   /**
-   * Registers an onended handler that disconnects all supplied nodes.
+   * Registers an onended handler that disconnects all supplied nodes and
+   * decrements the voice counter.
    * Include the source node itself in `nodes` to fully clean up the graph.
    */
   static _autoDisconnect(source, nodes) {
     source.onended = () => {
+      this._activeVoices = Math.max(0, this._activeVoices - 1);
       for (const n of nodes) { try { n.disconnect(); } catch (_) {} }
     };
   }
 
   /**
-   * Plays a filtered white-noise burst — the one-stop shop for simple sounds.
+   * Plays a filtered white-noise burst.
+   *
+   * freqEnd must be > 0 (Web Audio API requirement for exponential ramps).
+   * When freqEnd equals freqStart no ramp is scheduled — just a constant value.
    *
    * @param {AudioContext} ctx
+   * @param {number}       t    AudioContext timestamp to schedule from.
    * @param {{
-   *   filterType:  BiquadFilterType,
-   *   freqStart:   number,   // Hz at t=0
-   *   freqEnd:     number,   // Hz at t=duration
-   *   Q?:          number,   // default 1
-   *   vol:         number,   // peak gain [0–1]
-   *   duration:    number    // seconds
+   *   filterType: BiquadFilterType,
+   *   freqStart:  number,
+   *   freqEnd:    number,
+   *   Q?:         number,   // default 1
+   *   vol:        number,
+   *   duration:   number
    * }} opts
    */
-  static _playNoise(ctx, { filterType, freqStart, freqEnd, Q = 1, vol, duration }) {
+  static _playNoise(ctx, t, { filterType, freqStart, freqEnd, Q = 1, vol, duration }) {
     const src    = this._noiseSource(ctx);
     const filter = ctx.createBiquadFilter();
     const gain   = ctx.createGain();
-    const t      = ctx.currentTime;
 
     filter.type = filterType;
     filter.frequency.setValueAtTime(freqStart, t);
-    filter.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+    // Only ramp when frequencies differ — exponentialRamp requires a positive target.
+    if (freqEnd !== freqStart && freqEnd > 0) {
+      filter.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+    }
     if (Q !== 1) filter.Q.value = Q;
 
     gain.gain.setValueAtTime(vol, t);
@@ -163,12 +176,14 @@ class ThrustAudio {
 
     src.start(t);
     src.stop(t + duration);
+    this._activeVoices++;
   }
 
   /**
-   * Plays a frequency-swept oscillator — used for tonal layers.
+   * Plays a frequency-swept oscillator tone.
    *
    * @param {AudioContext} ctx
+   * @param {number}       t    AudioContext timestamp to schedule from.
    * @param {{
    *   type:      OscillatorType,
    *   freqStart: number,
@@ -177,14 +192,15 @@ class ThrustAudio {
    *   duration:  number
    * }} opts
    */
-  static _playOsc(ctx, { type, freqStart, freqEnd, vol, duration }) {
+  static _playOsc(ctx, t, { type, freqStart, freqEnd, vol, duration }) {
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
-    const t    = ctx.currentTime;
 
     osc.type = type;
     osc.frequency.setValueAtTime(freqStart, t);
-    osc.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+    if (freqEnd !== freqStart && freqEnd > 0) {
+      osc.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+    }
 
     gain.gain.setValueAtTime(vol, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
@@ -195,6 +211,7 @@ class ThrustAudio {
 
     osc.start(t);
     osc.stop(t + duration);
+    this._activeVoices++;
   }
 
   // ── Public sound API ──────────────────────────────────────────────────────
@@ -207,18 +224,19 @@ class ThrustAudio {
   static async playExplosion(scale = 1.0) {
     const ctx = await this._getCtx();
     if (!ctx) return;
+    // Explosion uses 2 voices; leave headroom for other sounds.
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
 
     const s        = Math.max(0.4, Math.min(2.0, scale));
     const duration = 0.5 * s;
     const vol      = this._cfg().EXPLOSION_VOLUME * Math.min(1.2, s);
+    const t        = ctx.currentTime; // Single timestamp for both layers
 
     try {
-      // Layer 1: Noise crack / hiss
-      this._playNoise(ctx, {
+      this._playNoise(ctx, t, {
         filterType: 'lowpass', freqStart: 1200, freqEnd: 20, vol, duration
       });
-      // Layer 2: Sub-bass thump
-      this._playOsc(ctx, {
+      this._playOsc(ctx, t, {
         type: 'sine', freqStart: 160, freqEnd: 30,
         vol: vol * 0.85, duration: duration * 0.8
       });
@@ -231,9 +249,10 @@ class ThrustAudio {
   static async playImpact() {
     const ctx = await this._getCtx();
     if (!ctx) return;
+    if (this._activeVoices >= this._MAX_VOICES) return;
 
     try {
-      this._playNoise(ctx, {
+      this._playNoise(ctx, ctx.currentTime, {
         filterType: 'bandpass', freqStart: 3000, freqEnd: 3000,
         Q: 8, vol: this._cfg().IMPACT_VOLUME, duration: 0.06
       });
@@ -253,6 +272,13 @@ class ThrustAudio {
       return;
     }
 
+    if (!active) {
+      // Stop path: use whichever context we have, even if init is pending.
+      // _stopThrustFade guards against a null context internally.
+      this._stopThrustFade(this._context);
+      return;
+    }
+
     // Fast path: skip async init when the context is already ready.
     let ctx = this._context;
     if (!ctx || ctx.state === 'closed' || !this._noiseBuffer) {
@@ -260,34 +286,30 @@ class ThrustAudio {
     }
     if (!ctx || !this._noiseBuffer) return;
 
-    if (active) {
-      if (this._thrustSource) return; // Already running
+    if (this._thrustSource) return; // Already running (may have started during await)
 
-      try {
-        const src    = this._noiseSource(ctx, /* loop */ true);
-        const filter = ctx.createBiquadFilter();
-        const gain   = ctx.createGain();
+    try {
+      const src    = this._noiseSource(ctx, /* loop */ true);
+      const filter = ctx.createBiquadFilter();
+      const gain   = ctx.createGain();
 
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(400, ctx.currentTime);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, ctx.currentTime);
 
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(this._cfg().THRUST_VOLUME, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(this._cfg().THRUST_VOLUME, ctx.currentTime + 0.12);
 
-        src.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
 
-        this._thrustSource = src;
-        this._thrustFilter = filter;
-        this._thrustGain   = gain;
+      this._thrustSource = src;
+      this._thrustFilter = filter;
+      this._thrustGain   = gain;
 
-        src.start();
-      } catch (e) {
-        console.warn('ThrustAudio: setThrust(true) failed —', e);
-      }
-    } else {
-      this._stopThrustFade(ctx);
+      src.start();
+    } catch (e) {
+      console.warn('ThrustAudio: setThrust(true) failed —', e);
     }
   }
 
@@ -306,34 +328,40 @@ class ThrustAudio {
     try { gain?.disconnect(); } catch (_) {}
   }
 
-  /** Fades the thrust tone out then disconnects. Re-entrant safe. */
+  /**
+   * Fades the thrust tone out then disconnects. Re-entrant safe.
+   * ctx may be null (e.g. called before context was ever created) — guarded.
+   */
   static _stopThrustFade(ctx) {
     const src    = this._thrustSource;
     const filter = this._thrustFilter;
     const gain   = this._thrustGain;
 
-    if (!src && !gain) return; // Nothing to stop
+    if (!src && !gain) return; // Nothing running
 
-    // Clear state before async work so concurrent calls are safe.
+    // Clear state before any async work so concurrent calls don't double-stop.
     this._thrustSource = null;
     this._thrustFilter = null;
     this._thrustGain   = null;
 
     try {
-      if (gain) {
+      if (gain && ctx && ctx.state === 'running') {
         const cur = gain.gain.value;
         gain.gain.cancelScheduledValues(ctx.currentTime);
         gain.gain.setValueAtTime(cur, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.12);
+        try { src?.stop(ctx.currentTime + 0.15); } catch (_) {}
+      } else {
+        // Context unavailable or closed — kill immediately.
+        try { src?.stop(); } catch (_) {}
       }
-      try { src?.stop(ctx.currentTime + 0.15); } catch (_) {}
-
-      setTimeout(() => {
-        try { src?.disconnect(); } catch (_) {}
-        try { filter?.disconnect(); } catch (_) {}
-        try { gain?.disconnect(); } catch (_) {}
-      }, 180);
     } catch (_) {}
+
+    setTimeout(() => {
+      try { src?.disconnect(); } catch (_) {}
+      try { filter?.disconnect(); } catch (_) {}
+      try { gain?.disconnect(); } catch (_) {}
+    }, 180);
   }
 
   /**
@@ -347,16 +375,17 @@ class ThrustAudio {
     if (ctx.currentTime - this._lastFireTime < 0.05) return;
     this._lastFireTime = ctx.currentTime;
 
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
+
     const vol = this._cfg().FIRE_VOLUME;
+    const t   = ctx.currentTime;
 
     try {
-      // Layer 1: High-frequency noise crack
-      this._playNoise(ctx, {
+      this._playNoise(ctx, t, {
         filterType: 'bandpass', freqStart: 1400, freqEnd: 500,
         Q: 4, vol, duration: 0.1
       });
-      // Layer 2: Descending "pew" tone
-      this._playOsc(ctx, {
+      this._playOsc(ctx, t, {
         type: 'triangle', freqStart: 2000, freqEnd: 200,
         vol: vol * 0.9, duration: 0.12
       });
@@ -376,8 +405,10 @@ class ThrustAudio {
     if (ctx.currentTime - this._lastLandTime < 0.5) return;
     this._lastLandTime = ctx.currentTime;
 
+    if (this._activeVoices >= this._MAX_VOICES) return;
+
     try {
-      this._playNoise(ctx, {
+      this._playNoise(ctx, ctx.currentTime, {
         filterType: 'lowpass', freqStart: 600, freqEnd: 80,
         vol: this._cfg().LANDING_VOLUME, duration: 0.18
       });
@@ -397,8 +428,10 @@ class ThrustAudio {
     if (ctx.currentTime - this._lastBounceTime < 0.15) return;
     this._lastBounceTime = ctx.currentTime;
 
+    if (this._activeVoices >= this._MAX_VOICES) return;
+
     try {
-      this._playNoise(ctx, {
+      this._playNoise(ctx, ctx.currentTime, {
         filterType: 'bandpass', freqStart: 1800, freqEnd: 500,
         Q: 4, vol: this._cfg().BOUNCE_VOLUME, duration: 0.12
       });
@@ -418,11 +451,12 @@ class ThrustAudio {
 
     try { this._context?.close().catch(() => {}); } catch (_) {}
 
-    this._context       = null;
-    this._noiseBuffer   = null;
-    this._initPromise   = null;
-    this._lastFireTime  = 0;
-    this._lastLandTime  = 0;
+    this._context        = null;
+    this._noiseBuffer    = null;
+    this._initPromise    = null;
+    this._activeVoices   = 0;
+    this._lastFireTime   = 0;
+    this._lastLandTime   = 0;
     this._lastBounceTime = 0;
   }
 }
