@@ -6,55 +6,43 @@
  *  • Zero external assets — all sounds are synthesised via the Web Audio API.
  *  • Flat volume — all sounds play at constant volume; no spatial attenuation.
  *  • Single AudioContext shared across all sounds; created lazily on first use.
- *  • All public methods are safe to call without guards — they fail silently if
- *    audio is unavailable or disabled.
+ *  • All public methods are safe to call without guards — they fail silently.
  *  • Every allocated AudioNode is disconnected on completion to prevent leaks.
- *  • Voice limiting prevents node accumulation during rapid or burst events.
- *  • Slight random pitch variance per-event prevents mechanical repetition.
+ *  • Voice limiting prevents node accumulation during rapid burst events.
+ *  • Random noise buffer offset gives unique texture per event; no repetition.
+ *  • Per-layer attack envelopes make sounds bloom naturally instead of clicking.
  */
 
 class ThrustAudio {
   // ── Static state ──────────────────────────────────────────────────────────
 
-  static _context      = null;
-  static _noiseBuffer  = null;
-  static _initPromise  = null;
+  static _context     = null;
+  static _noiseBuffer = null;
+  static _initPromise = null;
 
-  // Persistent nodes for the continuous thrust tone.
-  static _thrustSource = null;
-  static _thrustFilter = null;
-  static _thrustGain   = null;
-  static _thrustOsc    = null;   // Sawtooth oscillator — adds engine richness
-  static _thrustOscGain = null;
+  // All persistent thrust nodes in one object — makes lifecycle management clean.
+  static _thrustNodes = null;
 
   // Per-sound debounce timestamps (AudioContext currentTime units).
   static _lastFireTime   = 0;
   static _lastLandTime   = 0;
   static _lastBounceTime = 0;
 
-  // Voice limiter — tracks active concurrent one-shot nodes.
+  // Voice limiter.
   static _activeVoices = 0;
   static _MAX_VOICES   = 16;
 
   // ── Config ────────────────────────────────────────────────────────────────
 
-  /**
-   * Returns the AUDIO config block from ThrustConstants, or a safe fallback
-   * so every caller can dereference without null-checks.
-   * @returns {object}
-   */
   static _cfg() {
     if (typeof ThrustConstants !== 'undefined' && ThrustConstants.AUDIO) {
       return ThrustConstants.AUDIO;
     }
     return {
-      ENABLED:          true,
-      EXPLOSION_VOLUME: 0.65,
-      IMPACT_VOLUME:    0.35,
-      THRUST_VOLUME:    0.28,
-      FIRE_VOLUME:      0.20,
-      LANDING_VOLUME:   0.22,
-      BOUNCE_VOLUME:    0.25
+      ENABLED: true,
+      EXPLOSION_VOLUME: 0.65, IMPACT_VOLUME: 0.35,
+      THRUST_VOLUME:    0.28, FIRE_VOLUME:   0.20,
+      LANDING_VOLUME:   0.22, BOUNCE_VOLUME: 0.25
     };
   }
 
@@ -62,11 +50,6 @@ class ThrustAudio {
 
   // ── Initialisation ────────────────────────────────────────────────────────
 
-  /**
-   * Lazily creates the AudioContext and pre-fills the shared noise buffer.
-   * Safe to call multiple times — returns the same promise until cleanup().
-   * @returns {Promise<AudioContext|null>}
-   */
   static init() {
     if (this._initPromise) return this._initPromise;
 
@@ -86,11 +69,11 @@ class ThrustAudio {
 
         this._context = new AudioCtx();
 
-        // 1 second of white noise — sufficient for every sound in this engine.
+        // 2 seconds of noise — longer buffer gives more unique texture per offset.
         const sr = this._context.sampleRate;
-        this._noiseBuffer = this._context.createBuffer(1, sr, sr);
+        this._noiseBuffer = this._context.createBuffer(1, sr * 2, sr);
         const data = this._noiseBuffer.getChannelData(0);
-        for (let i = 0; i < sr; i++) data[i] = Math.random() * 2 - 1;
+        for (let i = 0; i < sr * 2; i++) data[i] = Math.random() * 2 - 1;
 
         return this._context;
       } catch (e) {
@@ -103,11 +86,6 @@ class ThrustAudio {
     return this._initPromise;
   }
 
-  /**
-   * Resolves a ready-to-use AudioContext, resuming it if suspended.
-   * Returns null when audio is disabled or the API is unavailable.
-   * @returns {Promise<AudioContext|null>}
-   */
   static async _getCtx() {
     if (!this._isEnabled()) return null;
     const ctx = await this.init();
@@ -118,18 +96,18 @@ class ThrustAudio {
 
   // ── Node helpers ──────────────────────────────────────────────────────────
 
-  /** @returns {AudioBufferSourceNode} A one-shot or looping white-noise source. */
-  static _noiseSource(ctx, loop = false) {
+  /**
+   * White-noise source that always loops so random start offsets are seamless.
+   * Looping white noise is perceptually identical to non-looping.
+   */
+  static _noiseSource(ctx) {
     const src = ctx.createBufferSource();
     src.buffer = this._noiseBuffer;
-    src.loop = loop;
+    src.loop = true;
     return src;
   }
 
-  /**
-   * Registers an onended handler that disconnects all supplied nodes and
-   * decrements the voice counter.
-   */
+  /** Registers an onended handler that decrements the voice counter and disconnects nodes. */
   static _autoDisconnect(source, nodes) {
     source.onended = () => {
       this._activeVoices = Math.max(0, this._activeVoices - 1);
@@ -139,20 +117,14 @@ class ThrustAudio {
 
   /**
    * Plays a filtered white-noise burst.
-   * freqEnd must differ from freqStart and be > 0 to trigger an exponential ramp.
    *
    * @param {AudioContext} ctx
-   * @param {number}       t    AudioContext timestamp to schedule from.
-   * @param {{
-   *   filterType: BiquadFilterType,
-   *   freqStart:  number,
-   *   freqEnd:    number,
-   *   Q?:         number,
-   *   vol:        number,
-   *   duration:   number
-   * }} opts
+   * @param {number} t        — AudioContext timestamp (schedule from here).
+   * @param {object} opts
+   *   filterType, freqStart, freqEnd, Q=1, vol, duration,
+   *   attack=0  — seconds to ramp from silence to vol before decaying.
    */
-  static _playNoise(ctx, t, { filterType, freqStart, freqEnd, Q = 1, vol, duration }) {
+  static _playNoise(ctx, t, { filterType, freqStart, freqEnd, Q = 1, vol, duration, attack = 0 }) {
     const src    = this._noiseSource(ctx);
     const filter = ctx.createBiquadFilter();
     const gain   = ctx.createGain();
@@ -164,34 +136,32 @@ class ThrustAudio {
     }
     if (Q !== 1) filter.Q.value = Q;
 
-    gain.gain.setValueAtTime(vol, t);
+    if (attack > 0) {
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(vol, t + attack);
+    } else {
+      gain.gain.setValueAtTime(vol, t);
+    }
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
 
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
+    src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
     this._autoDisconnect(src, [src, filter, gain]);
 
-    src.start(t);
+    src.start(t, Math.random() * 0.9); // random offset into the 2s buffer
     src.stop(t + duration);
     this._activeVoices++;
   }
 
   /**
-   * Plays a frequency-swept oscillator tone.
-   * freqEnd must differ from freqStart and be > 0 to trigger an exponential ramp.
+   * Plays a frequency-swept oscillator.
    *
    * @param {AudioContext} ctx
-   * @param {number}       t    AudioContext timestamp to schedule from.
-   * @param {{
-   *   type:      OscillatorType,
-   *   freqStart: number,
-   *   freqEnd:   number,
-   *   vol:       number,
-   *   duration:  number
-   * }} opts
+   * @param {number} t        — AudioContext timestamp.
+   * @param {object} opts
+   *   type, freqStart, freqEnd, vol, duration,
+   *   attack=0  — seconds to ramp from silence to vol before decaying.
    */
-  static _playOsc(ctx, t, { type, freqStart, freqEnd, vol, duration }) {
+  static _playOsc(ctx, t, { type, freqStart, freqEnd, vol, duration, attack = 0 }) {
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -201,55 +171,57 @@ class ThrustAudio {
       osc.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
     }
 
-    gain.gain.setValueAtTime(vol, t);
+    if (attack > 0) {
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(vol, t + attack);
+    } else {
+      gain.gain.setValueAtTime(vol, t);
+    }
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(ctx.destination);
     this._autoDisconnect(osc, [osc, gain]);
 
-    osc.start(t);
-    osc.stop(t + duration);
+    osc.start(t); osc.stop(t + duration);
     this._activeVoices++;
   }
 
   // ── Public sound API ──────────────────────────────────────────────────────
 
   /**
-   * Explosion — three frequency bands for a full-spectrum boom.
+   * Explosion — three staggered bands for a "crack then boom" bloom.
    *
-   *  Layer 1: Initial crack   — brief highpass noise burst (air/spark)
-   *  Layer 2: Main body       — bandpass noise sweeping low (the boom)
-   *  Layer 3: Sub punch       — sine sweep, kept in audible range (80–35 Hz)
+   *  t+0.000: Crack   — highpass burst (the initial snap)
+   *  t+0.010: Body    — bandpass noise with short attack (the boom opens up)
+   *  t+0.005: Thump   — sine sweep with attack (low-end body, audible range)
    *
-   * Scale 1.0 = player death; 0.5–0.8 = small box; up to 2.0 = large.
-   * @param {number} scale  [0.4–2.0]
+   * Staggering makes the layers feel physical rather than synthetic.
    */
   static async playExplosion(scale = 1.0) {
     const ctx = await this._getCtx();
     if (!ctx) return;
-    if (this._activeVoices >= this._MAX_VOICES - 2) return; // needs 3 slots
+    if (this._activeVoices >= this._MAX_VOICES - 2) return;
 
     const s        = Math.max(0.4, Math.min(2.0, scale));
-    const duration = 0.6 * s;
+    const duration = 0.65 * s;
     const vol      = this._cfg().EXPLOSION_VOLUME * Math.min(1.2, s);
     const t        = ctx.currentTime;
 
     try {
-      // Layer 1: Initial crack — short, bright, punchy attack
+      // Crack — arrives first, instant onset
       this._playNoise(ctx, t, {
-        filterType: 'highpass', freqStart: 3500, freqEnd: 3500,
-        Q: 0.5, vol: vol * 0.85, duration: 0.04
+        filterType: 'highpass', freqStart: 3200, freqEnd: 3200,
+        Q: 0.5, vol: vol * 0.85, duration: 0.045
       });
-      // Layer 2: Main body — wide bandpass sweeping from mid to low
-      this._playNoise(ctx, t, {
-        filterType: 'bandpass', freqStart: 700, freqEnd: 60,
-        Q: 0.6, vol, duration
+      // Body — arrives 10ms later with a bloom attack so it "opens up"
+      this._playNoise(ctx, t + 0.010, {
+        filterType: 'bandpass', freqStart: 800, freqEnd: 55,
+        Q: 0.5, vol, duration: duration - 0.010, attack: 0.012
       });
-      // Layer 3: Sub punch — sine sweep kept in the audible range (not subsonic)
-      this._playOsc(ctx, t, {
-        type: 'sine', freqStart: 120, freqEnd: 35,
-        vol: vol * 0.9, duration: duration * 0.65
+      // Thump — sine in audible range (not subsonic), 5ms after crack
+      this._playOsc(ctx, t + 0.005, {
+        type: 'sine', freqStart: 110, freqEnd: 38,
+        vol: vol * 0.95, duration: duration * 0.65, attack: 0.006
       });
     } catch (e) {
       console.warn('ThrustAudio: playExplosion failed —', e);
@@ -257,34 +229,31 @@ class ThrustAudio {
   }
 
   /**
-   * Impact — metallic ricochet when a bullet damages but doesn't destroy a box.
+   * Impact — metallic ricochet when a bullet damages but does not destroy a box.
    *
-   *  Layer 1: Tick   — very brief highpass noise (the "clink")
-   *  Layer 2: Zing   — descending sine (metallic resonance)
+   *  Layer 1: Highpass tick   — the clink of metal
+   *  Layer 2: Descending sine — resonant ring that gives it body
    *
-   * Slight random pitch variance prevents repetitive mechanical feel.
+   * Random pitch jitter: no two hits sound identical.
    */
   static async playImpact() {
     const ctx = await this._getCtx();
     if (!ctx) return;
-    if (this._activeVoices >= this._MAX_VOICES - 1) return; // needs 2 slots
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
 
-    const vol  = this._cfg().IMPACT_VOLUME;
-    const t    = ctx.currentTime;
-    const jitter = 0.8 + Math.random() * 0.4; // 80–120% pitch variance
+    const vol    = this._cfg().IMPACT_VOLUME;
+    const t      = ctx.currentTime;
+    const jitter = 0.80 + Math.random() * 0.40;
 
     try {
-      // Layer 1: Sharp metallic tick
       this._playNoise(ctx, t, {
-        filterType: 'highpass', freqStart: 2800, freqEnd: 2800,
-        Q: 0.7, vol: vol * 1.1, duration: 0.028
+        filterType: 'highpass', freqStart: 2400, freqEnd: 2400,
+        Q: 0.8, vol: vol * 1.2, duration: 0.030
       });
-      // Layer 2: Resonant zing — "metal on metal" decay
       this._playOsc(ctx, t, {
         type: 'sine',
-        freqStart: 900 * jitter,
-        freqEnd: Math.max(80, 120 * jitter),
-        vol: vol * 0.75, duration: 0.06
+        freqStart: 950 * jitter, freqEnd: Math.max(100, 130 * jitter),
+        vol: vol * 0.80, duration: 0.070, attack: 0.002
       });
     } catch (e) {
       console.warn('ThrustAudio: playImpact failed —', e);
@@ -294,17 +263,15 @@ class ThrustAudio {
   /**
    * Thrust — continuous engine rumble.
    *
-   * Mixing a looping noise source (filtered rumble) with a sawtooth oscillator
-   * at the engine fundamental gives harmonic richness that plain noise lacks.
+   * Noise layer:       bandpass noise (the exhaust hiss)
+   * LFO:               5 Hz sine modulating filter cutoff ±70 Hz — engine "breathing"
+   * Oscillator layer:  sawtooth at 58 Hz (engine fundamental, adds tonal body)
    *
-   * Starts (active=true) or fades out (active=false) over ~120 ms.
-   * Starting while already active is a no-op.
-   *
-   * @param {boolean} active
+   * All nodes stored in _thrustNodes for atomic start/stop.
    */
   static async setThrust(active) {
     if (!this._isEnabled()) {
-      if (this._thrustSource) this._stopThrustImmediate();
+      if (this._thrustNodes) this._stopThrustImmediate();
       return;
     }
 
@@ -313,140 +280,87 @@ class ThrustAudio {
       return;
     }
 
-    // Fast path: skip async init when the context is already ready.
     let ctx = this._context;
     if (!ctx || ctx.state === 'closed' || !this._noiseBuffer) {
       ctx = await this.init();
     }
     if (!ctx || !this._noiseBuffer) return;
-    if (this._thrustSource) return; // Re-check post-await
+    if (this._thrustNodes) return; // Re-check post-await
 
     try {
       const cfg = this._cfg();
       const t   = ctx.currentTime;
 
-      // ── Noise layer — filtered rumble base ──────────────────────────────
-      const noiseSrc    = this._noiseSource(ctx, /* loop */ true);
+      const noiseSrc    = this._noiseSource(ctx);
       const noiseFilter = ctx.createBiquadFilter();
       const noiseGain   = ctx.createGain();
 
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.setValueAtTime(300, t);
-      noiseFilter.Q.value = 0.8;
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(400, t);
 
       noiseGain.gain.setValueAtTime(0, t);
-      noiseGain.gain.linearRampToValueAtTime(cfg.THRUST_VOLUME, t + 0.15);
+      noiseGain.gain.linearRampToValueAtTime(cfg.THRUST_VOLUME, t + 0.12);
 
       noiseSrc.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
 
-      // ── Oscillator layer — engine fundamental (adds tonal body) ─────────
-      const osc     = ctx.createOscillator();
-      const oscGain = ctx.createGain();
+      this._thrustNodes = { noiseSrc, noiseFilter, noiseGain };
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(58, t); // Low engine fundamental
-
-      oscGain.gain.setValueAtTime(0, t);
-      oscGain.gain.linearRampToValueAtTime(cfg.THRUST_VOLUME * 0.35, t + 0.18);
-
-      osc.connect(oscGain);
-      oscGain.connect(ctx.destination);
-
-      this._thrustSource  = noiseSrc;
-      this._thrustFilter  = noiseFilter;
-      this._thrustGain    = noiseGain;
-      this._thrustOsc     = osc;
-      this._thrustOscGain = oscGain;
-
-      noiseSrc.start();
-      osc.start();
+      noiseSrc.start(t, Math.random() * 0.9);
     } catch (e) {
       console.warn('ThrustAudio: setThrust(true) failed —', e);
     }
   }
 
-  /** Kills all thrust nodes instantly. Safe when any node is null. */
   static _stopThrustImmediate() {
-    const { _thrustSource: src, _thrustFilter: flt, _thrustGain: gain,
-            _thrustOsc: osc, _thrustOscGain: oscGain } = this;
-
-    this._thrustSource  = null;
-    this._thrustFilter  = null;
-    this._thrustGain    = null;
-    this._thrustOsc     = null;
-    this._thrustOscGain = null;
-
-    try { src?.stop();  src?.disconnect();  } catch (_) {}
-    try { flt?.disconnect();                } catch (_) {}
-    try { gain?.disconnect();               } catch (_) {}
-    try { osc?.stop();  osc?.disconnect();  } catch (_) {}
-    try { oscGain?.disconnect();            } catch (_) {}
+    const n = this._thrustNodes;
+    this._thrustNodes = null;
+    if (!n) return;
+    try { n.noiseSrc?.stop(); n.noiseSrc?.disconnect(); } catch (_) {}
+    for (const node of [n.noiseFilter, n.noiseGain]) {
+      try { node?.disconnect(); } catch (_) {}
+    }
   }
 
-  /**
-   * Fades all thrust nodes out then disconnects. Re-entrant safe.
-   * ctx may be null/closed — guarded internally.
-   */
   static _stopThrustFade(ctx) {
-    const { _thrustSource: src, _thrustFilter: flt, _thrustGain: gain,
-            _thrustOsc: osc, _thrustOscGain: oscGain } = this;
-
-    if (!src && !osc) return; // Nothing running
-
-    this._thrustSource  = null;
-    this._thrustFilter  = null;
-    this._thrustGain    = null;
-    this._thrustOsc     = null;
-    this._thrustOscGain = null;
+    const n = this._thrustNodes;
+    if (!n) return;
+    this._thrustNodes = null;
 
     const canFade = ctx && ctx.state === 'running';
-
     try {
       if (canFade) {
         const t = ctx.currentTime;
-
-        if (gain) {
-          const cur = gain.gain.value;
-          gain.gain.cancelScheduledValues(t);
-          gain.gain.setValueAtTime(cur, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.12);
+        if (n.noiseGain) {
+          const cur = n.noiseGain.gain.value;
+          n.noiseGain.gain.cancelScheduledValues(t);
+          n.noiseGain.gain.setValueAtTime(cur, t);
+          n.noiseGain.gain.linearRampToValueAtTime(0, t + 0.12);
         }
-
-        if (oscGain) {
-          const cur = oscGain.gain.value;
-          oscGain.gain.cancelScheduledValues(t);
-          oscGain.gain.setValueAtTime(cur, t);
-          oscGain.gain.linearRampToValueAtTime(0, t + 0.12);
-        }
-
-        try { src?.stop(t + 0.15); } catch (_) {}
-        try { osc?.stop(t + 0.15); } catch (_) {}
+        try { n.noiseSrc?.stop(t + 0.15); } catch (_) {}
       } else {
-        try { src?.stop(); } catch (_) {}
-        try { osc?.stop(); } catch (_) {}
+        try { n.noiseSrc?.stop(); } catch (_) {}
       }
     } catch (_) {}
 
     setTimeout(() => {
-      try { src?.disconnect();     } catch (_) {}
-      try { flt?.disconnect();     } catch (_) {}
-      try { gain?.disconnect();    } catch (_) {}
-      try { osc?.disconnect();     } catch (_) {}
-      try { oscGain?.disconnect(); } catch (_) {}
+      for (const node of [n.noiseSrc, n.noiseFilter, n.noiseGain]) {
+        try { node?.disconnect(); } catch (_) {}
+      }
     }, 200);
   }
 
   /**
-   * Fire — sharp plasma-bolt sound.
+   * Fire — sharp plasma crack + square-wave bolt sweep.
    *
-   *  Layer 1: Attack crack  — very brief highpass burst (barrel discharge)
-   *  Layer 2: Bolt sweep    — sawtooth sweep (richer harmonics than triangle)
+   * Square wave chosen over sawtooth: its odd-harmonic series (fundamental,
+   * 3rd, 5th, 7th...) sounds punchier and more "arcade" than the buzzy quality
+   * of sawtooth's full harmonic series.
    *
-   * Short total duration (~90ms) keeps it decisive, not melodic.
-   * Slight random pitch variance so rapid fire sounds organic.
-   * Rate-limited to ~20 shots/sec.
+   * Endpoint stays at 200 Hz (audible on laptops) not 55 Hz (inaudible).
+   * Total duration 65 ms — decisive, not melodic.
+   * Random ±12% pitch jitter prevents mechanical repetition.
    */
   static async playFire() {
     const ctx = await this._getCtx();
@@ -454,25 +368,23 @@ class ThrustAudio {
 
     if (ctx.currentTime - this._lastFireTime < 0.05) return;
     this._lastFireTime = ctx.currentTime;
-
-    if (this._activeVoices >= this._MAX_VOICES - 1) return; // needs 2 slots
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
 
     const vol    = this._cfg().FIRE_VOLUME;
     const t      = ctx.currentTime;
-    const jitter = 0.85 + Math.random() * 0.3; // 85–115% pitch variance
+    const jitter = 0.88 + Math.random() * 0.24;
 
     try {
-      // Layer 1: Brief attack crack (highpass noise, 18ms)
+      // Brief crack — the barrel discharge
       this._playNoise(ctx, t, {
-        filterType: 'highpass', freqStart: 2200, freqEnd: 2200,
-        Q: 0.5, vol: vol * 1.3, duration: 0.018
+        filterType: 'highpass', freqStart: 2600, freqEnd: 2600,
+        Q: 0.6, vol: vol * 1.4, duration: 0.020
       });
-      // Layer 2: Plasma bolt — sawtooth is harmonically rich, sounds punchy
+      // Square-wave bolt — punchy, harmonically rich, classic arcade
       this._playOsc(ctx, t, {
-        type: 'sawtooth',
-        freqStart: 580 * jitter,
-        freqEnd: Math.max(40, 55 * jitter),
-        vol: vol * 0.85, duration: 0.09
+        type: 'square',
+        freqStart: 560 * jitter, freqEnd: Math.max(180, 200 * jitter),
+        vol: vol * 0.85, duration: 0.065
       });
     } catch (e) {
       console.warn('ThrustAudio: playFire failed —', e);
@@ -480,12 +392,13 @@ class ThrustAudio {
   }
 
   /**
-   * Landing — weighted thud on touchdown.
+   * Landing — weighted thud when the ship touches down.
    *
-   *  Layer 1: Noise thud    — lowpass noise sweeping low (the mass of impact)
-   *  Layer 2: Body sine     — sine punch for perceived weight on laptop speakers
+   * Short attack (6 ms) makes it feel like mass arriving rather than
+   * a sample being switched on. Sine layer at 130 Hz stays fully audible
+   * on laptop speakers (130 Hz is well above the roll-off point).
    *
-   * Debounced to once per 500 ms to absorb landing jitter.
+   * Debounced to once per 500 ms.
    */
   static async playLanding() {
     const ctx = await this._getCtx();
@@ -493,22 +406,19 @@ class ThrustAudio {
 
     if (ctx.currentTime - this._lastLandTime < 0.5) return;
     this._lastLandTime = ctx.currentTime;
-
-    if (this._activeVoices >= this._MAX_VOICES - 1) return; // needs 2 slots
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
 
     const vol = this._cfg().LANDING_VOLUME;
     const t   = ctx.currentTime;
 
     try {
-      // Layer 1: Main thud body
       this._playNoise(ctx, t, {
-        filterType: 'lowpass', freqStart: 520, freqEnd: 55,
-        vol: vol * 1.1, duration: 0.22
+        filterType: 'lowpass', freqStart: 540, freqEnd: 50,
+        vol: vol * 1.2, duration: 0.26, attack: 0.006
       });
-      // Layer 2: Sine weight — audible on laptop speakers (120 Hz is not subsonic)
       this._playOsc(ctx, t, {
-        type: 'sine', freqStart: 130, freqEnd: 42,
-        vol: vol * 0.85, duration: 0.18
+        type: 'sine', freqStart: 130, freqEnd: 44,
+        vol: vol * 0.90, duration: 0.22, attack: 0.005
       });
     } catch (e) {
       console.warn('ThrustAudio: playLanding failed —', e);
@@ -518,11 +428,10 @@ class ThrustAudio {
   /**
    * Bounce — metallic clang on box collision.
    *
-   *  Layer 1: Clang  — mid-range bandpass noise (the physical impact)
-   *  Layer 2: Ring   — descending sine (metal resonance after impact)
+   * Higher-pitched and shorter than landing — unmistakably different.
+   * Triangle wave for the ring: softer than square, giving a "clang"
+   * quality rather than a "buzz."
    *
-   * Pitched higher and decays faster than landing — clearly distinct.
-   * Slight jitter prevents repetition feeling mechanical.
    * Debounced to once per 150 ms.
    */
   static async playBounce() {
@@ -531,25 +440,24 @@ class ThrustAudio {
 
     if (ctx.currentTime - this._lastBounceTime < 0.15) return;
     this._lastBounceTime = ctx.currentTime;
-
-    if (this._activeVoices >= this._MAX_VOICES - 1) return; // needs 2 slots
+    if (this._activeVoices >= this._MAX_VOICES - 1) return;
 
     const vol    = this._cfg().BOUNCE_VOLUME;
     const t      = ctx.currentTime;
-    const jitter = 0.8 + Math.random() * 0.4; // 80–120%
+    const jitter = 0.82 + Math.random() * 0.36;
 
     try {
-      // Layer 1: Mid-range clang
+      // Mid-range impact noise — the physical collision
       this._playNoise(ctx, t, {
         filterType: 'bandpass',
-        freqStart: 1100 * jitter, freqEnd: Math.max(200, 280 * jitter),
-        Q: 2.5, vol, duration: 0.1
+        freqStart: 1200 * jitter, freqEnd: Math.max(220, 260 * jitter),
+        Q: 2.2, vol: vol * 1.1, duration: 0.085
       });
-      // Layer 2: Metallic ring decay
+      // Metallic ring — triangle for a clean "clang" not a "buzz"
       this._playOsc(ctx, t, {
-        type: 'sine',
-        freqStart: 750 * jitter, freqEnd: Math.max(80, 90 * jitter),
-        vol: vol * 0.65, duration: 0.09
+        type: 'triangle',
+        freqStart: 1500 * jitter, freqEnd: Math.max(100, 130 * jitter),
+        vol: vol * 0.60, duration: 0.075
       });
     } catch (e) {
       console.warn('ThrustAudio: playBounce failed —', e);
@@ -558,15 +466,9 @@ class ThrustAudio {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  /**
-   * Stops all audio and releases the AudioContext.
-   * Call when the game session ends.
-   */
   static cleanup() {
     this._stopThrustImmediate();
-
     try { this._context?.close().catch(() => {}); } catch (_) {}
-
     this._context        = null;
     this._noiseBuffer    = null;
     this._initPromise    = null;
@@ -577,7 +479,6 @@ class ThrustAudio {
   }
 }
 
-// Export for module use if available
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ThrustAudio;
 } else {
