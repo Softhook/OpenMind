@@ -126,7 +126,7 @@ describe('TextBox Edit Blocking behavioral tests', () => {
             editingBoxId: box.id
         });
 
-        const canResize = box.startResize(box.x + box.w, box.y + box.h);
+        const canResize = box.startResize(box.x + box.width, box.y + box.height);
         expect(canResize).toBe(false);
         expect(box.isResizing).toBeFalsy();
     });
