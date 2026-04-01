@@ -47,10 +47,13 @@ class Connection {
     this.arrowSize = Connection.ARROW_SIZE;
     this.selected = false;
 
-    // Cache for connection endpoints; invalidated whenever either box moves or resizes
+    // Cache for connection endpoints; invalidated whenever either box moves or resizes.
+    // Stored as two Float64Arrays [x, y, width, height] – one per box – so that
+    // staleness detection is a pure numeric comparison with zero allocations per frame.
     this._cachedEndpoints = null;
-    this._cachedFromKey = null;
-    this._cachedToKey = null;
+    this._cachedFromGeom = new Float64Array(4); // [x, y, width, height]
+    this._cachedToGeom   = new Float64Array(4); // [x, y, width, height]
+    this._cacheValid = false;
   }
 
   // ============================================================================
@@ -58,32 +61,27 @@ class Connection {
   // ============================================================================
 
   /**
-   * Returns a compact geometry key for a box used to detect endpoint cache staleness.
-   * @param {TextBox} box
-   * @returns {string}
-   * @private
-   */
-  _boxKey(box) {
-    return `${box.x},${box.y},${box.width},${box.height}`;
-  }
-
-  /**
    * Gets the connection endpoints on the edges of the boxes.
    * Calculates where the connection line should start and end based on
    * the positions of the two boxes.
    * Uses caching to avoid recalculating when boxes haven't moved.
+   * Cache staleness is checked via numeric field comparison (no allocations per frame).
    * @returns {Object|null} Object with {start, end} points, or null if invalid
    * @private
    */
   _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
 
-    // Return cached result if neither box has moved or resized
-    const fromKey = this._boxKey(this.fromBox);
-    const toKey = this._boxKey(this.toBox);
-    if (this._cachedEndpoints &&
-        fromKey === this._cachedFromKey &&
-        toKey === this._cachedToKey) {
+    // Return cached result if neither box has moved or resized (zero-allocation check)
+    if (this._cacheValid &&
+        this._cachedFromGeom[0] === this.fromBox.x &&
+        this._cachedFromGeom[1] === this.fromBox.y &&
+        this._cachedFromGeom[2] === this.fromBox.width &&
+        this._cachedFromGeom[3] === this.fromBox.height &&
+        this._cachedToGeom[0]   === this.toBox.x &&
+        this._cachedToGeom[1]   === this.toBox.y &&
+        this._cachedToGeom[2]   === this.toBox.width &&
+        this._cachedToGeom[3]   === this.toBox.height) {
       return this._cachedEndpoints;
     }
 
@@ -98,10 +96,17 @@ class Connection {
       return null;
     }
 
-    // Update cache
+    // Update cache – snapshot current geometry into the pre-allocated typed arrays
     this._cachedEndpoints = { start, end };
-    this._cachedFromKey = fromKey;
-    this._cachedToKey = toKey;
+    this._cachedFromGeom[0] = this.fromBox.x;
+    this._cachedFromGeom[1] = this.fromBox.y;
+    this._cachedFromGeom[2] = this.fromBox.width;
+    this._cachedFromGeom[3] = this.fromBox.height;
+    this._cachedToGeom[0]   = this.toBox.x;
+    this._cachedToGeom[1]   = this.toBox.y;
+    this._cachedToGeom[2]   = this.toBox.width;
+    this._cachedToGeom[3]   = this.toBox.height;
+    this._cacheValid = true;
 
     return this._cachedEndpoints;
   }
