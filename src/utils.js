@@ -157,9 +157,9 @@ function safePositiveNumber(value, defaultValue = 1) {
  * @returns {number} Clamped value
  */
 function clamp(value, min, max) {
-  if (!isValidNumber(value)) return min;
   if (!isValidNumber(min)) min = -Infinity;
   if (!isValidNumber(max)) max = Infinity;
+  if (!isValidNumber(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
 

@@ -47,16 +47,13 @@ class Connection {
     this.arrowSize = Connection.ARROW_SIZE;
     this.selected = false;
 
-    // Cache for connection endpoints
+    // Cache for connection endpoints; invalidated whenever either box moves or resizes.
+    // Stored as two Float64Arrays [x, y, width, height] – one per box – so that
+    // staleness detection is a pure numeric comparison with zero allocations per frame.
     this._cachedEndpoints = null;
-    this._lastFromBoxX = null;
-    this._lastFromBoxY = null;
-    this._lastFromBoxWidth = null;
-    this._lastFromBoxHeight = null;
-    this._lastToBoxX = null;
-    this._lastToBoxY = null;
-    this._lastToBoxWidth = null;
-    this._lastToBoxHeight = null;
+    this._cachedFromGeom = new Float64Array(4); // [x, y, width, height]
+    this._cachedToGeom   = new Float64Array(4); // [x, y, width, height]
+    this._cacheValid = false;
   }
 
   // ============================================================================
@@ -68,41 +65,24 @@ class Connection {
    * Calculates where the connection line should start and end based on
    * the positions of the two boxes.
    * Uses caching to avoid recalculating when boxes haven't moved.
+   * Cache staleness is checked via numeric field comparison (no allocations per frame).
    * @returns {Object|null} Object with {start, end} points, or null if invalid
    * @private
    */
   _getConnectionEndpoints() {
     if (!this.fromBox || !this.toBox) return null;
 
-    // Check if cache is valid (boxes haven't moved or resized)
-    // Cache is valid only if:
-    // 1. Cached endpoints exist
-    // 2. All tracking has been initialized (not first call)
-    // 3. Boxes haven't moved or changed size since last cache
-    const hasValidCache = this._cachedEndpoints !== null &&
-      this._lastFromBoxX !== null &&
-      this._lastFromBoxY !== null &&
-      this._lastFromBoxWidth !== null &&
-      this._lastFromBoxHeight !== null &&
-      this._lastToBoxX !== null &&
-      this._lastToBoxY !== null &&
-      this._lastToBoxWidth !== null &&
-      this._lastToBoxHeight !== null;
-
-    if (hasValidCache) {
-      const fromChanged = this._lastFromBoxX !== this.fromBox.x ||
-        this._lastFromBoxY !== this.fromBox.y ||
-        this._lastFromBoxWidth !== this.fromBox.width ||
-        this._lastFromBoxHeight !== this.fromBox.height;
-      const toChanged = this._lastToBoxX !== this.toBox.x ||
-        this._lastToBoxY !== this.toBox.y ||
-        this._lastToBoxWidth !== this.toBox.width ||
-        this._lastToBoxHeight !== this.toBox.height;
-
-      // Return cached result if boxes haven't changed
-      if (!fromChanged && !toChanged) {
-        return this._cachedEndpoints;
-      }
+    // Return cached result if neither box has moved or resized (zero-allocation check)
+    if (this._cacheValid &&
+        this._cachedFromGeom[0] === this.fromBox.x &&
+        this._cachedFromGeom[1] === this.fromBox.y &&
+        this._cachedFromGeom[2] === this.fromBox.width &&
+        this._cachedFromGeom[3] === this.fromBox.height &&
+        this._cachedToGeom[0]   === this.toBox.x &&
+        this._cachedToGeom[1]   === this.toBox.y &&
+        this._cachedToGeom[2]   === this.toBox.width &&
+        this._cachedToGeom[3]   === this.toBox.height) {
+      return this._cachedEndpoints;
     }
 
     // Recalculate endpoints
@@ -116,16 +96,17 @@ class Connection {
       return null;
     }
 
-    // Update cache with position and size
+    // Update cache – snapshot current geometry into the pre-allocated typed arrays
     this._cachedEndpoints = { start, end };
-    this._lastFromBoxX = this.fromBox.x;
-    this._lastFromBoxY = this.fromBox.y;
-    this._lastFromBoxWidth = this.fromBox.width;
-    this._lastFromBoxHeight = this.fromBox.height;
-    this._lastToBoxX = this.toBox.x;
-    this._lastToBoxY = this.toBox.y;
-    this._lastToBoxWidth = this.toBox.width;
-    this._lastToBoxHeight = this.toBox.height;
+    this._cachedFromGeom[0] = this.fromBox.x;
+    this._cachedFromGeom[1] = this.fromBox.y;
+    this._cachedFromGeom[2] = this.fromBox.width;
+    this._cachedFromGeom[3] = this.fromBox.height;
+    this._cachedToGeom[0]   = this.toBox.x;
+    this._cachedToGeom[1]   = this.toBox.y;
+    this._cachedToGeom[2]   = this.toBox.width;
+    this._cachedToGeom[3]   = this.toBox.height;
+    this._cacheValid = true;
 
     return this._cachedEndpoints;
   }
@@ -148,7 +129,7 @@ class Connection {
     const segmentLength = Math.sqrt(dx * dx + dy * dy);
 
     // Calculate angle (returned for reuse in draw())
-    const angle = atan2(dy, dx);
+    const angle = Math.atan2(dy, dx);
     if (!Utils.isValidNumber(angle)) return null;
 
     // If segment is too short, don't shorten (prevents line flipping)
@@ -157,8 +138,8 @@ class Connection {
     }
 
     const shortenedEnd = {
-      x: end.x - this.arrowSize * cos(angle),
-      y: end.y - this.arrowSize * sin(angle)
+      x: end.x - this.arrowSize * Math.cos(angle),
+      y: end.y - this.arrowSize * Math.sin(angle)
     };
 
     return { start, shortenedEnd, angle };
