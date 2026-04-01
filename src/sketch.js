@@ -272,20 +272,33 @@ window.ExtensionBridge = {
 // Fallback key-repeat for Backspace/Delete to ensure repeat works even if
 // the browser/OS doesn't auto-repeat these keys
 
+/**
+ * Resolves a p5.js key-code constant by name, falling back to the standard
+ * browser key code when the p5 global is not yet defined at load time.
+ * p5.js injects constants (BACKSPACE, etc.) onto the global object; in browsers
+ * this is `window`, in Node.js/Jest environments it is `global` — both of which
+ * are accessible via `globalThis`.
+ * @param {string} name - Global constant name (e.g. 'BACKSPACE')
+ * @param {number} fallback - Standard key code (e.g. 8)
+ * @returns {number} Resolved key code
+ */
+function resolveKeyCode(name, fallback) {
+  return (typeof globalThis[name] !== 'undefined') ? globalThis[name] : fallback;
+}
+
 const KeyRepeat = {
   // Handle deletion keys and arrow keys (arrow repeats are limited to text-editing mode).
   // Don't rely on p5's keyCode constants being pre-defined at load time.
   isTracked(code) {
-    const BK = (typeof BACKSPACE !== 'undefined') ? BACKSPACE : 8;
-    const DEL = (typeof DELETE !== 'undefined') ? DELETE : 46;
-    return code === BK || code === DEL || this._isArrowKey(code);
+    return code === resolveKeyCode('BACKSPACE', 8) ||
+           code === resolveKeyCode('DELETE', 46) ||
+           this._isArrowKey(code);
   },
   _isArrowKey(code) {
-    const LA = (typeof LEFT_ARROW !== 'undefined') ? LEFT_ARROW : 37;
-    const UA = (typeof UP_ARROW !== 'undefined') ? UP_ARROW : 38;
-    const RA = (typeof RIGHT_ARROW !== 'undefined') ? RIGHT_ARROW : 39;
-    const DA = (typeof DOWN_ARROW !== 'undefined') ? DOWN_ARROW : 40;
-    return code === LA || code === UA || code === RA || code === DA;
+    return code === resolveKeyCode('LEFT_ARROW', 37) ||
+           code === resolveKeyCode('UP_ARROW', 38) ||
+           code === resolveKeyCode('RIGHT_ARROW', 39) ||
+           code === resolveKeyCode('DOWN_ARROW', 40);
   },
   initialDelay: 400, // ms before repeating starts (match typical OS behavior)
   repeatInterval: 50, // ms between repeats
@@ -383,10 +396,6 @@ const KeyRepeat = {
 // Transform: screen = world * zoom + cam
 // Inverse: world = (screen - cam) / zoom
 
-/**
- * Converts mouse X position from screen space to world space
- * @returns {number} World X coordinate
- */
 /**
  * Converts mouse X position from screen space to world space
  * @returns {number} World X coordinate

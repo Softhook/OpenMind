@@ -167,9 +167,6 @@ class CollaborationManager {
         this.connectionStartTime = null;
         this.lastSyncAttemptTime = null;
         this.syncAttemptCount = 0;
-
-        // Flag to trigger resetView once after first receiving remote boxes
-        this.hasTriggeredInitialZoom = false;
     }
 
     // ============================================================================
