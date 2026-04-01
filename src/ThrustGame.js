@@ -164,7 +164,9 @@ class ThrustGame {
 
     this.lastMovementTime = Date.now();
     this.isIdle = false;
+    this.lastBroadcast = 0;
     this.lastBroadcastState = null;
+    this.multiplayerInitialized = false;
     this.remotePlayerStateTimestamps = new Map();
     this.remoteClockOffsets = new Map();
     this.damagedBoxIds = new Set();
@@ -223,7 +225,10 @@ class ThrustGame {
 
     if (this.mindMap && this.mindMap.boxes) {
       for (const box of this.mindMap.boxes) {
-        if (box && box.health !== undefined && box.health < 5) this.damagedBoxIds.add(box.id);
+        if (box) {
+          delete box.wasExploded; // Reset explosion flag for new session
+          if (box.health !== undefined && box.health < 5) this.damagedBoxIds.add(box.id);
+        }
       }
     }
 
@@ -291,14 +296,14 @@ class ThrustGame {
 
     if (this.player.alive) {
       const wasGrounded = this.player.grounded;
-    this.player.updatePhysics(this.keys, this.mindMap);
-    
-    // Play landing sound on touchdown
-    if (!wasGrounded && this.player.grounded) {
-      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding();
-    } else if (this.player.justBounced) {
-      if (typeof ThrustAudio !== 'undefined') ThrustAudio.playBounce();
-    }
+      this.player.updatePhysics(this.keys, this.mindMap);
+
+      // Play landing sound on touchdown
+      if (!wasGrounded && this.player.grounded) {
+        if (typeof ThrustAudio !== 'undefined') ThrustAudio.playLanding();
+      } else if (this.player.justBounced) {
+        if (typeof ThrustAudio !== 'undefined') ThrustAudio.playBounce();
+      }
       if (typeof CameraUtils !== 'undefined' && typeof width !== 'undefined' && !CameraUtils.isPanning) {
         CameraUtils.centerOn(this.player.x, this.player.y, width, height);
       }
@@ -356,11 +361,11 @@ class ThrustGame {
         if (now - box.lastHitTime >= ThrustConstants.HEALTH.RECOVERY_DELAY) {
           box.health++;
           box.lastHitTime = now - (ThrustConstants.HEALTH.RECOVERY_DELAY - ThrustConstants.HEALTH.RECOVERY_RATE);
-          if (box.health >= 5) { delete box.health; delete box.lastHitTime; recovered.push(id); }
+          if (box.health >= 5) { delete box.health; delete box.lastHitTime; delete box.wasExploded; recovered.push(id); }
           if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) MindMap.onBoxChange(box, false, null);
         }
       } else {
-        if (box.health !== undefined) { delete box.health; delete box.lastHitTime; }
+        if (box.health !== undefined) { delete box.health; delete box.lastHitTime; delete box.wasExploded; }
         recovered.push(id);
       }
     }
@@ -696,14 +701,14 @@ class ThrustGame {
         if (!box || box.isDeleted || (box.health !== undefined && box.health <= 0)) { recovered.push(id); continue; }
         if (box.health === undefined || box.health >= 5) {
           if (box.health !== undefined) { 
-            delete box.health; delete box.lastHitTime; 
+            delete box.health; delete box.lastHitTime; delete box.wasExploded;
             if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) MindMap.onBoxChange(box, false, null); 
           }
           recovered.push(id); continue;
         }
         if (box.health > 0 && box.lastHitTime > 0 && now - box.lastHitTime >= ThrustConstants.HEALTH.RECOVERY_DELAY) {
           box.health++; box.lastHitTime = now - (ThrustConstants.HEALTH.RECOVERY_DELAY - ThrustConstants.HEALTH.RECOVERY_RATE);
-          if (box.health >= 5) { delete box.health; delete box.lastHitTime; }
+          if (box.health >= 5) { delete box.health; delete box.lastHitTime; delete box.wasExploded; }
           if (typeof MindMap !== 'undefined' && MindMap.onBoxChange) MindMap.onBoxChange(box, false, null);
           if (box.health >= 5 || box.health === undefined) recovered.push(id);
         }

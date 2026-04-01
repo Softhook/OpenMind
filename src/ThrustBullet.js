@@ -22,17 +22,20 @@ class ThrustBullet {
    * Updates bullet physics
    */
   update() {
-    this.x += this.vx;
-    this.y += this.vy;
     this.lifetime--;
 
-    // Linear interpolation for remote bullets
-    const lerpFactor = 0.2;
     if (this.clientId) {
+      // Remote bullet: advance the prediction target then lerp towards it.
+      // Do NOT also apply velocity directly — that would move the bullet twice.
+      const lerpFactor = 0.2;
       this.targetX += this.vx;
       this.targetY += this.vy;
       this.x += (this.targetX - this.x) * lerpFactor;
       this.y += (this.targetY - this.y) * lerpFactor;
+    } else {
+      // Local bullet: direct velocity integration.
+      this.x += this.vx;
+      this.y += this.vy;
     }
   }
 
