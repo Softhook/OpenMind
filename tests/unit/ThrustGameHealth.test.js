@@ -941,4 +941,63 @@ describe('ThrustGame Health and Healing', () => {
             game = game2; // let afterEach not fail
         });
     });
+
+    // =========================================================================
+    // wasExploded FLAG LIFECYCLE
+    // =========================================================================
+
+    describe('wasExploded flag lifecycle', () => {
+        test('wasExploded is cleared on session start so re-entry triggers explosion', () => {
+            // Simulate first session: bullet kills the box
+            box.wasExploded = true;
+
+            // End session and start a new one
+            game.stop();
+            const game2 = new ThrustGame(null, mockMindMap);
+            game2.start();
+
+            expect(box.wasExploded).toBeUndefined();
+
+            game2.stop();
+            game = game2; // let afterEach clean up
+        });
+
+        test('wasExploded is cleared when box fully heals via updateHealthRecovery', () => {
+            box.health = 4;
+            box.lastHitTime = Date.now();
+            box.wasExploded = true;
+            game.damagedBoxIds.add(box.id);
+
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
+            game.updateHealthRecovery();
+
+            expect(box.health).toBeUndefined();
+            expect(box.wasExploded).toBeUndefined();
+        });
+
+        test('wasExploded is cleared when box fully heals via post-session healing loop', () => {
+            box.health = 4;
+            box.lastHitTime = Date.now();
+            box.wasExploded = true;
+            game.damagedBoxIds.add(box.id);
+            game.stop();
+
+            jest.advanceTimersByTime(ThrustConstants.HEALTH.RECOVERY_DELAY + 1000);
+
+            expect(box.wasExploded).toBeUndefined();
+        });
+
+        test('applyBulletForceToBox triggers explosion again after wasExploded cleared', () => {
+            // Simulate box destroyed, wasExploded set, then cleared for new session
+            box.wasExploded = undefined;
+            box.health = 1;
+
+            const explosionsBefore = game.explosions.length;
+            const bullet = { x: 100, y: 100, vx: 5, vy: 0 };
+            game.applyBulletForceToBox(box, bullet);
+
+            expect(game.explosions.length).toBeGreaterThan(explosionsBefore);
+            expect(box.wasExploded).toBe(true);
+        });
+    });
 });
