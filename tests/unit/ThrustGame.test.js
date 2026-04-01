@@ -393,8 +393,8 @@ describe('ThrustBullet Remote vs Local Movement', () => {
   });
 
   test('remote bullet does NOT apply velocity directly — only lerps to target', () => {
-    // Place bullet at origin, target well ahead
-    const b = new ThrustBullet({ x: 0, y: 0, vx: 10, vy: 0, clientId: 'remote-1' });
+    // clientId is numeric, matching Yjs Awareness clientId in production
+    const b = new ThrustBullet({ x: 0, y: 0, vx: 10, vy: 0, clientId: 42 });
     b.targetX = 50; // far ahead
     b.targetY = 0;
 
@@ -408,13 +408,25 @@ describe('ThrustBullet Remote vs Local Movement', () => {
   });
 
   test('remote bullet target advances by velocity each frame (dead-reckoning)', () => {
-    const b = new ThrustBullet({ x: 0, y: 0, vx: 5, vy: 2, clientId: 'remote-1' });
+    const b = new ThrustBullet({ x: 0, y: 0, vx: 5, vy: 2, clientId: 42 });
     b.targetX = 10;
     b.targetY = 4;
     b.update();
     // targetX should advance from 10 to 15, targetY from 4 to 6
     expect(b.targetX).toBeCloseTo(15);
     expect(b.targetY).toBeCloseTo(6);
+  });
+
+  test('clientId of 0 is treated as remote (numeric boundary)', () => {
+    // Yjs clientId can be 0; must not fall through to local bullet path
+    const b = new ThrustBullet({ x: 0, y: 0, vx: 10, vy: 0, clientId: 0 });
+    b.targetX = 50;
+    b.targetY = 0;
+
+    b.update(); // targetX → 60, lerp → x = 12
+
+    expect(b.x).toBeCloseTo(12);
+    expect(b.x).not.toBeCloseTo(22); // would be 22 if misclassified as local
   });
 
   test('local bullet lifetime decrements each frame', () => {
@@ -424,7 +436,7 @@ describe('ThrustBullet Remote vs Local Movement', () => {
   });
 
   test('remote bullet lifetime decrements each frame', () => {
-    const b = new ThrustBullet({ x: 0, y: 0, vx: 1, vy: 0, lifetime: 10, clientId: 'remote-1' });
+    const b = new ThrustBullet({ x: 0, y: 0, vx: 1, vy: 0, lifetime: 10, clientId: 42 });
     b.update();
     expect(b.lifetime).toBe(9);
   });

@@ -224,6 +224,7 @@ class ThrustGame {
     }
 
     if (this.mindMap && this.mindMap.boxes) {
+      this.damagedBoxIds.clear(); // Rebuild from authoritative box state
       for (const box of this.mindMap.boxes) {
         if (box) {
           delete box.wasExploded; // Reset explosion flag for new session

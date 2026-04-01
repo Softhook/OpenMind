@@ -10,7 +10,7 @@ class ThrustBullet {
     this.vx = options.vx || 0;
     this.vy = options.vy || 0;
     this.lifetime = options.lifetime || ThrustConstants.BULLET.LIFETIME;
-    this.clientId = options.clientId || null;
+    this.clientId = options.clientId ?? null;
     this.scored = false;
 
     // Interpolation targets for remote bullets
@@ -24,7 +24,7 @@ class ThrustBullet {
   update() {
     this.lifetime--;
 
-    if (this.clientId) {
+    if (this.clientId != null) {
       // Remote bullet: advance the prediction target then lerp towards it.
       // Do NOT also apply velocity directly — that would move the bullet twice.
       const lerpFactor = 0.2;
