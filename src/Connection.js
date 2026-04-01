@@ -22,11 +22,8 @@ class Connection {
   static STROKE_WEIGHT_NORMAL = 2;     // Line thickness when not selected
   static STROKE_WEIGHT_SELECTED = 3;   // Line thickness when selected
 
-  // Color constants - using centralized ColorPalette
-  static COLORS = {
-    NORMAL: ColorPalette.CONNECTION.NORMAL,
-    SELECTED: ColorPalette.CONNECTION.SELECTED
-  };
+  // Color constants - delegate directly to the centralized ColorPalette
+  static COLORS = ColorPalette.CONNECTION;
 
   // ============================================================================
   // CONSTRUCTOR

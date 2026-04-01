@@ -440,7 +440,21 @@ class ExportManager {
   }
 
   /**
-   * Check whether a character index falls inside any of the given ranges.
+   * Normalizes an alpha value (0–255 or 0–1) to the 0–1 range used by PDF rendering.
+   * Values > 1 are assumed to be in 0–255 range and are scaled down; values already
+   * in 0–1 are clamped. Falls back to `defaultAlpha` when the input is not a number.
+   * @param {number|undefined} alpha - Raw alpha value
+   * @param {number} [defaultAlpha=1] - Default to use when alpha is not a finite number
+   * @returns {number} Normalized alpha in [0, 1]
+   * @private
+   */
+  _normalizeAlpha(alpha, defaultAlpha = 1) {
+    if (typeof alpha !== 'number' || !isFinite(alpha)) return defaultAlpha;
+    const normalized = alpha > 1 ? alpha / 255 : alpha;
+    return Math.max(0, Math.min(1, normalized));
+  }
+
+  /**
    * Mirrors TextBox._isIndexInRanges().
    *
    * @param {Array} ranges - Array of {start, end} range objects
@@ -594,7 +608,7 @@ class ExportManager {
       // Default ~180/255 ≈ 70% opacity matches the in-app semi-transparent highlight look.
       const DEFAULT_HIGHLIGHT_ALPHA = 180;
       const rawAlpha = (c && typeof c.a === 'number') ? c.a : DEFAULT_HIGHLIGHT_ALPHA;
-      const alpha = Math.max(0, Math.min(1, rawAlpha > 1 ? rawAlpha / 255 : rawAlpha));
+      const alpha = this._normalizeAlpha(rawAlpha, DEFAULT_HIGHLIGHT_ALPHA / 255);
       const blendToWhite = ch => Math.round(255 * (1 - alpha) + ch * alpha);
       pdf.setFillColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
 
@@ -731,7 +745,7 @@ class ExportManager {
             const c = cluster.color;
             // PDF doesn't support true alpha; blend toward white to approximate
             // the semi-transparent fill used in the live canvas.
-            const alpha = (typeof c.a === 'number') ? Math.max(0, Math.min(1, c.a / 255)) : 0.31;
+            const alpha = this._normalizeAlpha(c.a, 0.31);
             const blendToWhite = ch => Math.round(255 * (1 - alpha) + ch * alpha);
             pdf.setFillColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));
             pdf.setDrawColor(blendToWhite(c.r), blendToWhite(c.g), blendToWhite(c.b));

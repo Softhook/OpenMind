@@ -180,10 +180,10 @@ class ColorPalette {
     if (typeof color === 'string') return color;
     if (!color) return 'rgba(0, 0, 0, 1)';
 
-    const r = color.r !== undefined ? color.r : 0;
-    const g = color.g !== undefined ? color.g : 0;
-    const b = color.b !== undefined ? color.b : 0;
-    const a = color.a !== undefined ? color.a / 255 : 1;
+    const r = color.r ?? 0;
+    const g = color.g ?? 0;
+    const b = color.b ?? 0;
+    const a = color.a != null ? color.a / 255 : 1;
 
     return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
