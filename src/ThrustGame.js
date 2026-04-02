@@ -76,6 +76,24 @@ class ThrustGame {
             break;
           }
         }
+
+        // When the last remote thrust player exits or disconnects, this client
+        // must take over responsibility for healing any damaged boxes. Without
+        // this, boxes damaged by the departing player would stay damaged forever
+        // on all remaining clients' screens.
+        if (!foundRemote && ThrustGame.hasRemotePlayers && !(ThrustGame.instance?.active)) {
+          const mindMap = ThrustGame.instance?.mindMap;
+          if (mindMap && mindMap.boxes) {
+            const damagedIds = new Set();
+            for (const box of mindMap.boxes) {
+              if (box && box.health !== undefined && box.health < 5) damagedIds.add(box.id);
+            }
+            if (damagedIds.size > 0) {
+              ThrustGame._startHealingLoop(mindMap, damagedIds);
+            }
+          }
+        }
+
         ThrustGame.hasRemotePlayers = foundRemote;
 
         if (foundRemote && window.ExtensionBridge && !window.ExtensionBridge.draw) {
