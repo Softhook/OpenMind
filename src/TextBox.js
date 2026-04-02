@@ -566,20 +566,52 @@ class TextBox {
    * @param {string} text - Text to wrap
    * @returns {Array<string>} Array of wrapped text lines
    */
+  _pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, lineText, lineOffset) {
+    if (!lineText) return;
+    wrappedLines.push(lineText);
+    lineCharMap.push(lineStartPos + lineOffset);
+  }
+
+  _appendWrappedSpaces(currentLine, currentLineStartOffset, spaces, nextSpaceOffset, wrapContext) {
+    let line = currentLine;
+    let lineStartOffset = currentLineStartOffset;
+    let consumedSpaces = 0;
+
+    while (consumedSpaces < spaces.length) {
+      if (textWidth(line + ' ') <= wrapContext.maxTextWidth) {
+        if (!line) {
+          lineStartOffset = nextSpaceOffset + consumedSpaces;
+        }
+        line += ' ';
+        consumedSpaces++;
+        continue;
+      }
+
+      if (!line) {
+        line = ' ';
+        lineStartOffset = nextSpaceOffset + consumedSpaces;
+        consumedSpaces++;
+        continue;
+      }
+
+      this._pushWrappedLine(wrapContext.wrappedLines, wrapContext.lineCharMap, wrapContext.lineStartPos, line, lineStartOffset);
+      line = '';
+    }
+
+    return { line, lineStartOffset };
+  }
+
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
 
-    // Use cache if width and text haven't changed
-    // Text reference check works because:
-    // 1. JavaScript string concatenation creates new string objects
-    // 2. All text mutation methods (addChar, removeChar, etc.) use concatenation
-    // 3. updateDimensions() invalidates cache when called directly
-    // 4. Direct assignment (box.text = ...) should be followed by updateDimensions()
+    // Use cache when the requested input text value and effective width match.
+    // This keeps wrapText(text) safe for callers that pass alternate text instead
+    // of always wrapping this.text.
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines &&
       this.cachedWidth === currentWidth &&
-      this.cachedText === this.text) {
+      this.cachedText === text) {
       return this.cachedWrappedLines;
     }
 
@@ -710,20 +742,15 @@ class TextBox {
             let lastWord = wordPositions[wordPositions.length - 1];
             let lastWordEnd = lastWord.start + lastWord.word.length;
             if (lastWordEnd < line.length) {
-              // There are trailing spaces - add them one by one, checking if we overflow
-              let trailingSpaces = line.substring(lastWordEnd);
-              for (let i = 0; i < trailingSpaces.length; i++) {
-                let testLine = currentLine + ' ';
-                if (textWidth(testLine) <= maxTextWidth) {
-                  currentLine = testLine;
-                } else {
-                  // Line is full, push it and start a new line with remaining spaces
-                  wrappedLines.push(currentLine);
-                  lineCharMap.push(lineStartPos + currentLineStartPos);
-                  currentLine = trailingSpaces.substring(i);
-                  currentLineStartPos = lastWordEnd + i;
-                }
-              }
+              const trailingWrap = this._appendWrappedSpaces(
+                currentLine,
+                currentLineStartPos,
+                line.substring(lastWordEnd),
+                lastWordEnd,
+                { maxTextWidth, wrappedLines, lineCharMap, lineStartPos }
+              );
+              currentLine = trailingWrap.line;
+              currentLineStartPos = trailingWrap.lineStartOffset;
             }
           }
         } else if (line.length > 0) {
@@ -749,10 +776,7 @@ class TextBox {
         }
 
         // Push the last line of this paragraph
-        if (currentLine) {
-          wrappedLines.push(currentLine);
-          lineCharMap.push(lineStartPos + currentLineStartPos);
-        }
+        this._pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, currentLine, currentLineStartPos);
 
         // Move to next logical line (past newline if not last logical line)
         if (lineIdx < lines.length - 1) {
@@ -772,7 +796,7 @@ class TextBox {
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
     this.cachedLineCharMap = lineCharMap;
-    this.cachedText = this.text;
+    this.cachedText = text;
     return result;
   }
 
