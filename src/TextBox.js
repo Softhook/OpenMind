@@ -572,13 +572,13 @@ class TextBox {
     lineCharMap.push(lineStartPos + lineOffset);
   }
 
-  _appendWrappedSpaces(currentLine, currentLineStartPos, spaces, nextSpaceOffset, maxTextWidth, wrappedLines, lineCharMap, lineStartPos) {
+  _appendWrappedSpaces(currentLine, currentLineStartPos, spaces, nextSpaceOffset, wrapContext) {
     let line = currentLine;
     let lineOffset = currentLineStartPos;
     let consumedSpaces = 0;
 
     while (consumedSpaces < spaces.length) {
-      if (textWidth(line + ' ') <= maxTextWidth) {
+      if (textWidth(line + ' ') <= wrapContext.maxTextWidth) {
         if (!line) {
           lineOffset = nextSpaceOffset + consumedSpaces;
         }
@@ -587,7 +587,14 @@ class TextBox {
         continue;
       }
 
-      this._pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, line, lineOffset);
+      if (!line) {
+        line = ' ';
+        lineOffset = nextSpaceOffset + consumedSpaces;
+        consumedSpaces++;
+        continue;
+      }
+
+      this._pushWrappedLine(wrapContext.wrappedLines, wrapContext.lineCharMap, wrapContext.lineStartPos, line, lineOffset);
       line = '';
     }
 
@@ -743,10 +750,7 @@ class TextBox {
                 currentLineStartPos,
                 line.substring(lastWordEnd),
                 lastWordEnd,
-                maxTextWidth,
-                wrappedLines,
-                lineCharMap,
-                lineStartPos
+                { maxTextWidth, wrappedLines, lineCharMap, lineStartPos }
               );
               currentLine = trailingWrap.line;
               currentLineStartPos = trailingWrap.lineOffset;
