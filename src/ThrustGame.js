@@ -198,28 +198,65 @@ class ThrustGame {
     }
   }
 
+  /**
+   * Returns the "main box": the top-left-most important box across all mind-map boxes.
+   * Importance follows the same colour priority used by arrow-key navigation:
+   *   RED (1) > ORANGE (2) > everything else (999).
+   * Among boxes that share the highest priority, the top-most (smallest y) and
+   * then left-most (smallest x) box wins – matching the tie-break in navigateBoxes().
+   */
+  getMainBox() {
+    if (!this.mindMap || !this.mindMap.boxes || this.mindMap.boxes.length === 0) return null;
+
+    // Delegate to MindMap.getBoxColorPriority when available so colour rules
+    // stay in sync; fall back to an inline copy for plain test objects that
+    // don't expose that method.
+    const getColorPriority = (box) => {
+      if (typeof this.mindMap.getBoxColorPriority === 'function') {
+        return this.mindMap.getBoxColorPriority(box);
+      }
+      if (!box || !box.backgroundColor) return 999;
+      const { r, g, b } = box.backgroundColor;
+      if (r === 255 && g === 140 && b === 140) return 1; // Red
+      if (r === 255 && g === 200 && b === 140) return 2; // Orange
+      return 999;
+    };
+
+    let mainBox = null;
+    let bestPriority = Infinity;
+    // Pixel tolerance for treating two boxes as being at the same y level,
+    // matching the tie-break threshold used in MindMap.navigateBoxes().
+    const Y_TOLERANCE = 10;
+
+    for (const box of this.mindMap.boxes) {
+      if (!box || box.x == null || box.y == null) continue;
+      const priority = getColorPriority(box);
+
+      if (mainBox === null) {
+        mainBox = box;
+        bestPriority = priority;
+      } else if (priority < bestPriority) {
+        mainBox = box;
+        bestPriority = priority;
+      } else if (priority === bestPriority) {
+        const yDiff = box.y - mainBox.y;
+        if (yDiff < -Y_TOLERANCE || (Math.abs(yDiff) <= Y_TOLERANCE && box.x < mainBox.x)) {
+          mainBox = box;
+        }
+      }
+    }
+
+    return mainBox;
+  }
+
   createPlayer() {
     let spawnX = 300, spawnY = 200;
-    if (this.mindMap && this.mindMap.boxes && this.mindMap.boxes.length > 0) {
-      let sumX = 0, sumY = 0, count = 0;
-      for (const box of this.mindMap.boxes) {
-        if (box && box.x != null && box.y != null) {
-          sumX += box.x; sumY += box.y; count++;
-        }
-      }
-      if (count > 0) {
-        const centerX = sumX / count, centerY = sumY / count;
-        const searchRadius = ThrustConstants.SPAWN.SEARCH_RADIUS;
-        const minDistance = ThrustConstants.SPAWN.MIN_DISTANCE_FROM_BOX;
-        for (let i = 0; i < ThrustConstants.SPAWN.MAX_ATTEMPTS; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const dist = searchRadius * (0.2 + Math.random() * 0.8);
-          const tx = centerX + Math.cos(angle) * dist, ty = centerY + Math.sin(angle) * dist;
-          if (ThrustUtils.isValidSpawnPosition(tx, ty, this.mindMap.boxes, minDistance)) {
-            spawnX = tx; spawnY = ty; break;
-          }
-        }
-      }
+
+    const mainBox = this.getMainBox();
+    if (mainBox) {
+      const boxHeight = mainBox.height ?? 90;
+      spawnX = mainBox.x;
+      spawnY = mainBox.y - boxHeight / 2 - ThrustConstants.PLAYER.SIZE;
     }
 
     return new ThrustShip({
