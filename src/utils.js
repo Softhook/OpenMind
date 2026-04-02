@@ -295,20 +295,6 @@ function screenY(worldY) {
   return worldY * z + cy;
 }
 
-/**
- * Converts world coordinates to screen coordinates.
- *
- * @param {number} worldX - X in world space
- * @param {number} worldY - Y in world space
- * @returns {{x: number, y: number}} Coordinates in screen space
- */
-function worldToScreen(worldX, worldY) {
-  return {
-    x: screenX(worldX),
-    y: screenY(worldY)
-  };
-}
-
 // ============================================================================
 // LOGGING UTILITIES
 // ============================================================================
@@ -625,6 +611,33 @@ function rectanglesOverlap(r1x1, r1y1, r1x2, r1y2, r2x1, r2y1, r2x2, r2y2) {
   return !(right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2);
 }
 
+// Helper: orientation of three points (used by segmentIntersectsRect)
+function _orient(ax, ay, bx, by, cx, cy) {
+  return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+}
+
+// Helper: check if two segments intersect (used by segmentIntersectsRect)
+function _segmentsIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+  const o1 = _orient(ax, ay, bx, by, cx, cy);
+  const o2 = _orient(ax, ay, bx, by, dx, dy);
+  const o3 = _orient(cx, cy, dx, dy, ax, ay);
+  const o4 = _orient(cx, cy, dx, dy, bx, by);
+
+  // Collinear overlap cases
+  if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) &&
+    Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
+    (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) &&
+      Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
+    (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) &&
+      Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
+    (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) &&
+      Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
+    return true;
+  }
+
+  return (o1 * o2 < 0) && (o3 * o4 < 0);
+}
+
 /**
  * Checks if a line segment intersects a rectangle
  * @param {number} x1 - Segment start X
@@ -660,38 +673,11 @@ function segmentIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
     return true;
   }
 
-  // Helper: orientation of three points
-  function orient(ax, ay, bx, by, cx, cy) {
-    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-  }
-
-  // Helper: check if two segments intersect
-  function segmentsIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
-    const o1 = orient(ax, ay, bx, by, cx, cy);
-    const o2 = orient(ax, ay, bx, by, dx, dy);
-    const o3 = orient(cx, cy, dx, dy, ax, ay);
-    const o4 = orient(cx, cy, dx, dy, bx, by);
-
-    // Collinear overlap cases
-    if ((o1 === 0 && Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) &&
-      Math.min(ay, by) <= cy && cy <= Math.max(ay, by)) ||
-      (o2 === 0 && Math.min(ax, bx) <= dx && dx <= Math.max(ax, bx) &&
-        Math.min(ay, by) <= dy && dy <= Math.max(ay, by)) ||
-      (o3 === 0 && Math.min(cx, dx) <= ax && ax <= Math.max(cx, dx) &&
-        Math.min(cy, dy) <= ay && ay <= Math.max(cy, dy)) ||
-      (o4 === 0 && Math.min(cx, dx) <= bx && bx <= Math.max(cx, dx) &&
-        Math.min(cy, dy) <= by && by <= Math.max(cy, dy))) {
-      return true;
-    }
-
-    return (o1 * o2 < 0) && (o3 * o4 < 0);
-  }
-
   // Check against rectangle edges
-  if (segmentsIntersect(x1, y1, x2, y2, minRx, minRy, minRx, maxRy)) return true; // left
-  if (segmentsIntersect(x1, y1, x2, y2, maxRx, minRy, maxRx, maxRy)) return true; // right
-  if (segmentsIntersect(x1, y1, x2, y2, minRx, minRy, maxRx, minRy)) return true; // top
-  if (segmentsIntersect(x1, y1, x2, y2, minRx, maxRy, maxRx, maxRy)) return true; // bottom
+  if (_segmentsIntersect(x1, y1, x2, y2, minRx, minRy, minRx, maxRy)) return true; // left
+  if (_segmentsIntersect(x1, y1, x2, y2, maxRx, minRy, maxRx, maxRy)) return true; // right
+  if (_segmentsIntersect(x1, y1, x2, y2, minRx, minRy, maxRx, minRy)) return true; // top
+  if (_segmentsIntersect(x1, y1, x2, y2, minRx, maxRy, maxRx, maxRy)) return true; // bottom
 
   return false;
 }
@@ -932,45 +918,6 @@ function showNotification(message, type = 'info', duration = 3000) {
 }
 
 // ============================================================================
-// ERROR HANDLING UTILITIES
-// ============================================================================
-
-/**
- * Safely executes a function with error handling
- * @param {Function} fn - Function to execute
- * @param {*} defaultValue - Default value if function throws
- * @param {string} context - Context string for error logging
- * @returns {*} Function result or default value
- */
-function safeExecute(fn, defaultValue = null, context = '') {
-  try {
-    return fn();
-  } catch (e) {
-    if (context) {
-      console.warn(`Error in ${context}:`, e);
-    }
-    return defaultValue;
-  }
-}
-
-/**
- * Wraps a function to catch and log errors
- * @param {Function} fn - Function to wrap
- * @param {string} context - Context string for error logging
- * @returns {Function} Wrapped function
- */
-function wrapWithErrorHandler(fn, context = '') {
-  return function (...args) {
-    try {
-      return fn.apply(this, args);
-    } catch (e) {
-      console.error(`Error in ${context}:`, e);
-      return undefined;
-    }
-  };
-}
-
-// ============================================================================
 // EXPORT (for module systems, or attach to window for browser)
 // ============================================================================
 
@@ -1003,7 +950,6 @@ if (typeof window !== 'undefined') {
     getMouseCoordinates,
     screenX,
     screenY,
-    worldToScreen,
 
     // Logging
     Logger,
@@ -1034,11 +980,7 @@ if (typeof window !== 'undefined') {
     generateUUID,
 
     // User notifications
-    showNotification,
-
-    // Error handling
-    safeExecute,
-    wrapWithErrorHandler
+    showNotification
   };
 
   // Also expose commonly used utilities via simpler aliases for backward compatibility
@@ -1067,7 +1009,6 @@ if (typeof module !== 'undefined' && module.exports) {
     getMouseCoordinates,
     screenX,
     screenY,
-    worldToScreen,
     Logger,
     applyStroke,
     applyFill,
@@ -1084,8 +1025,6 @@ if (typeof module !== 'undefined' && module.exports) {
     safeMap,
     deepClone,
     generateUUID,
-    showNotification,
-    safeExecute,
-    wrapWithErrorHandler
+    showNotification
   };
 }

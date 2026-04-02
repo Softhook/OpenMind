@@ -299,23 +299,8 @@ class Connection {
     const { start, shortenedEnd } = shortened;
 
     // Calculate distance from mouse to the shortened line segment
-    const distance = this.distanceToSegment(mx, my, start.x, start.y, shortenedEnd.x, shortenedEnd.y);
+    const distance = Utils.distanceToSegment(mx, my, start.x, start.y, shortenedEnd.x, shortenedEnd.y);
     return distance < Connection.HIT_THRESHOLD;
-  }
-
-  /**
-   * Calculates distance from a point to a line segment.
-   * Delegates to Utils for the actual calculation.
-   * @param {number} px - Point X
-   * @param {number} py - Point Y
-   * @param {number} x1 - Segment start X
-   * @param {number} y1 - Segment start Y
-   * @param {number} x2 - Segment end X
-   * @param {number} y2 - Segment end Y
-   * @returns {number} Distance in pixels
-   */
-  distanceToSegment(px, py, x1, y1, x2, y2) {
-    return Utils.distanceToSegment(px, py, x1, y1, x2, y2);
   }
 
   // ============================================================================

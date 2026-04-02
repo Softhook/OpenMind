@@ -158,12 +158,20 @@ class ExportManager {
 
         // Draw boxes
         if (this.mindMap.boxes) {
+          const hasTextBox = typeof TextBox !== 'undefined' && TextBox;
+          const TB_CORNER_RADIUS = (hasTextBox ? TextBox.CORNER_RADIUS : undefined) ?? 6;
+          const TB_FONT_SIZE = (hasTextBox ? TextBox.FONT_SIZE : undefined) ?? 14;
+          const TB_PADDING = (hasTextBox ? TextBox.PADDING : undefined) ?? 12;
+          const TB_LINE_HEIGHT_MULTIPLIER = (hasTextBox ? TextBox.LINE_HEIGHT_MULTIPLIER : undefined) ?? 1.5;
+          const TB_ITALIC_SHEAR_RADIANS = (hasTextBox ? TextBox.ITALIC_SHEAR_RADIANS : undefined) ?? -0.24;
+          const TB_BOLD_STROKE_WEIGHT = (hasTextBox ? TextBox.BOLD_STROKE_WEIGHT : undefined) ?? 0.8;
+
           this.mindMap.boxes.forEach(box => {
             if (!box) return;
 
             // Box background - use backgroundColor property
             const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
-            const cornerRadius = (typeof TextBox !== 'undefined' && TextBox.CORNER_RADIUS) || 6;
+            const cornerRadius = TB_CORNER_RADIUS;
             pg.fill(bgColor.r, bgColor.g, bgColor.b);
             pg.stroke(100);
             pg.strokeWeight(1); // matches TextBox.draw() strokeWeight(1 / zoomFactor) at normal zoom (zoomFactor = 1)
@@ -194,14 +202,11 @@ class ExportManager {
 
             // Draw text with wrapping, highlights, bold/italic (skip if image box)
             if (!box.imageUrl) {
-              const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
-              const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
-              const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
-              const italicShear = (typeof TextBox !== 'undefined' && TextBox.ITALIC_SHEAR_RADIANS) || -0.24;
-              const boldWeight = (typeof TextBox !== 'undefined' && TextBox.BOLD_STROKE_WEIGHT) || 0.8;
-              const fontSize = box.fontSize || defaultFontSize;
-              const padding = box.padding || defaultPadding;
-              const lineHeight = fontSize * lineHeightMult;
+              const fontSize = box.fontSize || TB_FONT_SIZE;
+              const padding = box.padding || TB_PADDING;
+              const lineHeight = fontSize * TB_LINE_HEIGHT_MULTIPLIER;
+              const italicShear = TB_ITALIC_SHEAR_RADIANS;
+              const boldWeight = TB_BOLD_STROKE_WEIGHT;
               const maxTextWidth = box.width - padding * 2;
               const { lines, charMap } = this.wrapTextForExport(pg, box.text || '', maxTextWidth, fontSize);
 
@@ -824,6 +829,12 @@ class ExportManager {
 
       // Draw boxes
       if (this.mindMap.boxes) {
+        const hasTextBox = typeof TextBox !== 'undefined' && TextBox;
+        const TB_CORNER_RADIUS = (hasTextBox ? TextBox.CORNER_RADIUS : undefined) ?? 6;
+        const TB_FONT_SIZE = (hasTextBox ? TextBox.FONT_SIZE : undefined) ?? 14;
+        const TB_PADDING = (hasTextBox ? TextBox.PADDING : undefined) ?? 12;
+        const TB_LINE_HEIGHT_MULTIPLIER = (hasTextBox ? TextBox.LINE_HEIGHT_MULTIPLIER : undefined) ?? 1.5;
+
         for (const box of this.mindMap.boxes) {
           if (!box) continue;
 
@@ -834,7 +845,7 @@ class ExportManager {
 
           // Box background - use backgroundColor property
           const bgColor = box.backgroundColor || { r: 255, g: 255, b: 255 };
-          const cornerRadius = (typeof TextBox !== 'undefined' && TextBox.CORNER_RADIUS) || 6;
+          const cornerRadius = TB_CORNER_RADIUS;
           pdf.setFillColor(bgColor.r, bgColor.g, bgColor.b);
           pdf.setDrawColor(100);
           pdf.setLineWidth(scale); // 1px at zoom=1, scaled proportionally
@@ -861,18 +872,15 @@ class ExportManager {
 
           // Text (skip if image box)
           if (!box.imageUrl) {
-            const defaultFontSize = (typeof TextBox !== 'undefined' && TextBox.FONT_SIZE) || 14;
-            const defaultPadding = (typeof TextBox !== 'undefined' && TextBox.PADDING) || 12;
-            const lineHeightMult = (typeof TextBox !== 'undefined' && TextBox.LINE_HEIGHT_MULTIPLIER) || 1.5;
-            const fontSize = box.fontSize || defaultFontSize;
-            const padding = box.padding || defaultPadding;
+            const fontSize = box.fontSize || TB_FONT_SIZE;
+            const padding = box.padding || TB_PADDING;
             // Wrap using p5.js metrics so lines match the box's actual dimensions
             const maxTextWidth = box.width - padding * 2;
             const { lines, charMap } = this.wrapTextForExport(
               measureGraphics, box.text || '', maxTextWidth, fontSize);
 
             const pdfFontSize = fontSize * scale;
-            const pdfLineHeight = fontSize * lineHeightMult * scale;
+            const pdfLineHeight = fontSize * TB_LINE_HEIGHT_MULTIPLIER * scale;
             const textX = bx + padding * scale;
             // y is the vertical center of each line (matches p5 textAlign CENTER)
             const startY = by + padding * scale + pdfLineHeight / 2;
