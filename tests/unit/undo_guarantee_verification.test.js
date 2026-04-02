@@ -84,7 +84,7 @@ describe('Undo Identity & Text Integrity behavioral tests', () => {
         expect(cm.textSyncTimers.has(box.id)).toBe(false); // Timer cleared
     });
 
-    test('should batch deferred flushes in a single transaction', (done) => {
+    test('should batch deferred flushes in a single transaction', async () => {
         const box1 = new TextBox(0, 0, 'Text 1');
         const box2 = new TextBox(100, 0, 'Text 2');
         mindMap.boxes.push(box1, box2);
@@ -114,15 +114,14 @@ describe('Undo Identity & Text Integrity behavioral tests', () => {
         cm.ydoc.transact(() => { cm.yboxes.set('dummy', { text: 'hi' }); }, cm.undoManager);
         cm._isPerformingUndoRedo = false;
 
-        // Final state check
-        setTimeout(() => {
-            try {
-                expect(cm.yboxes.get(box1.id).text).toBe('Updated 1');
-                expect(cm.yboxes.get(box2.id).text).toBe('Updated 2');
-                done();
-            } catch (e) {
-                done(e);
-            }
-        }, 50);
+        // The observer schedules deferred flushes via queueMicrotask (falls back to
+        // setTimeout(fn, 0)).  The first await flushes the queueMicrotask callback
+        // itself; the second flush handles any microtasks chained inside that
+        // callback (e.g., Yjs transaction promise continuations).
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(cm.yboxes.get(box1.id).text).toBe('Updated 1');
+        expect(cm.yboxes.get(box2.id).text).toBe('Updated 2');
     });
 });

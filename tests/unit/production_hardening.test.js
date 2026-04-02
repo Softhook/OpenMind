@@ -79,11 +79,6 @@ describe('Production Hardening behavioral tests', () => {
             expect(CollaborationManager.MAX_UNDO_STACK_SIZE).toBeGreaterThanOrEqual(50);
             expect(CollaborationManager.MAX_UNDO_STACK_SIZE).toBeLessThanOrEqual(500);
         });
-
-        test('UndoManager should be initialized with maxStackSize', () => {
-            // We verify that the constant is defined, which is used in the constructor
-            expect(CollaborationManager.MAX_UNDO_STACK_SIZE).toBeDefined();
-        });
     });
 
     describe('Stable User Identity', () => {
