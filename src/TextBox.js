@@ -572,15 +572,15 @@ class TextBox {
     lineCharMap.push(lineStartPos + lineOffset);
   }
 
-  _appendWrappedSpaces(currentLine, currentLineStartPos, spaces, nextSpaceOffset, wrapContext) {
+  _appendWrappedSpaces(currentLine, currentLineStartOffset, spaces, nextSpaceOffset, wrapContext) {
     let line = currentLine;
-    let lineOffset = currentLineStartPos;
+    let lineStartOffset = currentLineStartOffset;
     let consumedSpaces = 0;
 
     while (consumedSpaces < spaces.length) {
       if (textWidth(line + ' ') <= wrapContext.maxTextWidth) {
         if (!line) {
-          lineOffset = nextSpaceOffset + consumedSpaces;
+          lineStartOffset = nextSpaceOffset + consumedSpaces;
         }
         line += ' ';
         consumedSpaces++;
@@ -589,28 +589,25 @@ class TextBox {
 
       if (!line) {
         line = ' ';
-        lineOffset = nextSpaceOffset + consumedSpaces;
+        lineStartOffset = nextSpaceOffset + consumedSpaces;
         consumedSpaces++;
         continue;
       }
 
-      this._pushWrappedLine(wrapContext.wrappedLines, wrapContext.lineCharMap, wrapContext.lineStartPos, line, lineOffset);
+      this._pushWrappedLine(wrapContext.wrappedLines, wrapContext.lineCharMap, wrapContext.lineStartPos, line, lineStartOffset);
       line = '';
     }
 
-    return { line, lineOffset };
+    return { line, lineStartOffset };
   }
 
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
 
-    // Use cache if width and text haven't changed
-    // Text reference check works because:
-    // 1. JavaScript string concatenation creates new string objects
-    // 2. All text mutation methods (addChar, removeChar, etc.) use concatenation
-    // 3. updateDimensions() invalidates cache when called directly
-    // 4. Direct assignment (box.text = ...) should be followed by updateDimensions()
+    // Use cache when the requested input text value and effective width match.
+    // This keeps wrapText(text) safe for callers that pass alternate text instead
+    // of always wrapping this.text.
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines &&
       this.cachedWidth === currentWidth &&
@@ -753,7 +750,7 @@ class TextBox {
                 { maxTextWidth, wrappedLines, lineCharMap, lineStartPos }
               );
               currentLine = trailingWrap.line;
-              currentLineStartPos = trailingWrap.lineOffset;
+              currentLineStartPos = trailingWrap.lineStartOffset;
             }
           }
         } else if (line.length > 0) {
