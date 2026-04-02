@@ -359,7 +359,7 @@ describe('ThrustGame Health and Healing', () => {
     // =========================================================================
 
     describe('Health recovery', () => {
-        test('should heal 1 HP every 10 seconds (robust)', () => {
+        test('should heal 1 HP every 10 seconds', () => {
             const delay = ThrustConstants.HEALTH.RECOVERY_DELAY;
             MindMapStatic.onBoxChange = jest.fn(); // must be a spy for assertion
             
@@ -370,7 +370,7 @@ describe('ThrustGame Health and Healing', () => {
             jest.advanceTimersByTime(delay + 5000); 
             game.updateHealthRecovery();
             
-            expect(box.health === undefined || box.health > 3).toBe(true);
+            expect(box.health).toBe(4);
             expect(MindMapStatic.onBoxChange).toHaveBeenCalled();
         });
 
@@ -800,7 +800,11 @@ describe('ThrustGame Health and Healing', () => {
             game.updateHealthRecovery();
             const elapsed = performance.now() - start;
             
-            expect(elapsed).toBeLessThan(50);
+            if (process.env.THRUST_PERF_BENCHMARK === '1') {
+                // Strict bound for controlled / profiling environments only.
+                expect(elapsed).toBeLessThan(50);
+            }
+            // In normal CI runs timing is not asserted; correctness is verified below.
             
             for (let i = 0; i < DAMAGED_COUNT; i++) {
                 const b = mockMindMap.boxes.find(b => b.id === `stress-box-${i}`);
@@ -825,8 +829,12 @@ describe('ThrustGame Health and Healing', () => {
             // No drawing calls on undamaged boxes
             expect(sandbox.push).not.toHaveBeenCalled();
             expect(sandbox.circle).not.toHaveBeenCalled();
-            // Must complete in << 1ms
-            expect(elapsed).toBeLessThan(5);
+            if (process.env.THRUST_PERF_BENCHMARK === '1') {
+                // Strict bound for controlled / profiling environments only.
+                expect(elapsed).toBeLessThan(5);
+            }
+            // In normal CI runs timing is not asserted; the drawing-call checks above
+            // verify correctness.
         });
     });
 

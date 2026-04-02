@@ -122,7 +122,7 @@ describe('ThrustGame Collision Detection', () => {
       expect(ThrustUtils.pointInTriangle(point, triangle)).toBe(false);
     });
 
-    test('should return false for point on edge (boundary case)', () => {
+    test('should treat point on edge as inside triangle (boundary case)', () => {
       const triangle = [
         { x: 0, y: 0 },
         { x: 10, y: 0 },
@@ -130,9 +130,11 @@ describe('ThrustGame Collision Detection', () => {
       ];
       const point = { x: 5, y: 0 }; // On bottom edge
 
-      // Edge points might be slightly inside or outside due to floating point
+      // The barycentric implementation uses >= 0 for all coordinates,
+      // so edge points (where one barycentric coord is exactly 0) are inside.
+      // For these integer coordinates the computation is exact (no float error).
       const result = ThrustUtils.pointInTriangle(point, triangle);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
     });
   });
 
