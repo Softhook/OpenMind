@@ -208,7 +208,13 @@ class ThrustGame {
   getMainBox() {
     if (!this.mindMap || !this.mindMap.boxes || this.mindMap.boxes.length === 0) return null;
 
+    // Delegate to MindMap.getBoxColorPriority when available so colour rules
+    // stay in sync; fall back to an inline copy for plain test objects that
+    // don't expose that method.
     const getColorPriority = (box) => {
+      if (typeof this.mindMap.getBoxColorPriority === 'function') {
+        return this.mindMap.getBoxColorPriority(box);
+      }
       if (!box || !box.backgroundColor) return 999;
       const { r, g, b } = box.backgroundColor;
       if (r === 255 && g === 140 && b === 140) return 1; // Red
@@ -248,7 +254,7 @@ class ThrustGame {
 
     const mainBox = this.getMainBox();
     if (mainBox) {
-      const boxHeight = mainBox.height || 90;
+      const boxHeight = mainBox.height ?? 90;
       spawnX = mainBox.x;
       spawnY = mainBox.y - boxHeight / 2 - ThrustConstants.PLAYER.SIZE;
     }

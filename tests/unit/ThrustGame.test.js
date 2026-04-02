@@ -420,6 +420,25 @@ describe('ThrustGame getMainBox', () => {
     const topEdge = mainBox.y - mainBox.height / 2; // 270
     expect(player.y).toBeLessThan(topEdge);
   });
+
+  test('delegates colour priority to mindMap.getBoxColorPriority when available', () => {
+    // low-priority red box (inline logic would score it 1), but the delegate
+    // overrides and says priority 999 (unimportant) for the red box and 1 for
+    // the other box — whichever the delegate picks should win.
+    const redBox   = { x: 500, y: 500, width: 60, height: 40, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const otherBox = { x: 50,  y: 50,  width: 60, height: 40 };
+
+    // mindMap exposes getBoxColorPriority that inverts priorities relative to
+    // what the inline fallback would return.
+    const mindMap = {
+      boxes: [redBox, otherBox],
+      getBoxColorPriority: (box) => box === redBox ? 999 : 1
+    };
+
+    const game = new ThrustGame(null, mindMap);
+    // The delegate says otherBox has priority 1 (highest), so it should win.
+    expect(game.getMainBox()).toBe(otherBox);
+  });
 });
 
 describe('ThrustGame Integration', () => {
