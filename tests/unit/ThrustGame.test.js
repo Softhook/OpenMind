@@ -299,18 +299,16 @@ describe('ThrustGame Spawn Logic', () => {
     const game = new ThrustGame(null, mockMindMap);
     const player = game.createPlayer();
 
-    // Calculate center of boxes
-    const centerX = 150; // (100 + 200) / 2
-    const centerY = 125; // (100 + 150) / 2
-
-    // Player should be within reasonable distance of center
+    // Player spawns above the main box (top-left-most box at x=100, y=100)
+    // and should be within a reasonable distance of that box
+    const mainBox = mockMindMap.boxes[0]; // x=100, y=100 is top-left-most
     const distance = Math.sqrt(
-      Math.pow(player.x - centerX, 2) +
-      Math.pow(player.y - centerY, 2)
+      Math.pow(player.x - mainBox.x, 2) +
+      Math.pow(player.y - mainBox.y, 2)
     );
 
-    // Should be within search radius * 2 (accounting for fallback)
-    expect(distance).toBeLessThan(300);
+    // Should be close to the main box (adjacent = just above it)
+    expect(distance).toBeLessThan(100);
   });
 
   test('should use default position when no boxes exist', () => {
@@ -332,6 +330,95 @@ describe('ThrustGame Spawn Logic', () => {
     expect(player.alive).toBe(true);
     expect(player.respawnTime).toBe(0);
     expect(typeof player.invulnerableUntil).toBe('number');
+  });
+
+  test('should spawn adjacent to (just above) the main box', () => {
+    const game = new ThrustGame(null, mockMindMap);
+    const player = game.createPlayer();
+    const mainBox = mockMindMap.boxes[0]; // box at (100, 100, w=50, h=50)
+
+    // Player x should be centred on the main box
+    expect(player.x).toBe(mainBox.x);
+
+    // Player y should be just above the top edge of the main box
+    const mainBoxTopEdge = mainBox.y - mainBox.height / 2;
+    expect(player.y).toBeLessThan(mainBoxTopEdge);
+  });
+});
+
+describe('ThrustGame getMainBox', () => {
+  test('returns null when mindMap has no boxes', () => {
+    const game = new ThrustGame(null, { boxes: [] });
+    expect(game.getMainBox()).toBeNull();
+  });
+
+  test('returns null when mindMap is absent', () => {
+    const game = new ThrustGame(null, null);
+    expect(game.getMainBox()).toBeNull();
+  });
+
+  test('returns the only box when one box exists', () => {
+    const box = { x: 50, y: 80, width: 60, height: 40 };
+    const game = new ThrustGame(null, { boxes: [box] });
+    expect(game.getMainBox()).toBe(box);
+  });
+
+  test('returns top-left-most box among equal-priority boxes', () => {
+    const top    = { x: 200, y: 50,  width: 50, height: 50 };
+    const bottom = { x: 100, y: 200, width: 50, height: 50 };
+    const game = new ThrustGame(null, { boxes: [bottom, top] });
+    expect(game.getMainBox()).toBe(top);
+  });
+
+  test('breaks y tie by choosing the left-most box', () => {
+    const right = { x: 300, y: 100, width: 50, height: 50 };
+    const left  = { x: 100, y: 100, width: 50, height: 50 }; // same y, smaller x
+    const game = new ThrustGame(null, { boxes: [right, left] });
+    expect(game.getMainBox()).toBe(left);
+  });
+
+  test('prefers a red box over a white box regardless of position', () => {
+    const white = { x: 50,  y: 50,  width: 60, height: 40 }; // top-left but no colour
+    const red   = { x: 300, y: 300, width: 60, height: 40, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const game = new ThrustGame(null, { boxes: [white, red] });
+    expect(game.getMainBox()).toBe(red);
+  });
+
+  test('prefers an orange box over a white box', () => {
+    const white  = { x: 50,  y: 50,  width: 60, height: 40 };
+    const orange = { x: 300, y: 300, width: 60, height: 40, backgroundColor: { r: 255, g: 200, b: 140 } };
+    const game = new ThrustGame(null, { boxes: [white, orange] });
+    expect(game.getMainBox()).toBe(orange);
+  });
+
+  test('prefers a red box over an orange box', () => {
+    const orange = { x: 50, y: 50, width: 60, height: 40, backgroundColor: { r: 255, g: 200, b: 140 } };
+    const red    = { x: 300, y: 300, width: 60, height: 40, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const game = new ThrustGame(null, { boxes: [orange, red] });
+    expect(game.getMainBox()).toBe(red);
+  });
+
+  test('returns top-left-most red box when multiple red boxes exist', () => {
+    const redA = { x: 200, y: 100, width: 60, height: 40, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const redB = { x: 100, y: 50,  width: 60, height: 40, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const game = new ThrustGame(null, { boxes: [redA, redB] });
+    expect(game.getMainBox()).toBe(redB); // lower y wins
+  });
+
+  test('spawn x aligns with main box centre', () => {
+    const mainBox = { x: 400, y: 300, width: 80, height: 60, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const other   = { x: 50,  y: 50,  width: 80, height: 60 }; // top-left but lower priority
+    const game = new ThrustGame(null, { boxes: [other, mainBox] });
+    const player = game.createPlayer();
+    expect(player.x).toBe(mainBox.x);
+  });
+
+  test('spawn y is above the top edge of the main box', () => {
+    const mainBox = { x: 400, y: 300, width: 80, height: 60, backgroundColor: { r: 255, g: 140, b: 140 } };
+    const game = new ThrustGame(null, { boxes: [mainBox] });
+    const player = game.createPlayer();
+    const topEdge = mainBox.y - mainBox.height / 2; // 270
+    expect(player.y).toBeLessThan(topEdge);
   });
 });
 
