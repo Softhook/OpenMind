@@ -566,6 +566,34 @@ class TextBox {
    * @param {string} text - Text to wrap
    * @returns {Array<string>} Array of wrapped text lines
    */
+  _pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, lineText, lineOffset) {
+    if (!lineText) return;
+    wrappedLines.push(lineText);
+    lineCharMap.push(lineStartPos + lineOffset);
+  }
+
+  _appendWrappedSpaces(currentLine, currentLineStartPos, spaces, nextSpaceOffset, maxTextWidth, wrappedLines, lineCharMap, lineStartPos) {
+    let line = currentLine;
+    let lineOffset = currentLineStartPos;
+    let consumedSpaces = 0;
+
+    while (consumedSpaces < spaces.length) {
+      if (textWidth(line + ' ') <= maxTextWidth) {
+        if (!line) {
+          lineOffset = nextSpaceOffset + consumedSpaces;
+        }
+        line += ' ';
+        consumedSpaces++;
+        continue;
+      }
+
+      this._pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, line, lineOffset);
+      line = '';
+    }
+
+    return { line, lineOffset };
+  }
+
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
@@ -579,7 +607,7 @@ class TextBox {
     const currentWidth = (this.width != null && isFinite(this.width)) ? this.width : this.minWidth;
     if (this.cachedWrappedLines &&
       this.cachedWidth === currentWidth &&
-      this.cachedText === this.text) {
+      this.cachedText === text) {
       return this.cachedWrappedLines;
     }
 
@@ -710,20 +738,18 @@ class TextBox {
             let lastWord = wordPositions[wordPositions.length - 1];
             let lastWordEnd = lastWord.start + lastWord.word.length;
             if (lastWordEnd < line.length) {
-              // There are trailing spaces - add them one by one, checking if we overflow
-              let trailingSpaces = line.substring(lastWordEnd);
-              for (let i = 0; i < trailingSpaces.length; i++) {
-                let testLine = currentLine + ' ';
-                if (textWidth(testLine) <= maxTextWidth) {
-                  currentLine = testLine;
-                } else {
-                  // Line is full, push it and start a new line with remaining spaces
-                  wrappedLines.push(currentLine);
-                  lineCharMap.push(lineStartPos + currentLineStartPos);
-                  currentLine = trailingSpaces.substring(i);
-                  currentLineStartPos = lastWordEnd + i;
-                }
-              }
+              const trailingWrap = this._appendWrappedSpaces(
+                currentLine,
+                currentLineStartPos,
+                line.substring(lastWordEnd),
+                lastWordEnd,
+                maxTextWidth,
+                wrappedLines,
+                lineCharMap,
+                lineStartPos
+              );
+              currentLine = trailingWrap.line;
+              currentLineStartPos = trailingWrap.lineOffset;
             }
           }
         } else if (line.length > 0) {
@@ -749,10 +775,7 @@ class TextBox {
         }
 
         // Push the last line of this paragraph
-        if (currentLine) {
-          wrappedLines.push(currentLine);
-          lineCharMap.push(lineStartPos + currentLineStartPos);
-        }
+        this._pushWrappedLine(wrappedLines, lineCharMap, lineStartPos, currentLine, currentLineStartPos);
 
         // Move to next logical line (past newline if not last logical line)
         if (lineIdx < lines.length - 1) {
@@ -772,7 +795,7 @@ class TextBox {
     this.cachedWrappedLines = result;
     this.cachedWidth = currentWidth;
     this.cachedLineCharMap = lineCharMap;
-    this.cachedText = this.text;
+    this.cachedText = text;
     return result;
   }
 
