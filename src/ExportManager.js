@@ -57,13 +57,6 @@ class ExportManager {
       return;
     }
 
-    // Validate TextBox dependency
-    if (typeof TextBox === 'undefined') {
-      console.error('TextBox not available');
-      alert('Export failed: TextBox not initialized');
-      return;
-    }
-
     if (!this.mindMap) {
       console.error('MindMap not initialized');
       return;
@@ -165,12 +158,13 @@ class ExportManager {
 
         // Draw boxes
         if (this.mindMap.boxes) {
-          const TB_CORNER_RADIUS = TextBox.CORNER_RADIUS;
-          const TB_FONT_SIZE = TextBox.FONT_SIZE;
-          const TB_PADDING = TextBox.PADDING;
-          const TB_LINE_HEIGHT_MULTIPLIER = TextBox.LINE_HEIGHT_MULTIPLIER;
-          const TB_ITALIC_SHEAR_RADIANS = TextBox.ITALIC_SHEAR_RADIANS;
-          const TB_BOLD_STROKE_WEIGHT = TextBox.BOLD_STROKE_WEIGHT;
+          const hasTextBox = typeof TextBox !== 'undefined' && TextBox;
+          const TB_CORNER_RADIUS = (hasTextBox ? TextBox.CORNER_RADIUS : undefined) ?? 6;
+          const TB_FONT_SIZE = (hasTextBox ? TextBox.FONT_SIZE : undefined) ?? 14;
+          const TB_PADDING = (hasTextBox ? TextBox.PADDING : undefined) ?? 12;
+          const TB_LINE_HEIGHT_MULTIPLIER = (hasTextBox ? TextBox.LINE_HEIGHT_MULTIPLIER : undefined) ?? 1.5;
+          const TB_ITALIC_SHEAR_RADIANS = (hasTextBox ? TextBox.ITALIC_SHEAR_RADIANS : undefined) ?? -0.24;
+          const TB_BOLD_STROKE_WEIGHT = (hasTextBox ? TextBox.BOLD_STROKE_WEIGHT : undefined) ?? 0.8;
 
           this.mindMap.boxes.forEach(box => {
             if (!box) return;
@@ -670,13 +664,6 @@ class ExportManager {
       return;
     }
 
-    // Validate TextBox dependency
-    if (typeof TextBox === 'undefined') {
-      console.error('TextBox not available');
-      alert('Export failed: TextBox not initialized');
-      return;
-    }
-
     if (!this.mindMap) {
       console.error('MindMap not initialized');
       return;
@@ -842,10 +829,11 @@ class ExportManager {
 
       // Draw boxes
       if (this.mindMap.boxes) {
-        const TB_CORNER_RADIUS = TextBox.CORNER_RADIUS;
-        const TB_FONT_SIZE = TextBox.FONT_SIZE;
-        const TB_PADDING = TextBox.PADDING;
-        const TB_LINE_HEIGHT_MULTIPLIER = TextBox.LINE_HEIGHT_MULTIPLIER;
+        const hasTextBox = typeof TextBox !== 'undefined' && TextBox;
+        const TB_CORNER_RADIUS = (hasTextBox ? TextBox.CORNER_RADIUS : undefined) ?? 6;
+        const TB_FONT_SIZE = (hasTextBox ? TextBox.FONT_SIZE : undefined) ?? 14;
+        const TB_PADDING = (hasTextBox ? TextBox.PADDING : undefined) ?? 12;
+        const TB_LINE_HEIGHT_MULTIPLIER = (hasTextBox ? TextBox.LINE_HEIGHT_MULTIPLIER : undefined) ?? 1.5;
 
         for (const box of this.mindMap.boxes) {
           if (!box) continue;
