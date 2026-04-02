@@ -162,8 +162,8 @@ describe('UrlUtils - parseFileFromLocation (with mocked location)', () => {
 });
 
 describe('UrlUtils - parseServerFromUrl', () => {
-    function setLocation(search = '') {
-        sandbox.window.location = { search, hash: '', pathname: '/' };
+    function setLocation(search = '', hash = '') {
+        sandbox.window.location = { search, hash, pathname: '/' };
     }
 
     test('should parse wss:// server URL', () => {
@@ -184,6 +184,11 @@ describe('UrlUtils - parseServerFromUrl', () => {
     test('should return null when no server param', () => {
         setLocation('');
         expect(parseServerFromUrl()).toBe(null);
+    });
+
+    test('should parse server URL from hash params used by recent-room links', () => {
+        setLocation('', '#room=my-collaboration-room&server=wss%3A%2F%2Fexample.com');
+        expect(parseServerFromUrl()).toBe('wss://example.com');
     });
 });
 

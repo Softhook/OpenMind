@@ -74,15 +74,19 @@ function parseFileFromLocation() {
 }
 
 /**
- * Parses server URL from query params.
+ * Parses server URL from query params or room hash params.
  * Supports full WebSocket URLs (ws:// or wss://).
  *
  * @returns {string|null} Server URL or null
  */
 function parseServerFromUrl() {
     try {
-        const params = new URLSearchParams(window.location.search);
-        const server = params.get('server');
+        const searchParams = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        const hashParams = hash && hash.startsWith('#')
+            ? new URLSearchParams(hash.substring(1))
+            : null;
+        const server = searchParams.get('server') || hashParams?.get('server');
 
         if (!server) return null;
 
