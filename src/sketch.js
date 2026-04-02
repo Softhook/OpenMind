@@ -625,6 +625,7 @@ async function initializeCollaboration(roomName) {
 async function _proceedWithRoomJoin(roomName, userChoice) {
   const joinId = ++currentJoinId;
   const isStale = () => joinId !== currentJoinId;
+  const serverUrl = parseServerFromUrl();
 
   try {
     Utils.Logger.collab('[Room] Starting join sequence', joinId, 'for:', roomName);
