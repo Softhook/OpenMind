@@ -454,6 +454,9 @@ describe('ThrustGame Multiplayer - Box Healing After Remote Player Leaves', () =
       ThrustGame.instance.active = false;
       ThrustGame.instance = null;
     }
+    ThrustGame._cleanupListener?.();
+    ThrustGame._cleanupListener = null;
+    ThrustGame._activeManager = null;
     ThrustGame.hasRemotePlayers = false;
   });
 
