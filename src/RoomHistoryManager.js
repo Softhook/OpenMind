@@ -9,6 +9,27 @@ const ROOM_HISTORY_KEY = 'openmind_room_history';
 const MAX_HISTORY_ITEMS = 15;
 
 class RoomHistoryManager {
+    static _saveHistory(history) {
+        try {
+            localStorage.setItem(ROOM_HISTORY_KEY, JSON.stringify(history));
+        } catch (e) {
+            console.warn('RoomHistoryManager: Failed to save to localStorage', e);
+        }
+    }
+
+    static _readHistory() {
+        try {
+            const stored = localStorage.getItem(ROOM_HISTORY_KEY);
+            if (!stored) return [];
+
+            const history = JSON.parse(stored);
+            return Array.isArray(history) ? history : [];
+        } catch (e) {
+            console.warn('RoomHistoryManager: Failed to read from localStorage', e);
+            return [];
+        }
+    }
+
     /**
      * Adds a room to the history or updates its last visited time.
      * @param {string} roomName - The name of the room
@@ -17,29 +38,25 @@ class RoomHistoryManager {
     static addRoom(roomName, serverUrl = null) {
         if (!roomName) return;
 
-        let history = this.getHistory();
-        
+        const history = this.getHistory();
+        const existingEntry = history.find(item => item.roomName === roomName);
+
         // Remove existing entry if it exists (we'll re-add it at the top)
         const filteredHistory = history.filter(item => item.roomName !== roomName);
-        
+
         // Add new entry to the front
         const newEntry = {
-            roomName: roomName,
-            serverUrl: serverUrl,
+            roomName,
+            serverUrl: serverUrl || existingEntry?.serverUrl || null,
             lastVisited: Date.now()
         };
-        
+
         filteredHistory.unshift(newEntry);
-        
+
         // Cap the history
         const cappedHistory = filteredHistory.slice(0, MAX_HISTORY_ITEMS);
-        
-        // Save to localStorage
-        try {
-            localStorage.setItem(ROOM_HISTORY_KEY, JSON.stringify(cappedHistory));
-        } catch (e) {
-            console.warn('RoomHistoryManager: Failed to save to localStorage', e);
-        }
+
+        this._saveHistory(cappedHistory);
     }
 
     /**
@@ -47,18 +64,7 @@ class RoomHistoryManager {
      * @returns {Array} Array of room history items
      */
     static getHistory() {
-        try {
-            const stored = localStorage.getItem(ROOM_HISTORY_KEY);
-            if (!stored) return [];
-            
-            const history = JSON.parse(stored);
-            if (!Array.isArray(history)) return [];
-            
-            return history;
-        } catch (e) {
-            console.warn('RoomHistoryManager: Failed to read from localStorage', e);
-            return [];
-        }
+        return this._readHistory();
     }
 
     /**
@@ -68,14 +74,10 @@ class RoomHistoryManager {
     static removeRoom(roomName) {
         if (!roomName) return;
 
-        let history = this.getHistory();
+        const history = this.getHistory();
         const filteredHistory = history.filter(item => item.roomName !== roomName);
-        
-        try {
-            localStorage.setItem(ROOM_HISTORY_KEY, JSON.stringify(filteredHistory));
-        } catch (e) {
-            console.warn('RoomHistoryManager: Failed to update localStorage', e);
-        }
+
+        this._saveHistory(filteredHistory);
     }
 
     /**

@@ -549,9 +549,11 @@ function _clearLocalState() {
 async function initializeCollaboration(roomName) {
   if (!mindMap || !roomName) return;
 
+  const serverUrl = parseServerFromUrl();
+
   // Record room in history as early as possible (catches manual URL entry)
   if (typeof RoomHistoryManager !== 'undefined') {
-    RoomHistoryManager.addRoom(roomName);
+    RoomHistoryManager.addRoom(roomName, serverUrl);
   }
 
   if (typeof CollaborationManager === 'undefined') {
@@ -746,7 +748,6 @@ async function _proceedWithRoomJoin(roomName, userChoice) {
     };
 
     // Now proceed with connection
-    const serverUrl = parseServerFromUrl();
     if (serverUrl) {
       Utils.Logger.network('[Server] Connecting to custom signaling server:', serverUrl);
     }
