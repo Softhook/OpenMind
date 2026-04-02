@@ -26,6 +26,10 @@ const sandbox = {
   console: console,
   get Date() { return Date; },
   Math: Math,
+  get setTimeout() { return setTimeout; },
+  get clearTimeout() { return clearTimeout; },
+  get setInterval() { return setInterval; },
+  get clearInterval() { return clearInterval; },
   module: { exports: {} },
   window: {},
   // Mock p5.js functions
@@ -407,5 +411,173 @@ describe('ThrustGame Multiplayer - Death and Respawn', () => {
 
     // Death count should increment
     expect(game.deaths).toBe(initialDeaths + 1);
+  });
+});
+
+describe('ThrustGame Multiplayer - Box Healing After Remote Player Leaves', () => {
+  let mockCollaborationManager;
+  let savedHealingLoop;
+  let healingLoopCallArgs;
+
+  beforeEach(() => {
+    ThrustGame.hasRemotePlayers = false;
+    ThrustGame._activeManager = null;
+    ThrustGame._cleanupListener = null;
+    ThrustGame.instance = null;
+    ThrustGame._healingInterval = null;
+
+    // Install a manual spy on _startHealingLoop that works across the vm boundary
+    healingLoopCallArgs = [];
+    savedHealingLoop = ThrustGame._startHealingLoop;
+    ThrustGame._startHealingLoop = function(mindMap, ids) {
+      healingLoopCallArgs.push({ mindMap, ids });
+      ThrustGame._healingInterval = 'mocked'; // Mark as started without a real interval
+    };
+
+    mockCollaborationManager = {
+      isConnected: true,
+      awareness: {
+        clientID: 'local-client',
+        getStates: jest.fn(() => new Map()),
+        setLocalStateField: jest.fn(),
+        on: jest.fn(),
+        off: jest.fn()
+      }
+    };
+  });
+
+  afterEach(() => {
+    // Always restore the original _startHealingLoop even if a test fails
+    ThrustGame._startHealingLoop = savedHealingLoop;
+    ThrustGame._healingInterval = null;
+    if (ThrustGame.instance) {
+      ThrustGame.instance.active = false;
+      ThrustGame.instance = null;
+    }
+    ThrustGame._cleanupListener?.();
+    ThrustGame._cleanupListener = null;
+    ThrustGame._activeManager = null;
+    ThrustGame.hasRemotePlayers = false;
+  });
+
+  test('observer starts healing loop when last remote thrust player leaves', () => {
+    const damagedBox = {
+      id: 'box-1',
+      health: 3,
+      lastHitTime: Date.now() - ThrustConstants.HEALTH.RECOVERY_DELAY,
+      isDeleted: false
+    };
+    const mockMindMap = {
+      boxes: [damagedBox],
+      getBoxById: jest.fn((id) => id === 'box-1' ? damagedBox : null)
+    };
+
+    // Set up observer: instance exists (was watching remote player) but NOT active
+    ThrustGame.instance = new ThrustGame(mockCollaborationManager, mockMindMap);
+    ThrustGame.instance.active = false;
+    ThrustGame.instance.mindMap = mockMindMap;
+    ThrustGame.hasRemotePlayers = true; // Was watching a remote player
+
+    // Setup awareness listener - initial checkActivity() fires, finds no remote players
+    ThrustGame._setupAwarenessListener(mockCollaborationManager);
+
+    // _startHealingLoop should have been called with the damaged box
+    expect(healingLoopCallArgs.length).toBe(1);
+    expect(healingLoopCallArgs[0].mindMap).toBe(mockMindMap);
+    expect(healingLoopCallArgs[0].ids.has('box-1')).toBe(true);
+
+    // hasRemotePlayers should now be false
+    expect(ThrustGame.hasRemotePlayers).toBe(false);
+  });
+
+  test('observer starts healing loop when remote player quits mid-session (via awareness event)', () => {
+    const damagedBox = {
+      id: 'box-1',
+      health: 4,
+      lastHitTime: Date.now() - ThrustConstants.HEALTH.RECOVERY_DELAY - 1000,
+      isDeleted: false
+    };
+    const mockMindMap = {
+      boxes: [damagedBox],
+      getBoxById: jest.fn((id) => id === 'box-1' ? damagedBox : null)
+    };
+
+    // First getStates returns remote player presence, then empty after they leave
+    let remotePresent = true;
+    mockCollaborationManager.awareness.getStates = jest.fn(() => remotePresent
+      ? new Map([['remote-client', { thrustGame: { x: 0, y: 0, alive: true } }]])
+      : new Map()
+    );
+
+    ThrustGame.instance = new ThrustGame(mockCollaborationManager, mockMindMap);
+    ThrustGame.instance.active = false;
+    ThrustGame.instance.mindMap = mockMindMap;
+
+    // Initial setup: remote player is present, no healing triggered
+    ThrustGame._setupAwarenessListener(mockCollaborationManager);
+    expect(ThrustGame.hasRemotePlayers).toBe(true);
+    expect(healingLoopCallArgs.length).toBe(0); // No healing yet
+
+    // Remote player leaves
+    remotePresent = false;
+    const changeHandler = mockCollaborationManager.awareness.on.mock.calls[0][1];
+    changeHandler();
+
+    // Now healing loop should be triggered
+    expect(healingLoopCallArgs.length).toBe(1);
+    expect(healingLoopCallArgs[0].mindMap).toBe(mockMindMap);
+    expect(healingLoopCallArgs[0].ids.has('box-1')).toBe(true);
+    expect(ThrustGame.hasRemotePlayers).toBe(false);
+  });
+
+  test('observer does NOT start healing loop when local player is active in thrust mode', () => {
+    const damagedBox = {
+      id: 'box-1',
+      health: 3,
+      lastHitTime: Date.now() - ThrustConstants.HEALTH.RECOVERY_DELAY,
+      isDeleted: false
+    };
+    const mockMindMap = {
+      boxes: [damagedBox],
+      getBoxById: jest.fn((id) => id === 'box-1' ? damagedBox : null)
+    };
+
+    // Local player IS active in thrust mode
+    ThrustGame.instance = new ThrustGame(mockCollaborationManager, mockMindMap);
+    ThrustGame.instance.active = true; // local is active — handles healing itself
+    ThrustGame.instance.mindMap = mockMindMap;
+    ThrustGame.hasRemotePlayers = true;
+
+    ThrustGame._setupAwarenessListener(mockCollaborationManager);
+
+    // Simulate remote player leaving
+    mockCollaborationManager.awareness.getStates = jest.fn(() => new Map());
+    const changeHandler = mockCollaborationManager.awareness.on.mock.calls[0][1];
+    changeHandler();
+
+    // No healing loop from awareness handler — active ThrustGame.update() handles it
+    expect(healingLoopCallArgs.length).toBe(0);
+  });
+
+  test('observer does NOT start healing loop when no boxes are damaged', () => {
+    const healthyBox = {
+      id: 'box-1',
+      // No health property = fully healthy (lazy-init convention)
+      isDeleted: false
+    };
+    const mockMindMap = {
+      boxes: [healthyBox],
+      getBoxById: jest.fn((id) => id === 'box-1' ? healthyBox : null)
+    };
+
+    ThrustGame.instance = new ThrustGame(mockCollaborationManager, mockMindMap);
+    ThrustGame.instance.active = false;
+    ThrustGame.instance.mindMap = mockMindMap;
+    ThrustGame.hasRemotePlayers = true;
+
+    ThrustGame._setupAwarenessListener(mockCollaborationManager);
+
+    // No damaged boxes → no healing loop needed
+    expect(healingLoopCallArgs.length).toBe(0);
   });
 });
