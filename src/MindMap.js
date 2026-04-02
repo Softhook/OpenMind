@@ -3083,32 +3083,40 @@ class MindMap {
       }
       // Clear navigation mode after deleting single connection
       this.isArrowKeyNavigating = false;
-    } else if (key === '1' || key === '2' || key === '3') {
-      // Number keys to change selected box colors (when not editing)
-      // 1 = red, 2 = orange, 3 = white
+    } else if (key === '1' || key === '2' || key === '3' || key === '4' || key === '5' || key === '6' || key === '7' || key === '8' || key === '9') {
+      // Number keys change colours (when not editing, no modifier held)
       const hasModifier = keyIsDown(91) || keyIsDown(93) || keyIsDown(17) || keyIsDown(18) || keyIsDown(16);
       if (!hasModifier) {
-        if (this.selectedBoxes && this.selectedBoxes.size > 0) {
-          const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
-
+        if (this.selectedCluster) {
+          // Keys 1-9: cycle through the predefined cluster fill colours
+          const fills = ColorPalette.CLUSTER.FILLS;
+          const newIndex = (parseInt(key, 10) - 1) % fills.length;
           this._wrapInTransaction(() => {
-            const changedBoxes = [];
-            for (const box of this.selectedBoxes) {
-              if (box && typeof box.setBackgroundByKey === 'function') {
-                box.setBackgroundByKey(colorKey);
-                changedBoxes.push(box);
-              }
-            }
-            this._notifyBoxesChanged(changedBoxes, true);
+            this.selectedCluster.colorIndex = newIndex;
+            this.isSaved = false;
+            if (MindMap.onClustersChange) MindMap.onClustersChange(true);
           });
-        } else if (this.selectedBox && !this.selectedBox.isEditing) {
+        } else if (key === '1' || key === '2' || key === '3') {
+          // Keys 1-3: change selected box colors (1 = red, 2 = orange, 3 = white)
           const colorKey = key === '1' ? 'red' : (key === '2' ? 'orange' : 'white');
-          if (typeof this.selectedBox.setBackgroundByKey === 'function') {
-            // Wrap for consistency with multi-box color change above.
+          if (this.selectedBoxes && this.selectedBoxes.size > 0) {
             this._wrapInTransaction(() => {
-              this.selectedBox.setBackgroundByKey(colorKey);
-              this._notifyBoxesChanged([this.selectedBox], true);
+              const changedBoxes = [];
+              for (const box of this.selectedBoxes) {
+                if (box && typeof box.setBackgroundByKey === 'function') {
+                  box.setBackgroundByKey(colorKey);
+                  changedBoxes.push(box);
+                }
+              }
+              this._notifyBoxesChanged(changedBoxes, true);
             });
+          } else if (this.selectedBox && !this.selectedBox.isEditing) {
+            if (typeof this.selectedBox.setBackgroundByKey === 'function') {
+              this._wrapInTransaction(() => {
+                this.selectedBox.setBackgroundByKey(colorKey);
+                this._notifyBoxesChanged([this.selectedBox], true);
+              });
+            }
           }
         }
       }
