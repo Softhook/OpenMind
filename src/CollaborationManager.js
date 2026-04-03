@@ -242,7 +242,7 @@ class CollaborationManager {
             // We use ydoc.transact with undoManager as second parameter to mark trackable operations.
             // Empty trackedOrigins means it tracks nothing by default.
             // We use this.undoManager as the origin for our own trackable transactions.
-            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections, this.yclusters, this.ytimelineConnections], {
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections, this.yclusters, this.ytimelineConnections, this.ytimeline], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
                 trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN]),
                 maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE

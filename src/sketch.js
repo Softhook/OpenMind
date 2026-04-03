@@ -3697,6 +3697,22 @@ function completeMultiBoxSelection() {
       }
     }
   }
+
+  // Select timeline connections that intersect the selection rectangle
+  if (mindMap.timelineConnections && mindMap.addConnectionToSelection) {
+    for (const tc of mindMap.timelineConnections) {
+      if (!tc || typeof tc._getConnectionEndpoints !== 'function') continue;
+      try {
+        const ep = tc._getConnectionEndpoints();
+        if (!ep || isNaN(ep.start.x) || isNaN(ep.start.y) || isNaN(ep.end.x) || isNaN(ep.end.y)) continue;
+        if (segmentIntersectsRect(ep.start.x, ep.start.y, ep.end.x, ep.end.y, x1, y1, x2, y2)) {
+          mindMap.addConnectionToSelection(tc);
+        }
+      } catch (e) {
+        // ignore geometry errors per timeline connection
+      }
+    }
+  }
 }
 
 // ============================================================================

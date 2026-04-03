@@ -324,29 +324,46 @@ class MindMap {
   /**
    * Bulk deletes specified connections.
    * Efficiently handles array filtering and selection cleanup.
+   * Handles both regular Connection and TimelineConnection objects.
    * @param {Connection[]} connectionsToDelete 
    */
   _performConnectionDeletion(connectionsToDelete) {
     if (!connectionsToDelete || connectionsToDelete.length === 0) return;
     const connSet = new Set(connectionsToDelete);
-    const initialLength = this.connections.length;
 
-    this.connections = this.connections.filter(c => !connSet.has(c));
+    // Separate timeline connections from regular connections
+    const timelineConns = connectionsToDelete.filter(
+      c => this.timelineConnections && this.timelineConnections.includes(c)
+    );
+    const regularConns = connectionsToDelete.filter(c => !timelineConns.includes(c));
 
-    if (this.connections.length !== initialLength) {
-      // Cleanup selection state for all deleted connections
-      for (const conn of connectionsToDelete) {
-        if (this.selectedConnection === conn) this.selectedConnection = null;
-        if (this.selectedConnections) this.selectedConnections.delete(conn);
-        conn.selected = false;
-      }
+    // Delete timeline connections via their dedicated path (handles Yjs sync)
+    for (const tc of timelineConns) {
+      this.removeTimelineConnection(tc);
+    }
 
-      this.isDirty = true;
-      this.isSaved = false;
+    // Delete regular connections
+    if (regularConns.length > 0) {
+      const regularSet = new Set(regularConns);
+      const initialLength = this.connections.length;
 
-      // Sync connection deletion to collaboration
-      if (MindMap.onConnectionsChange) {
-        MindMap.onConnectionsChange();
+      this.connections = this.connections.filter(c => !regularSet.has(c));
+
+      if (this.connections.length !== initialLength) {
+        // Cleanup selection state for all deleted connections
+        for (const conn of regularConns) {
+          if (this.selectedConnection === conn) this.selectedConnection = null;
+          if (this.selectedConnections) this.selectedConnections.delete(conn);
+          conn.selected = false;
+        }
+
+        this.isDirty = true;
+        this.isSaved = false;
+
+        // Sync connection deletion to collaboration
+        if (MindMap.onConnectionsChange) {
+          MindMap.onConnectionsChange();
+        }
       }
     }
   }
@@ -2584,10 +2601,11 @@ class MindMap {
             this.selectedCluster.selected = false;
             this.selectedCluster = null;
           }
-          // Clear normal connection selection, then select this timeline connection
+          // Clear normal connection selection, then select this timeline connection.
+          // Also add to selectedConnections so behaviour is consistent with regular connections.
           if (this.clearConnectionSelection) this.clearConnectionSelection();
           this.selectedTimelineConnection = tc;
-          tc.selected = true;
+          if (this.addConnectionToSelection) this.addConnectionToSelection(tc);
           return;
         }
       }
