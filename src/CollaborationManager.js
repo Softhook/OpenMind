@@ -97,6 +97,7 @@ class CollaborationManager {
         this.yconnections = null; // Y.Array<{fromId, toId}>
         this.yclusters = null;   // Y.Map<clusterId, {id, colorIndex, boxIds}>
         this.ytimelineConnections = null; // Y.Array<{fromId, dayIndex}>
+        this.ytimeline = null;   // Y.Map<string, any> – timeline active state (shared across clients)
         this.undoManager = null;  // Y.UndoManager for undo/redo
 
         // Persistence
@@ -222,6 +223,7 @@ class CollaborationManager {
             this.yconnections = this.ydoc.getArray('connections');
             this.yclusters = this.ydoc.getMap('clusters');
             this.ytimelineConnections = this.ydoc.getArray('timelineConnections');
+            this.ytimeline = this.ydoc.getMap('timeline');
 
             // Create IndexedDB provider for automatic persistence
             // Use room-specific database name to ensure data isolation
@@ -376,6 +378,7 @@ class CollaborationManager {
                             Utils.Logger.collab('[Sync] No local data - loading from room');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
+                            this._applyRemoteTimelineActive();
 
                         } else if (yjsEmpty && localHasData) {
                             // Empty room, have local data
@@ -392,6 +395,7 @@ class CollaborationManager {
                             Utils.Logger.collab('[Sync] Both have data - rebuilding from merged Yjs state');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
+                            this._applyRemoteTimelineActive();
                         }
 
                     } catch (error) {
@@ -420,6 +424,7 @@ class CollaborationManager {
                             try {
                                 this._rebuildBoxesFromYjs();
                                 this._rebuildConnectionsFromYjs();
+                                this._applyRemoteTimelineActive();
                                 this.mindMap.isDirty = true;
                             } finally {
                                 this.isSyncing = false;
@@ -620,6 +625,7 @@ class CollaborationManager {
         this.yconnections = null;
         this.yclusters = null;
         this.ytimelineConnections = null;
+        this.ytimeline = null;
         this.isInitialized = false;
         this.isInitializing = false;
         this.initializationPromise = null;
@@ -1035,6 +1041,10 @@ class CollaborationManager {
             MindMap.onTimelineConnectionsChange = (skipTransactionWrapper = false) => {
                 this.syncTimelineConnectionsToYjs(skipTransactionWrapper);
             };
+
+            MindMap.onTimelineActiveChange = () => {
+                this.syncTimelineActiveToYjs();
+            };
         }
 
         // Set up TextBox callback to check for remote editing
@@ -1061,6 +1071,7 @@ class CollaborationManager {
             MindMap.onConnectionsChange = null;
             MindMap.onClustersChange = null;
             MindMap.onTimelineConnectionsChange = null;
+            MindMap.onTimelineActiveChange = null;
             // Note: onBoxHealthChanged is owned by ThrustGame, not CollaborationManager.
             // ThrustGame registers/deregisters it independently via start()/stop().
         }
@@ -1174,6 +1185,11 @@ class CollaborationManager {
                             }
                         }
                     }
+                }
+
+                // Sync timeline active state
+                if (this.ytimeline && this.mindMap.timelineActive) {
+                    this.ytimeline.set('active', true);
                 }
             }, null); // null origin = don't track in undo
         }
@@ -1537,6 +1553,41 @@ class CollaborationManager {
     // ============================================================================
     // YJS → LOCAL SYNCHRONIZATION
     // ============================================================================
+
+    /**
+     * Syncs timeline active state to Yjs so remote users see the timeline.
+     * Called whenever toggleTimeline() changes mindMap.timelineActive.
+     */
+    syncTimelineActiveToYjs() {
+        if (!this.ytimeline || !this.mindMap || this.isSyncing) return;
+        const active = this.mindMap.timelineActive === true;
+        this.ydoc.transact(() => {
+            this.ytimeline.set('active', active);
+        });
+    }
+
+    /**
+     * Applies the remote timeline active state to the local mindMap.
+     * Called from the ytimeline observer.
+     * @private
+     */
+    _applyRemoteTimelineActive() {
+        if (!this.mindMap || !this.ytimeline) return;
+        const active = this.ytimeline.get('active') === true;
+        if (active === this.mindMap.timelineActive) return; // nothing changed
+        this.mindMap.timelineActive = active;
+        if (active) {
+            if (!this.mindMap.timelineStartDate) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                this.mindMap.timelineStartDate = today;
+            }
+            if (!this.mindMap.timelineConnections) this.mindMap.timelineConnections = [];
+        } else {
+            this.mindMap.timelineDraggingResize = false;
+        }
+        if (this.mindMap) this.mindMap.isDirty = true;
+    }
 
     /**
      * Syncs timeline connections to Yjs.
@@ -1966,6 +2017,15 @@ class CollaborationManager {
                     } finally {
                         this.isSyncing = false;
                     }
+                });
+            }
+
+            // Observe timeline active state changes (remote toggle)
+            if (this.ytimeline) {
+                this.ytimeline.observe((event) => {
+                    if (this.isSyncing) return;
+                    if (event.transaction.local) return;
+                    this._applyRemoteTimelineActive();
                 });
             }
         }

@@ -77,6 +77,9 @@ class MindMap {
   /** @type {function(boolean=):void|null} Called when timeline connections change */
   static onTimelineConnectionsChange = null;
 
+  /** @type {function():void|null} Called when timeline active state changes (on/off toggle) */
+  static onTimelineActiveChange = null;
+
   /**
    * Called when a box's health changes from a remote Yjs update.
    * Registered by ThrustGame to track damaged boxes without CollaborationManager
@@ -503,6 +506,7 @@ class MindMap {
 
   /** Returns the current bar width, falling back to DEFAULT_WIDTH. */
   getTimelineBarWidth() {
+    if (typeof TimelineMode === 'undefined') return 800; // safe fallback
     return (this.timelineBarWidth && typeof this.timelineBarWidth === 'number')
       ? this.timelineBarWidth
       : TimelineMode.DEFAULT_WIDTH;
@@ -520,11 +524,14 @@ class MindMap {
       this.timelineActive = false;
       this.timelineDraggingResize = false;
     }
+    // Notify collaboration layer so remote users see the change
+    if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
   }
 
   /** Draw the timeline bar (thin wrapper around TimelineMode.drawBar). */
   drawTimeline() {
     if (!this.timelineActive || !this.timelineStartDate) return;
+    if (typeof TimelineMode === 'undefined') return; // guard: script not loaded
     TimelineMode.drawBar(this);
   }
 
