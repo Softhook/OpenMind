@@ -274,6 +274,15 @@ class ExportManager {
           });
         }
 
+        // Draw Timeline Mode bar at world (0,0) if active and has content
+        if (this.mindMap && this.mindMap.timelineActive) {
+          try {
+            TimelineMode.drawToGraphics(pg, this.mindMap);
+          } catch (e) {
+            console.warn('Error drawing timeline in PNG export:', e);
+          }
+        }
+
       } finally {
         // Always restore graphics state
         pg.pop();
@@ -1174,6 +1183,22 @@ class ExportManager {
 
     if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
       return null;
+    }
+
+    // Expand bounds to include the Timeline Mode bar when active.
+    // Use the bar's world position (barX, barY) — legacy files default to (0, 0).
+    if (this.mindMap && this.mindMap.timelineActive) {
+      const barX = this.mindMap.timelineBarX || 0;
+      const barY = this.mindMap.timelineBarY || 0;
+      const barHeight = (typeof TimelineMode !== 'undefined' &&
+        typeof TimelineMode.BAR_HEIGHT === 'number' &&
+        isFinite(TimelineMode.BAR_HEIGHT))
+        ? TimelineMode.BAR_HEIGHT
+        : 80; // fallback matches TimelineMode.BAR_HEIGHT default
+      minX = Math.min(minX, barX);
+      maxX = Math.max(maxX, barX + this.mindMap.getTimelineBarWidth());
+      minY = Math.min(minY, barY);
+      maxY = Math.max(maxY, barY + barHeight);
     }
 
     return { minX, maxX, minY, maxY };

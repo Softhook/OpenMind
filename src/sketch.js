@@ -1465,6 +1465,12 @@ function draw() {
         ExtensionBridge.draw(collaborationManager, mindMap);
       }
 
+      // Timeline Mode: world-space overlay (drawn inside camera transform so it
+      // zooms and pans with the map)
+      mindMap.drawTimeline();
+      // Date-assignment badges: visible even when the timeline bar is hidden
+      mindMap.drawTimelineDateLabels();
+
       pop();
 
       // Update our presence (cursor position, selection) if connected - throttled internally
@@ -2018,6 +2024,11 @@ function mousePressed(e) {
         return false;
       }
 
+      // Timeline Mode: intercept clicks on the calendar bar (world coords).
+      if (mindMap.handleTimelineMousePressed(worldMouseX(), worldMouseY())) {
+        return false;
+      }
+
       // Multi-box selection when clicking in empty space with no box selected.
       // Check for clusters first — if a cluster is under the cursor the user
       // wants to select it, not start a rubber-band rectangle.
@@ -2077,11 +2088,37 @@ function mouseReleased() {
   }
 
   if (mindMap) {
+    // Timeline Mode: intercept connection drags that end over the timeline bar.
+    // This must happen BEFORE handleMouseReleased so completeConnection() is not called.
+    if (mindMap.connectingFrom && mindMap.timelineActive) {
+      const wx = worldMouseX();
+      const wy = worldMouseY();
+      const barWidth = mindMap.getTimelineBarWidth();
+      const barX = mindMap.timelineBarX || 0;
+      const barY = mindMap.timelineBarY || 0;
+      if (TimelineMode.isOverBarWorld(wx - barX, wy - barY, barWidth)) {
+        const sourceBox = mindMap.connectingFrom.box;
+        // Clear connectingFrom BEFORE handleMouseReleased to prevent completeConnection()
+        mindMap.connectingFrom = null;
+        mindMap.connectingFromInitiatedByKeyboard = false;
+        mindMap.handleTimelineConnectionDropped(wx, wy, sourceBox);
+        // Still need handleMouseReleased to stop any box drags
+        try { mindMap.handleMouseReleased(); } catch (e) { /* ignore */ }
+        mindMap.handleTimelineRelease();
+        return false;
+      }
+    }
+
     try {
       mindMap.handleMouseReleased();
     } catch (e) {
       console.error('Error handling mouse release:', e);
     }
+  }
+
+  // Timeline Mode: finalise any resize drag and persist new bar width
+  if (mindMap) {
+    mindMap.handleTimelineRelease();
   }
 }
 
@@ -2102,6 +2139,11 @@ function mouseDragged() {
     // Update selection rectangle current corner
     selectionCurrentX = worldMouseX();
     selectionCurrentY = worldMouseY();
+    return false;
+  }
+
+  // Timeline Mode: handle resize drag (world coords; consumed if resize is active)
+  if (mindMap && mindMap.handleTimelineDrag(worldMouseX(), worldMouseY())) {
     return false;
   }
 
@@ -2205,6 +2247,12 @@ function keyPressed() {
       });
       return false;
     }
+  }
+
+  // PRIORITY: Handle Timeline Mode — Ctrl+K creates/removes the timeline bar at cursor
+  if ((key === 'k' || key === 'K') && isCtrl) {
+    if (mindMap) mindMap.createTimeline(worldMouseX(), worldMouseY());
+    return false;
   }
 
   // Route to Extension Bridge (Ghost Plugin hook)
@@ -3441,6 +3489,17 @@ function isOverAnyInteractive() {
       if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) return true;
     } catch (_) { }
   }
+  // Check timeline connections (so arrowhead clicks are not swallowed by the marquee-select path)
+  if (mindMap.timelineConnections) {
+    for (let i = 0; i < mindMap.timelineConnections.length; i++) {
+      const tc = mindMap.timelineConnections[i];
+      if (!tc) continue;
+      try {
+        if (tc.isMouseOver && tc.isMouseOver()) return true;
+        if (tc.isMouseOverArrowHead && tc.isMouseOverArrowHead()) return true;
+      } catch (_) { }
+    }
+  }
   return false;
 }
 
@@ -3646,6 +3705,22 @@ function completeMultiBoxSelection() {
         }
       } catch (e) {
         // ignore geometry errors per-connection
+      }
+    }
+  }
+
+  // Select timeline connections that intersect the selection rectangle
+  if (mindMap.timelineConnections && mindMap.addConnectionToSelection) {
+    for (const tc of mindMap.timelineConnections) {
+      if (!tc || typeof tc._getConnectionEndpoints !== 'function') continue;
+      try {
+        const ep = tc._getConnectionEndpoints();
+        if (!ep || isNaN(ep.start.x) || isNaN(ep.start.y) || isNaN(ep.end.x) || isNaN(ep.end.y)) continue;
+        if (segmentIntersectsRect(ep.start.x, ep.start.y, ep.end.x, ep.end.y, x1, y1, x2, y2)) {
+          mindMap.addConnectionToSelection(tc);
+        }
+      } catch (e) {
+        // ignore geometry errors per timeline connection
       }
     }
   }

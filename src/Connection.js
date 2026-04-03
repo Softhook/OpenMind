@@ -36,8 +36,9 @@ class Connection {
    * @param {TextBox} toBox - Target box (head of arrow)
    */
   constructor(fromBox, toBox) {
-    if (!fromBox || !toBox) {
-      Utils.Logger.error('[Connection] Constructor called with invalid boxes:', { fromBox, toBox });
+    // fromBox is always required; toBox may be null for subclasses (e.g. TimelineConnection)
+    if (!fromBox) {
+      Utils.Logger.error('[Connection] Constructor called with null fromBox:', { fromBox, toBox });
     }
     this.fromBox = fromBox;
     this.toBox = toBox;
