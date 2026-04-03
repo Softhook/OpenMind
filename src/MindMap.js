@@ -539,6 +539,33 @@ class MindMap {
   }
 
   /**
+   * Draw date-assignment labels (day badges) above boxes that have a timeline
+   * connection, even when the timeline bar itself is hidden.
+   * Called every frame from sketch.js inside the camera transform.
+   * When the bar is visible, drawBar() already calls _drawBoxDateLabels, so
+   * this method is a no-op in that case to avoid double-drawing.
+   */
+  drawTimelineDateLabels() {
+    if (this.timelineActive) return; // drawBar() already renders them
+    if (typeof TimelineMode === 'undefined') return;
+    if (!this.timelineConnections || this.timelineConnections.length === 0) return;
+    // Use stored start date; fall back to today so labels can still show dates
+    // even when timeline was toggled off (timelineStartDate was not cleared).
+    let startDate = this.timelineStartDate;
+    if (!startDate) {
+      startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      this.timelineStartDate = startDate; // cache so all callers agree
+    }
+    const bw = this.getTimelineBarWidth();
+    const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
+    const safeZ = Math.max(0.01, z);
+    push();
+    TimelineMode._drawBoxDateLabels(this.timelineConnections, startDate, bw, safeZ);
+    pop();
+  }
+
+  /**
    * Handle a mouse-press in world coordinates for the timeline bar.
    * Returns true if the event was consumed.
    */

@@ -1468,6 +1468,8 @@ function draw() {
       // Timeline Mode: world-space overlay (drawn inside camera transform so it
       // zooms and pans with the map)
       mindMap.drawTimeline();
+      // Date-assignment badges: visible even when the timeline bar is hidden
+      mindMap.drawTimelineDateLabels();
 
       pop();
 

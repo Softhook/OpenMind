@@ -378,6 +378,7 @@ class CollaborationManager {
                             Utils.Logger.collab('[Sync] No local data - loading from room');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
+                            this._rebuildTimelineConnectionsFromYjs();
                             this._applyRemoteTimelineActive();
 
                         } else if (yjsEmpty && localHasData) {
@@ -395,6 +396,7 @@ class CollaborationManager {
                             Utils.Logger.collab('[Sync] Both have data - rebuilding from merged Yjs state');
                             this._rebuildBoxesFromYjs();
                             this._rebuildConnectionsFromYjs();
+                            this._rebuildTimelineConnectionsFromYjs();
                             this._applyRemoteTimelineActive();
                         }
 
@@ -424,6 +426,7 @@ class CollaborationManager {
                             try {
                                 this._rebuildBoxesFromYjs();
                                 this._rebuildConnectionsFromYjs();
+                                this._rebuildTimelineConnectionsFromYjs();
                                 this._applyRemoteTimelineActive();
                                 this.mindMap.isDirty = true;
                             } finally {
@@ -489,6 +492,8 @@ class CollaborationManager {
         Utils.Logger.collab('[Room] Loading data from room (replacing local)');
         this._rebuildBoxesFromYjs();
         this._rebuildConnectionsFromYjs();
+        this._rebuildTimelineConnectionsFromYjs();
+        this._applyRemoteTimelineActive();
     }
 
     /**
@@ -2759,6 +2764,7 @@ class CollaborationManager {
                 // This matches the initial sync behavior (_rebuildBoxesFromYjs)
                 this._rebuildBoxesFromYjs();
                 this._rebuildConnectionsFromYjs();
+                this._rebuildTimelineConnectionsFromYjs();
 
                 this.mindMap.isDirty = true;
                 Utils.Logger.state('[Consistency] Reconciliation complete');
