@@ -5,7 +5,7 @@
  *   - TimelineConnection class (arrow from a TextBox to a calendar-bar day tick)
  *   - TimelineMode class with static constants and static draw/utility methods
  *
- * Keyboard shortcut: Ctrl+K – create/remove timeline at cursor (handled by MindMap.createTimeline())
+ * Keyboard shortcut: Ctrl+K – creates timeline at cursor if inactive, or removes it if already active (MindMap.createTimeline())
  *
  * World-space placement:
  *   The bar is anchored at world (0, 0) and drawn inside the camera transform
