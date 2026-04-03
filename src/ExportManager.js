@@ -1186,12 +1186,14 @@ class ExportManager {
     }
 
     // Expand bounds to include the Timeline Mode bar when active.
-    // The bar occupies world (0, 0) → (barWorldWidth, BAR_HEIGHT).
+    // Use the bar's world position (barX, barY) — legacy files default to (0, 0).
     if (this.mindMap && this.mindMap.timelineActive) {
-      minX = Math.min(minX, 0);
-      maxX = Math.max(maxX, this.mindMap.getTimelineBarWidth());
-      minY = Math.min(minY, 0);
-      maxY = Math.max(maxY, TimelineMode.BAR_HEIGHT);
+      const barX = this.mindMap.timelineBarX || 0;
+      const barY = this.mindMap.timelineBarY || 0;
+      minX = Math.min(minX, barX);
+      maxX = Math.max(maxX, barX + this.mindMap.getTimelineBarWidth());
+      minY = Math.min(minY, barY);
+      maxY = Math.max(maxY, barY + TimelineMode.BAR_HEIGHT);
     }
 
     return { minX, maxX, minY, maxY };

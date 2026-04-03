@@ -2094,7 +2094,9 @@ function mouseReleased() {
       const wx = worldMouseX();
       const wy = worldMouseY();
       const barWidth = mindMap.getTimelineBarWidth();
-      if (TimelineMode.isOverBarWorld(wx, wy, barWidth)) {
+      const barX = mindMap.timelineBarX || 0;
+      const barY = mindMap.timelineBarY || 0;
+      if (TimelineMode.isOverBarWorld(wx - barX, wy - barY, barWidth)) {
         const sourceBox = mindMap.connectingFrom.box;
         // Clear connectingFrom BEFORE handleMouseReleased to prevent completeConnection()
         mindMap.connectingFrom = null;
@@ -2247,9 +2249,9 @@ function keyPressed() {
     }
   }
 
-  // PRIORITY: Handle Timeline Mode toggle (Ctrl+K)
+  // PRIORITY: Handle Timeline Mode — Ctrl+K creates/removes the timeline bar at cursor
   if ((key === 'k' || key === 'K') && isCtrl) {
-    if (mindMap) mindMap.toggleTimeline();
+    if (mindMap) mindMap.createTimeline(worldMouseX(), worldMouseY());
     return false;
   }
 

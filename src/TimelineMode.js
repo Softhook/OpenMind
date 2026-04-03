@@ -5,7 +5,7 @@
  *   - TimelineConnection class (arrow from a TextBox to a calendar-bar day tick)
  *   - TimelineMode class with static constants and static draw/utility methods
  *
- * Keyboard shortcut: Ctrl+K – toggle Timeline Mode (handled by MindMap.toggleTimeline())
+ * Keyboard shortcut: Ctrl+K – create/remove timeline at cursor (handled by MindMap.createTimeline())
  *
  * World-space placement:
  *   The bar is anchored at world (0, 0) and drawn inside the camera transform
@@ -71,8 +71,11 @@ class TimelineConnection extends Connection {
   _getConnectionEndpoints() {
     if (!this.fromBox) return null;
     const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
-    const tx = TimelineMode.worldDayX(this.dayIndex, barWidth);
-    const ty = (this.fromBox.y < TimelineMode.BAR_HEIGHT / 2) ? 0 : TimelineMode.BAR_HEIGHT;
+    const barX = this.mindMap ? (this.mindMap.timelineBarX || 0) : 0;
+    const barY = this.mindMap ? (this.mindMap.timelineBarY || 0) : 0;
+    // tx/ty are world-space coordinates of the tick on the bar
+    const tx = barX + TimelineMode.worldDayX(this.dayIndex, barWidth);
+    const ty = (this.fromBox.y < barY + TimelineMode.BAR_HEIGHT / 2) ? barY : barY + TimelineMode.BAR_HEIGHT;
     const end = { x: tx, y: ty };
     if (typeof this.fromBox.getConnectionPoint !== 'function') return null;
     const start = this.fromBox.getConnectionPoint(end);
@@ -218,6 +221,8 @@ class TimelineMode {
 
     const bw      = mindMap.getTimelineBarWidth();
     const bh      = TimelineMode.BAR_HEIGHT;
+    const barX    = mindMap.timelineBarX || 0;
+    const barY    = mindMap.timelineBarY || 0;
     const conns   = mindMap.timelineConnections || [];
     const startDate = mindMap.timelineStartDate;
 
@@ -228,6 +233,8 @@ class TimelineMode {
     const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
 
     push();
+    // Move drawing origin to bar position so all internal drawing uses local (0,0) coords
+    translate(barX, barY);
 
     // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
     // Skip the one being dragged — MindMap.draw() shows the live preview instead.
@@ -258,17 +265,26 @@ class TimelineMode {
     TimelineMode._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate);
 
     // --- Snap preview: highlight nearest tick while dragging a connection ---
-    TimelineMode._drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap);
+    TimelineMode._drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap, barX, barY);
 
     // --- Resize handle ---
     TimelineMode._drawResizeHandle(bw, bh, sw);
+
+    // --- Selection highlight (drawn on top when bar is selected) ---
+    if (mindMap.timelineSelected) {
+      const margin = 4 / safeZ;
+      stroke(100, 180, 255, 220);
+      strokeWeight(sw * 2);
+      noFill();
+      rect(-margin, -margin, bw + margin * 2, bh + margin * 2, 3 / safeZ);
+    }
 
     // --- Hint label ---
     noStroke();
     fill(80, 100, 160, 160);
     textSize(9 / safeZ);
     textAlign(RIGHT, BOTTOM);
-    text('Ctrl+K: exit timeline', bw - 6 / safeZ, bh - 3 / safeZ);
+    text('Ctrl+K: remove timeline', bw - 6 / safeZ, bh - 3 / safeZ);
 
     pop();
   }
@@ -286,12 +302,22 @@ class TimelineMode {
     if (!mindMap) return;
     const bw   = mindMap.getTimelineBarWidth ? mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
     const bh   = TimelineMode.BAR_HEIGHT;
+    const barX = mindMap.timelineBarX || 0;
+    const barY = mindMap.timelineBarY || 0;
     const conns = (mindMap && mindMap.timelineConnections) ? mindMap.timelineConnections : [];
     const highlightedDays = new Set(conns.map(c => c.dayIndex));
     const startDate = (mindMap && mindMap.timelineStartDate) ? mindMap.timelineStartDate : new Date();
 
+    // Move drawing origin to bar position so local (0,0) coords are correct.
+    // The export caller already translates so world (0,0) maps to export-canvas origin,
+    // so adding barX/barY here places the bar at its world position.
+    pg.push();
+    pg.translate(barX, barY);
+
     // --- TimelineConnection arrows (drawn behind the bar so the bar sits on top) ---
     // Draw manually using pg.* calls because conn.draw() uses global p5 functions.
+    // Endpoints returned by _getConnectionEndpoints() are world-space; subtract barX/barY
+    // so they align with the translated drawing context.
     for (const conn of conns) {
       if (!conn || typeof conn._getConnectionEndpoints !== 'function') continue;
       const ep = conn._getConnectionEndpoints();
@@ -299,24 +325,30 @@ class TimelineMode {
       const { start, end: tick } = ep;
       if (!isFinite(start.x) || !isFinite(start.y)) continue;
 
-      const dx = tick.x - start.x;
-      const dy = tick.y - start.y;
+      // Convert world-space endpoints to bar-local coords for the translated pg context
+      const sx = start.x - barX;
+      const sy = start.y - barY;
+      const tx = tick.x - barX;
+      const ty = tick.y - barY;
+
+      const dx = tx - sx;
+      const dy = ty - sy;
       const len = Math.sqrt(dx * dx + dy * dy);
       if (len < 1) continue;
 
       const angle     = Math.atan2(dy, dx);
       const arrowSize = 12;
-      const ex = tick.x - arrowSize * Math.cos(angle);
-      const ey = tick.y - arrowSize * Math.sin(angle);
+      const ex = tx - arrowSize * Math.cos(angle);
+      const ey = ty - arrowSize * Math.sin(angle);
 
       pg.stroke(80, 100, 160);
       pg.strokeWeight(2);
       pg.noFill();
-      pg.line(start.x, start.y, ex, ey);
+      pg.line(sx, sy, ex, ey);
       pg.fill(80, 100, 160);
       pg.noStroke();
       pg.push();
-      pg.translate(tick.x, tick.y);
+      pg.translate(tx, ty);
       pg.rotate(angle);
       pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
       pg.pop();
@@ -417,6 +449,8 @@ class TimelineMode {
     pg.fill(80, 120, 200, 180);
     pg.noStroke();
     pg.rect(bw - 6, bh * 0.25, 6, bh * 0.5, 3);
+
+    pg.pop();
   }
 
   // ============================================================================
@@ -424,12 +458,16 @@ class TimelineMode {
   // ============================================================================
 
   /** @private */
-  static _drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap) {
+  static _drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap, barX = 0, barY = 0) {
     if (!mindMap) return;
     if (typeof worldMouseX === 'undefined' || typeof worldMouseY === 'undefined') return;
 
     const mx = worldMouseX();
     const my = worldMouseY();
+
+    // Convert world mouse coords to bar-local coords for hit testing and day lookup
+    const lx = mx - barX;
+    const ly = my - barY;
 
     // Determine which source box drives the snap:
     //   - connectingFrom: dragging a new connection from a box connector dot
@@ -441,11 +479,12 @@ class TimelineMode {
       sourceBox = mindMap.draggingConnection.conn.fromBox;
     }
     if (!sourceBox) return;
-    if (!TimelineMode.isOverBarWorld(mx, my, bw)) return;
+    if (!TimelineMode.isOverBarWorld(lx, ly, bw)) return;
 
-    const dayIndex = TimelineMode.dayFromWorldX(mx, bw);
-    const tx = TimelineMode.worldDayX(dayIndex, bw);
-    const ty = (sourceBox.y < bh / 2) ? 0 : bh;
+    const dayIndex = TimelineMode.dayFromWorldX(lx, bw);
+    const tx = TimelineMode.worldDayX(dayIndex, bw); // bar-local X (correct since we're inside translate)
+    // sourceBox.y is world-space; compare against world-space bar centre
+    const ty = (sourceBox.y < barY + bh / 2) ? 0 : bh;
 
     // Highlight the snap tick
     stroke(100, 200, 255, 255);

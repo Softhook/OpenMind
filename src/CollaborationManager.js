@@ -1560,26 +1560,42 @@ class CollaborationManager {
     // ============================================================================
 
     /**
-     * Syncs timeline active state to Yjs so remote users see the timeline.
-     * Called whenever toggleTimeline() changes mindMap.timelineActive.
+     * Syncs timeline state (active flag, bar position, bar width) to Yjs.
+     * Called whenever createTimeline() or handleTimelineRelease() changes timeline state.
      */
     syncTimelineActiveToYjs() {
         if (!this.ytimeline || !this.mindMap || this.isSyncing) return;
         const active = this.mindMap.timelineActive === true;
         this.ydoc.transact(() => {
             this.ytimeline.set('active', active);
+            this.ytimeline.set('x', this.mindMap.timelineBarX || 0);
+            this.ytimeline.set('y', this.mindMap.timelineBarY || 0);
+            if (this.mindMap.timelineBarWidth) {
+                this.ytimeline.set('width', this.mindMap.timelineBarWidth);
+            }
         });
     }
 
     /**
-     * Applies the remote timeline active state to the local mindMap.
+     * Applies the remote timeline state (active flag, position) to the local mindMap.
      * Called from the ytimeline observer.
      * @private
      */
     _applyRemoteTimelineActive() {
         if (!this.mindMap || !this.ytimeline) return;
         const active = this.ytimeline.get('active') === true;
-        if (active === this.mindMap.timelineActive) return; // nothing changed
+        // Apply position and width whenever the map changes (even if active flag is unchanged)
+        const remoteX = this.ytimeline.get('x');
+        const remoteY = this.ytimeline.get('y');
+        const remoteWidth = this.ytimeline.get('width');
+        if (typeof remoteX === 'number') this.mindMap.timelineBarX = remoteX;
+        if (typeof remoteY === 'number') this.mindMap.timelineBarY = remoteY;
+        if (typeof remoteWidth === 'number') this.mindMap.timelineBarWidth = remoteWidth;
+
+        if (active === this.mindMap.timelineActive) {
+            if (this.mindMap) this.mindMap.isDirty = true;
+            return;
+        }
         this.mindMap.timelineActive = active;
         if (active) {
             if (!this.mindMap.timelineStartDate) {
@@ -1590,6 +1606,8 @@ class CollaborationManager {
             if (!this.mindMap.timelineConnections) this.mindMap.timelineConnections = [];
         } else {
             this.mindMap.timelineDraggingResize = false;
+            this.mindMap.timelineBarDragging = false;
+            this.mindMap.timelineSelected = false;
         }
         if (this.mindMap) this.mindMap.isDirty = true;
     }

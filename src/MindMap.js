@@ -155,8 +155,13 @@ class MindMap {
     this.timelineConnections = [];
     // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH)
     this.timelineBarWidth = null;
+    // Bar position in world space (placed at cursor when created via Ctrl+K)
+    this.timelineBarX = 0;
+    this.timelineBarY = 0;
     // Currently selected timeline connection (for delete, visual highlight)
     this.selectedTimelineConnection = null;
+    // Whether the bar itself is selected (for move / delete)
+    this.timelineSelected = false;
 
     // Timeline Mode active state and configuration
     this.timelineActive = false;
@@ -164,6 +169,10 @@ class MindMap {
     this.timelineDraggingResize = false;
     this.timelineDragStartWorldX = 0;
     this.timelineDragStartWidth = 0;
+    // Bar body drag state (moving the whole bar)
+    this.timelineBarDragging = false;
+    this.timelineBarDragOffsetX = 0;
+    this.timelineBarDragOffsetY = 0;
   }
 
   // ============================================================================
@@ -517,10 +526,18 @@ class MindMap {
       : TimelineMode.DEFAULT_WIDTH;
   }
 
-  /** Toggle Timeline Mode on/off. */
-  toggleTimeline() {
+  /**
+   * Create a new timeline bar at the given world position, or remove it if already active.
+   * Replaces the old toggle behaviour with placement at cursor (like the N key for boxes).
+   * @param {number} worldX – world-space X to place the bar's left edge at
+   * @param {number} worldY – world-space Y to vertically centre the bar on
+   */
+  createTimeline(worldX = 0, worldY = 0) {
     if (!this.timelineActive) {
       this.timelineActive = true;
+      // Place bar so its vertical centre is at the cursor; left edge at worldX
+      this.timelineBarX = worldX;
+      this.timelineBarY = worldY - TimelineMode.BAR_HEIGHT / 2;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       this.timelineStartDate = today;
@@ -528,6 +545,8 @@ class MindMap {
     } else {
       this.timelineActive = false;
       this.timelineDraggingResize = false;
+      this.timelineBarDragging = false;
+      this.timelineSelected = false;
     }
     // Notify collaboration layer so remote users see the change
     if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
@@ -571,9 +590,22 @@ class MindMap {
    * Returns true if the event was consumed.
    */
   handleTimelineMousePressed(worldX, worldY) {
-    if (!this.timelineActive) return false;
+    if (!this.timelineActive) {
+      this.timelineSelected = false;
+      return false;
+    }
+    const barX = this.timelineBarX || 0;
+    const barY = this.timelineBarY || 0;
     const barWidth = this.getTimelineBarWidth();
-    if (!TimelineMode.isOverBarWorld(worldX, worldY, barWidth)) return false;
+    // Convert to bar-local coordinates for all geometry checks
+    const localX = worldX - barX;
+    const localY = worldY - barY;
+
+    if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) {
+      // Click outside the bar — clear bar selection and let normal handling proceed
+      this.timelineSelected = false;
+      return false;
+    }
 
     // If the click lands on a timeline connection's arrowhead, let handleMousePressed
     // handle it (timeline endpoint drag) rather than consuming it here.
@@ -585,30 +617,48 @@ class MindMap {
       }
     }
 
-    if (TimelineMode.isDragHandle(worldX, worldY, barWidth)) {
+    if (TimelineMode.isDragHandle(localX, localY, barWidth)) {
       this.timelineDraggingResize = true;
       this.timelineDragStartWorldX = worldX;
       this.timelineDragStartWidth = barWidth;
-      return true;
+    } else {
+      // Bar body click: select the bar and begin a move drag
+      this.timelineSelected = true;
+      this.timelineBarDragging = true;
+      this.timelineBarDragOffsetX = localX;
+      this.timelineBarDragOffsetY = localY;
+      // Clear other selections so the bar is the only thing selected
+      this.clearBoxSelection();
+      this.selectedBox = null;
+      this.clearConnectionSelection();
     }
-    // Bar body click: consume to prevent canvas deselection
     return true;
   }
 
   /**
-   * Handle a drag update in world coordinates for timeline resize.
+   * Handle a drag update in world coordinates for timeline resize or bar move.
    * Returns true if consumed.
    */
   handleTimelineDrag(worldX, worldY) {
+    if (this.timelineBarDragging) {
+      // Move the bar: offset was recorded at mousedown so dragging feels natural
+      this.timelineBarX = worldX - this.timelineBarDragOffsetX;
+      this.timelineBarY = worldY - this.timelineBarDragOffsetY;
+      return true;
+    }
     if (!this.timelineDraggingResize) return false;
     const newWidth = this.timelineDragStartWidth + (worldX - this.timelineDragStartWorldX);
     this.timelineBarWidth = Math.max(TimelineMode.MIN_WIDTH, newWidth);
     return true;
   }
 
-  /** End a timeline resize drag. */
+  /** End a timeline resize or move drag; sync position/size to collaborators. */
   handleTimelineRelease() {
+    const wasDragging = this.timelineBarDragging || this.timelineDraggingResize;
+    this.timelineBarDragging = false;
     this.timelineDraggingResize = false;
+    // Sync updated position or width to collaborators
+    if (wasDragging && MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
   }
 
   /**
@@ -617,11 +667,15 @@ class MindMap {
    */
   handleTimelineConnectionDropped(worldX, worldY, fromBox) {
     if (!this.timelineActive) return false;
+    const barX = this.timelineBarX || 0;
+    const barY = this.timelineBarY || 0;
     const barWidth = this.getTimelineBarWidth();
-    if (!TimelineMode.isOverBarWorld(worldX, worldY, barWidth)) return false;
+    const localX = worldX - barX;
+    const localY = worldY - barY;
+    if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) return false;
     if (!fromBox) return false;
-    if (TimelineMode.isDragHandle(worldX, worldY, barWidth)) return false;
-    const dayIndex = TimelineMode.dayFromWorldX(worldX, barWidth);
+    if (TimelineMode.isDragHandle(localX, localY, barWidth)) return false;
+    const dayIndex = TimelineMode.dayFromWorldX(localX, barWidth);
     this.addTimelineConnection(fromBox, dayIndex);
     return true;
   }
@@ -2595,6 +2649,9 @@ class MindMap {
 
     // Always clear connection multi-selection and single selected connection
     if (this.clearConnectionSelection) this.clearConnectionSelection();
+
+    // Clear timeline bar selection when clicking empty background
+    this.timelineSelected = false;
   }
 
   /**
@@ -2612,10 +2669,14 @@ class MindMap {
           const wx = worldMouseX();
           const wy = worldMouseY();
           const bw = this.getTimelineBarWidth();
+          const bx = this.timelineBarX || 0;
+          const by = this.timelineBarY || 0;
+          const lx = wx - bx;
+          const ly = wy - by;
 
           // Dropped on bar → change the day
-          if (TimelineMode.isOverBarWorld(wx, wy, bw) && !TimelineMode.isDragHandle(wx, wy, bw)) {
-            const newDay = TimelineMode.dayFromWorldX(wx, bw);
+          if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
+            const newDay = TimelineMode.dayFromWorldX(lx, bw);
             if (newDay !== conn.dayIndex) {
               const dup = this.timelineConnections.some(
                 c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
@@ -2667,8 +2728,12 @@ class MindMap {
         const wx = worldMouseX();
         const wy = worldMouseY();
         const bw = this.getTimelineBarWidth();
-        if (TimelineMode.isOverBarWorld(wx, wy, bw) && !TimelineMode.isDragHandle(wx, wy, bw)) {
-          const dayIndex = TimelineMode.dayFromWorldX(wx, bw);
+        const bx = this.timelineBarX || 0;
+        const by = this.timelineBarY || 0;
+        const lx = wx - bx;
+        const ly = wy - by;
+        if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
+          const dayIndex = TimelineMode.dayFromWorldX(lx, bw);
           this._wrapInTransaction(() => {
             this._unregisterConnection(conn);
             this.addTimelineConnection(conn.fromBox, dayIndex);
@@ -3413,6 +3478,9 @@ class MindMap {
       } else if (this.selectedTimelineConnection) {
         // Delete selected timeline connection
         this.removeTimelineConnection(this.selectedTimelineConnection);
+      } else if (this.timelineSelected) {
+        // Delete the timeline bar itself
+        this.createTimeline();
       }
       // Clear navigation mode after deleting single connection
       this.isArrowKeyNavigating = false;
@@ -3477,6 +3545,8 @@ class MindMap {
         : [],
       timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
+      timelineBarX: this.timelineBarX || 0,
+      timelineBarY: this.timelineBarY || 0,
       timelineActive: this.timelineActive || false,
       // Persist as ISO string so day-index labels show the same calendar dates
       // across reloads (without this, labels would shift to today each time).
@@ -3516,6 +3586,8 @@ class MindMap {
       this.selectedConnections.clear();
     }
     this.selectedTimelineConnection = null;
+    this.timelineSelected = false;
+    this.timelineBarDragging = false;
     this.timelineActive = false;
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;
@@ -3599,10 +3671,13 @@ class MindMap {
         }
       }
     }
-    // Restore persisted bar width
+    // Restore persisted bar width and position.
+    // Legacy files without barX/barY default to (0, 0) so old maps still work.
     this.timelineBarWidth = (data.timelineBarWidth && typeof data.timelineBarWidth === 'number')
       ? data.timelineBarWidth
       : null;
+    this.timelineBarX = (typeof data.timelineBarX === 'number') ? data.timelineBarX : 0;
+    this.timelineBarY = (typeof data.timelineBarY === 'number') ? data.timelineBarY : 0;
 
     // Restore timeline active state and start date.
     // timelineStartDate is persisted so that day-index labels show the same
