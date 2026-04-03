@@ -3489,6 +3489,17 @@ function isOverAnyInteractive() {
       if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) return true;
     } catch (_) { }
   }
+  // Check timeline connections (so arrowhead clicks are not swallowed by the marquee-select path)
+  if (mindMap.timelineConnections) {
+    for (let i = 0; i < mindMap.timelineConnections.length; i++) {
+      const tc = mindMap.timelineConnections[i];
+      if (!tc) continue;
+      try {
+        if (tc.isMouseOver && tc.isMouseOver()) return true;
+        if (tc.isMouseOverArrowHead && tc.isMouseOverArrowHead()) return true;
+      } catch (_) { }
+    }
+  }
   return false;
 }
 

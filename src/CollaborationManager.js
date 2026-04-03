@@ -2047,11 +2047,12 @@ class CollaborationManager {
                 });
             }
 
-            // Observe timeline active state changes (remote toggle)
+            // Observe timeline active state changes (remote toggle and undo/redo)
             if (this.ytimeline) {
                 this.ytimeline.observe((event) => {
-                    if (this.isSyncing) return;
-                    if (event.transaction.local) return;
+                    const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
+                    if (this.isSyncing && !isUndoRedo) return;
+                    if (event.transaction.local && !isUndoRedo) return;
                     this._applyRemoteTimelineActive();
                 });
             }
