@@ -1,11 +1,12 @@
 /**
  * TimelineMode.js - Horizontal calendar timeline overlay for mind mapping.
  *
- * Follows the ExtensionBridge "ghost plugin" pattern used by ThrustGame:
- *   - Zero CPU overhead when inactive (static check + immediate return)
- *   - Lazily loaded on first Ctrl+K key press
+ * Fully integrated into MindMap — no more singleton/lazy-loading pattern.
+ * All active state lives in the MindMap instance; this file provides:
+ *   - TimelineConnection class (arrow from a TextBox to a calendar-bar day tick)
+ *   - TimelineMode class with static constants + static utility/draw functions
  *
- * Keyboard shortcut : Ctrl+K – toggle Timeline Mode
+ * Keyboard shortcut : Ctrl+K – toggle Timeline Mode (handled in MindMap.toggleTimeline())
  *
  * World-space placement:
  *   The bar lives at world coordinates (0, 0).  It is drawn INSIDE the camera
@@ -41,10 +42,12 @@ class TimelineConnection {
   /**
    * @param {TextBox} fromBox   – source box
    * @param {number}  dayIndex  – 0 … TimelineMode.TOTAL_DAYS-1
+   * @param {*}       mindMap   – MindMap instance (for bar width lookup)
    */
-  constructor(fromBox, dayIndex) {
+  constructor(fromBox, dayIndex, mindMap = null) {
     this.fromBox  = fromBox;
     this.dayIndex = dayIndex;
+    this.mindMap  = mindMap;
     this.selected = false;
   }
 
@@ -59,9 +62,9 @@ class TimelineConnection {
    * @returns {{x:number, y:number}|null}
    */
   _getTickPoint() {
-    const inst = (typeof TimelineMode !== 'undefined') ? TimelineMode.instance : null;
-    if (!inst || !this.fromBox) return null;
-    const tx = inst._worldDayX(this.dayIndex);
+    const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
+    if (!this.fromBox) return null;
+    const tx = TimelineMode.worldDayX(this.dayIndex, barWidth);
     const ty = (this.fromBox.y < TimelineMode.BAR_HEIGHT / 2) ? 0 : TimelineMode.BAR_HEIGHT;
     return { x: tx, y: ty };
   }
@@ -183,9 +186,10 @@ class TimelineConnection {
    * Reconstruct a TimelineConnection from stored JSON.
    * @param {Object}              data        – {fromId, dayIndex}
    * @param {Map|Array<TextBox>}  boxesOrMap  – boxIdMap or boxes array
+   * @param {*}                   mindMap     – MindMap instance (optional)
    * @returns {TimelineConnection|null}
    */
-  static fromJSON(data, boxesOrMap) {
+  static fromJSON(data, boxesOrMap, mindMap = null) {
     if (!data || !data.fromId || data.dayIndex == null) return null;
     let fromBox = null;
     if (boxesOrMap instanceof Map) {
@@ -194,12 +198,12 @@ class TimelineConnection {
       fromBox = boxesOrMap.find(b => b && b.id === data.fromId);
     }
     if (!fromBox) return null;
-    return new TimelineConnection(fromBox, data.dayIndex);
+    return new TimelineConnection(fromBox, data.dayIndex, mindMap);
   }
 }
 
 // ==============================================================================
-// TimelineMode – the main timeline-bar overlay controller
+// TimelineMode – static constants and utility functions
 // ==============================================================================
 class TimelineMode {
   // ============================================================================
@@ -225,140 +229,121 @@ class TimelineMode {
   static DAY_TICK_H   = 18;
 
   // ============================================================================
-  // STATIC STATE
+  // STATIC GEOMETRY UTILITIES
   // ============================================================================
 
-  /** @type {TimelineMode|null} singleton instance */
-  static instance = null;
+  /** World X of a given day tick */
+  static worldDayX(dayIndex, barWidth) {
+    return (dayIndex / (TimelineMode.TOTAL_DAYS - 1)) * barWidth;
+  }
+
+  /** Day index (0 … TOTAL_DAYS-1) from a world X coordinate */
+  static dayFromWorldX(worldX, barWidth) {
+    const frac = Math.max(0, Math.min(1, worldX / barWidth));
+    return Math.round(frac * (TimelineMode.TOTAL_DAYS - 1));
+  }
+
+  /**
+   * True when (worldX, worldY) is within the interactive hit area of the bar.
+   * HIT_EXTEND provides a small tolerance around all four edges.
+   */
+  static isOverBarWorld(worldX, worldY, barWidth) {
+    const ext = TimelineMode.HIT_EXTEND;
+    return worldX >= -ext &&
+           worldX <= barWidth + ext &&
+           worldY >= -ext &&
+           worldY <= TimelineMode.BAR_HEIGHT + ext;
+  }
+
+  /**
+   * True when (worldX, worldY) is over the drag-resize handle at the right edge.
+   * Uses HANDLE_RADIUS as a world-unit tolerance.
+   */
+  static isDragHandle(worldX, worldY, barWidth) {
+    const r = TimelineMode.HANDLE_RADIUS;
+    return Math.abs(worldX - barWidth) <= r &&
+           worldY >= -r && worldY <= TimelineMode.BAR_HEIGHT + r;
+  }
+
+  /** Returns the Date corresponding to a given day index */
+  static dateForDay(dayIndex, startDate) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + dayIndex);
+    return d;
+  }
+
+  /** ISO week number */
+  static weekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  }
 
   // ============================================================================
-  // STATIC INTERFACE  (called from sketch.js)
+  // STATIC DRAW METHODS
   // ============================================================================
 
   /**
-   * Main draw hook – called every frame from sketch.js INSIDE the camera
-   * transform so the bar zooms/pans with the map.
-   * Zero overhead when not loaded; near-zero when loaded-but-inactive.
-   * @param {*} collaborationManager  – unused, passed for convention parity
-   * @param {*} mindMap               – current MindMap instance
-   */
-  static loop(collaborationManager, mindMap) {
-    if (!TimelineMode.instance || !TimelineMode.instance.active) return;
-    TimelineMode.instance.mindMap = mindMap;
-    TimelineMode.instance.draw();
-  }
-
-  /**
-   * Keyboard handler.  Returns true if the event was consumed.
-   * @param {string}  key     – p5.js `key` value
-   * @param {number}  keyCode – p5.js `keyCode` value
-   * @param {*}       mindMap
-   * @param {Object}  options – { isCtrl }
-   */
-  static handleInput(key, keyCode, mindMap, options = {}) {
-    const isCtrl = options.isCtrl ?? TimelineMode._isCtrlPressed();
-    if ((key === 'k' || key === 'K') && isCtrl) {
-      TimelineMode.toggle(mindMap);
-      return true;
-    }
-    return false;
-  }
-
-  /** Portable ctrl-key detection (mirrors ThrustGame pattern) */
-  static _isCtrlPressed() {
-    try {
-      if (typeof keyIsDown === 'function' && keyIsDown(17)) return true;
-      if (typeof window !== 'undefined' && window.event && window.event.ctrlKey) return true;
-    } catch (e) { /* ignore */ }
-    return false;
-  }
-
-  /** Toggle Timeline Mode on/off */
-  static toggle(mindMap) {
-    if (!TimelineMode.instance) TimelineMode.instance = new TimelineMode(mindMap);
-    TimelineMode.instance.mindMap = mindMap;
-    // Restore persisted bar width if available
-    if (mindMap && mindMap.timelineBarWidth) {
-      TimelineMode.instance.barWorldWidth = mindMap.timelineBarWidth;
-    }
-    if (!TimelineMode.instance.active) {
-      TimelineMode.instance.start();
-    } else {
-      TimelineMode.instance.stop();
-    }
-  }
-
-  /**
-   * Mouse-press handler – call from sketch.js mousePressed() BEFORE normal
-   * mindMap handling.  Receives WORLD coordinates.
-   * Returns true if the event was consumed (bar was clicked).
-   * @param {number} worldX  – world-space mouse X (worldMouseX())
-   * @param {number} worldY  – world-space mouse Y (worldMouseY())
-   * @param {*}      mindMap
-   */
-  static handleMousePressed(worldX, worldY, mindMap) {
-    if (!TimelineMode.instance || !TimelineMode.instance.active) return false;
-    return TimelineMode.instance.handleMouseDown(worldX, worldY, mindMap);
-  }
-
-  /**
-   * Mouse-drag handler – call from sketch.js mouseDragged().
-   * Receives WORLD coordinates.
-   * Returns true if the drag was consumed (resize in progress).
-   * @param {number} worldX
-   * @param {number} worldY
-   */
-  static handleMouseDragged(worldX, worldY) {
-    if (!TimelineMode.instance || !TimelineMode.instance.active) return false;
-    return TimelineMode.instance.handleDrag(worldX, worldY);
-  }
-
-  /**
-   * Mouse-release handler – call from sketch.js mouseReleased().
-   * Finalises a resize drag and persists the new width.
-   */
-  static handleMouseReleased() {
-    if (!TimelineMode.instance) return;
-    TimelineMode.instance.handleRelease();
-  }
-
-  /**
-   * Called from sketch.js mouseReleased() when a connection drag ends over the
-   * timeline bar.  Creates a TimelineConnection from the source box to the
-   * nearest day tick via mindMap.addTimelineConnection() (undo-tracked).
+   * Draw the full timeline bar for the live canvas.
+   * Must be called INSIDE the camera transform (push/translate/scale already applied).
+   * Reads all state from mindMap.
    *
-   * @param {number} worldX   – world-space mouse X where the drag ended
-   * @param {number} worldY   – world-space mouse Y where the drag ended
-   * @param {*}      fromBox  – TextBox that the connection was dragged from
-   * @param {*}      mindMap  – current MindMap instance
-   * @returns {boolean} true if a connection was created
+   * @param {*} mindMap – current MindMap instance
    */
-  static handleConnectionDropped(worldX, worldY, fromBox, mindMap) {
-    const inst = TimelineMode.instance;
-    if (!inst || !inst.active) return false;
-    if (!inst._isOverBarWorld(worldX, worldY)) return false;
-    if (!fromBox || !mindMap) return false;
-    if (inst._isDragHandle(worldX, worldY)) return false; // don't create connection on handle
+  static drawBar(mindMap) {
+    if (!mindMap || !mindMap.timelineActive || !mindMap.timelineStartDate) return;
 
-    const dayIndex = inst._dayFromWorldX(worldX);
-    if (typeof mindMap.addTimelineConnection === 'function') {
-      mindMap.addTimelineConnection(fromBox, dayIndex);
-    } else {
-      // Fallback when MindMap hasn't been updated yet
-      if (!mindMap.timelineConnections) mindMap.timelineConnections = [];
-      const exists = mindMap.timelineConnections.some(
-        c => c.fromBox === fromBox && c.dayIndex === dayIndex
-      );
-      if (!exists) {
-        mindMap.timelineConnections.push(new TimelineConnection(fromBox, dayIndex));
+    const bw      = mindMap.getTimelineBarWidth();
+    const bh      = TimelineMode.BAR_HEIGHT;
+    const conns   = mindMap.timelineConnections || [];
+    const startDate = mindMap.timelineStartDate;
+
+    // Zoom compensation: keep strokes and text the same pixel size on screen
+    const z     = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
+    const safeZ = Math.max(0.01, z);
+    const sw    = 1 / safeZ;  // stroke weight for 1px on screen
+    const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
+
+    push();
+
+    // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
+    for (const conn of conns) {
+      if (typeof conn.draw === 'function') {
+        try { conn.draw(); } catch (e) { /* skip broken connection */ }
       }
     }
-    return true;
-  }
 
-  // ============================================================================
-  // EXPORT HELPER  (called from ExportManager inside push/translate context)
-  // ============================================================================
+    // --- Bar background ---
+    noStroke();
+    fill(15, 20, 40, 210);
+    rect(0, 0, bw, bh);
+
+    // --- Bar border ---
+    stroke(60, 80, 140, 180);
+    strokeWeight(sw);
+    noFill();
+    rect(0, 0, bw, bh);
+
+    // --- Gradations (ticks, labels) ---
+    const highlightedDays = new Set(conns.map(c => c.dayIndex));
+    TimelineMode._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate);
+
+    // --- Snap preview: highlight nearest tick while dragging a connection ---
+    TimelineMode._drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap);
+
+    // --- Resize handle ---
+    TimelineMode._drawResizeHandle(bw, bh, sw);
+
+    // --- Hint label ---
+    noStroke();
+    fill(80, 100, 160, 160);
+    textSize(9 / safeZ);
+    textAlign(RIGHT, BOTTOM);
+    text('Ctrl+K: exit timeline', bw - 6 / safeZ, bh - 3 / safeZ);
+
+    pop();
+  }
 
   /**
    * Draw the timeline bar into a p5 graphics buffer.
@@ -367,21 +352,19 @@ class TimelineMode {
    * Text and stroke weights are drawn at world scale (zoom = 1 for exports).
    *
    * @param {p5.Graphics} pg      – offscreen graphics buffer
-   * @param {*}           mindMap – used to resolve box positions
+   * @param {*}           mindMap – used to resolve box positions and bar width
    */
   static drawToGraphics(pg, mindMap) {
-    if (!TimelineMode.instance) return;
-    const inst = TimelineMode.instance;
-    const bw   = inst.barWorldWidth;
+    if (!mindMap) return;
+    const bw   = mindMap.getTimelineBarWidth ? mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
     const bh   = TimelineMode.BAR_HEIGHT;
     const conns = (mindMap && mindMap.timelineConnections) ? mindMap.timelineConnections : [];
     const highlightedDays = new Set(conns.map(c => c.dayIndex));
+    const startDate = (mindMap && mindMap.timelineStartDate) ? mindMap.timelineStartDate : new Date();
 
     // --- TimelineConnection arrows (drawn behind the bar so the bar sits on top) ---
     for (const conn of conns) {
       if (typeof conn.draw !== 'function') continue;
-      // Temporarily swap drawing functions to draw into pg
-      // We re-implement drawing here to use pg's methods directly
       const tick = conn._getTickPoint && conn._getTickPoint();
       if (!tick || !conn.fromBox || typeof conn.fromBox.getConnectionPoint !== 'function') continue;
       const start = conn.fromBox.getConnectionPoint(tick);
@@ -427,12 +410,11 @@ class TimelineMode {
     const showDayNums  = dayWorldPx >= 14;
     const showWeekNums = dayWorldPx >= 4;
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const startDate = inst.startDate || new Date();
     let currentMonth = -1;
 
     for (let d = 0; d < totalDays; d++) {
-      const date = inst._dateForDay(d);
-      const x   = inst._worldDayX(d);
+      const date = TimelineMode.dateForDay(d, startDate);
+      const x   = TimelineMode.worldDayX(d, bw);
       const dom = date.getDate();
       const mon = date.getMonth();
       const dow = date.getDay();
@@ -463,7 +445,7 @@ class TimelineMode {
           pg.fill(140, 160, 220, 180);
           pg.textSize(9);
           pg.textAlign(pg.CENTER, pg.BOTTOM);
-          pg.text('W' + inst._weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2);
+          pg.text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2);
         }
       }
 
@@ -509,224 +491,21 @@ class TimelineMode {
   }
 
   // ============================================================================
-  // CONSTRUCTOR
+  // PRIVATE STATIC DRAW HELPERS
   // ============================================================================
 
-  /**
-   * @param {*} mindMap – MindMap instance (may be null; set later on each loop)
-   */
-  constructor(mindMap = null) {
-    this.mindMap        = mindMap;
-    this.active         = false;
-    this.startDate      = null;
-    this.barWorldWidth  = TimelineMode.DEFAULT_WIDTH;
-
-    // Resize-drag internal state
-    this._draggingResize  = false;
-    this._dragStartWorldX = 0;
-    this._dragStartWidth  = 0;
-  }
-
-  // ============================================================================
-  // LIFECYCLE
-  // ============================================================================
-
-  start() {
-    this.active = true;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    this.startDate = today;
-    if (this.mindMap && !this.mindMap.timelineConnections) {
-      this.mindMap.timelineConnections = [];
-    }
-  }
-
-  stop() {
-    this.active = false;
-    this._draggingResize = false;
-    // Soft connections remain stored on mindMap.timelineConnections.
-  }
-
-  // ============================================================================
-  // GEOMETRY HELPERS  (world space)
-  // ============================================================================
-
-  /** World X of a given day tick */
-  _worldDayX(dayIndex) {
-    return (dayIndex / (TimelineMode.TOTAL_DAYS - 1)) * this.barWorldWidth;
-  }
-
-  /** Day index (0 … TOTAL_DAYS-1) from a world X coordinate */
-  _dayFromWorldX(worldX) {
-    const frac = Math.max(0, Math.min(1, worldX / this.barWorldWidth));
-    return Math.round(frac * (TimelineMode.TOTAL_DAYS - 1));
-  }
-
-  /**
-   * True when (worldX, worldY) is within the interactive hit area of the bar.
-   * HIT_EXTEND provides a small tolerance around all four edges.
-   */
-  _isOverBarWorld(worldX, worldY) {
-    const ext = TimelineMode.HIT_EXTEND;
-    return worldX >= -ext &&
-           worldX <= this.barWorldWidth + ext &&
-           worldY >= -ext &&
-           worldY <= TimelineMode.BAR_HEIGHT + ext;
-  }
-
-  /**
-   * True when (worldX, worldY) is over the drag-resize handle at the right edge.
-   * Uses HANDLE_RADIUS as a world-unit tolerance.
-   */
-  _isDragHandle(worldX, worldY) {
-    const r = TimelineMode.HANDLE_RADIUS;
-    return Math.abs(worldX - this.barWorldWidth) <= r &&
-           worldY >= -r && worldY <= TimelineMode.BAR_HEIGHT + r;
-  }
-
-  /** Returns the Date corresponding to a given day index */
-  _dateForDay(dayIndex) {
-    const d = new Date(this.startDate);
-    d.setDate(d.getDate() + dayIndex);
-    return d;
-  }
-
-  /** Convenience: returns the soft-connections array from mindMap */
-  _connections() {
-    return (this.mindMap && this.mindMap.timelineConnections)
-      ? this.mindMap.timelineConnections
-      : [];
-  }
-
-  /** ISO week number */
-  _weekNumber(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  }
-
-  // ============================================================================
-  // INTERACTION
-  // ============================================================================
-
-  /**
-   * Handle a mouse-press in world coordinates.
-   * Only handles the resize handle; connection creation is handled by
-   * TimelineMode.handleConnectionDropped() on mouse release.
-   * Returns true if the event was consumed.
-   */
-  handleMouseDown(worldX, worldY, mindMap) {
-    if (!this._isOverBarWorld(worldX, worldY)) return false;
-
-    // Consume resize-handle presses
-    if (this._isDragHandle(worldX, worldY)) {
-      this._draggingResize  = true;
-      this._dragStartWorldX = worldX;
-      this._dragStartWidth  = this.barWorldWidth;
-      return true;
-    }
-
-    // Clicks on the bar body (non-handle) are consumed to prevent the camera
-    // from interpreting them as empty-canvas clicks (which would deselect boxes).
-    return true;
-  }
-
-  /**
-   * Handle a drag update in world coordinates.
-   * Updates barWorldWidth while dragging the resize handle.
-   * Returns true if consumed.
-   */
-  handleDrag(worldX, worldY) {
-    if (!this._draggingResize) return false;
-    const newWidth = this._dragStartWidth + (worldX - this._dragStartWorldX);
-    this.barWorldWidth = Math.max(TimelineMode.MIN_WIDTH, newWidth);
-    return true;
-  }
-
-  /**
-   * Handle mouse-release: end resize drag and persist the new width.
-   */
-  handleRelease() {
-    if (this._draggingResize && this.mindMap) {
-      this.mindMap.timelineBarWidth = this.barWorldWidth;
-    }
-    this._draggingResize = false;
-  }
-
-  // ============================================================================
-  // DRAWING  (called INSIDE camera transform — pure world-space)
-  // ============================================================================
-
-  draw() {
-    if (!this.active || !this.startDate) return;
-
-    const bw   = this.barWorldWidth;
-    const bh   = TimelineMode.BAR_HEIGHT;
-    const conns = this._connections();
-
-    // Zoom compensation: keep strokes and text the same pixel size on screen
-    const z     = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
-    const safeZ = Math.max(0.01, z);
-    const sw    = 1 / safeZ;  // stroke weight for 1px on screen
-    const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
-
-    push();
-
-    // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
-    for (const conn of conns) {
-      if (typeof conn.draw === 'function') {
-        try { conn.draw(); } catch (e) { /* skip broken connection */ }
-      }
-    }
-
-    // --- Bar background ---
-    noStroke();
-    fill(15, 20, 40, 210);
-    rect(0, 0, bw, bh);
-
-    // --- Bar border ---
-    stroke(60, 80, 140, 180);
-    strokeWeight(sw);
-    noFill();
-    rect(0, 0, bw, bh);
-
-    // --- Gradations (ticks, labels) ---
-    const highlightedDays = new Set(conns.map(c => c.dayIndex));
-    this._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts);
-
-    // --- Snap preview: highlight nearest tick while dragging a connection ---
-    this._drawConnectionDragPreview(bw, bh, safeZ, sw);
-
-    // --- Resize handle ---
-    this._drawResizeHandle(bw, bh, sw);
-
-    // --- Hint label ---
-    noStroke();
-    fill(80, 100, 160, 160);
-    textSize(9 / safeZ);
-    textAlign(RIGHT, BOTTOM);
-    text('Ctrl+K: exit timeline', bw - 6 / safeZ, bh - 3 / safeZ);
-
-    pop();
-  }
-
-  /**
-   * Draws a visual snap indicator on the nearest tick while a connection drag
-   * is in progress (mindMap.connectingFrom is set and mouse is over the bar).
-   * @private
-   */
-  _drawConnectionDragPreview(bw, bh, safeZ, sw) {
-    if (!this.mindMap || !this.mindMap.connectingFrom) return;
+  /** @private */
+  static _drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap) {
+    if (!mindMap || !mindMap.connectingFrom) return;
     if (typeof worldMouseX === 'undefined' || typeof worldMouseY === 'undefined') return;
 
     const mx = worldMouseX();
     const my = worldMouseY();
-    if (!this._isOverBarWorld(mx, my)) return;
+    if (!TimelineMode.isOverBarWorld(mx, my, bw)) return;
 
-    const dayIndex = this._dayFromWorldX(mx);
-    const tx = this._worldDayX(dayIndex);
-    const ty = (this.mindMap.connectingFrom.box && this.mindMap.connectingFrom.box.y < bh / 2) ? 0 : bh;
+    const dayIndex = TimelineMode.dayFromWorldX(mx, bw);
+    const tx = TimelineMode.worldDayX(dayIndex, bw);
+    const ty = (mindMap.connectingFrom.box && mindMap.connectingFrom.box.y < bh / 2) ? 0 : bh;
 
     // Highlight the snap tick
     stroke(100, 200, 255, 255);
@@ -741,7 +520,8 @@ class TimelineMode {
     circle(tx, ty, 8 * sw);
   }
 
-  _drawGradations(bw, bh, highlightedDays, safeZ, sw, ts) {
+  /** @private */
+  static _drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate) {
     const totalDays    = TimelineMode.TOTAL_DAYS;
     const dayWorldPx   = bw / (totalDays - 1);
     const showDayNums  = dayWorldPx * safeZ >= 14; // visible at ≥14 screen-px/day
@@ -751,8 +531,8 @@ class TimelineMode {
     let currentMonth = -1;
 
     for (let d = 0; d < totalDays; d++) {
-      const date = this._dateForDay(d);
-      const x   = this._worldDayX(d);
+      const date = TimelineMode.dateForDay(d, startDate);
+      const x   = TimelineMode.worldDayX(d, bw);
       const dom = date.getDate();
       const mon = date.getMonth();
       const dow = date.getDay();   // 0=Sun … 6=Sat
@@ -785,7 +565,7 @@ class TimelineMode {
           fill(140, 160, 220, 180);
           textSize(9 / safeZ);
           textAlign(CENTER, BOTTOM);
-          text('W' + this._weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2 / safeZ);
+          text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2 / safeZ);
         }
       }
 
@@ -827,7 +607,8 @@ class TimelineMode {
     }
   }
 
-  _drawResizeHandle(bw, bh, sw) {
+  /** @private */
+  static _drawResizeHandle(bw, bh, sw) {
     const hr  = bh * 0.5;  // handle height (half bar height)
     const hx  = bw;
     const hy  = bh / 2;
@@ -849,10 +630,10 @@ class TimelineMode {
 // ==============================================================================
 // MODULE EXPORT (for Jest / Node.js)
 // ==============================================================================
-if (typeof module !== 'undefined' && module.exports) module.exports = TimelineMode;
-
-// Also expose TimelineConnection globally
-if (typeof module !== 'undefined' && module.exports) module.exports.TimelineConnection = TimelineConnection;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = TimelineMode;
+  module.exports.TimelineConnection = TimelineConnection;
+}
 
 // ==============================================================================
 // BROWSER SELF-REGISTRATION
@@ -862,4 +643,3 @@ if (typeof window !== 'undefined') {
   window.TimelineMode = TimelineMode;
   window.TimelineConnection = TimelineConnection;
 }
-

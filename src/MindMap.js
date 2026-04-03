@@ -151,6 +151,13 @@ class MindMap {
     this.timelineBarWidth = null;
     // Currently selected timeline connection (for delete, visual highlight)
     this.selectedTimelineConnection = null;
+
+    // Timeline Mode active state (fully integrated — no more TimelineMode singleton)
+    this.timelineActive = false;
+    this.timelineStartDate = null;
+    this.timelineDraggingResize = false;
+    this.timelineDragStartWorldX = 0;
+    this.timelineDragStartWidth = 0;
   }
 
   // ============================================================================
@@ -462,10 +469,7 @@ class MindMap {
     if (already) return;
 
     this._wrapInTransaction(() => {
-      // Use TimelineConnection class if loaded; fall back to plain object
-      const conn = (typeof TimelineConnection !== 'undefined')
-        ? new TimelineConnection(fromBox, dayIndex)
-        : { fromBox, dayIndex, toJSON() { return { fromId: fromBox.id, dayIndex }; } };
+      const conn = new TimelineConnection(fromBox, dayIndex, this);
       this.timelineConnections.push(conn);
       if (MindMap.onTimelineConnectionsChange) {
         MindMap.onTimelineConnectionsChange(true);
@@ -495,6 +499,82 @@ class MindMap {
         }
       }
     });
+  }
+
+  /** Returns the current bar width, falling back to DEFAULT_WIDTH. */
+  getTimelineBarWidth() {
+    return (this.timelineBarWidth && typeof this.timelineBarWidth === 'number')
+      ? this.timelineBarWidth
+      : TimelineMode.DEFAULT_WIDTH;
+  }
+
+  /** Toggle Timeline Mode on/off. */
+  toggleTimeline() {
+    if (!this.timelineActive) {
+      this.timelineActive = true;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      this.timelineStartDate = today;
+      if (!this.timelineConnections) this.timelineConnections = [];
+    } else {
+      this.timelineActive = false;
+      this.timelineDraggingResize = false;
+    }
+  }
+
+  /** Draw the timeline bar (thin wrapper around TimelineMode.drawBar). */
+  drawTimeline() {
+    if (!this.timelineActive || !this.timelineStartDate) return;
+    TimelineMode.drawBar(this);
+  }
+
+  /**
+   * Handle a mouse-press in world coordinates for the timeline bar.
+   * Returns true if the event was consumed.
+   */
+  handleTimelineMousePressed(worldX, worldY) {
+    if (!this.timelineActive) return false;
+    const barWidth = this.getTimelineBarWidth();
+    if (!TimelineMode.isOverBarWorld(worldX, worldY, barWidth)) return false;
+    if (TimelineMode.isDragHandle(worldX, worldY, barWidth)) {
+      this.timelineDraggingResize = true;
+      this.timelineDragStartWorldX = worldX;
+      this.timelineDragStartWidth = barWidth;
+      return true;
+    }
+    // Bar body click: consume to prevent canvas deselection
+    return true;
+  }
+
+  /**
+   * Handle a drag update in world coordinates for timeline resize.
+   * Returns true if consumed.
+   */
+  handleTimelineDrag(worldX, worldY) {
+    if (!this.timelineDraggingResize) return false;
+    const newWidth = this.timelineDragStartWidth + (worldX - this.timelineDragStartWorldX);
+    this.timelineBarWidth = Math.max(TimelineMode.MIN_WIDTH, newWidth);
+    return true;
+  }
+
+  /** End a timeline resize drag. */
+  handleTimelineRelease() {
+    this.timelineDraggingResize = false;
+  }
+
+  /**
+   * Handle a connection drag dropped over the timeline bar.
+   * Returns true if a timeline connection was created.
+   */
+  handleTimelineConnectionDropped(worldX, worldY, fromBox) {
+    if (!this.timelineActive) return false;
+    const barWidth = this.getTimelineBarWidth();
+    if (!TimelineMode.isOverBarWorld(worldX, worldY, barWidth)) return false;
+    if (!fromBox) return false;
+    if (TimelineMode.isDragHandle(worldX, worldY, barWidth)) return false;
+    const dayIndex = TimelineMode.dayFromWorldX(worldX, barWidth);
+    this.addTimelineConnection(fromBox, dayIndex);
+    return true;
   }
 
   /**
@@ -3248,6 +3328,7 @@ class MindMap {
         : [],
       timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
+      timelineActive: this.timelineActive || false,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3282,6 +3363,10 @@ class MindMap {
     if (this.selectedConnections) {
       this.selectedConnections.clear();
     }
+    this.selectedTimelineConnection = null;
+    this.timelineActive = false;
+    this.timelineStartDate = null;
+    this.timelineDraggingResize = false;
 
     // Load boxes with error handling
     // Use safe iteration utility if available
@@ -3349,24 +3434,14 @@ class MindMap {
     }
 
     // Restore Timeline Mode connections
-    // Prefer TimelineConnection.fromJSON() for full object restoration; fall back
-    // to plain data (backwards-compatible with saves from before this version).
     this.timelineConnections = [];
     this.selectedTimelineConnection = null;
     if (Array.isArray(data.timelineConnections)) {
       for (const tcData of data.timelineConnections) {
         if (!tcData) continue;
         try {
-          let tc = null;
-          if (typeof TimelineConnection !== 'undefined') {
-            tc = TimelineConnection.fromJSON(tcData, this.boxIdMap);
-          }
-          if (tc) {
-            this.timelineConnections.push(tc);
-          } else if (tcData.fromId && tcData.dayIndex != null) {
-            // Plain data fallback (loaded before TimelineConnection class is available)
-            this.timelineConnections.push(tcData);
-          }
+          const tc = TimelineConnection.fromJSON(tcData, this.boxIdMap, this);
+          if (tc) this.timelineConnections.push(tc);
         } catch (e) {
           console.error('Failed to load timeline connection:', e);
         }
@@ -3376,6 +3451,14 @@ class MindMap {
     this.timelineBarWidth = (data.timelineBarWidth && typeof data.timelineBarWidth === 'number')
       ? data.timelineBarWidth
       : null;
+
+    // Restore timeline active state
+    this.timelineActive = data.timelineActive === true;
+    if (this.timelineActive) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      this.timelineStartDate = today;
+    }
 
     this.isDirty = true;
 

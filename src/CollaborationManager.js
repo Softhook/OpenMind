@@ -1620,7 +1620,6 @@ class CollaborationManager {
      */
     _rebuildTimelineConnectionsFromYjs() {
         if (!this.mindMap || !this.ytimelineConnections) return;
-        if (typeof TimelineConnection === 'undefined') return;
 
         this.mindMap.timelineConnections = [];
         if (this.mindMap.selectedTimelineConnection) {
@@ -1631,7 +1630,7 @@ class CollaborationManager {
             if (!entry || !entry.fromId || entry.dayIndex == null) continue;
             const fromBox = this.mindMap.getBoxById(entry.fromId);
             if (fromBox) {
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, entry.dayIndex));
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, entry.dayIndex, this.mindMap));
             }
         }
     }

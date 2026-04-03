@@ -1466,10 +1466,8 @@ function draw() {
       }
 
       // Timeline Mode: world-space overlay (drawn inside camera transform so it
-      // zooms and pans with the map — zero overhead when not loaded/active)
-      if (typeof TimelineMode !== 'undefined') {
-        TimelineMode.loop(collaborationManager, mindMap);
-      }
+      // zooms and pans with the map)
+      mindMap.drawTimeline();
 
       pop();
 
@@ -2025,10 +2023,7 @@ function mousePressed(e) {
       }
 
       // Timeline Mode: intercept clicks on the calendar bar (world coords).
-      // Clicking on the resize handle starts a drag; clicking a tick with a
-      // selected box creates/removes a soft connection.
-      if (typeof TimelineMode !== 'undefined' &&
-          TimelineMode.handleMousePressed(worldMouseX(), worldMouseY(), mindMap)) {
+      if (mindMap.handleTimelineMousePressed(worldMouseX(), worldMouseY())) {
         return false;
       }
 
@@ -2093,21 +2088,19 @@ function mouseReleased() {
   if (mindMap) {
     // Timeline Mode: intercept connection drags that end over the timeline bar.
     // This must happen BEFORE handleMouseReleased so completeConnection() is not called.
-    if (mindMap.connectingFrom &&
-        typeof TimelineMode !== 'undefined' &&
-        TimelineMode.instance && TimelineMode.instance.active) {
+    if (mindMap.connectingFrom && mindMap.timelineActive) {
       const wx = worldMouseX();
       const wy = worldMouseY();
-      if (TimelineMode.instance._isOverBarWorld(wx, wy)) {
+      const barWidth = mindMap.getTimelineBarWidth();
+      if (TimelineMode.isOverBarWorld(wx, wy, barWidth)) {
         const sourceBox = mindMap.connectingFrom.box;
         // Clear connectingFrom BEFORE handleMouseReleased to prevent completeConnection()
         mindMap.connectingFrom = null;
         mindMap.connectingFromInitiatedByKeyboard = false;
-        TimelineMode.handleConnectionDropped(wx, wy, sourceBox, mindMap);
+        mindMap.handleTimelineConnectionDropped(wx, wy, sourceBox);
         // Still need handleMouseReleased to stop any box drags
         try { mindMap.handleMouseReleased(); } catch (e) { /* ignore */ }
-        // Also finalize any timeline resize drag
-        if (typeof TimelineMode !== 'undefined') TimelineMode.handleMouseReleased();
+        mindMap.handleTimelineRelease();
         return false;
       }
     }
@@ -2120,8 +2113,8 @@ function mouseReleased() {
   }
 
   // Timeline Mode: finalise any resize drag and persist new bar width
-  if (typeof TimelineMode !== 'undefined') {
-    TimelineMode.handleMouseReleased();
+  if (mindMap) {
+    mindMap.handleTimelineRelease();
   }
 }
 
@@ -2146,8 +2139,7 @@ function mouseDragged() {
   }
 
   // Timeline Mode: handle resize drag (world coords; consumed if resize is active)
-  if (typeof TimelineMode !== 'undefined' &&
-      TimelineMode.handleMouseDragged(worldMouseX(), worldMouseY())) {
+  if (mindMap && mindMap.handleTimelineDrag(worldMouseX(), worldMouseY())) {
     return false;
   }
 
@@ -2255,15 +2247,7 @@ function keyPressed() {
 
   // PRIORITY: Handle Timeline Mode toggle (Ctrl+K)
   if ((key === 'k' || key === 'K') && isCtrl) {
-    if (typeof TimelineMode === 'undefined') {
-      ExtensionBridge.load('TimelineMode', ['src/TimelineMode.js'], () => {
-        if (typeof TimelineMode !== 'undefined') {
-          TimelineMode.handleInput(key, keyCode, mindMap, { isCtrl });
-        }
-      });
-    } else {
-      TimelineMode.handleInput(key, keyCode, mindMap, { isCtrl });
-    }
+    if (mindMap) mindMap.toggleTimeline();
     return false;
   }
 
