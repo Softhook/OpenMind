@@ -57,6 +57,9 @@ class MindMap {
   // Stroke weight for connection preview (in pixels)
   static STROKE_WEIGHT_PREVIEW = 2;
 
+  // Fallback bar width (px) used when TimelineMode is not loaded
+  static FALLBACK_TIMELINE_WIDTH = 800;
+
   // ============================================================================
   // COLLABORATION CALLBACKS
   // ============================================================================
@@ -506,7 +509,7 @@ class MindMap {
 
   /** Returns the current bar width, falling back to DEFAULT_WIDTH. */
   getTimelineBarWidth() {
-    if (typeof TimelineMode === 'undefined') return 800; // safe fallback
+    if (typeof TimelineMode === 'undefined') return MindMap.FALLBACK_TIMELINE_WIDTH;
     return (this.timelineBarWidth && typeof this.timelineBarWidth === 'number')
       ? this.timelineBarWidth
       : TimelineMode.DEFAULT_WIDTH;
