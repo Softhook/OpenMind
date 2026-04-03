@@ -570,15 +570,22 @@ class MindMap {
 
     if (!this.timelineActive) {
       this.timelineActive = true;
-      // Place bar so its vertical centre is at the cursor; left edge at worldX
-      this.timelineBarX = worldX;
-      this.timelineBarY = worldY - barHalfHeight;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      this.timelineStartDate = today;
-      this.timelineTotalDays = (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
-        ? TimelineMode.DEFAULT_TOTAL_DAYS
-        : 31;
+      // Only initialise position and start date for a genuinely fresh timeline.
+      // If the bar was previously active (timelineStartDate already set), preserve
+      // the original bar position, start date, and total days so that existing
+      // connections remain anchored to the correct calendar dates.
+      if (!this.timelineStartDate) {
+        // Fresh create: place bar so its vertical centre is at the cursor
+        this.timelineBarX = worldX;
+        this.timelineBarY = worldY - barHalfHeight;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        this.timelineStartDate = today;
+        this.timelineTotalDays = (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+          ? TimelineMode.DEFAULT_TOTAL_DAYS
+          : 31;
+      }
+      // Ensure the connections array exists (may have been cleared by a hard reset)
       if (!this.timelineConnections) this.timelineConnections = [];
     } else {
       this.timelineActive = false;
