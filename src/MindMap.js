@@ -329,13 +329,19 @@ class MindMap {
    */
   _performConnectionDeletion(connectionsToDelete) {
     if (!connectionsToDelete || connectionsToDelete.length === 0) return;
-    const connSet = new Set(connectionsToDelete);
 
-    // Separate timeline connections from regular connections
-    const timelineConns = connectionsToDelete.filter(
-      c => this.timelineConnections && this.timelineConnections.includes(c)
-    );
-    const regularConns = connectionsToDelete.filter(c => !timelineConns.includes(c));
+    // Single-pass O(n) partition: timeline vs regular.
+    // Use a Set of the timeline connections for O(1) membership test.
+    const timelineSet = new Set(this.timelineConnections || []);
+    const timelineConns = [];
+    const regularConns = [];
+    for (const c of connectionsToDelete) {
+      if (timelineSet.has(c)) {
+        timelineConns.push(c);
+      } else {
+        regularConns.push(c);
+      }
+    }
 
     // Delete timeline connections via their dedicated path (handles Yjs sync)
     for (const tc of timelineConns) {
@@ -547,11 +553,16 @@ class MindMap {
    * @param {number} worldY – world-space Y to vertically centre the bar on
    */
   createTimeline(worldX = 0, worldY = 0) {
+    const barHalfHeight = (typeof TimelineMode !== 'undefined' &&
+      typeof TimelineMode.BAR_HEIGHT === 'number')
+      ? TimelineMode.BAR_HEIGHT / 2
+      : 40; // fallback: half of the default 80px bar height
+
     if (!this.timelineActive) {
       this.timelineActive = true;
       // Place bar so its vertical centre is at the cursor; left edge at worldX
       this.timelineBarX = worldX;
-      this.timelineBarY = worldY - TimelineMode.BAR_HEIGHT / 2;
+      this.timelineBarY = worldY - barHalfHeight;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       this.timelineStartDate = today;
@@ -562,6 +573,8 @@ class MindMap {
       this.timelineBarDragging = false;
       this.timelineSelected = false;
     }
+    this.isSaved = false;
+    this.isDirty = true;
     // Notify collaboration layer so remote users see the change
     if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
   }
@@ -658,11 +671,15 @@ class MindMap {
       // Move the bar: offset was recorded at mousedown so dragging feels natural
       this.timelineBarX = worldX - this.timelineBarDragOffsetX;
       this.timelineBarY = worldY - this.timelineBarDragOffsetY;
+      this.isSaved = false;
+      this.isDirty = true;
       return true;
     }
     if (!this.timelineDraggingResize) return false;
     const newWidth = this.timelineDragStartWidth + (worldX - this.timelineDragStartWorldX);
     this.timelineBarWidth = Math.max(TimelineMode.MIN_WIDTH, newWidth);
+    this.isSaved = false;
+    this.isDirty = true;
     return true;
   }
 
@@ -671,8 +688,12 @@ class MindMap {
     const wasDragging = this.timelineBarDragging || this.timelineDraggingResize;
     this.timelineBarDragging = false;
     this.timelineDraggingResize = false;
-    // Sync updated position or width to collaborators
-    if (wasDragging && MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
+    if (wasDragging) {
+      this.isSaved = false;
+      this.isDirty = true;
+      // Sync updated position or width to collaborators
+      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
+    }
   }
 
   /**

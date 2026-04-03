@@ -1190,10 +1190,15 @@ class ExportManager {
     if (this.mindMap && this.mindMap.timelineActive) {
       const barX = this.mindMap.timelineBarX || 0;
       const barY = this.mindMap.timelineBarY || 0;
+      const barHeight = (typeof TimelineMode !== 'undefined' &&
+        typeof TimelineMode.BAR_HEIGHT === 'number' &&
+        isFinite(TimelineMode.BAR_HEIGHT))
+        ? TimelineMode.BAR_HEIGHT
+        : 80; // fallback matches TimelineMode.BAR_HEIGHT default
       minX = Math.min(minX, barX);
       maxX = Math.max(maxX, barX + this.mindMap.getTimelineBarWidth());
       minY = Math.min(minY, barY);
-      maxY = Math.max(maxY, barY + TimelineMode.BAR_HEIGHT);
+      maxY = Math.max(maxY, barY + barHeight);
     }
 
     return { minX, maxX, minY, maxY };
