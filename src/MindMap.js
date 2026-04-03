@@ -509,6 +509,8 @@ class MindMap {
 
   /** Returns the current bar width, falling back to DEFAULT_WIDTH. */
   getTimelineBarWidth() {
+    // Guard: TimelineMode may be undefined in Jest/Node test environments (no browser globals)
+    // and in browser if TimelineMode.js failed to load (the original bug: "TimelineMode is not defined").
     if (typeof TimelineMode === 'undefined') return MindMap.FALLBACK_TIMELINE_WIDTH;
     return (this.timelineBarWidth && typeof this.timelineBarWidth === 'number')
       ? this.timelineBarWidth
