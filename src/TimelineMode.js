@@ -552,11 +552,13 @@ class TimelineMode {
       const date   = TimelineMode.dateForDay(conn.dayIndex, startDate);
       const label  = date.getDate() + ' ' + monthNames[date.getMonth()];
 
-      // Position: top-right corner of the box, shifted up so it doesn't overlap the box outline
+      // Position: top-right corner of the box, shifted up so it doesn't overlap the box outline.
+      // box.x is the box centre, so box.x + box.width/2 is the right edge in world space.
+      // lx is the left edge of the pill so that lx + labelW == right edge of box.
       textSize(fontSize);
       const labelW = textWidth(label) + padding * 2;
       const labelH = fontSize + padding * 2;
-      const lx = box.x + box.width / 2 - labelW;  // right-align flush with box right edge
+      const lx = box.x + box.width / 2 - labelW;  // pill right edge aligns with box right edge
       const ly = box.y - box.height / 2 - labelH - 2 / safeZ; // just above the box
 
       // Pill background
