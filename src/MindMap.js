@@ -145,6 +145,8 @@ class MindMap {
     // Timeline Mode soft connections (plain data; TimelineMode.js reads/writes this)
     // Each entry: { boxId: string, dayIndex: number, side: 'above'|'below' }
     this.timelineConnections = [];
+    // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH)
+    this.timelineBarWidth = null;
   }
 
   // ============================================================================
@@ -3143,6 +3145,7 @@ class MindMap {
         ? this.clusters.filter(c => c).map(c => c.toJSON())
         : [],
       timelineConnections: this.timelineConnections || [],
+      timelineBarWidth: this.timelineBarWidth || null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3247,6 +3250,10 @@ class MindMap {
     this.timelineConnections = Array.isArray(data.timelineConnections)
       ? data.timelineConnections
       : [];
+    // Restore persisted bar width
+    this.timelineBarWidth = (data.timelineBarWidth && typeof data.timelineBarWidth === 'number')
+      ? data.timelineBarWidth
+      : null;
 
     this.isDirty = true;
 

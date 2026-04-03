@@ -1465,13 +1465,13 @@ function draw() {
         ExtensionBridge.draw(collaborationManager, mindMap);
       }
 
-      pop();
-
-      // Timeline Mode: screen-space overlay (zero overhead when not loaded/active)
-      // Must be called after pop() so we are back in default screen-space coordinates.
+      // Timeline Mode: world-space overlay (drawn inside camera transform so it
+      // zooms and pans with the map — zero overhead when not loaded/active)
       if (typeof TimelineMode !== 'undefined') {
         TimelineMode.loop(collaborationManager, mindMap);
       }
+
+      pop();
 
       // Update our presence (cursor position, selection) if connected - throttled internally
       if (hasActiveCollaboration) {
@@ -2024,11 +2024,11 @@ function mousePressed(e) {
         return false;
       }
 
-      // Timeline Mode: intercept clicks on the calendar bar.
-      // A click in the timeline area while a box is selected creates/removes
-      // a soft connection — the normal mindmap handler is skipped in that case.
+      // Timeline Mode: intercept clicks on the calendar bar (world coords).
+      // Clicking on the resize handle starts a drag; clicking a tick with a
+      // selected box creates/removes a soft connection.
       if (typeof TimelineMode !== 'undefined' &&
-          TimelineMode.handleMousePressed(mouseX, mouseY, mindMap)) {
+          TimelineMode.handleMousePressed(worldMouseX(), worldMouseY(), mindMap)) {
         return false;
       }
 
@@ -2097,6 +2097,11 @@ function mouseReleased() {
       console.error('Error handling mouse release:', e);
     }
   }
+
+  // Timeline Mode: finalise any resize drag and persist new bar width
+  if (typeof TimelineMode !== 'undefined') {
+    TimelineMode.handleMouseReleased();
+  }
 }
 
 /**
@@ -2116,6 +2121,12 @@ function mouseDragged() {
     // Update selection rectangle current corner
     selectionCurrentX = worldMouseX();
     selectionCurrentY = worldMouseY();
+    return false;
+  }
+
+  // Timeline Mode: handle resize drag (world coords; consumed if resize is active)
+  if (typeof TimelineMode !== 'undefined' &&
+      TimelineMode.handleMouseDragged(worldMouseX(), worldMouseY())) {
     return false;
   }
 

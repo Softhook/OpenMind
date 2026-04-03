@@ -4,6 +4,12 @@
  * Follows the same vm-sandbox pattern used by ThrustGame.test.js:
  *   - Load the source file with vm.Script into a sandbox that stubs all p5 globals
  *   - Retrieve the exported class from sandbox.module.exports
+ *
+ * API change summary (world-space rewrite):
+ *   - Bar is at world (0, 0) → (barWorldWidth, BAR_HEIGHT) — no more screen-space helpers
+ *   - _dayX / _dayFromX / _barY / _barW removed → _worldDayX / _dayFromWorldX
+ *   - _isOverBar(sx,sy) → _isOverBarWorld(wx,wy)
+ *   - handleMousePressed / handleMouseDragged / handleMouseReleased take world coords
  */
 
 'use strict';
@@ -18,7 +24,6 @@ const path = require('path');
 const p5Stubs = {
   push:         jest.fn(),
   pop:          jest.fn(),
-  resetMatrix:  jest.fn(),
   fill:         jest.fn(),
   noFill:       jest.fn(),
   stroke:       jest.fn(),
@@ -45,14 +50,8 @@ const sandbox = {
   console,
   module: { exports: {} },
   window: {},
-  // height / width – mimic browser globals (p5 sets these)
-  height: 600,
-  width:  800,
-  // CameraUtils stub (screenX/screenY are identity by default)
-  CameraUtils: {
-    screenX: jest.fn(x => x),
-    screenY: jest.fn(y => y),
-  },
+  // CameraUtils stub – zoom=1 by default so 1/safeZ = 1 in drawing
+  CameraUtils: { zoom: 1 },
 };
 
 const timelineCode = fs.readFileSync(
@@ -71,6 +70,7 @@ function makeMindMap(boxes = []) {
     boxes,
     boxIdMap: new Map(boxes.map(b => [b.id, b])),
     timelineConnections: [],
+    timelineBarWidth: null,
     selectedBox: null,
   };
 }
@@ -90,7 +90,7 @@ beforeEach(() => {
 });
 
 // ============================================================
-// Static interface
+// Static interface – toggle
 // ============================================================
 describe('TimelineMode.toggle()', () => {
   test('creates a new instance and activates it on first call', () => {
@@ -118,15 +118,23 @@ describe('TimelineMode.toggle()', () => {
   test('initialises timelineConnections on mindMap if missing', () => {
     const mm = makeMindMap();
     delete mm.timelineConnections;
-    // Before toggling, the property should be absent
     expect(mm.timelineConnections).toBeUndefined();
     TimelineMode.toggle(mm);
-    // After toggle → start(), the array should be initialised
     expect(TimelineMode.instance.active).toBe(true);
     expect(Array.isArray(mm.timelineConnections)).toBe(true);
   });
+
+  test('restores persisted barWorldWidth from mindMap.timelineBarWidth', () => {
+    const mm = makeMindMap();
+    mm.timelineBarWidth = 1500;
+    TimelineMode.toggle(mm);
+    expect(TimelineMode.instance.barWorldWidth).toBe(1500);
+  });
 });
 
+// ============================================================
+// Static interface – handleInput
+// ============================================================
 describe('TimelineMode.handleInput()', () => {
   test('returns true and toggles when Ctrl+K is pressed', () => {
     const mm = makeMindMap();
@@ -156,144 +164,233 @@ describe('TimelineMode.handleInput()', () => {
 // Instance lifecycle
 // ============================================================
 describe('TimelineMode instance start/stop', () => {
-  test('start() sets active and records startDate', () => {
+  test('start() sets active and records startDate normalised to midnight', () => {
     const mm = makeMindMap();
     const inst = new TimelineMode(mm);
     inst.start();
     expect(inst.active).toBe(true);
     expect(inst.startDate).toBeInstanceOf(Date);
-    // Normalised to midnight
     expect(inst.startDate.getHours()).toBe(0);
     expect(inst.startDate.getMinutes()).toBe(0);
   });
 
-  test('stop() sets active to false', () => {
+  test('stop() sets active to false but preserves startDate', () => {
     const mm = makeMindMap();
     const inst = new TimelineMode(mm);
     inst.start();
     inst.stop();
     expect(inst.active).toBe(false);
-    // startDate is preserved so connections still resolve when re-activated
     expect(inst.startDate).not.toBeNull();
   });
+
+  test('stop() clears _draggingResize flag', () => {
+    const mm = makeMindMap();
+    const inst = new TimelineMode(mm);
+    inst.start();
+    inst._draggingResize = true;
+    inst.stop();
+    expect(inst._draggingResize).toBe(false);
+  });
 });
 
 // ============================================================
-// Geometry helpers
+// World-space geometry helpers
 // ============================================================
-describe('_dayX / _dayFromX round-trip', () => {
+describe('_worldDayX / _dayFromWorldX round-trip', () => {
   let inst;
   beforeEach(() => {
     inst = new TimelineMode(makeMindMap());
     inst.start();
   });
 
-  test('day 0 maps to x=0', () => {
-    expect(inst._dayX(0)).toBe(0);
+  test('day 0 maps to world x=0', () => {
+    expect(inst._worldDayX(0)).toBe(0);
   });
 
-  test('last day maps to x=barW', () => {
-    expect(inst._dayX(TimelineMode.TOTAL_DAYS - 1)).toBeCloseTo(inst._barW(), 1);
+  test('last day maps to barWorldWidth', () => {
+    expect(inst._worldDayX(TimelineMode.TOTAL_DAYS - 1)).toBeCloseTo(inst.barWorldWidth, 1);
   });
 
-  test('mid day round-trips correctly', () => {
+  test('mid-day round-trips correctly', () => {
     const mid = Math.floor(TimelineMode.TOTAL_DAYS / 2);
-    const x   = inst._dayX(mid);
-    expect(inst._dayFromX(x)).toBe(mid);
+    const x   = inst._worldDayX(mid);
+    expect(inst._dayFromWorldX(x)).toBe(mid);
   });
 
-  test('x=0 maps back to day 0', () => {
-    expect(inst._dayFromX(0)).toBe(0);
+  test('worldX=0 maps back to day 0', () => {
+    expect(inst._dayFromWorldX(0)).toBe(0);
   });
 
-  test('x=barW maps back to last day', () => {
-    expect(inst._dayFromX(inst._barW())).toBe(TimelineMode.TOTAL_DAYS - 1);
+  test('worldX=barWorldWidth maps back to last day', () => {
+    expect(inst._dayFromWorldX(inst.barWorldWidth)).toBe(TimelineMode.TOTAL_DAYS - 1);
   });
 });
 
-describe('_isOverBar()', () => {
+describe('_isOverBarWorld()', () => {
   let inst;
   beforeEach(() => {
     inst = new TimelineMode(makeMindMap());
     inst.start();
   });
 
-  test('returns true for y inside the bar', () => {
-    const barY = inst._barY();
-    expect(inst._isOverBar(400, barY + 10)).toBe(true);
+  test('returns true for world coords inside the bar', () => {
+    // Bar spans x:[0,barWorldWidth], y:[0,BAR_HEIGHT]
+    expect(inst._isOverBarWorld(100, 40)).toBe(true);
   });
 
-  test('returns true within HIT_EXTEND above bar', () => {
-    const barY = inst._barY();
-    expect(inst._isOverBar(400, barY - TimelineMode.HIT_EXTEND + 1)).toBe(true);
+  test('returns true within HIT_EXTEND above the bar top (world y < 0)', () => {
+    expect(inst._isOverBarWorld(100, -TimelineMode.HIT_EXTEND + 1)).toBe(true);
   });
 
-  test('returns false well above the bar', () => {
-    expect(inst._isOverBar(400, 10)).toBe(false);
+  test('returns false well outside the bar', () => {
+    expect(inst._isOverBarWorld(100, -200)).toBe(false);
+  });
+
+  test('returns false beyond the right edge + HIT_EXTEND', () => {
+    expect(inst._isOverBarWorld(inst.barWorldWidth + TimelineMode.HIT_EXTEND + 1, 40)).toBe(false);
+  });
+});
+
+describe('_isDragHandle()', () => {
+  let inst;
+  beforeEach(() => {
+    inst = new TimelineMode(makeMindMap());
+    inst.start();
+  });
+
+  test('returns true near the right edge', () => {
+    expect(inst._isDragHandle(inst.barWorldWidth, TimelineMode.BAR_HEIGHT / 2)).toBe(true);
+  });
+
+  test('returns true within HANDLE_RADIUS', () => {
+    expect(inst._isDragHandle(inst.barWorldWidth - TimelineMode.HANDLE_RADIUS + 1, 40)).toBe(true);
+  });
+
+  test('returns false far from the right edge', () => {
+    expect(inst._isDragHandle(0, 40)).toBe(false);
   });
 });
 
 // ============================================================
-// handleClick – soft connection management
+// handleMouseDown – connection creation
 // ============================================================
-describe('TimelineMode.handleMousePressed() / handleClick()', () => {
+describe('TimelineMode.handleMousePressed() / handleMouseDown()', () => {
   let mm, box;
   beforeEach(() => {
-    box = makeBox('box1', 100, 50);
+    box = makeBox('box1', 100, -50); // box above the bar (y < 0)
     mm  = makeMindMap([box]);
     mm.selectedBox = box;
     TimelineMode.toggle(mm);   // activate
   });
 
-  test('returns false when click is not in timeline area', () => {
-    const result = TimelineMode.handleMousePressed(400, 10, mm);
+  test('returns false when world click is not in the bar area', () => {
+    const result = TimelineMode.handleMousePressed(100, -200, mm);
     expect(result).toBe(false);
     expect(mm.timelineConnections).toHaveLength(0);
   });
 
-  test('returns false when no box is selected', () => {
+  test('returns false when no box is selected (non-handle click)', () => {
     mm.selectedBox = null;
-    const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    const result = TimelineMode.handleMousePressed(400, barY + 20, mm);
+    const result = TimelineMode.handleMousePressed(100, 40, mm);
     expect(result).toBe(false);
+  });
+
+  test('returns true and starts resize when clicking the drag handle', () => {
+    const inst = TimelineMode.instance;
+    const result = TimelineMode.handleMousePressed(inst.barWorldWidth, TimelineMode.BAR_HEIGHT / 2, mm);
+    expect(result).toBe(true);
+    expect(inst._draggingResize).toBe(true);
   });
 
   test('creates a connection when clicking a day tick with a box selected', () => {
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    const result = TimelineMode.handleMousePressed(inst._dayX(5), barY + 20, mm);
+    const wx = inst._worldDayX(5);
+    const result = TimelineMode.handleMousePressed(wx, 40, mm);
     expect(result).toBe(true);
     expect(mm.timelineConnections).toHaveLength(1);
     expect(mm.timelineConnections[0].boxId).toBe('box1');
     expect(mm.timelineConnections[0].dayIndex).toBe(5);
   });
 
-  test('removes an existing connection when clicking the same day tick again', () => {
+  test('removes an existing connection on second click of the same tick', () => {
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    const dx = inst._dayX(10);
-    TimelineMode.handleMousePressed(dx, barY + 20, mm);
+    const wx = inst._worldDayX(10);
+    TimelineMode.handleMousePressed(wx, 40, mm);
     expect(mm.timelineConnections).toHaveLength(1);
-    TimelineMode.handleMousePressed(dx, barY + 20, mm);
+    TimelineMode.handleMousePressed(wx, 40, mm);
     expect(mm.timelineConnections).toHaveLength(0);
   });
 
   test('two different day ticks produce two connections', () => {
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    TimelineMode.handleMousePressed(inst._dayX(3), barY + 20, mm);
-    TimelineMode.handleMousePressed(inst._dayX(7), barY + 20, mm);
+    TimelineMode.handleMousePressed(inst._worldDayX(3), 40, mm);
+    TimelineMode.handleMousePressed(inst._worldDayX(7), 40, mm);
     expect(mm.timelineConnections).toHaveLength(2);
   });
 
-  test('side is "above" when box screen Y is above the bar midpoint', () => {
-    // box.y = 50, CameraUtils.screenY returns y unchanged, barY ~ 510, mid ~ 550
-    // So screenY(50) = 50 < midY → side = 'above'
+  test('side is "above" when box.y < BAR_HEIGHT/2', () => {
+    // box.y = -50 < 40 → 'above'
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    TimelineMode.handleMousePressed(inst._dayX(1), barY + 20, mm);
+    TimelineMode.handleMousePressed(inst._worldDayX(1), 40, mm);
     expect(mm.timelineConnections[0].side).toBe('above');
+  });
+
+  test('side is "below" when box.y >= BAR_HEIGHT/2', () => {
+    box.y = 200; // below the bar midpoint (40)
+    const inst = TimelineMode.instance;
+    TimelineMode.handleMousePressed(inst._worldDayX(1), 40, mm);
+    expect(mm.timelineConnections[0].side).toBe('below');
+  });
+});
+
+// ============================================================
+// Resize drag – handleDrag / handleRelease
+// ============================================================
+describe('Resize drag', () => {
+  let mm, inst;
+  beforeEach(() => {
+    mm = makeMindMap();
+    TimelineMode.toggle(mm);
+    inst = TimelineMode.instance;
+  });
+
+  test('handleDrag updates barWorldWidth while _draggingResize is true', () => {
+    const startWidth = inst.barWorldWidth;
+    inst._draggingResize  = true;
+    inst._dragStartWorldX = 0;
+    inst._dragStartWidth  = startWidth;
+    const consumed = TimelineMode.handleMouseDragged(300, 40);
+    expect(consumed).toBe(true);
+    expect(inst.barWorldWidth).toBe(startWidth + 300);
+  });
+
+  test('handleDrag clamps barWorldWidth to MIN_WIDTH', () => {
+    inst._draggingResize  = true;
+    inst._dragStartWorldX = 0;
+    inst._dragStartWidth  = TimelineMode.MIN_WIDTH;
+    TimelineMode.handleMouseDragged(-9999, 40);
+    expect(inst.barWorldWidth).toBe(TimelineMode.MIN_WIDTH);
+  });
+
+  test('handleDrag returns false when not dragging', () => {
+    inst._draggingResize = false;
+    const consumed = TimelineMode.handleMouseDragged(300, 40);
+    expect(consumed).toBe(false);
+  });
+
+  test('handleRelease clears _draggingResize', () => {
+    inst._draggingResize = true;
+    inst.mindMap = mm;
+    TimelineMode.handleMouseReleased();
+    expect(inst._draggingResize).toBe(false);
+  });
+
+  test('handleRelease persists barWorldWidth to mindMap.timelineBarWidth', () => {
+    inst._draggingResize = true;
+    inst.barWorldWidth   = 1234;
+    inst.mindMap = mm;
+    TimelineMode.handleMouseReleased();
+    expect(mm.timelineBarWidth).toBe(1234);
   });
 });
 
@@ -308,14 +405,21 @@ describe('TimelineMode draw()', () => {
     expect(() => inst.draw()).not.toThrow();
   });
 
-  test('draw() is a no-op when not active', () => {
+  test('draw() is a no-op when not active (rect not called)', () => {
     const mm = makeMindMap();
     const inst = new TimelineMode(mm);
     inst.start();
     inst.stop();
     expect(() => inst.draw()).not.toThrow();
-    // p5 drawing functions should not be called
     expect(sandbox.rect).not.toHaveBeenCalled();
+  });
+
+  test('draw() calls push() when active', () => {
+    const mm = makeMindMap();
+    TimelineMode.toggle(mm);
+    sandbox.push.mockClear();
+    TimelineMode.instance.draw();
+    expect(sandbox.push).toHaveBeenCalled();
   });
 });
 
@@ -331,6 +435,7 @@ describe('TimelineMode.loop()', () => {
   test('loop() draws when instance is active', () => {
     const mm = makeMindMap();
     TimelineMode.toggle(mm);
+    sandbox.push.mockClear();
     TimelineMode.loop(null, mm);
     expect(sandbox.push).toHaveBeenCalled();
   });
@@ -349,15 +454,13 @@ describe('TimelineMode.loop()', () => {
 // JSON serialisation (via mindMap.timelineConnections)
 // ============================================================
 describe('timelineConnections serialisation', () => {
-  test('connections are stored on mindMap (plain data, no TimelineMode coupling)', () => {
-    const mm = makeMindMap([makeBox('b1', 0, 0)]);
+  test('connections stored on mindMap are plain JSON-serialisable objects', () => {
+    const mm = makeMindMap([makeBox('b1', 0, -100)]); // box above bar
     mm.selectedBox = mm.boxes[0];
     TimelineMode.toggle(mm);
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    TimelineMode.handleMousePressed(inst._dayX(15), barY + 20, mm);
+    TimelineMode.handleMousePressed(inst._worldDayX(15), 40, mm);
 
-    // The data is plain JSON-serialisable objects on mindMap
     const json = JSON.stringify({ timelineConnections: mm.timelineConnections });
     const parsed = JSON.parse(json);
     expect(parsed.timelineConnections).toHaveLength(1);
@@ -368,16 +471,14 @@ describe('timelineConnections serialisation', () => {
   });
 
   test('connections survive toggle off/on cycle', () => {
-    const mm = makeMindMap([makeBox('b1', 0, 0)]);
+    const mm = makeMindMap([makeBox('b1', 0, -100)]);
     mm.selectedBox = mm.boxes[0];
     TimelineMode.toggle(mm); // on
     const inst = TimelineMode.instance;
-    const barY = inst._barY();
-    TimelineMode.handleMousePressed(inst._dayX(20), barY + 20, mm);
+    TimelineMode.handleMousePressed(inst._worldDayX(20), 40, mm);
     expect(mm.timelineConnections).toHaveLength(1);
 
-    TimelineMode.toggle(mm); // off
-    // Connections are NOT cleared on deactivation
+    TimelineMode.toggle(mm); // off – connections NOT cleared
     expect(mm.timelineConnections).toHaveLength(1);
 
     TimelineMode.toggle(mm); // on again
@@ -389,7 +490,7 @@ describe('timelineConnections serialisation', () => {
 // _dateForDay
 // ============================================================
 describe('_dateForDay()', () => {
-  test('day 0 returns today (normalised)', () => {
+  test('day 0 returns today (date part only)', () => {
     const inst = new TimelineMode(makeMindMap());
     inst.start();
     const d = inst._dateForDay(0);
@@ -413,15 +514,14 @@ describe('_dateForDay()', () => {
 // _weekNumber
 // ============================================================
 describe('_weekNumber()', () => {
-  test('returns a positive integer', () => {
+  test('6 Jan 2025 (Monday) is ISO week 2', () => {
     const inst = new TimelineMode();
-    const d = new Date(2025, 0, 6); // Monday 6 Jan 2025 = ISO week 2
-    expect(inst._weekNumber(d)).toBe(2);
+    expect(inst._weekNumber(new Date(2025, 0, 6))).toBe(2);
   });
 
-  test('week 1 for first week of year', () => {
+  test('1 Jan 2025 is in week ≥ 1', () => {
     const inst = new TimelineMode();
-    const d = new Date(2025, 0, 1); // 1 Jan 2025 = ISO week 1
-    expect(inst._weekNumber(d)).toBeGreaterThanOrEqual(1);
+    expect(inst._weekNumber(new Date(2025, 0, 1))).toBeGreaterThanOrEqual(1);
   });
 });
+

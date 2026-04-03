@@ -70,12 +70,7 @@ class ExportManager {
 
     const padding = this.config.EXPORT?.PADDING || 50;
     const width = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + 2 * padding));
-    // Extend height to include Timeline Mode strip when active
-    const hasTimeline = typeof TimelineMode !== 'undefined' &&
-      TimelineMode.instance && TimelineMode.instance.active &&
-      this.mindMap.timelineConnections && this.mindMap.timelineConnections.length > 0;
-    const timelineStripH = hasTimeline ? TimelineMode.EXPORT_STRIP_HEIGHT : 0;
-    const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding) + timelineStripH);
+    const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding));
 
     // Validate dimensions are finite
     if (!isFinite(width) || !isFinite(height)) {
@@ -279,21 +274,19 @@ class ExportManager {
           });
         }
 
+        // Draw Timeline Mode bar at world (0,0) if active and has content
+        if (typeof TimelineMode !== 'undefined' &&
+            TimelineMode.instance && TimelineMode.instance.active) {
+          try {
+            TimelineMode.drawToGraphics(pg, this.mindMap);
+          } catch (e) {
+            console.warn('Error drawing timeline in PNG export:', e);
+          }
+        }
+
       } finally {
         // Always restore graphics state
         pg.pop();
-      }
-
-      // Draw Timeline Mode strip at the bottom of the export (if active)
-      if (hasTimeline) {
-        try {
-          TimelineMode.drawToGraphics(
-            pg, width, height, this.mindMap,
-            padding - bounds.minX, padding - bounds.minY
-          );
-        } catch (e) {
-          console.warn('Error drawing timeline in PNG export:', e);
-        }
       }
 
       // Convert to data URL and download
@@ -696,11 +689,6 @@ class ExportManager {
     const padding = this.config.EXPORT?.PADDING || 50;
     const margin = this.config.EXPORT?.MARGIN || 20;
 
-    // Determine if Timeline Mode strip should be included
-    const hasPDFTimeline = typeof TimelineMode !== 'undefined' &&
-      TimelineMode.instance && TimelineMode.instance.active &&
-      this.mindMap.timelineConnections && this.mindMap.timelineConnections.length > 0;
-
     // Determine page orientation based on content aspect ratio
     const contentWidth = bounds.maxX - bounds.minX + 2 * padding;
     const contentHeight = bounds.maxY - bounds.minY + 2 * padding;
@@ -1015,30 +1003,6 @@ class ExportManager {
       measureGraphics.remove();
     }
 
-    // Timeline Mode strip: render to an offscreen canvas then embed as image
-    if (hasPDFTimeline && this.p5Instance) {
-      try {
-        const pdfPageTotalWidth  = pdf.internal.pageSize.getWidth();
-        const tlH = TimelineMode.EXPORT_STRIP_HEIGHT;
-        const tlW = pdfPageTotalWidth;
-        const pg = this.p5Instance.createGraphics(Math.ceil(tlW), tlH);
-        try {
-          pg.background(15, 20, 40);
-          TimelineMode.drawToGraphics(
-            pg, Math.ceil(tlW), tlH, this.mindMap,
-            padding - bounds.minX, padding - bounds.minY
-          );
-          const dataUrl = pg.canvas.toDataURL('image/png');
-          pdf.addPage();
-          pdf.addImage(dataUrl, 'PNG', 0, margin, pdfPageTotalWidth, tlH);
-        } finally {
-          pg.remove();
-        }
-      } catch (e) {
-        console.warn('Error drawing timeline in PDF export:', e);
-      }
-    }
-
     // Save PDF
     pdf.save('mindmap.pdf');
   }
@@ -1220,6 +1184,16 @@ class ExportManager {
 
     if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
       return null;
+    }
+
+    // Expand bounds to include the Timeline Mode bar when active.
+    // The bar occupies world (0, 0) → (barWorldWidth, BAR_HEIGHT).
+    if (typeof TimelineMode !== 'undefined' &&
+        TimelineMode.instance && TimelineMode.instance.active) {
+      minX = Math.min(minX, 0);
+      maxX = Math.max(maxX, TimelineMode.instance.barWorldWidth);
+      minY = Math.min(minY, 0);
+      maxY = Math.max(maxY, TimelineMode.BAR_HEIGHT);
     }
 
     return { minX, maxX, minY, maxY };
