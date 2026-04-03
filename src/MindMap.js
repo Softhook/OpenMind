@@ -158,9 +158,9 @@ class MindMap {
     // Currently selected timeline connection (for delete, visual highlight)
     this.selectedTimelineConnection = null;
 
-    // Timeline Mode active state (fully integrated — no more TimelineMode singleton)
+    // Timeline Mode active state and configuration
     this.timelineActive = false;
-    this.timelineStartDate = null;
+    this.timelineStartDate = null;   // origin date for day-index labels; persisted in save files
     this.timelineDraggingResize = false;
     this.timelineDragStartWorldX = 0;
     this.timelineDragStartWidth = 0;
@@ -544,26 +544,25 @@ class MindMap {
    * Draw date-assignment labels (day badges) above boxes that have a timeline
    * connection, even when the timeline bar itself is hidden.
    * Called every frame from sketch.js inside the camera transform.
-   * When the bar is visible, drawBar() already calls _drawBoxDateLabels, so
+   * When the bar is visible, drawBar() already calls drawBoxDateLabels, so
    * this method is a no-op in that case to avoid double-drawing.
    */
   drawTimelineDateLabels() {
     if (this.timelineActive) return; // drawBar() already renders them
     if (typeof TimelineMode === 'undefined') return;
     if (!this.timelineConnections || this.timelineConnections.length === 0) return;
-    // Use stored start date; fall back to today so labels can still show dates
-    // even when timeline was toggled off (timelineStartDate was not cleared).
+    // Use stored start date; fall back to today so labels can still show even
+    // when the timeline bar has been toggled off (timelineStartDate is preserved).
     let startDate = this.timelineStartDate;
     if (!startDate) {
       startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
       this.timelineStartDate = startDate; // cache so all callers agree
     }
-    const bw = this.getTimelineBarWidth();
     const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
     push();
-    TimelineMode._drawBoxDateLabels(this.timelineConnections, startDate, bw, safeZ);
+    TimelineMode.drawBoxDateLabels(this.timelineConnections, startDate, safeZ);
     pop();
   }
 
@@ -3466,7 +3465,6 @@ class MindMap {
    * @returns {Object} JSON representation of the mind map
    */
   toJSON() {
-    // Serialize timeline connections: use toJSON() if available, else pass through
     const tlConns = (this.timelineConnections || []).map(c =>
       (c && typeof c.toJSON === 'function') ? c.toJSON() : c
     ).filter(Boolean);
@@ -3480,6 +3478,7 @@ class MindMap {
       timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
       timelineActive: this.timelineActive || false,
+      timelineStartDate: this.timelineStartDate ? this.timelineStartDate.toISOString() : null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3603,12 +3602,20 @@ class MindMap {
       ? data.timelineBarWidth
       : null;
 
-    // Restore timeline active state
+    // Restore timeline active state and start date.
+    // timelineStartDate is persisted so that day-index labels show the same
+    // calendar dates across reloads rather than shifting to "today".
     this.timelineActive = data.timelineActive === true;
-    if (this.timelineActive) {
+    if (data.timelineStartDate) {
+      const parsed = new Date(data.timelineStartDate);
+      this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
+    } else if (this.timelineActive) {
+      // Fallback for maps saved before timelineStartDate was persisted.
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       this.timelineStartDate = today;
+    } else {
+      this.timelineStartDate = null;
     }
 
     this.isDirty = true;

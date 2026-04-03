@@ -410,9 +410,9 @@ describe('TimelineMode static constants', () => {
 });
 
 // ============================================================
-// _drawBoxDateLabels – date badge above each connected box
+// drawBoxDateLabels – date badge above each connected box
 // ============================================================
-describe('TimelineMode._drawBoxDateLabels()', () => {
+describe('TimelineMode.drawBoxDateLabels()', () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -421,14 +421,14 @@ describe('TimelineMode._drawBoxDateLabels()', () => {
   });
 
   test('does not throw with empty connections', () => {
-    expect(() => TimelineMode._drawBoxDateLabels([], today, TimelineMode.DEFAULT_WIDTH, 1)).not.toThrow();
+    expect(() => TimelineMode.drawBoxDateLabels([], today, 1)).not.toThrow();
     expect(sandbox.rect).not.toHaveBeenCalled();
   });
 
   test('draws a rect and text for each connected box', () => {
     const box = makeBox('b1', 0, -200);
     const conn = new TimelineConnection(box, 10, null);
-    TimelineMode._drawBoxDateLabels([conn], today, TimelineMode.DEFAULT_WIDTH, 1);
+    TimelineMode.drawBoxDateLabels([conn], today, 1);
     // Should have drawn at least one rect (pill) and one text call
     expect(sandbox.rect).toHaveBeenCalled();
     expect(sandbox.text).toHaveBeenCalled();
@@ -436,7 +436,7 @@ describe('TimelineMode._drawBoxDateLabels()', () => {
 
   test('skips connections with no fromBox', () => {
     const conn = new TimelineConnection(null, 5, null);
-    expect(() => TimelineMode._drawBoxDateLabels([conn], today, TimelineMode.DEFAULT_WIDTH, 1)).not.toThrow();
+    expect(() => TimelineMode.drawBoxDateLabels([conn], today, 1)).not.toThrow();
     expect(sandbox.rect).not.toHaveBeenCalled();
   });
 
@@ -446,7 +446,7 @@ describe('TimelineMode._drawBoxDateLabels()', () => {
     const conn1 = new TimelineConnection(box1, 5, null);
     const conn2 = new TimelineConnection(box2, 20, null);
     sandbox.rect.mockClear();
-    TimelineMode._drawBoxDateLabels([conn1, conn2], today, TimelineMode.DEFAULT_WIDTH, 1);
+    TimelineMode.drawBoxDateLabels([conn1, conn2], today, 1);
     expect(sandbox.rect.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

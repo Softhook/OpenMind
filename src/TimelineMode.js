@@ -1,30 +1,26 @@
 /**
  * TimelineMode.js - Horizontal calendar timeline overlay for mind mapping.
  *
- * Fully integrated into MindMap — no more singleton/lazy-loading pattern.
- * All active state lives in the MindMap instance; this file provides:
+ * All timeline state lives in the MindMap instance.  This file provides:
  *   - TimelineConnection class (arrow from a TextBox to a calendar-bar day tick)
- *   - TimelineMode class with static constants + static utility/draw functions
+ *   - TimelineMode class with static constants and static draw/utility methods
  *
- * Keyboard shortcut : Ctrl+K – toggle Timeline Mode (handled in MindMap.toggleTimeline())
+ * Keyboard shortcut: Ctrl+K – toggle Timeline Mode (handled by MindMap.toggleTimeline())
  *
  * World-space placement:
- *   The bar lives at world coordinates (0, 0).  It is drawn INSIDE the camera
- *   transform (translate + scale) so it zooms and pans exactly like the rest of
- *   the mind-map content.  Text and stroke weights are divided by the current
- *   zoom so they stay a constant size on screen.
+ *   The bar is anchored at world (0, 0) and drawn inside the camera transform
+ *   so it zooms and pans with the rest of the mind map.  Stroke weights and
+ *   text sizes are divided by the current zoom so they remain a constant size
+ *   on screen.
  *
  * Resizing:
- *   Drag the resize handle (semi-transparent grip at the right edge) left/right
- *   to shorten or lengthen the bar.
+ *   Drag the grip handle at the right edge left/right to resize the bar.
  *
  * Connections:
- *   Drag from a box connector dot and release over the timeline bar to attach
- *   the box to a day tick.  Connections are full Connection-look-alike arrows
- *   (TimelineConnection objects stored in mindMap.timelineConnections).
- *   Click a connection line to select it; press Delete/Backspace to remove it.
- *   All add/remove operations go through mindMap._wrapInTransaction() so they
- *   are tracked by the Yjs UndoManager and can be undone with Ctrl+Z.
+ *   Drag from a box connector dot and release over the bar to attach the box to
+ *   a day tick.  Click a connection arrow to select it; Delete/Backspace removes
+ *   it.  All add/remove operations go through MindMap._wrapInTransaction() so
+ *   they are tracked by the Yjs UndoManager and can be undone with Ctrl+Z.
  */
 
 // ==============================================================================
@@ -244,7 +240,7 @@ class TimelineMode {
     }
 
     // --- Date labels above each connected box (world-space, outside bar) ---
-    TimelineMode._drawBoxDateLabels(conns, startDate, bw, safeZ);
+    TimelineMode.drawBoxDateLabels(conns, startDate, safeZ);
 
     // --- Bar background ---
     noStroke();
@@ -295,12 +291,13 @@ class TimelineMode {
     const startDate = (mindMap && mindMap.timelineStartDate) ? mindMap.timelineStartDate : new Date();
 
     // --- TimelineConnection arrows (drawn behind the bar so the bar sits on top) ---
+    // Draw manually using pg.* calls because conn.draw() uses global p5 functions.
     for (const conn of conns) {
-      if (typeof conn.draw !== 'function') continue;
-      const tick = conn._getTickPoint && conn._getTickPoint();
-      if (!tick || !conn.fromBox || typeof conn.fromBox.getConnectionPoint !== 'function') continue;
-      const start = conn.fromBox.getConnectionPoint(tick);
-      if (!start || !isFinite(start.x) || !isFinite(start.y)) continue;
+      if (!conn || typeof conn._getConnectionEndpoints !== 'function') continue;
+      const ep = conn._getConnectionEndpoints();
+      if (!ep) continue;
+      const { start, end: tick } = ep;
+      if (!isFinite(start.x) || !isFinite(start.y)) continue;
 
       const dx = tick.x - start.x;
       const dy = tick.y - start.y;
@@ -423,7 +420,7 @@ class TimelineMode {
   }
 
   // ============================================================================
-  // PRIVATE STATIC DRAW HELPERS
+  // STATIC DRAW HELPERS
   // ============================================================================
 
   /** @private */
@@ -465,11 +462,11 @@ class TimelineMode {
 
   /**
    * Draw a small date badge above the top-right corner of each box that has a
-   * timeline connection.  Drawn outside (above) the bar so it always shows even
-   * when the box is far from the bar.
-   * @private
+   * timeline connection.  Called by drawBar (bar visible) and by
+   * MindMap.drawTimelineDateLabels (bar hidden but connections exist).
+   * Must be called inside the camera transform (p5 push/pop by the caller).
    */
-  static _drawBoxDateLabels(conns, startDate, bw, safeZ) {
+  static drawBoxDateLabels(conns, startDate, safeZ) {
     if (!conns || conns.length === 0) return;
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const fontSize = 9 / safeZ;
