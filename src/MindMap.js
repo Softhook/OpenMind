@@ -74,6 +74,9 @@ class MindMap {
   /** @type {function(boolean=):void|null} Called when clusters change (receives optional skipTransactionWrapper) */
   static onClustersChange = null;
 
+  /** @type {function(boolean=):void|null} Called when timeline connections change */
+  static onTimelineConnectionsChange = null;
+
   /**
    * Called when a box's health changes from a remote Yjs update.
    * Registered by ThrustGame to track damaged boxes without CollaborationManager
@@ -142,11 +145,12 @@ class MindMap {
     this.isZoomAnimating = false;
     this.zoomAnimationSpeed = 0.12; // separate speed for zoom interpolation
 
-    // Timeline Mode soft connections (plain data; TimelineMode.js reads/writes this)
-    // Each entry: { boxId: string, dayIndex: number, side: 'above'|'below' }
+    // Timeline Mode connections (TimelineConnection objects; TimelineMode.js reads/writes this)
     this.timelineConnections = [];
     // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH)
     this.timelineBarWidth = null;
+    // Currently selected timeline connection (for delete, visual highlight)
+    this.selectedTimelineConnection = null;
   }
 
   // ============================================================================
@@ -437,6 +441,58 @@ class MindMap {
       // Pass skipTransactionWrapper=true since we're already in a transaction
       if (MindMap.onConnectionsChange) {
         MindMap.onConnectionsChange(true);
+      }
+    });
+  }
+
+  /**
+   * Adds a timeline connection (box → day-tick) with full undo tracking.
+   * Prevents duplicate connections for the same (fromBox, dayIndex) pair.
+   * @param {TextBox} fromBox  – source box
+   * @param {number}  dayIndex – 0 … TimelineMode.TOTAL_DAYS-1
+   */
+  addTimelineConnection(fromBox, dayIndex) {
+    if (!fromBox || dayIndex == null) return;
+    if (!this.timelineConnections) this.timelineConnections = [];
+
+    // Prevent duplicate
+    const already = this.timelineConnections.some(
+      c => c.fromBox === fromBox && c.dayIndex === dayIndex
+    );
+    if (already) return;
+
+    this._wrapInTransaction(() => {
+      // Use TimelineConnection class if loaded; fall back to plain object
+      const conn = (typeof TimelineConnection !== 'undefined')
+        ? new TimelineConnection(fromBox, dayIndex)
+        : { fromBox, dayIndex, toJSON() { return { fromId: fromBox.id, dayIndex }; } };
+      this.timelineConnections.push(conn);
+      if (MindMap.onTimelineConnectionsChange) {
+        MindMap.onTimelineConnectionsChange(true);
+      }
+    });
+  }
+
+  /**
+   * Removes a timeline connection with full undo tracking.
+   * @param {TimelineConnection} conn – the connection to remove
+   */
+  removeTimelineConnection(conn) {
+    if (!conn || !this.timelineConnections) return;
+    const idx = this.timelineConnections.indexOf(conn);
+    if (idx < 0) return;
+
+    this._wrapInTransaction(() => {
+      const i = this.timelineConnections.indexOf(conn);
+      if (i >= 0) {
+        this.timelineConnections.splice(i, 1);
+        // Clear selection if this connection was selected
+        if (this.selectedTimelineConnection === conn) {
+          this.selectedTimelineConnection = null;
+        }
+        if (MindMap.onTimelineConnectionsChange) {
+          MindMap.onTimelineConnectionsChange(true);
+        }
       }
     });
   }
@@ -1668,6 +1724,19 @@ class MindMap {
     // 1. Bulk remove all related connections efficiently (O(Connections))
     this._removeConnectionsForBoxes(boxesToDelete);
 
+    // 1b. Remove timeline connections for deleted boxes
+    if (this.timelineConnections && this.timelineConnections.length > 0) {
+      const boxSet = new Set(boxesToDelete);
+      const prev = this.timelineConnections.length;
+      this.timelineConnections = this.timelineConnections.filter(c => !c || !boxSet.has(c.fromBox));
+      if (this.selectedTimelineConnection && boxSet.has(this.selectedTimelineConnection.fromBox)) {
+        this.selectedTimelineConnection = null;
+      }
+      if (this.timelineConnections.length !== prev && MindMap.onTimelineConnectionsChange) {
+        MindMap.onTimelineConnectionsChange(true);
+      }
+    }
+
     // 2. Remove deleted boxes from any clusters they belong to;
     //    prune clusters that drop below 2 members.
     if (this.clusters && this.clusters.length > 0) {
@@ -2288,6 +2357,31 @@ class MindMap {
         this.selectedConnection = conn;
         conn.selected = true;
         return;
+      }
+    }
+
+    // Check if clicking on a timeline connection (when timeline is active)
+    if (this.timelineConnections && this.timelineConnections.length > 0) {
+      for (let i = this.timelineConnections.length - 1; i >= 0; i--) {
+        const tc = this.timelineConnections[i];
+        if (!tc || typeof tc.isMouseOver !== 'function') continue;
+        if (tc.isMouseOver()) {
+          this.isArrowKeyNavigating = false;
+          if (this.selectedBox) {
+            this.selectedBox.stopEditing();
+            this.selectedBox = null;
+          }
+          this.clearBoxSelection();
+          if (this.selectedCluster) {
+            this.selectedCluster.selected = false;
+            this.selectedCluster = null;
+          }
+          // Clear normal connection selection, then select this timeline connection
+          if (this.clearConnectionSelection) this.clearConnectionSelection();
+          this.selectedTimelineConnection = tc;
+          tc.selected = true;
+          return;
+        }
       }
     }
 
@@ -3086,6 +3180,9 @@ class MindMap {
             MindMap.onConnectionsChange();
           }
         });
+      } else if (this.selectedTimelineConnection) {
+        // Delete selected timeline connection
+        this.removeTimelineConnection(this.selectedTimelineConnection);
       }
       // Clear navigation mode after deleting single connection
       this.isArrowKeyNavigating = false;
@@ -3138,13 +3235,18 @@ class MindMap {
    * @returns {Object} JSON representation of the mind map
    */
   toJSON() {
+    // Serialize timeline connections: use toJSON() if available, else pass through
+    const tlConns = (this.timelineConnections || []).map(c =>
+      (c && typeof c.toJSON === 'function') ? c.toJSON() : c
+    ).filter(Boolean);
+
     return {
       boxes: this.boxes.map(box => box.toJSON()),
       connections: this.connections.map(conn => conn.toJSON(this.boxes)),
       clusters: this.clusters
         ? this.clusters.filter(c => c).map(c => c.toJSON())
         : [],
-      timelineConnections: this.timelineConnections || [],
+      timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
@@ -3246,10 +3348,30 @@ class MindMap {
       }
     }
 
-    // Restore Timeline Mode soft connections (isolated plain data)
-    this.timelineConnections = Array.isArray(data.timelineConnections)
-      ? data.timelineConnections
-      : [];
+    // Restore Timeline Mode connections
+    // Prefer TimelineConnection.fromJSON() for full object restoration; fall back
+    // to plain data (backwards-compatible with saves from before this version).
+    this.timelineConnections = [];
+    this.selectedTimelineConnection = null;
+    if (Array.isArray(data.timelineConnections)) {
+      for (const tcData of data.timelineConnections) {
+        if (!tcData) continue;
+        try {
+          let tc = null;
+          if (typeof TimelineConnection !== 'undefined') {
+            tc = TimelineConnection.fromJSON(tcData, this.boxIdMap);
+          }
+          if (tc) {
+            this.timelineConnections.push(tc);
+          } else if (tcData.fromId && tcData.dayIndex != null) {
+            // Plain data fallback (loaded before TimelineConnection class is available)
+            this.timelineConnections.push(tcData);
+          }
+        } catch (e) {
+          console.error('Failed to load timeline connection:', e);
+        }
+      }
+    }
     // Restore persisted bar width
     this.timelineBarWidth = (data.timelineBarWidth && typeof data.timelineBarWidth === 'number')
       ? data.timelineBarWidth
@@ -3272,6 +3394,9 @@ class MindMap {
     }
     if (MindMap.onClustersChange) {
       MindMap.onClustersChange();
+    }
+    if (MindMap.onTimelineConnectionsChange) {
+      MindMap.onTimelineConnectionsChange();
     }
   }
 
@@ -3718,7 +3843,7 @@ class MindMap {
   // ============================================================================
 
   /**
-   * Clears all connection selections
+   * Clears all connection selections (normal and timeline)
    */
   clearConnectionSelection() {
     if (!this.selectedConnections) this.selectedConnections = new Set();
@@ -3731,6 +3856,12 @@ class MindMap {
     if (this.selectedConnection) {
       try { this.selectedConnection.selected = false; } catch (_) { }
       this.selectedConnection = null;
+    }
+
+    // Clear any selected timeline connection
+    if (this.selectedTimelineConnection) {
+      try { this.selectedTimelineConnection.selected = false; } catch (_) { }
+      this.selectedTimelineConnection = null;
     }
   }
 

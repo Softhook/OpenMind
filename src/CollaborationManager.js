@@ -96,6 +96,7 @@ class CollaborationManager {
         this.yboxes = null;      // Y.Map<boxId, boxData>
         this.yconnections = null; // Y.Array<{fromId, toId}>
         this.yclusters = null;   // Y.Map<clusterId, {id, colorIndex, boxIds}>
+        this.ytimelineConnections = null; // Y.Array<{fromId, dayIndex}>
         this.undoManager = null;  // Y.UndoManager for undo/redo
 
         // Persistence
@@ -220,6 +221,7 @@ class CollaborationManager {
             this.yboxes = this.ydoc.getMap('boxes');
             this.yconnections = this.ydoc.getArray('connections');
             this.yclusters = this.ydoc.getMap('clusters');
+            this.ytimelineConnections = this.ydoc.getArray('timelineConnections');
 
             // Create IndexedDB provider for automatic persistence
             // Use room-specific database name to ensure data isolation
@@ -238,7 +240,7 @@ class CollaborationManager {
             // We use ydoc.transact with undoManager as second parameter to mark trackable operations.
             // Empty trackedOrigins means it tracks nothing by default.
             // We use this.undoManager as the origin for our own trackable transactions.
-            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections, this.yclusters], {
+            this.undoManager = new this.Y.UndoManager([this.yboxes, this.yconnections, this.yclusters, this.ytimelineConnections], {
                 captureTimeout: CollaborationManager.UNDO_CAPTURE_TIMEOUT,
                 trackedOrigins: new Set([CollaborationManager.TRACKED_ORIGIN]),
                 maxStackSize: CollaborationManager.MAX_UNDO_STACK_SIZE
@@ -617,6 +619,7 @@ class CollaborationManager {
         this.yboxes = null;
         this.yconnections = null;
         this.yclusters = null;
+        this.ytimelineConnections = null;
         this.isInitialized = false;
         this.isInitializing = false;
         this.initializationPromise = null;
@@ -1028,6 +1031,10 @@ class CollaborationManager {
             MindMap.onClustersChange = (skipTransactionWrapper = false) => {
                 this.syncClustersToYjs(skipTransactionWrapper);
             };
+
+            MindMap.onTimelineConnectionsChange = (skipTransactionWrapper = false) => {
+                this.syncTimelineConnectionsToYjs(skipTransactionWrapper);
+            };
         }
 
         // Set up TextBox callback to check for remote editing
@@ -1053,6 +1060,7 @@ class CollaborationManager {
             MindMap.onBoxDelete = null;
             MindMap.onConnectionsChange = null;
             MindMap.onClustersChange = null;
+            MindMap.onTimelineConnectionsChange = null;
             // Note: onBoxHealthChanged is owned by ThrustGame, not CollaborationManager.
             // ThrustGame registers/deregisters it independently via start()/stop().
         }
@@ -1145,6 +1153,25 @@ class CollaborationManager {
                     for (const cluster of this.mindMap.clusters) {
                         if (cluster && cluster.id) {
                             this.yclusters.set(cluster.id, cluster.toJSON());
+                        }
+                    }
+                }
+
+                // Sync timeline connections
+                if (this.ytimelineConnections && this.mindMap.timelineConnections) {
+                    const existingTlConns = new Set(
+                        this.ytimelineConnections.toArray().map(c => `${c.fromId}:${c.dayIndex}`)
+                    );
+                    for (const conn of this.mindMap.timelineConnections) {
+                        if (!conn) continue;
+                        const fromId   = conn.fromBox ? conn.fromBox.id : conn.fromId;
+                        const dayIndex = conn.dayIndex;
+                        if (fromId && dayIndex != null) {
+                            const key = `${fromId}:${dayIndex}`;
+                            if (!existingTlConns.has(key)) {
+                                this.ytimelineConnections.push([{ fromId, dayIndex }]);
+                                existingTlConns.add(key);
+                            }
                         }
                     }
                 }
@@ -1512,6 +1539,104 @@ class CollaborationManager {
     // ============================================================================
 
     /**
+     * Syncs timeline connections to Yjs.
+     * Call this when mindMap.timelineConnections changes.
+     * @param {boolean} skipTransactionWrapper - If true, sync directly (already inside a transaction)
+     */
+    syncTimelineConnectionsToYjs(skipTransactionWrapper = false) {
+        if (!this.ytimelineConnections || !this.mindMap || this.isSyncing) return;
+
+        const localConns = (this.mindMap.timelineConnections || [])
+            .filter(c => c && (c.fromBox ? c.fromBox.id : c.fromId) && c.dayIndex != null)
+            .map(c => ({
+                fromId:   c.fromBox ? c.fromBox.id : c.fromId,
+                dayIndex: c.dayIndex
+            }));
+
+        if (skipTransactionWrapper) {
+            this._syncTimelineConnectionsToYjsImpl(localConns);
+            return;
+        }
+
+        if (this.ydoc && this.undoManager) {
+            this.transact(() => {
+                this._syncTimelineConnectionsToYjsImpl(localConns);
+            }, CollaborationManager.TRACKED_ORIGIN);
+        } else if (this.ydoc) {
+            this.ydoc.transact(() => {
+                this._syncTimelineConnectionsToYjsImpl(localConns);
+            });
+        }
+    }
+
+    /**
+     * Internal implementation: diff-sync local timeline connections to Yjs.
+     * @private
+     */
+    _syncTimelineConnectionsToYjsImpl(localConns) {
+        const yjsConns = this.ytimelineConnections.toArray();
+
+        // Build a map of existing Yjs entries: "fromId:dayIndex" -> [index...]
+        const yjsMap = new Map();
+        yjsConns.forEach((c, i) => {
+            if (c && c.fromId && c.dayIndex != null) {
+                const key = `${c.fromId}:${c.dayIndex}`;
+                if (!yjsMap.has(key)) yjsMap.set(key, []);
+                yjsMap.get(key).push(i);
+            }
+        });
+
+        const toAdd = [];
+        for (const conn of localConns) {
+            const key = `${conn.fromId}:${conn.dayIndex}`;
+            if (yjsMap.has(key)) {
+                const indices = yjsMap.get(key);
+                if (indices.length > 0) {
+                    indices.shift();
+                    if (indices.length === 0) yjsMap.delete(key);
+                } else {
+                    toAdd.push(conn);
+                }
+            } else {
+                toAdd.push(conn);
+            }
+        }
+
+        // Delete extras in descending order to avoid index shifts
+        const indicesToDelete = [];
+        for (const indices of yjsMap.values()) indicesToDelete.push(...indices);
+        indicesToDelete.sort((a, b) => b - a);
+        for (const index of indicesToDelete) {
+            this.ytimelineConnections.delete(index, 1);
+        }
+        if (toAdd.length > 0) {
+            this.ytimelineConnections.push(toAdd);
+        }
+    }
+
+    /**
+     * Rebuilds mindMap.timelineConnections from the Yjs array.
+     * @private
+     */
+    _rebuildTimelineConnectionsFromYjs() {
+        if (!this.mindMap || !this.ytimelineConnections) return;
+        if (typeof TimelineConnection === 'undefined') return;
+
+        this.mindMap.timelineConnections = [];
+        if (this.mindMap.selectedTimelineConnection) {
+            this.mindMap.selectedTimelineConnection = null;
+        }
+        const data = this.ytimelineConnections.toArray();
+        for (const entry of data) {
+            if (!entry || !entry.fromId || entry.dayIndex == null) continue;
+            const fromBox = this.mindMap.getBoxById(entry.fromId);
+            if (fromBox) {
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, entry.dayIndex));
+            }
+        }
+    }
+
+    /**
      * Syncs local clusters to Yjs.
      * Call this when clusters change.
      * @param {boolean} skipTransactionWrapper - If true, sync directly (already inside a transaction)
@@ -1671,6 +1796,9 @@ class CollaborationManager {
                     // Same reasoning as connections: fire order is non-deterministic.
                     this._rebuildClustersFromYjs();
 
+                    // Rebuild timeline connections after boxes are available.
+                    this._rebuildTimelineConnectionsFromYjs();
+
                     // NOTE: We do NOT sync connections/clusters back to Yjs here.
                     // The undo/redo operation already correctly reverts yconnections
                     // (box deletion + connection deletion are in the same transaction).
@@ -1818,6 +1946,29 @@ class CollaborationManager {
                     this.isSyncing = false;
                 }
             });
+
+            // Observe timeline connection changes (undo/redo + remote)
+            if (this.ytimelineConnections) {
+                this.ytimelineConnections.observe((event) => {
+                    const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
+                    if (this.isSyncing && !isUndoRedo) return;
+                    if (event.transaction.local && !isUndoRedo) return;
+
+                    if (isUndoRedo) {
+                        // If boxes also changed, yboxes observer will call rebuild after boxes
+                        const hasBoxChanges = event.transaction.changed.has(this.yboxes);
+                        if (hasBoxChanges) return;
+                    }
+
+                    this.isSyncing = true;
+                    try {
+                        this._rebuildTimelineConnectionsFromYjs();
+                        if (this.mindMap) this.mindMap.isDirty = true;
+                    } finally {
+                        this.isSyncing = false;
+                    }
+                });
+            }
         }
     }
 

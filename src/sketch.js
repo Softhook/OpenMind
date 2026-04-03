@@ -2091,6 +2091,27 @@ function mouseReleased() {
   }
 
   if (mindMap) {
+    // Timeline Mode: intercept connection drags that end over the timeline bar.
+    // This must happen BEFORE handleMouseReleased so completeConnection() is not called.
+    if (mindMap.connectingFrom &&
+        typeof TimelineMode !== 'undefined' &&
+        TimelineMode.instance && TimelineMode.instance.active) {
+      const wx = worldMouseX();
+      const wy = worldMouseY();
+      if (TimelineMode.instance._isOverBarWorld(wx, wy)) {
+        const sourceBox = mindMap.connectingFrom.box;
+        // Clear connectingFrom BEFORE handleMouseReleased to prevent completeConnection()
+        mindMap.connectingFrom = null;
+        mindMap.connectingFromInitiatedByKeyboard = false;
+        TimelineMode.handleConnectionDropped(wx, wy, sourceBox, mindMap);
+        // Still need handleMouseReleased to stop any box drags
+        try { mindMap.handleMouseReleased(); } catch (e) { /* ignore */ }
+        // Also finalize any timeline resize drag
+        if (typeof TimelineMode !== 'undefined') TimelineMode.handleMouseReleased();
+        return false;
+      }
+    }
+
     try {
       mindMap.handleMouseReleased();
     } catch (e) {

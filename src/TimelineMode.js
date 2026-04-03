@@ -4,8 +4,6 @@
  * Follows the ExtensionBridge "ghost plugin" pattern used by ThrustGame:
  *   - Zero CPU overhead when inactive (static check + immediate return)
  *   - Lazily loaded on first Ctrl+K key press
- *   - Soft connections stored as plain data on mindMap.timelineConnections
- *     so that MindMap never depends on this class (complete isolation)
  *
  * Keyboard shortcut : Ctrl+K – toggle Timeline Mode
  *
@@ -20,18 +18,189 @@
  *   to shorten or lengthen the bar.
  *
  * Connections:
- *   While Timeline Mode is active, clicking a day tick while a box is selected
- *   creates a soft connection (plain-data entry on mindMap.timelineConnections)
- *   between that box and the tick.  Connections are drawn as lines directly in
- *   world space (box world coords → tick world coords).
- *
- * The soft connections:
- *   - Are rendered only while Timeline Mode is active
- *   - Are exported in JSON save files (via mindMap.timelineConnections)
- *   - Are rendered in PNG and PDF exports when Timeline Mode is active
- *   - Do not affect the normal graph/cluster/connection structure
+ *   Drag from a box connector dot and release over the timeline bar to attach
+ *   the box to a day tick.  Connections are full Connection-look-alike arrows
+ *   (TimelineConnection objects stored in mindMap.timelineConnections).
+ *   Click a connection line to select it; press Delete/Backspace to remove it.
+ *   All add/remove operations go through mindMap._wrapInTransaction() so they
+ *   are tracked by the Yjs UndoManager and can be undone with Ctrl+Z.
  */
 
+// ==============================================================================
+// TimelineConnection – arrow from a TextBox to a calendar-bar day tick
+// ==============================================================================
+/**
+ * Looks and behaves like a normal Connection but its "to" endpoint is a fixed
+ * point on the timeline bar (the nearest top/bottom edge of the bar at the
+ * day tick's world X coordinate).
+ *
+ * Stored in mindMap.timelineConnections (separate from mindMap.connections so
+ * that MindMap's Yjs connection sync does not interfere).
+ */
+class TimelineConnection {
+  /**
+   * @param {TextBox} fromBox   – source box
+   * @param {number}  dayIndex  – 0 … TimelineMode.TOTAL_DAYS-1
+   */
+  constructor(fromBox, dayIndex) {
+    this.fromBox  = fromBox;
+    this.dayIndex = dayIndex;
+    this.selected = false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal geometry helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the world-space attachment point on the bar.
+   * Attaches to the top edge (y=0) when the box is above the bar mid-line,
+   * otherwise to the bottom edge (y=BAR_HEIGHT).
+   * @returns {{x:number, y:number}|null}
+   */
+  _getTickPoint() {
+    const inst = (typeof TimelineMode !== 'undefined') ? TimelineMode.instance : null;
+    if (!inst || !this.fromBox) return null;
+    const tx = inst._worldDayX(this.dayIndex);
+    const ty = (this.fromBox.y < TimelineMode.BAR_HEIGHT / 2) ? 0 : TimelineMode.BAR_HEIGHT;
+    return { x: tx, y: ty };
+  }
+
+  /**
+   * Returns { start, end } world-space points (box edge → tick).
+   * @returns {{start:{x,y}, end:{x,y}}|null}
+   */
+  _getEndpoints() {
+    const tick = this._getTickPoint();
+    if (!tick) return null;
+    if (!this.fromBox || typeof this.fromBox.getConnectionPoint !== 'function') return null;
+    const start = this.fromBox.getConnectionPoint(tick);
+    if (!start || !isFinite(start.x) || !isFinite(start.y)) return null;
+    return { start, end: tick };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering  (called inside the camera transform – pure world space)
+  // ---------------------------------------------------------------------------
+
+  draw() {
+    const ep = this._getEndpoints();
+    if (!ep) return;
+    const { start, end } = ep;
+
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+
+    const angle     = Math.atan2(dy, dx);
+    const arrowSize = 12;
+    // Shortened line endpoint (stops where the arrowhead begins)
+    const ex = end.x - arrowSize * Math.cos(angle);
+    const ey = end.y - arrowSize * Math.sin(angle);
+
+    // Reuse Connection's colour palette and weights when available
+    const colors  = (typeof Connection !== 'undefined') ? Connection.COLORS  : null;
+    const normalW = (typeof Connection !== 'undefined') ? Connection.STROKE_WEIGHT_NORMAL   : 2;
+    const selectW = (typeof Connection !== 'undefined') ? Connection.STROKE_WEIGHT_SELECTED : 3;
+    const col     = this.selected ? (colors ? colors.SELECTED : null) : (colors ? colors.NORMAL : null);
+    const weight  = this.selected ? selectW : normalW;
+
+    push();
+
+    // Line
+    if (col && typeof Utils !== 'undefined' && Utils.applyStroke) {
+      Utils.applyStroke(col, weight);
+    } else {
+      stroke(this.selected ? 255 : 80, this.selected ? 140 : 100, this.selected ? 0 : 160);
+      strokeWeight(weight);
+    }
+    noFill();
+    line(start.x, start.y, ex, ey);
+
+    // Arrowhead
+    if (col && typeof Utils !== 'undefined' && Utils.applyFill) {
+      Utils.applyFill(col);
+    } else {
+      fill(this.selected ? 255 : 80, this.selected ? 140 : 100, this.selected ? 0 : 160);
+    }
+    noStroke();
+    push();
+    translate(end.x, end.y);
+    rotate(angle);
+    triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
+    pop();
+
+    pop();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hit testing  (world-space mouse coordinates via Utils)
+  // ---------------------------------------------------------------------------
+
+  isMouseOver() {
+    const ep = this._getEndpoints();
+    if (!ep) return false;
+    if (typeof Utils === 'undefined') return false;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) return false;
+
+    const { start, end } = ep;
+    const angle     = Math.atan2(end.y - start.y, end.x - start.x);
+    const arrowSize = 12;
+    const ex = end.x - arrowSize * Math.cos(angle);
+    const ey = end.y - arrowSize * Math.sin(angle);
+    const threshold = (typeof Connection !== 'undefined') ? Connection.HIT_THRESHOLD : 7;
+    return Utils.distanceToSegment(mx, my, start.x, start.y, ex, ey) < threshold;
+  }
+
+  isMouseOverArrowHead() {
+    const ep = this._getEndpoints();
+    if (!ep) return false;
+    if (typeof Utils === 'undefined') return false;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) return false;
+
+    const { end } = ep;
+    const currentZoom = (typeof Utils.getCurrentZoom === 'function') ? Utils.getCurrentZoom() : 1;
+    const safeZoom    = Math.max(0.25, Math.min(4, currentZoom));
+    const hitRadius   = 10 / Math.sqrt(safeZoom);
+    return Utils.distance(mx, my, end.x, end.y) <= hitRadius;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Serialisation
+  // ---------------------------------------------------------------------------
+
+  toJSON() {
+    return {
+      fromId:   this.fromBox ? this.fromBox.id : null,
+      dayIndex: this.dayIndex,
+    };
+  }
+
+  /**
+   * Reconstruct a TimelineConnection from stored JSON.
+   * @param {Object}              data        – {fromId, dayIndex}
+   * @param {Map|Array<TextBox>}  boxesOrMap  – boxIdMap or boxes array
+   * @returns {TimelineConnection|null}
+   */
+  static fromJSON(data, boxesOrMap) {
+    if (!data || !data.fromId || data.dayIndex == null) return null;
+    let fromBox = null;
+    if (boxesOrMap instanceof Map) {
+      fromBox = boxesOrMap.get(data.fromId);
+    } else if (Array.isArray(boxesOrMap)) {
+      fromBox = boxesOrMap.find(b => b && b.id === data.fromId);
+    }
+    if (!fromBox) return null;
+    return new TimelineConnection(fromBox, data.dayIndex);
+  }
+}
+
+// ==============================================================================
+// TimelineMode – the main timeline-bar overlay controller
+// ==============================================================================
 class TimelineMode {
   // ============================================================================
   // STATIC CONSTANTS
@@ -153,6 +322,40 @@ class TimelineMode {
     TimelineMode.instance.handleRelease();
   }
 
+  /**
+   * Called from sketch.js mouseReleased() when a connection drag ends over the
+   * timeline bar.  Creates a TimelineConnection from the source box to the
+   * nearest day tick via mindMap.addTimelineConnection() (undo-tracked).
+   *
+   * @param {number} worldX   – world-space mouse X where the drag ended
+   * @param {number} worldY   – world-space mouse Y where the drag ended
+   * @param {*}      fromBox  – TextBox that the connection was dragged from
+   * @param {*}      mindMap  – current MindMap instance
+   * @returns {boolean} true if a connection was created
+   */
+  static handleConnectionDropped(worldX, worldY, fromBox, mindMap) {
+    const inst = TimelineMode.instance;
+    if (!inst || !inst.active) return false;
+    if (!inst._isOverBarWorld(worldX, worldY)) return false;
+    if (!fromBox || !mindMap) return false;
+    if (inst._isDragHandle(worldX, worldY)) return false; // don't create connection on handle
+
+    const dayIndex = inst._dayFromWorldX(worldX);
+    if (typeof mindMap.addTimelineConnection === 'function') {
+      mindMap.addTimelineConnection(fromBox, dayIndex);
+    } else {
+      // Fallback when MindMap hasn't been updated yet
+      if (!mindMap.timelineConnections) mindMap.timelineConnections = [];
+      const exists = mindMap.timelineConnections.some(
+        c => c.fromBox === fromBox && c.dayIndex === dayIndex
+      );
+      if (!exists) {
+        mindMap.timelineConnections.push(new TimelineConnection(fromBox, dayIndex));
+      }
+    }
+    return true;
+  }
+
   // ============================================================================
   // EXPORT HELPER  (called from ExportManager inside push/translate context)
   // ============================================================================
@@ -174,21 +377,37 @@ class TimelineMode {
     const conns = (mindMap && mindMap.timelineConnections) ? mindMap.timelineConnections : [];
     const highlightedDays = new Set(conns.map(c => c.dayIndex));
 
-    // --- Soft connection lines ---
+    // --- TimelineConnection arrows (drawn behind the bar so the bar sits on top) ---
     for (const conn of conns) {
-      const box = mindMap.boxIdMap
-        ? mindMap.boxIdMap.get(conn.boxId)
-        : mindMap.boxes && mindMap.boxes.find(b => b && b.id === conn.boxId);
-      if (!box) continue;
-      const tx = inst._worldDayX(conn.dayIndex);
-      const ty = conn.side === 'below' ? bh : 0;
-      pg.stroke(100, 180, 255, 180);
-      pg.strokeWeight(1.5);
+      if (typeof conn.draw !== 'function') continue;
+      // Temporarily swap drawing functions to draw into pg
+      // We re-implement drawing here to use pg's methods directly
+      const tick = conn._getTickPoint && conn._getTickPoint();
+      if (!tick || !conn.fromBox || typeof conn.fromBox.getConnectionPoint !== 'function') continue;
+      const start = conn.fromBox.getConnectionPoint(tick);
+      if (!start || !isFinite(start.x) || !isFinite(start.y)) continue;
+
+      const dx = tick.x - start.x;
+      const dy = tick.y - start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1) continue;
+
+      const angle     = Math.atan2(dy, dx);
+      const arrowSize = 12;
+      const ex = tick.x - arrowSize * Math.cos(angle);
+      const ey = tick.y - arrowSize * Math.sin(angle);
+
+      pg.stroke(80, 100, 160);
+      pg.strokeWeight(2);
       pg.noFill();
-      pg.line(box.x, box.y, tx, ty);
-      pg.fill(100, 200, 255, 220);
+      pg.line(start.x, start.y, ex, ey);
+      pg.fill(80, 100, 160);
       pg.noStroke();
-      pg.circle(tx, ty, 6);
+      pg.push();
+      pg.translate(tick.x, tick.y);
+      pg.rotate(angle);
+      pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
+      pg.pop();
     }
 
     // --- Bar background ---
@@ -393,13 +612,14 @@ class TimelineMode {
 
   /**
    * Handle a mouse-press in world coordinates.
-   * Priority: resize handle > tick connection.
+   * Only handles the resize handle; connection creation is handled by
+   * TimelineMode.handleConnectionDropped() on mouse release.
    * Returns true if the event was consumed.
    */
   handleMouseDown(worldX, worldY, mindMap) {
     if (!this._isOverBarWorld(worldX, worldY)) return false;
 
-    // Always consume resize-handle presses
+    // Consume resize-handle presses
     if (this._isDragHandle(worldX, worldY)) {
       this._draggingResize  = true;
       this._dragStartWorldX = worldX;
@@ -407,28 +627,8 @@ class TimelineMode {
       return true;
     }
 
-    // For tick clicks, require a selected box
-    if (!mindMap) return false;
-    const selectedBox = mindMap.selectedBox;
-    if (!selectedBox) return false;
-
-    const dayIndex = this._dayFromWorldX(worldX);
-
-    if (!mindMap.timelineConnections) mindMap.timelineConnections = [];
-    const conns = mindMap.timelineConnections;
-
-    const existingIdx = conns.findIndex(
-      c => c.boxId === selectedBox.id && c.dayIndex === dayIndex
-    );
-
-    if (existingIdx >= 0) {
-      conns.splice(existingIdx, 1);
-    } else {
-      // Side: 'above' attaches to top edge (y=0), 'below' to bottom (y=BAR_HEIGHT)
-      const side = selectedBox.y < TimelineMode.BAR_HEIGHT / 2 ? 'above' : 'below';
-      conns.push({ boxId: selectedBox.id, dayIndex, side });
-    }
-
+    // Clicks on the bar body (non-handle) are consumed to prevent the camera
+    // from interpreting them as empty-canvas clicks (which would deselect boxes).
     return true;
   }
 
@@ -473,9 +673,11 @@ class TimelineMode {
 
     push();
 
-    // --- Soft connection lines (drawn behind bar) ---
-    if (conns.length > 0 && this.mindMap) {
-      this._drawConnections(conns, bh, sw);
+    // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
+    for (const conn of conns) {
+      if (typeof conn.draw === 'function') {
+        try { conn.draw(); } catch (e) { /* skip broken connection */ }
+      }
     }
 
     // --- Bar background ---
@@ -489,9 +691,12 @@ class TimelineMode {
     noFill();
     rect(0, 0, bw, bh);
 
-    // --- Gradations ---
+    // --- Gradations (ticks, labels) ---
     const highlightedDays = new Set(conns.map(c => c.dayIndex));
     this._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts);
+
+    // --- Snap preview: highlight nearest tick while dragging a connection ---
+    this._drawConnectionDragPreview(bw, bh, safeZ, sw);
 
     // --- Resize handle ---
     this._drawResizeHandle(bw, bh, sw);
@@ -506,27 +711,34 @@ class TimelineMode {
     pop();
   }
 
-  _drawConnections(conns, bh, sw) {
-    for (const conn of conns) {
-      const box = this.mindMap.boxIdMap
-        ? this.mindMap.boxIdMap.get(conn.boxId)
-        : this.mindMap.boxes && this.mindMap.boxes.find(b => b && b.id === conn.boxId);
-      if (!box) continue;
+  /**
+   * Draws a visual snap indicator on the nearest tick while a connection drag
+   * is in progress (mindMap.connectingFrom is set and mouse is over the bar).
+   * @private
+   */
+  _drawConnectionDragPreview(bw, bh, safeZ, sw) {
+    if (!this.mindMap || !this.mindMap.connectingFrom) return;
+    if (typeof worldMouseX === 'undefined' || typeof worldMouseY === 'undefined') return;
 
-      const tx = this._worldDayX(conn.dayIndex);
-      const ty = conn.side === 'below' ? bh : 0;
+    const mx = worldMouseX();
+    const my = worldMouseY();
+    if (!this._isOverBarWorld(mx, my)) return;
 
-      // Line from box to tick attachment point (both in world space)
-      stroke(100, 180, 255, 180);
-      strokeWeight(1.5 * sw);
-      noFill();
-      line(box.x, box.y, tx, ty);
+    const dayIndex = this._dayFromWorldX(mx);
+    const tx = this._worldDayX(dayIndex);
+    const ty = (this.mindMap.connectingFrom.box && this.mindMap.connectingFrom.box.y < bh / 2) ? 0 : bh;
 
-      // Attachment dot
-      noStroke();
-      fill(100, 200, 255, 220);
-      circle(tx, ty, 6 * sw);
-    }
+    // Highlight the snap tick
+    stroke(100, 200, 255, 255);
+    strokeWeight(2 * sw);
+    noFill();
+    const dh = TimelineMode.DAY_TICK_H;
+    line(tx, ty === 0 ? 0 : bh - dh * 1.5, tx, ty === 0 ? dh * 1.5 : bh);
+
+    // Snap dot
+    noStroke();
+    fill(100, 200, 255, 220);
+    circle(tx, ty, 8 * sw);
   }
 
   _drawGradations(bw, bh, highlightedDays, safeZ, sw, ts) {
@@ -639,11 +851,15 @@ class TimelineMode {
 // ==============================================================================
 if (typeof module !== 'undefined' && module.exports) module.exports = TimelineMode;
 
+// Also expose TimelineConnection globally
+if (typeof module !== 'undefined' && module.exports) module.exports.TimelineConnection = TimelineConnection;
+
 // ==============================================================================
 // BROWSER SELF-REGISTRATION
 // ==============================================================================
 /* istanbul ignore next */
 if (typeof window !== 'undefined') {
   window.TimelineMode = TimelineMode;
+  window.TimelineConnection = TimelineConnection;
 }
 

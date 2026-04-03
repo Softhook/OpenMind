@@ -32,6 +32,9 @@ const p5Stubs = {
   rect:         jest.fn(),
   line:         jest.fn(),
   circle:       jest.fn(),
+  triangle:     jest.fn(),
+  translate:    jest.fn(),
+  rotate:       jest.fn(),
   text:         jest.fn(),
   textSize:     jest.fn(),
   textAlign:    jest.fn(),
@@ -47,11 +50,17 @@ const sandbox = {
   ...p5Stubs,
   Math,
   Date,
+  Number,
+  isFinite,
+  isNaN,
   console,
   module: { exports: {} },
   window: {},
   // CameraUtils stub – zoom=1 by default so 1/safeZ = 1 in drawing
   CameraUtils: { zoom: 1 },
+  // worldMouseX/Y used by _drawConnectionDragPreview
+  worldMouseX: jest.fn(() => -9999),
+  worldMouseY: jest.fn(() => -9999),
 };
 
 const timelineCode = fs.readFileSync(
@@ -72,11 +81,18 @@ function makeMindMap(boxes = []) {
     timelineConnections: [],
     timelineBarWidth: null,
     selectedBox: null,
+    connectingFrom: null,
   };
 }
 
 function makeBox(id, x = 0, y = 0) {
-  return { id, x, y, width: 100, height: 40 };
+  return {
+    id, x, y, width: 100, height: 40,
+    getConnectionPoint(other) {
+      // Returns the box center as a simple stub
+      return { x: this.x, y: this.y };
+    }
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -289,10 +305,11 @@ describe('TimelineMode.handleMousePressed() / handleMouseDown()', () => {
     expect(mm.timelineConnections).toHaveLength(0);
   });
 
-  test('returns false when no box is selected (non-handle click)', () => {
+  test('returns true (consumed) for any click on the bar body regardless of selection', () => {
     mm.selectedBox = null;
     const result = TimelineMode.handleMousePressed(100, 40, mm);
-    expect(result).toBe(false);
+    // The bar body click is now always consumed to prevent deselection of boxes
+    expect(result).toBe(true);
   });
 
   test('returns true and starts resize when clicking the drag handle', () => {
@@ -302,44 +319,114 @@ describe('TimelineMode.handleMousePressed() / handleMouseDown()', () => {
     expect(inst._draggingResize).toBe(true);
   });
 
-  test('creates a connection when clicking a day tick with a box selected', () => {
+  test('does NOT create connection on bar body click (connections use drag-to-create)', () => {
     const inst = TimelineMode.instance;
     const wx = inst._worldDayX(5);
-    const result = TimelineMode.handleMousePressed(wx, 40, mm);
-    expect(result).toBe(true);
-    expect(mm.timelineConnections).toHaveLength(1);
-    expect(mm.timelineConnections[0].boxId).toBe('box1');
-    expect(mm.timelineConnections[0].dayIndex).toBe(5);
+    TimelineMode.handleMousePressed(wx, 40, mm);
+    // Bar body clicks no longer create connections; use handleConnectionDropped instead
+    expect(mm.timelineConnections).toHaveLength(0);
+  });
+});
+
+// ============================================================
+// handleConnectionDropped – drag-to-create connections
+// ============================================================
+describe('TimelineMode.handleConnectionDropped()', () => {
+  let mm, box;
+  beforeEach(() => {
+    box = makeBox('box1', 100, -50);
+    mm  = makeMindMap([box]);
+    TimelineMode.toggle(mm);
   });
 
-  test('removes an existing connection on second click of the same tick', () => {
+  test('returns false when timeline is inactive', () => {
+    TimelineMode.toggle(mm); // deactivate
     const inst = TimelineMode.instance;
-    const wx = inst._worldDayX(10);
-    TimelineMode.handleMousePressed(wx, 40, mm);
-    expect(mm.timelineConnections).toHaveLength(1);
-    TimelineMode.handleMousePressed(wx, 40, mm);
+    const result = TimelineMode.handleConnectionDropped(inst._worldDayX(5), 40, box, mm);
+    expect(result).toBe(false);
+  });
+
+  test('returns false when drop is outside the bar', () => {
+    const result = TimelineMode.handleConnectionDropped(100, -500, box, mm);
+    expect(result).toBe(false);
     expect(mm.timelineConnections).toHaveLength(0);
   });
 
-  test('two different day ticks produce two connections', () => {
+  test('creates a TimelineConnection when dropped on the bar', () => {
     const inst = TimelineMode.instance;
-    TimelineMode.handleMousePressed(inst._worldDayX(3), 40, mm);
-    TimelineMode.handleMousePressed(inst._worldDayX(7), 40, mm);
+    const wx = inst._worldDayX(5);
+    const result = TimelineMode.handleConnectionDropped(wx, 40, box, mm);
+    expect(result).toBe(true);
+    expect(mm.timelineConnections).toHaveLength(1);
+    const conn = mm.timelineConnections[0];
+    expect(conn.fromBox).toBe(box);
+    expect(conn.dayIndex).toBe(5);
+  });
+
+  test('two different ticks produce two connections', () => {
+    const inst = TimelineMode.instance;
+    TimelineMode.handleConnectionDropped(inst._worldDayX(3), 40, box, mm);
+    TimelineMode.handleConnectionDropped(inst._worldDayX(7), 40, box, mm);
     expect(mm.timelineConnections).toHaveLength(2);
   });
 
-  test('side is "above" when box.y < BAR_HEIGHT/2', () => {
-    // box.y = -50 < 40 → 'above'
+  test('prevents duplicate connections to the same tick', () => {
     const inst = TimelineMode.instance;
-    TimelineMode.handleMousePressed(inst._worldDayX(1), 40, mm);
-    expect(mm.timelineConnections[0].side).toBe('above');
+    const wx = inst._worldDayX(10);
+    TimelineMode.handleConnectionDropped(wx, 40, box, mm);
+    TimelineMode.handleConnectionDropped(wx, 40, box, mm);
+    expect(mm.timelineConnections).toHaveLength(1);
   });
 
-  test('side is "below" when box.y >= BAR_HEIGHT/2', () => {
-    box.y = 200; // below the bar midpoint (40)
+  test('returns false when dropped on the resize handle', () => {
     const inst = TimelineMode.instance;
-    TimelineMode.handleMousePressed(inst._worldDayX(1), 40, mm);
-    expect(mm.timelineConnections[0].side).toBe('below');
+    const result = TimelineMode.handleConnectionDropped(
+      inst.barWorldWidth, TimelineMode.BAR_HEIGHT / 2, box, mm
+    );
+    expect(result).toBe(false);
+  });
+});
+
+// ============================================================
+// TimelineConnection – JSON round-trip
+// ============================================================
+describe('TimelineConnection serialisation', () => {
+  let mm, box;
+  beforeEach(() => {
+    box = makeBox('b1', 0, -100);
+    mm  = makeMindMap([box]);
+    TimelineMode.toggle(mm);
+  });
+
+  test('toJSON() returns {fromId, dayIndex}', () => {
+    const inst = TimelineMode.instance;
+    TimelineMode.handleConnectionDropped(inst._worldDayX(15), 40, box, mm);
+    const conn = mm.timelineConnections[0];
+    const json = conn.toJSON();
+    expect(json).toMatchObject({ fromId: 'b1', dayIndex: 15 });
+    expect(json.side).toBeUndefined();
+    expect(json.boxId).toBeUndefined();
+  });
+
+  test('plain JSON.stringify round-trip preserves fromId and dayIndex', () => {
+    const inst = TimelineMode.instance;
+    TimelineMode.handleConnectionDropped(inst._worldDayX(15), 40, box, mm);
+    const json = JSON.stringify(mm.timelineConnections.map(c => c.toJSON()));
+    const parsed = JSON.parse(json);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({ fromId: 'b1', dayIndex: 15 });
+  });
+
+  test('connections survive toggle off/on cycle', () => {
+    const inst = TimelineMode.instance;
+    TimelineMode.handleConnectionDropped(inst._worldDayX(20), 40, box, mm);
+    expect(mm.timelineConnections).toHaveLength(1);
+
+    TimelineMode.toggle(mm); // off – connections NOT cleared
+    expect(mm.timelineConnections).toHaveLength(1);
+
+    TimelineMode.toggle(mm); // on again
+    expect(mm.timelineConnections).toHaveLength(1);
   });
 });
 
@@ -454,28 +541,14 @@ describe('TimelineMode.loop()', () => {
 // JSON serialisation (via mindMap.timelineConnections)
 // ============================================================
 describe('timelineConnections serialisation', () => {
-  test('connections stored on mindMap are plain JSON-serialisable objects', () => {
-    const mm = makeMindMap([makeBox('b1', 0, -100)]); // box above bar
-    mm.selectedBox = mm.boxes[0];
-    TimelineMode.toggle(mm);
-    const inst = TimelineMode.instance;
-    TimelineMode.handleMousePressed(inst._worldDayX(15), 40, mm);
-
-    const json = JSON.stringify({ timelineConnections: mm.timelineConnections });
-    const parsed = JSON.parse(json);
-    expect(parsed.timelineConnections).toHaveLength(1);
-    expect(parsed.timelineConnections[0]).toMatchObject({
-      boxId: 'b1',
-      dayIndex: 15,
-    });
-  });
-
-  test('connections survive toggle off/on cycle', () => {
+  // This describe block is now superseded by the "TimelineConnection serialisation"
+  // block added near handleConnectionDropped tests above.  Keeping a minimal
+  // sanity check here for backward compatibility verification.
+  test('connections array is preserved across toggle off/on cycle', () => {
     const mm = makeMindMap([makeBox('b1', 0, -100)]);
-    mm.selectedBox = mm.boxes[0];
     TimelineMode.toggle(mm); // on
     const inst = TimelineMode.instance;
-    TimelineMode.handleMousePressed(inst._worldDayX(20), 40, mm);
+    TimelineMode.handleConnectionDropped(inst._worldDayX(20), 40, mm.boxes[0], mm);
     expect(mm.timelineConnections).toHaveLength(1);
 
     TimelineMode.toggle(mm); // off – connections NOT cleared
