@@ -275,8 +275,7 @@ class ExportManager {
         }
 
         // Draw Timeline Mode bar at world (0,0) if active and has content
-        if (typeof TimelineMode !== 'undefined' &&
-            TimelineMode.instance && TimelineMode.instance.active) {
+        if (this.mindMap && this.mindMap.timelineActive) {
           try {
             TimelineMode.drawToGraphics(pg, this.mindMap);
           } catch (e) {
@@ -1188,10 +1187,9 @@ class ExportManager {
 
     // Expand bounds to include the Timeline Mode bar when active.
     // The bar occupies world (0, 0) → (barWorldWidth, BAR_HEIGHT).
-    if (typeof TimelineMode !== 'undefined' &&
-        TimelineMode.instance && TimelineMode.instance.active) {
+    if (this.mindMap && this.mindMap.timelineActive) {
       minX = Math.min(minX, 0);
-      maxX = Math.max(maxX, TimelineMode.instance.barWorldWidth);
+      maxX = Math.max(maxX, this.mindMap.getTimelineBarWidth());
       minY = Math.min(minY, 0);
       maxY = Math.max(maxY, TimelineMode.BAR_HEIGHT);
     }
