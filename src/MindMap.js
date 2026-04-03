@@ -519,16 +519,13 @@ class MindMap {
     if (idx < 0) return;
 
     this._wrapInTransaction(() => {
-      const i = this.timelineConnections.indexOf(conn);
-      if (i >= 0) {
-        this.timelineConnections.splice(i, 1);
-        // Clear selection if this connection was selected
-        if (this.selectedTimelineConnection === conn) {
-          this.selectedTimelineConnection = null;
-        }
-        if (MindMap.onTimelineConnectionsChange) {
-          MindMap.onTimelineConnectionsChange(true);
-        }
+      this.timelineConnections.splice(idx, 1);
+      // Clear selection if this connection was selected
+      if (this.selectedTimelineConnection === conn) {
+        this.selectedTimelineConnection = null;
+      }
+      if (MindMap.onTimelineConnectionsChange) {
+        MindMap.onTimelineConnectionsChange(true);
       }
     });
   }
@@ -2754,6 +2751,8 @@ class MindMap {
           const dayIndex = TimelineMode.dayFromWorldX(lx, bw);
           this._wrapInTransaction(() => {
             this._unregisterConnection(conn);
+            // Notify Yjs that the regular connection was removed
+            if (MindMap.onConnectionsChange) MindMap.onConnectionsChange(true);
             this.addTimelineConnection(conn.fromBox, dayIndex);
           });
           this.draggingConnection = null;

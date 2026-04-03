@@ -8,7 +8,8 @@
  * Keyboard shortcut: Ctrl+K – creates timeline at cursor if inactive, or removes it if already active (MindMap.createTimeline())
  *
  * World-space placement:
- *   The bar is anchored at world (0, 0) and drawn inside the camera transform
+ *   The bar is placed at the cursor position when created (Ctrl+K) and stored in
+ *   MindMap.timelineBarX / timelineBarY.  It is drawn inside the camera transform
  *   so it zooms and pans with the rest of the mind map.  Stroke weights and
  *   text sizes are divided by the current zoom so they remain a constant size
  *   on screen.
