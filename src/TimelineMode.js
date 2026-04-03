@@ -461,10 +461,15 @@ class TimelineMode {
   }
 
   /**
-   * Draw a small date badge above the top-right corner of each box that has a
-   * timeline connection.  Called by drawBar (bar visible) and by
-   * MindMap.drawTimelineDateLabels (bar hidden but connections exist).
-   * Must be called inside the camera transform (p5 push/pop by the caller).
+   * Draw a small date badge (pill) above the top-right corner of each box that
+   * has a timeline connection.  Called by drawBar() when the bar is visible, and
+   * by MindMap.drawTimelineDateLabels() when the bar is hidden.
+   * Must be called inside the camera transform (caller owns push/pop).
+   *
+   * @param {TimelineConnection[]} conns     – connections to draw badges for
+   * @param {Date}                 startDate – origin date; day 0 maps to this date
+   * @param {number}               safeZ     – current camera zoom (≥0.01) used to
+   *                                          keep badge text a constant screen size
    */
   static drawBoxDateLabels(conns, startDate, safeZ) {
     if (!conns || conns.length === 0) return;

@@ -3478,6 +3478,8 @@ class MindMap {
       timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
       timelineActive: this.timelineActive || false,
+      // Persist as ISO string so day-index labels show the same calendar dates
+      // across reloads (without this, labels would shift to today each time).
       timelineStartDate: this.timelineStartDate ? this.timelineStartDate.toISOString() : null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
