@@ -141,6 +141,10 @@ class MindMap {
     this.zoomTarget = null;
     this.isZoomAnimating = false;
     this.zoomAnimationSpeed = 0.12; // separate speed for zoom interpolation
+
+    // Timeline Mode soft connections (plain data; TimelineMode.js reads/writes this)
+    // Each entry: { boxId: string, dayIndex: number, side: 'above'|'below' }
+    this.timelineConnections = [];
   }
 
   // ============================================================================
@@ -3138,6 +3142,7 @@ class MindMap {
       clusters: this.clusters
         ? this.clusters.filter(c => c).map(c => c.toJSON())
         : [],
+      timelineConnections: this.timelineConnections || [],
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3237,6 +3242,11 @@ class MindMap {
         }
       }
     }
+
+    // Restore Timeline Mode soft connections (isolated plain data)
+    this.timelineConnections = Array.isArray(data.timelineConnections)
+      ? data.timelineConnections
+      : [];
 
     this.isDirty = true;
 

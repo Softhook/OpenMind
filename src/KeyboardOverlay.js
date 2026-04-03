@@ -32,7 +32,8 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'Cmd/Ctrl + I', description: 'Italic slant selected text' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
-    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' }
+    { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' },
+    { keys: 'Cmd/Ctrl + K', description: 'Toggle Timeline Mode (6-month calendar bar)' }
 ];
 
 class KeyboardOverlayManager extends BaseOverlay {

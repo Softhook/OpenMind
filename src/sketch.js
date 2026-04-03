@@ -1467,6 +1467,12 @@ function draw() {
 
       pop();
 
+      // Timeline Mode: screen-space overlay (zero overhead when not loaded/active)
+      // Must be called after pop() so we are back in default screen-space coordinates.
+      if (typeof TimelineMode !== 'undefined') {
+        TimelineMode.loop(collaborationManager, mindMap);
+      }
+
       // Update our presence (cursor position, selection) if connected - throttled internally
       if (hasActiveCollaboration) {
         updateCollaborationPresence();
@@ -2018,6 +2024,14 @@ function mousePressed(e) {
         return false;
       }
 
+      // Timeline Mode: intercept clicks on the calendar bar.
+      // A click in the timeline area while a box is selected creates/removes
+      // a soft connection — the normal mindmap handler is skipped in that case.
+      if (typeof TimelineMode !== 'undefined' &&
+          TimelineMode.handleMousePressed(mouseX, mouseY, mindMap)) {
+        return false;
+      }
+
       // Multi-box selection when clicking in empty space with no box selected.
       // Check for clusters first — if a cluster is under the cursor the user
       // wants to select it, not start a rubber-band rectangle.
@@ -2205,6 +2219,20 @@ function keyPressed() {
       });
       return false;
     }
+  }
+
+  // PRIORITY: Handle Timeline Mode toggle (Ctrl+K)
+  if ((key === 'k' || key === 'K') && isCtrl) {
+    if (typeof TimelineMode === 'undefined') {
+      ExtensionBridge.load('TimelineMode', ['src/TimelineMode.js'], () => {
+        if (typeof TimelineMode !== 'undefined') {
+          TimelineMode.handleInput(key, keyCode, mindMap, { isCtrl });
+        }
+      });
+    } else {
+      TimelineMode.handleInput(key, keyCode, mindMap, { isCtrl });
+    }
+    return false;
   }
 
   // Route to Extension Bridge (Ghost Plugin hook)

@@ -70,7 +70,12 @@ class ExportManager {
 
     const padding = this.config.EXPORT?.PADDING || 50;
     const width = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + 2 * padding));
-    const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding));
+    // Extend height to include Timeline Mode strip when active
+    const hasTimeline = typeof TimelineMode !== 'undefined' &&
+      TimelineMode.instance && TimelineMode.instance.active &&
+      this.mindMap.timelineConnections && this.mindMap.timelineConnections.length > 0;
+    const timelineStripH = hasTimeline ? TimelineMode.EXPORT_STRIP_HEIGHT : 0;
+    const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding) + timelineStripH);
 
     // Validate dimensions are finite
     if (!isFinite(width) || !isFinite(height)) {
@@ -277,6 +282,18 @@ class ExportManager {
       } finally {
         // Always restore graphics state
         pg.pop();
+      }
+
+      // Draw Timeline Mode strip at the bottom of the export (if active)
+      if (hasTimeline) {
+        try {
+          TimelineMode.drawToGraphics(
+            pg, width, height, this.mindMap,
+            padding - bounds.minX, padding - bounds.minY
+          );
+        } catch (e) {
+          console.warn('Error drawing timeline in PNG export:', e);
+        }
       }
 
       // Convert to data URL and download
@@ -679,6 +696,11 @@ class ExportManager {
     const padding = this.config.EXPORT?.PADDING || 50;
     const margin = this.config.EXPORT?.MARGIN || 20;
 
+    // Determine if Timeline Mode strip should be included
+    const hasPDFTimeline = typeof TimelineMode !== 'undefined' &&
+      TimelineMode.instance && TimelineMode.instance.active &&
+      this.mindMap.timelineConnections && this.mindMap.timelineConnections.length > 0;
+
     // Determine page orientation based on content aspect ratio
     const contentWidth = bounds.maxX - bounds.minX + 2 * padding;
     const contentHeight = bounds.maxY - bounds.minY + 2 * padding;
@@ -991,6 +1013,30 @@ class ExportManager {
 
     } finally {
       measureGraphics.remove();
+    }
+
+    // Timeline Mode strip: render to an offscreen canvas then embed as image
+    if (hasPDFTimeline && this.p5Instance) {
+      try {
+        const pdfPageTotalWidth  = pdf.internal.pageSize.getWidth();
+        const tlH = TimelineMode.EXPORT_STRIP_HEIGHT;
+        const tlW = pdfPageTotalWidth;
+        const pg = this.p5Instance.createGraphics(Math.ceil(tlW), tlH);
+        try {
+          pg.background(15, 20, 40);
+          TimelineMode.drawToGraphics(
+            pg, Math.ceil(tlW), tlH, this.mindMap,
+            padding - bounds.minX, padding - bounds.minY
+          );
+          const dataUrl = pg.canvas.toDataURL('image/png');
+          pdf.addPage();
+          pdf.addImage(dataUrl, 'PNG', 0, margin, pdfPageTotalWidth, tlH);
+        } finally {
+          pg.remove();
+        }
+      } catch (e) {
+        console.warn('Error drawing timeline in PDF export:', e);
+      }
     }
 
     // Save PDF
