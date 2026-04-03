@@ -138,15 +138,21 @@ class TimelineMode {
 
   /** Height of the calendar bar in world units */
   static BAR_HEIGHT = 80;
-  /** Default bar width in world units */
-  static DEFAULT_WIDTH = 3000;
-  /** Minimum bar width in world units */
-  static MIN_WIDTH = 400;
-  /** Total days displayed (≈ 6 months) */
-  static TOTAL_DAYS = 183;
+  /** Fixed world units per day — the scale never changes, handles extend the range */
+  static DAY_WIDTH = 30;
+  /** Default number of days shown (1 month) */
+  static DEFAULT_TOTAL_DAYS = 31;
+  /** Minimum number of days shown (1 week) */
+  static MIN_TOTAL_DAYS = 7;
+  /** Legacy: kept so old callers of DEFAULT_WIDTH don't break */
+  static get DEFAULT_WIDTH() { return TimelineMode.DEFAULT_TOTAL_DAYS * TimelineMode.DAY_WIDTH; }
+  /** Legacy: kept so old callers of MIN_WIDTH don't break */
+  static get MIN_WIDTH() { return TimelineMode.MIN_TOTAL_DAYS * TimelineMode.DAY_WIDTH; }
+  /** Legacy alias — actual total days is now stored in mindMap.timelineTotalDays */
+  static get TOTAL_DAYS() { return TimelineMode.DEFAULT_TOTAL_DAYS; }
   /** World-unit tolerance for click-hit detection around the bar edges */
   static HIT_EXTEND = 15;
-  /** World-unit hit radius for the resize handle at the right edge */
+  /** World-unit hit radius for the resize handles */
   static HANDLE_RADIUS = 20;
 
   /** Tick heights measured from bar bottom edge (world units) */
@@ -158,15 +164,14 @@ class TimelineMode {
   // STATIC GEOMETRY UTILITIES
   // ============================================================================
 
-  /** World X of a given day tick */
-  static worldDayX(dayIndex, barWidth) {
-    return (dayIndex / (TimelineMode.TOTAL_DAYS - 1)) * barWidth;
+  /** World X of a given day tick — fixed scale, DAY_WIDTH units per day */
+  static worldDayX(dayIndex, _barWidth) {
+    return dayIndex * TimelineMode.DAY_WIDTH;
   }
 
-  /** Day index (0 … TOTAL_DAYS-1) from a world X coordinate */
-  static dayFromWorldX(worldX, barWidth) {
-    const frac = Math.max(0, Math.min(1, worldX / barWidth));
-    return Math.round(frac * (TimelineMode.TOTAL_DAYS - 1));
+  /** Day index from a world X coordinate — fixed scale, rounds to nearest day */
+  static dayFromWorldX(worldX, _barWidth) {
+    return Math.max(0, Math.round(worldX / TimelineMode.DAY_WIDTH));
   }
 
   /**
@@ -181,13 +186,23 @@ class TimelineMode {
            worldY <= TimelineMode.BAR_HEIGHT + ext;
   }
 
-  /**
-   * True when (worldX, worldY) is over the drag-resize handle at the right edge.
-   * Uses HANDLE_RADIUS as a world-unit tolerance.
-   */
+  /** True when (worldX, worldY) is over either the left or right resize handle. */
   static isDragHandle(worldX, worldY, barWidth) {
+    return TimelineMode.isRightDragHandle(worldX, worldY, barWidth) ||
+           TimelineMode.isLeftDragHandle(worldX, worldY);
+  }
+
+  /** Right handle: drag to extend/shrink the future end of the timeline. */
+  static isRightDragHandle(worldX, worldY, barWidth) {
     const r = TimelineMode.HANDLE_RADIUS;
     return Math.abs(worldX - barWidth) <= r &&
+           worldY >= -r && worldY <= TimelineMode.BAR_HEIGHT + r;
+  }
+
+  /** Left handle: drag to extend/shrink the past end of the timeline. */
+  static isLeftDragHandle(worldX, worldY) {
+    const r = TimelineMode.HANDLE_RADIUS;
+    return Math.abs(worldX) <= r &&
            worldY >= -r && worldY <= TimelineMode.BAR_HEIGHT + r;
   }
 
@@ -196,6 +211,18 @@ class TimelineMode {
     const d = new Date(startDate);
     d.setDate(d.getDate() + dayIndex);
     return d;
+  }
+
+  /**
+   * Returns the day index of today relative to startDate, or -1 if today is
+   * before startDate (i.e. not visible on the bar).
+   */
+  static todayDayIndex(startDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    return Math.round((today - start) / 86400000);
   }
 
   /** ISO week number */
@@ -233,11 +260,16 @@ class TimelineMode {
     const sw    = 1 / safeZ;  // stroke weight for 1px on screen
     const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
 
+    const totalDays = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+
+    // Only connections whose dayIndex falls within the visible range
+    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
+
     // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
     // These use world-space coordinates from _getConnectionEndpoints() and MUST NOT
     // be drawn inside the translate(barX, barY) block — that would double-offset them.
     const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
-    for (const conn of conns) {
+    for (const conn of visibleConns) {
       if (conn === draggingConn) continue;
       if (typeof conn.draw === 'function') {
         try { conn.draw(); } catch (e) { /* skip broken connection */ }
@@ -247,7 +279,7 @@ class TimelineMode {
     // --- Date labels above each connected box (world-space, outside bar) ---
     // Also world-space — must remain outside the translate block.
     push();
-    TimelineMode.drawBoxDateLabels(conns, startDate, safeZ);
+    TimelineMode.drawBoxDateLabels(visibleConns, startDate, safeZ);
     pop();
 
     // From here everything is in bar-local coordinates (0,0 = bar top-left).
@@ -266,7 +298,7 @@ class TimelineMode {
     rect(0, 0, bw, bh);
 
     // --- Gradations (ticks, labels) ---
-    const highlightedDays = new Set(conns.map(c => c.dayIndex));
+    const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
     TimelineMode._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate);
 
     // --- Snap preview: highlight nearest tick while dragging a connection ---
@@ -283,14 +315,6 @@ class TimelineMode {
       noFill();
       rect(-margin, -margin, bw + margin * 2, bh + margin * 2, 3 / safeZ);
     }
-
-    // --- Hint label ---
-    noStroke();
-    fill(80, 100, 160, 160);
-    textSize(9 / safeZ);
-    textAlign(RIGHT, BOTTOM);
-    text('Ctrl+K: remove timeline', bw - 6 / safeZ, bh - 3 / safeZ);
-
     pop();
   }
 
@@ -310,8 +334,11 @@ class TimelineMode {
     const barX = mindMap.timelineBarX || 0;
     const barY = mindMap.timelineBarY || 0;
     const conns = (mindMap && mindMap.timelineConnections) ? mindMap.timelineConnections : [];
-    const highlightedDays = new Set(conns.map(c => c.dayIndex));
+    const totalDaysForFilter = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDaysForFilter);
+    const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
     const startDate = (mindMap && mindMap.timelineStartDate) ? mindMap.timelineStartDate : new Date();
+    const todayIndex = TimelineMode.todayDayIndex(startDate);
 
     // Move drawing origin to bar position so local (0,0) coords are correct.
     // The export caller already translates so world (0,0) maps to export-canvas origin,
@@ -323,7 +350,7 @@ class TimelineMode {
     // Draw manually using pg.* calls because conn.draw() uses global p5 functions.
     // Endpoints returned by _getConnectionEndpoints() are world-space; subtract barX/barY
     // so they align with the translated drawing context.
-    for (const conn of conns) {
+    for (const conn of visibleConns) {
       if (!conn || typeof conn._getConnectionEndpoints !== 'function') continue;
       const ep = conn._getConnectionEndpoints();
       if (!ep) continue;
@@ -371,8 +398,8 @@ class TimelineMode {
     pg.rect(0, 0, bw, bh);
 
     // --- Gradations ---
-    const totalDays = TimelineMode.TOTAL_DAYS;
-    const dayWorldPx = bw / (totalDays - 1);
+    const totalDays = Math.round(bw / TimelineMode.DAY_WIDTH);
+    const dayWorldPx = TimelineMode.DAY_WIDTH; // fixed scale
     const showDayNums  = dayWorldPx >= 14;
     const showWeekNums = dayWorldPx >= 4;
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -385,7 +412,7 @@ class TimelineMode {
       const mon = date.getMonth();
       const dow = date.getDay();
       const isHighlighted = highlightedDays.has(d);
-      const isToday = d === 0;
+      const isToday = d === todayIndex;
 
       if (dom === 1 || mon !== currentMonth) {
         if (dom === 1 || d === 0) {
@@ -450,10 +477,12 @@ class TimelineMode {
       }
     }
 
-    // --- Resize handle visual ---
+    // --- Resize handle visuals (left and right) ---
+    const hw = 6, hr2 = bh * 0.5;
     pg.fill(80, 120, 200, 180);
     pg.noStroke();
-    pg.rect(bw - 6, bh * 0.25, 6, bh * 0.5, 3);
+    pg.rect(bw - hw, bh * 0.25, hw, hr2, 3); // right handle
+    pg.rect(0,       bh * 0.25, hw, hr2, 3); // left handle
 
     pg.pop();
   }
@@ -486,7 +515,8 @@ class TimelineMode {
     if (!sourceBox) return;
     if (!TimelineMode.isOverBarWorld(lx, ly, bw)) return;
 
-    const dayIndex = TimelineMode.dayFromWorldX(lx, bw);
+    const totalDays = Math.round(bw / TimelineMode.DAY_WIDTH);
+    const dayIndex = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
     const tx = TimelineMode.worldDayX(dayIndex, bw); // bar-local X (correct since we're inside translate)
     // sourceBox.y is world-space; compare against world-space bar centre
     const ty = (sourceBox.y < barY + bh / 2) ? 0 : bh;
@@ -556,11 +586,12 @@ class TimelineMode {
 
   /** @private */
   static _drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate) {
-    const totalDays    = TimelineMode.TOTAL_DAYS;
-    const dayWorldPx   = bw / (totalDays - 1);
+    const totalDays    = Math.round(bw / TimelineMode.DAY_WIDTH);
+    const dayWorldPx   = TimelineMode.DAY_WIDTH;            // fixed scale
     const showDayNums  = dayWorldPx * safeZ >= 14; // visible at ≥14 screen-px/day
     const showWeekNums = dayWorldPx * safeZ >= 4;
     const monthNames   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const todayIndex   = TimelineMode.todayDayIndex(startDate); // may be outside [0, totalDays)
 
     let currentMonth = -1;
 
@@ -571,7 +602,7 @@ class TimelineMode {
       const mon = date.getMonth();
       const dow = date.getDay();   // 0=Sun … 6=Sat
       const isHighlighted = highlightedDays.has(d);
-      const isToday       = d === 0;
+      const isToday       = d === todayIndex;
 
       // Month divider
       if (dom === 1 || mon !== currentMonth) {
@@ -641,23 +672,25 @@ class TimelineMode {
     }
   }
 
-  /** @private */
+  /** @private – draws both the right-extend and left-extend grip handles */
   static _drawResizeHandle(bw, bh, sw) {
-    const hr  = bh * 0.5;  // handle height (half bar height)
-    const hx  = bw;
-    const hy  = bh / 2;
-    const hw  = 5 * sw;   // handle width in world units
+    const hr = bh * 0.5;
+    const hy = bh / 2;
+    const hw = 5 * sw;
 
-    // Grip background
+    // Right handle (extend future)
     fill(80, 120, 200, 200);
     noStroke();
-    rect(hx - hw, hy - hr / 2, hw, hr, 2 * sw);
-
-    // Three grip dots
+    rect(bw - hw, hy - hr / 2, hw, hr, 2 * sw);
     fill(180, 210, 255, 220);
-    for (let i = -1; i <= 1; i++) {
-      circle(hx - hw / 2, hy + i * 5 * sw, 2.5 * sw);
-    }
+    for (let i = -1; i <= 1; i++) circle(bw - hw / 2, hy + i * 5 * sw, 2.5 * sw);
+
+    // Left handle (extend past)
+    fill(80, 120, 200, 200);
+    noStroke();
+    rect(0, hy - hr / 2, hw, hr, 2 * sw);
+    fill(180, 210, 255, 220);
+    for (let i = -1; i <= 1; i++) circle(hw / 2, hy + i * 5 * sw, 2.5 * sw);
   }
 }
 

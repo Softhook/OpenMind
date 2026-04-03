@@ -1569,13 +1569,13 @@ class CollaborationManager {
         const active = this.mindMap.timelineActive === true;
         const barX = this.mindMap.timelineBarX || 0;
         const barY = this.mindMap.timelineBarY || 0;
-        const barWidth = this.mindMap.timelineBarWidth;
+        const totalDays = this.mindMap.timelineTotalDays;
         this.transact(() => {
             this.ytimeline.set('active', active);
             this.ytimeline.set('x', barX);
             this.ytimeline.set('y', barY);
-            if (barWidth) {
-                this.ytimeline.set('width', barWidth);
+            if (totalDays) {
+                this.ytimeline.set('totalDays', totalDays);
             }
         }, CollaborationManager.TRACKED_ORIGIN);
     }
@@ -1591,10 +1591,10 @@ class CollaborationManager {
         // Apply position and width whenever the map changes (even if active flag is unchanged)
         const remoteX = this.ytimeline.get('x');
         const remoteY = this.ytimeline.get('y');
-        const remoteWidth = this.ytimeline.get('width');
+        const remoteTotalDays = this.ytimeline.get('totalDays');
         if (typeof remoteX === 'number') this.mindMap.timelineBarX = remoteX;
         if (typeof remoteY === 'number') this.mindMap.timelineBarY = remoteY;
-        if (typeof remoteWidth === 'number') this.mindMap.timelineBarWidth = remoteWidth;
+        if (typeof remoteTotalDays === 'number') this.mindMap.timelineTotalDays = remoteTotalDays;
 
         if (active === this.mindMap.timelineActive) {
             if (this.mindMap) this.mindMap.isDirty = true;
@@ -1610,6 +1610,7 @@ class CollaborationManager {
             if (!this.mindMap.timelineConnections) this.mindMap.timelineConnections = [];
         } else {
             this.mindMap.timelineDraggingResize = false;
+            this.mindMap.timelineDraggingLeftHandle = false;
             this.mindMap.timelineBarDragging = false;
             this.mindMap.timelineSelected = false;
         }

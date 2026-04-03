@@ -153,8 +153,10 @@ class MindMap {
 
     // Timeline Mode connections (TimelineConnection objects; TimelineMode.js reads/writes this)
     this.timelineConnections = [];
-    // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH)
+    // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH) — legacy, now derived from timelineTotalDays
     this.timelineBarWidth = null;
+    // Number of days shown on the bar (null = use TimelineMode.DEFAULT_TOTAL_DAYS)
+    this.timelineTotalDays = null;
     // Bar position in world space (placed at cursor when created via Ctrl+K)
     this.timelineBarX = 0;
     this.timelineBarY = 0;
@@ -166,9 +168,17 @@ class MindMap {
     // Timeline Mode active state and configuration
     this.timelineActive = false;
     this.timelineStartDate = null;   // origin date for day-index labels; persisted in save files
+    // Right-handle (extend future) drag state
     this.timelineDraggingResize = false;
     this.timelineDragStartWorldX = 0;
     this.timelineDragStartWidth = 0;
+    // Left-handle (extend past) drag state
+    this.timelineDraggingLeftHandle = false;
+    this.timelineDragStartTotalDays = 0;
+    this.timelineDragStartBarX = 0;
+    this.timelineDragStartDate = null;
+    this.timelineDragLastDeltaDays = 0;
+    this.timelineDragStartDayIndices = null;
     // Bar body drag state (moving the whole bar)
     this.timelineBarDragging = false;
     this.timelineBarDragOffsetX = 0;
@@ -536,14 +546,14 @@ class MindMap {
     });
   }
 
-  /** Returns the current bar width, falling back to DEFAULT_WIDTH. */
+  /** Returns the current bar width: totalDays × DAY_WIDTH (fixed scale). */
   getTimelineBarWidth() {
     // Guard: TimelineMode may be undefined in Jest/Node test environments (no browser globals)
-    // and in browser if TimelineMode.js failed to load (the original bug: "TimelineMode is not defined").
     if (typeof TimelineMode === 'undefined') return MindMap.FALLBACK_TIMELINE_WIDTH;
-    return (this.timelineBarWidth && typeof this.timelineBarWidth === 'number')
-      ? this.timelineBarWidth
-      : TimelineMode.DEFAULT_WIDTH;
+    const days = (this.timelineTotalDays && typeof this.timelineTotalDays === 'number')
+      ? this.timelineTotalDays
+      : TimelineMode.DEFAULT_TOTAL_DAYS;
+    return days * TimelineMode.DAY_WIDTH;
   }
 
   /**
@@ -566,6 +576,9 @@ class MindMap {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       this.timelineStartDate = today;
+      this.timelineTotalDays = (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+        ? TimelineMode.DEFAULT_TOTAL_DAYS
+        : 31;
       if (!this.timelineConnections) this.timelineConnections = [];
     } else {
       this.timelineActive = false;
@@ -607,8 +620,10 @@ class MindMap {
     }
     const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
+    const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const visibleConns = this.timelineConnections.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
     push();
-    TimelineMode.drawBoxDateLabels(this.timelineConnections, startDate, safeZ);
+    TimelineMode.drawBoxDateLabels(visibleConns, startDate, safeZ);
     pop();
   }
 
@@ -644,10 +659,23 @@ class MindMap {
       }
     }
 
-    if (TimelineMode.isDragHandle(localX, localY, barWidth)) {
+    if (TimelineMode.isRightDragHandle(localX, localY, barWidth)) {
+      // Right handle: extends the future end of the timeline
       this.timelineDraggingResize = true;
       this.timelineDragStartWorldX = worldX;
       this.timelineDragStartWidth = barWidth;
+    } else if (TimelineMode.isLeftDragHandle(localX, localY)) {
+      // Left handle: extends the past end of the timeline
+      this.timelineDraggingLeftHandle = true;
+      this.timelineDragStartWorldX = worldX;
+      this.timelineDragStartTotalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+      this.timelineDragStartBarX = this.timelineBarX || 0;
+      this.timelineDragStartDate = new Date(this.timelineStartDate);
+      this.timelineDragLastDeltaDays = 0;
+      // Snapshot current day indices so we can restore from absolute delta each frame
+      this.timelineDragStartDayIndices = new Map(
+        (this.timelineConnections || []).map(c => [c, c.dayIndex])
+      );
     } else {
       // Bar body click: select the bar and begin a move drag
       this.timelineSelected = true;
@@ -675,19 +703,56 @@ class MindMap {
       this.isDirty = true;
       return true;
     }
-    if (!this.timelineDraggingResize) return false;
-    const newWidth = this.timelineDragStartWidth + (worldX - this.timelineDragStartWorldX);
-    this.timelineBarWidth = Math.max(TimelineMode.MIN_WIDTH, newWidth);
-    this.isSaved = false;
-    this.isDirty = true;
-    return true;
+    if (this.timelineDraggingResize) {
+      // Right handle: add/remove days from the future end, bar grows/shrinks right
+      const deltaX = worldX - this.timelineDragStartWorldX;
+      const DAY_WIDTH = (typeof TimelineMode !== 'undefined') ? TimelineMode.DAY_WIDTH : 40;
+      const MIN_DAYS  = (typeof TimelineMode !== 'undefined') ? TimelineMode.MIN_TOTAL_DAYS : 7;
+      const startDays = this.timelineDragStartWidth / DAY_WIDTH;
+      const newDays = Math.max(MIN_DAYS, Math.round(startDays + deltaX / DAY_WIDTH));
+      this.timelineTotalDays = newDays;
+      this.isSaved = false;
+      this.isDirty = true;
+      return true;
+    }
+    if (this.timelineDraggingLeftHandle) {
+      // Left handle: shift start date into the past, bar grows/shrinks left
+      const DAY_WIDTH = (typeof TimelineMode !== 'undefined') ? TimelineMode.DAY_WIDTH : 40;
+      const MIN_DAYS  = (typeof TimelineMode !== 'undefined') ? TimelineMode.MIN_TOTAL_DAYS : 7;
+      const deltaX = worldX - this.timelineDragStartWorldX;
+      // Positive deltaDays means we're extending further into the past
+      const maxDelta = this.timelineDragStartTotalDays - MIN_DAYS; // can't shrink below minimum
+      const deltaDays = Math.max(-maxDelta, Math.round(-deltaX / DAY_WIDTH));
+      if (deltaDays !== this.timelineDragLastDeltaDays) {
+        // Update start date (shift back by deltaDays relative to drag start)
+        const newStart = new Date(this.timelineDragStartDate);
+        newStart.setDate(newStart.getDate() - deltaDays);
+        this.timelineStartDate = newStart;
+        // Move bar left edge left by the same amount
+        this.timelineBarX = this.timelineDragStartBarX - deltaDays * DAY_WIDTH;
+        // Grow/shrink total days
+        this.timelineTotalDays = this.timelineDragStartTotalDays + deltaDays;
+        // Shift all connection day indices so dates are preserved
+        for (const [conn, origIdx] of (this.timelineDragStartDayIndices || [])) {
+          conn.dayIndex = origIdx + deltaDays;
+        }
+        this.timelineDragLastDeltaDays = deltaDays;
+      }
+      this.isSaved = false;
+      this.isDirty = true;
+      return true;
+    }
+    return false;
   }
 
   /** End a timeline resize or move drag; sync position/size to collaborators. */
   handleTimelineRelease() {
-    const wasDragging = this.timelineBarDragging || this.timelineDraggingResize;
+    const wasDragging = this.timelineBarDragging || this.timelineDraggingResize || this.timelineDraggingLeftHandle;
     this.timelineBarDragging = false;
     this.timelineDraggingResize = false;
+    this.timelineDraggingLeftHandle = false;
+    this.timelineDragStartDayIndices = null;
+    this.timelineDragLastDeltaDays = 0;
     if (wasDragging) {
       this.isSaved = false;
       this.isDirty = true;
@@ -710,7 +775,8 @@ class MindMap {
     if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) return false;
     if (!fromBox) return false;
     if (TimelineMode.isDragHandle(localX, localY, barWidth)) return false;
-    const dayIndex = TimelineMode.dayFromWorldX(localX, barWidth);
+    const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const dayIndex = Math.min(TimelineMode.dayFromWorldX(localX, barWidth), totalDays - 1);
     this.addTimelineConnection(fromBox, dayIndex);
     return true;
   }
@@ -2712,7 +2778,8 @@ class MindMap {
 
           // Dropped on bar → change the day
           if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
-            const newDay = TimelineMode.dayFromWorldX(lx, bw);
+            const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+            const newDay = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
             if (newDay !== conn.dayIndex) {
               const dup = this.timelineConnections.some(
                 c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
@@ -2769,7 +2836,8 @@ class MindMap {
         const lx = wx - bx;
         const ly = wy - by;
         if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
-          const dayIndex = TimelineMode.dayFromWorldX(lx, bw);
+          const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+          const dayIndex = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
           this._wrapInTransaction(() => {
             this._unregisterConnection(conn);
             // Notify Yjs that the regular connection was removed
@@ -3583,6 +3651,7 @@ class MindMap {
         : [],
       timelineConnections: tlConns,
       timelineBarWidth: this.timelineBarWidth || null,
+      timelineTotalDays: this.timelineTotalDays || null,
       timelineBarX: this.timelineBarX || 0,
       timelineBarY: this.timelineBarY || 0,
       timelineActive: this.timelineActive || false,
@@ -3629,6 +3698,8 @@ class MindMap {
     this.timelineActive = false;
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;
+    this.timelineDraggingLeftHandle = false;
+    this.timelineDragStartDayIndices = null;
 
     // Load boxes with error handling
     // Use safe iteration utility if available
@@ -3709,13 +3780,23 @@ class MindMap {
         }
       }
     }
-    // Restore persisted bar width and position.
+    // Restore persisted bar position and day count.
     // Legacy files without barX/barY default to (0, 0) so old maps still work.
-    this.timelineBarWidth = (data.timelineBarWidth && typeof data.timelineBarWidth === 'number')
-      ? data.timelineBarWidth
-      : null;
+    // Legacy files with timelineBarWidth are converted to timelineTotalDays.
     this.timelineBarX = (typeof data.timelineBarX === 'number') ? data.timelineBarX : 0;
     this.timelineBarY = (typeof data.timelineBarY === 'number') ? data.timelineBarY : 0;
+    if (data.timelineTotalDays && typeof data.timelineTotalDays === 'number') {
+      this.timelineTotalDays = data.timelineTotalDays;
+    } else if (data.timelineBarWidth && typeof data.timelineBarWidth === 'number' && typeof TimelineMode !== 'undefined') {
+      // Migrate legacy width to day count
+      this.timelineTotalDays = Math.max(
+        TimelineMode.MIN_TOTAL_DAYS,
+        Math.round(data.timelineBarWidth / TimelineMode.DAY_WIDTH)
+      );
+    } else {
+      this.timelineTotalDays = null; // will use DEFAULT_TOTAL_DAYS
+    }
+    this.timelineBarWidth = null; // no longer used
 
     // Restore timeline active state and start date.
     // timelineStartDate is persisted so that day-index labels show the same
