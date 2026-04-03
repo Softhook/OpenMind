@@ -2088,7 +2088,8 @@ function mouseReleased() {
   if (mindMap) {
     // Timeline Mode: intercept connection drags that end over the timeline bar.
     // This must happen BEFORE handleMouseReleased so completeConnection() is not called.
-    if (mindMap.connectingFrom && mindMap.timelineActive) {
+    // Skip this intercept when we are dragging a timeline connection endpoint (handled inside handleMouseReleased).
+    if (mindMap.connectingFrom && mindMap.timelineActive && !mindMap.draggingTimelineConnection) {
       const wx = worldMouseX();
       const wy = worldMouseY();
       const barWidth = mindMap.getTimelineBarWidth();

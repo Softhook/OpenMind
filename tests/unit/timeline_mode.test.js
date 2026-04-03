@@ -35,6 +35,7 @@ const p5Stubs = {
   text:         jest.fn(),
   textSize:     jest.fn(),
   textAlign:    jest.fn(),
+  textWidth:    jest.fn(() => 40),
   LEFT:   'left',
   RIGHT:  'right',
   CENTER: 'center',
@@ -353,5 +354,87 @@ describe('TimelineMode static constants', () => {
   test('TOTAL_DAYS is a positive integer', () => {
     expect(TimelineMode.TOTAL_DAYS).toBeGreaterThan(0);
     expect(Number.isInteger(TimelineMode.TOTAL_DAYS)).toBe(true);
+  });
+});
+
+// ============================================================
+// _drawBoxDateLabels – date badge above each connected box
+// ============================================================
+describe('TimelineMode._drawBoxDateLabels()', () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('does not throw with empty connections', () => {
+    expect(() => TimelineMode._drawBoxDateLabels([], today, TimelineMode.DEFAULT_WIDTH, 1)).not.toThrow();
+    expect(sandbox.rect).not.toHaveBeenCalled();
+  });
+
+  test('draws a rect and text for each connected box', () => {
+    const box = makeBox('b1', 0, -200);
+    const conn = new TimelineConnection(box, 10, null);
+    TimelineMode._drawBoxDateLabels([conn], today, TimelineMode.DEFAULT_WIDTH, 1);
+    // Should have drawn at least one rect (pill) and one text call
+    expect(sandbox.rect).toHaveBeenCalled();
+    expect(sandbox.text).toHaveBeenCalled();
+  });
+
+  test('skips connections with no fromBox', () => {
+    const conn = new TimelineConnection(null, 5, null);
+    expect(() => TimelineMode._drawBoxDateLabels([conn], today, TimelineMode.DEFAULT_WIDTH, 1)).not.toThrow();
+    expect(sandbox.rect).not.toHaveBeenCalled();
+  });
+
+  test('draws one badge per connection', () => {
+    const box1 = makeBox('b1', 0, -200);
+    const box2 = makeBox('b2', 300, -200);
+    const conn1 = new TimelineConnection(box1, 5, null);
+    const conn2 = new TimelineConnection(box2, 20, null);
+    sandbox.rect.mockClear();
+    TimelineMode._drawBoxDateLabels([conn1, conn2], today, TimelineMode.DEFAULT_WIDTH, 1);
+    expect(sandbox.rect.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ============================================================
+// _drawConnectionDragPreview – snap preview for endpoint drags
+// ============================================================
+describe('TimelineMode._drawConnectionDragPreview() with draggingTimelineConnection', () => {
+  const barWidth = TimelineMode.DEFAULT_WIDTH;
+  const bh = TimelineMode.BAR_HEIGHT;
+  const safeZ = 1;
+  const sw = 1;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sandbox.worldMouseX.mockReturnValue(-9999);
+    sandbox.worldMouseY.mockReturnValue(-9999);
+  });
+
+  test('draws snap preview when draggingTimelineConnection and mouse over bar', () => {
+    const box = makeBox('b1', 100, -200);
+    const conn = new TimelineConnection(box, 5, null);
+    const mindMap = makeMindMap([box]);
+    mindMap.connectingFrom = null;
+    mindMap.draggingTimelineConnection = { conn, origDayIndex: 5 };
+    sandbox.worldMouseX.mockReturnValue(TimelineMode.worldDayX(10, barWidth));
+    sandbox.worldMouseY.mockReturnValue(bh / 2);
+    TimelineMode._drawConnectionDragPreview(barWidth, bh, safeZ, sw, mindMap);
+    expect(sandbox.circle).toHaveBeenCalled();
+  });
+
+  test('no preview when mouse outside bar and dragging endpoint', () => {
+    const box = makeBox('b1', 100, -200);
+    const conn = new TimelineConnection(box, 5, null);
+    const mindMap = makeMindMap([box]);
+    mindMap.connectingFrom = null;
+    mindMap.draggingTimelineConnection = { conn, origDayIndex: 5 };
+    sandbox.worldMouseX.mockReturnValue(-9999);
+    sandbox.worldMouseY.mockReturnValue(-9999);
+    TimelineMode._drawConnectionDragPreview(barWidth, bh, safeZ, sw, mindMap);
+    expect(sandbox.circle).not.toHaveBeenCalled();
   });
 });

@@ -151,6 +151,8 @@ class MindMap {
     this.timelineBarWidth = null;
     // Currently selected timeline connection (for delete, visual highlight)
     this.selectedTimelineConnection = null;
+    // In-progress endpoint drag for a timeline connection { conn, origDayIndex }
+    this.draggingTimelineConnection = null;
 
     // Timeline Mode active state (fully integrated — no more TimelineMode singleton)
     this.timelineActive = false;
@@ -536,6 +538,17 @@ class MindMap {
     if (!this.timelineActive) return false;
     const barWidth = this.getTimelineBarWidth();
     if (!TimelineMode.isOverBarWorld(worldX, worldY, barWidth)) return false;
+
+    // If the click lands on a timeline connection's arrowhead, let handleMousePressed
+    // handle it (timeline endpoint drag) rather than consuming it here.
+    if (this.timelineConnections) {
+      for (const tc of this.timelineConnections) {
+        if (tc && typeof tc.isMouseOverArrowHead === 'function') {
+          try { if (tc.isMouseOverArrowHead()) return false; } catch (_) { }
+        }
+      }
+    }
+
     if (TimelineMode.isDragHandle(worldX, worldY, barWidth)) {
       this.timelineDraggingResize = true;
       this.timelineDragStartWorldX = worldX;
@@ -895,6 +908,32 @@ class MindMap {
         rotate(angle);
         const size = (conn.arrowSize || 10);
         triangle(0, 0, -size, -size / 2, -size, size / 2);
+        pop();
+        pop();
+      }
+    }
+
+    // Draw live preview line when dragging a timeline connection endpoint
+    if (this.draggingTimelineConnection && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+      const tc = this.draggingTimelineConnection.conn;
+      const bw = this.getTimelineBarWidth();
+      const bh = TimelineMode.BAR_HEIGHT;
+      const mx = worldMouseX();
+      const my = worldMouseY();
+      const from = tc.fromBox ? tc.fromBox.getConnectionPoint({ x: mx, y: my }) : null;
+      if (from && isFinite(from.x) && isFinite(from.y)) {
+        const lineColor = MindMap.COLORS.CONNECTING_LINE;
+        const dotColor  = MindMap.COLORS.CONNECTOR_DOT;
+        push();
+        Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
+        line(from.x, from.y, mx, my);
+        const angle = atan2(my - from.y, mx - from.x);
+        Utils.applyFill(dotColor);
+        noStroke();
+        push();
+        translate(mx, my);
+        rotate(angle);
+        triangle(0, 0, -12, -6, -12, 6);
         pop();
         pop();
       }
@@ -2283,6 +2322,27 @@ class MindMap {
     }
 
     // PRIORITY: Arrowhead reattach comes before connector dots to avoid conflict when overlapping
+    // Check if clicking on a timeline connection's arrow head to re-date or re-connect
+    if (this.timelineActive && this.timelineConnections && this.timelineConnections.length > 0) {
+      for (let i = this.timelineConnections.length - 1; i >= 0; i--) {
+        const tc = this.timelineConnections[i];
+        if (!tc || typeof tc.isMouseOverArrowHead !== 'function') continue;
+        try {
+          if (tc.isMouseOverArrowHead()) {
+            this.isArrowKeyNavigating = false;
+            this.draggingTimelineConnection = { conn: tc, origDayIndex: tc.dayIndex };
+            // Select this timeline connection
+            if (this.selectedTimelineConnection && this.selectedTimelineConnection !== tc) {
+              this.selectedTimelineConnection.selected = false;
+            }
+            this.selectedTimelineConnection = tc;
+            tc.selected = true;
+            return;
+          }
+        } catch (_) { }
+      }
+    }
+
     // Check if clicking on an existing connection's arrow head to reattach
     for (let i = this.connections.length - 1; i >= 0; i--) {
       const conn = this.connections[i];
@@ -2527,6 +2587,44 @@ class MindMap {
    * Handles mouse release events
    */
   handleMouseReleased() {
+    // Complete timeline connection endpoint drag (re-date or discard)
+    if (this.draggingTimelineConnection) {
+      const { conn, origDayIndex } = this.draggingTimelineConnection;
+      this.draggingTimelineConnection = null;
+
+      if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+        const wx = worldMouseX();
+        const wy = worldMouseY();
+        const barWidth = this.getTimelineBarWidth();
+
+        if (TimelineMode.isOverBarWorld(wx, wy, barWidth) &&
+            !TimelineMode.isDragHandle(wx, wy, barWidth)) {
+          // Dropped on bar → change the day
+          const newDay = TimelineMode.dayFromWorldX(wx, barWidth);
+          if (newDay !== origDayIndex) {
+            // Check for existing duplicate at newDay before committing
+            const duplicate = this.timelineConnections.some(
+              c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
+            );
+            if (!duplicate) {
+              this._wrapInTransaction(() => {
+                conn.dayIndex = newDay;
+                if (MindMap.onTimelineConnectionsChange) {
+                  MindMap.onTimelineConnectionsChange(true);
+                }
+              });
+            }
+            // else: duplicate at target day; restore original silently
+          }
+          // else: same day, nothing to change
+        }
+        // Dropped outside bar → discard (restore original, no change needed since
+        // dayIndex was never mutated during the drag)
+      }
+      // Don't fall through to other release logic
+      return;
+    }
+
     // Complete reattachment if dragging an existing connection
     if (this.draggingConnection && this.draggingConnection.conn) {
       const { conn, originalTo } = this.draggingConnection;
@@ -2666,6 +2764,14 @@ class MindMap {
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
       return;
     }
+
+    // If dragging a timeline connection endpoint, just let the draw loop handle the
+    // live preview — no other drag processing should run.
+    if (this.draggingTimelineConnection) {
+      this.isSaved = false;
+      return;
+    }
+
     // Continuous mark as unsaved for gestures
     try {
       let gestureActive = !!this.connectingFrom || !!this.draggingConnection || !!this._potentialClusterDrag;
@@ -3364,6 +3470,7 @@ class MindMap {
       this.selectedConnections.clear();
     }
     this.selectedTimelineConnection = null;
+    this.draggingTimelineConnection = null;
     this.timelineActive = false;
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;

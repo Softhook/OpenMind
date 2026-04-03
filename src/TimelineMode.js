@@ -314,6 +314,9 @@ class TimelineMode {
       }
     }
 
+    // --- Date labels above each connected box (world-space, outside bar) ---
+    TimelineMode._drawBoxDateLabels(conns, startDate, bw, safeZ);
+
     // --- Bar background ---
     noStroke();
     fill(15, 20, 40, 210);
@@ -496,16 +499,25 @@ class TimelineMode {
 
   /** @private */
   static _drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap) {
-    if (!mindMap || !mindMap.connectingFrom) return;
+    if (!mindMap) return;
     if (typeof worldMouseX === 'undefined' || typeof worldMouseY === 'undefined') return;
 
     const mx = worldMouseX();
     const my = worldMouseY();
+
+    // Determine which source box drives the snap (new connection OR timeline endpoint drag)
+    let sourceBox = null;
+    if (mindMap.connectingFrom) {
+      sourceBox = mindMap.connectingFrom.box;
+    } else if (mindMap.draggingTimelineConnection) {
+      sourceBox = mindMap.draggingTimelineConnection.conn.fromBox;
+    }
+    if (!sourceBox) return;
     if (!TimelineMode.isOverBarWorld(mx, my, bw)) return;
 
     const dayIndex = TimelineMode.dayFromWorldX(mx, bw);
     const tx = TimelineMode.worldDayX(dayIndex, bw);
-    const ty = (mindMap.connectingFrom.box && mindMap.connectingFrom.box.y < bh / 2) ? 0 : bh;
+    const ty = (sourceBox.y < bh / 2) ? 0 : bh;
 
     // Highlight the snap tick
     stroke(100, 200, 255, 255);
@@ -518,6 +530,49 @@ class TimelineMode {
     noStroke();
     fill(100, 200, 255, 220);
     circle(tx, ty, 8 * sw);
+  }
+
+  /**
+   * Draw a small date badge above the top-right corner of each box that has a
+   * timeline connection.  Drawn outside (above) the bar so it always shows even
+   * when the box is far from the bar.
+   * @private
+   */
+  static _drawBoxDateLabels(conns, startDate, bw, safeZ) {
+    if (!conns || conns.length === 0) return;
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fontSize = 9 / safeZ;
+    const padding  = 3 / safeZ;
+
+    for (const conn of conns) {
+      if (!conn || !conn.fromBox || conn.dayIndex == null) continue;
+      const box = conn.fromBox;
+      if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
+
+      const date   = TimelineMode.dateForDay(conn.dayIndex, startDate);
+      const label  = date.getDate() + ' ' + monthNames[date.getMonth()];
+
+      // Position: top-right corner of the box, shifted up so it doesn't overlap the box outline
+      textSize(fontSize);
+      const labelW = textWidth(label) + padding * 2;
+      const labelH = fontSize + padding * 2;
+      const lx = box.x + box.width / 2 - labelW;  // right-align flush with box right edge
+      const ly = box.y - box.height / 2 - labelH - 2 / safeZ; // just above the box
+
+      // Pill background
+      noStroke();
+      fill(conn.selected ? 255 : 80,
+           conn.selected ? 140 : 140,
+           conn.selected ? 0   : 220,
+           210);
+      rect(lx, ly, labelW, labelH, labelH / 2);
+
+      // Label text
+      fill(255, 255, 255, 245);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      text(label, lx + labelW / 2, ly + labelH / 2);
+    }
   }
 
   /** @private */
