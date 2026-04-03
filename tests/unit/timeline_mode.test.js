@@ -16,7 +16,7 @@ const fs   = require('fs');
 const path = require('path');
 
 // ---------------------------------------------------------------------------
-// Build sandbox (p5 stubs + window stub)
+// Build sandbox (p5 stubs + window stub + Connection dependencies)
 // ---------------------------------------------------------------------------
 const p5Stubs = {
   push:         jest.fn(),
@@ -44,6 +44,7 @@ const p5Stubs = {
   keyIsDown: jest.fn(() => false),
 };
 
+// Build the sandbox before loading any scripts so stubs are available.
 const sandbox = {
   ...p5Stubs,
   Math,
@@ -51,6 +52,8 @@ const sandbox = {
   Number,
   Set,
   Map,
+  Array,
+  Float64Array,
   isFinite,
   isNaN,
   console,
@@ -61,13 +64,55 @@ const sandbox = {
   // worldMouseX/Y used by _drawConnectionDragPreview
   worldMouseX: jest.fn(() => -9999),
   worldMouseY: jest.fn(() => -9999),
+  // ColorPalette stub (Connection.COLORS = ColorPalette.CONNECTION)
+  ColorPalette: {
+    CONNECTION: {
+      NORMAL:   { r: 80,  g: 100, b: 160, a: 255 },
+      SELECTED: { r: 255, g: 140, b: 0,   a: 255 },
+    },
+    BASE: { BLACK: { r: 0, g: 0, b: 0, a: 255 } },
+  },
+  // Utils stub (subset used by Connection and TimelineConnection)
+  Utils: null, // filled after sandbox creation so we can reference p5Stubs
 };
 
-const timelineCode = fs.readFileSync(
-  path.join(__dirname, '../../src/TimelineMode.js'), 'utf8'
-);
-const script = new vm.Script(timelineCode);
-script.runInNewContext(sandbox);
+// Utils references sandbox.stroke etc. so build it after sandbox is defined.
+sandbox.Utils = {
+  Logger: { error: jest.fn(), warn: jest.fn() },
+  areValidCoordinates: (x, y) => isFinite(x) && isFinite(y),
+  isValidNumber: (n) => isFinite(n),
+  getWorldMouseCoordinates: () => ({ x: sandbox.worldMouseX(), y: sandbox.worldMouseY() }),
+  getCurrentZoom: () => 1,
+  clamp: (val, lo, hi) => Math.max(lo, Math.min(hi, val)),
+  distance: (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2),
+  distanceToSegment(px, py, ax, ay, bx, by) {
+    const abx = bx - ax, aby = by - ay;
+    const len2 = abx * abx + aby * aby;
+    if (len2 === 0) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+    const t = Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / len2));
+    return Math.sqrt((px - (ax + t * abx)) ** 2 + (py - (ay + t * aby)) ** 2);
+  },
+  applyStroke(color, weight) {
+    if (color) sandbox.stroke(color.r || 0, color.g || 0, color.b || 0);
+    if (weight !== undefined) sandbox.strokeWeight(weight);
+  },
+  applyFill(color) {
+    if (color) sandbox.fill(color.r || 0, color.g || 0, color.b || 0);
+  },
+};
+
+// Load Connection.js so TimelineConnection can extend it.
+// sandbox acts as globalThis inside the vm, so globalThis.Connection = Connection
+// in Connection.js sets sandbox.Connection.
+new vm.Script(fs.readFileSync(path.join(__dirname, '../../src/Connection.js'), 'utf8'))
+  .runInNewContext(sandbox);
+
+// Reset module.exports so TimelineMode.js can use it for its own export.
+sandbox.module = { exports: {} };
+
+// Load TimelineMode.js (TimelineConnection extends Connection which is now in scope).
+new vm.Script(fs.readFileSync(path.join(__dirname, '../../src/TimelineMode.js'), 'utf8'))
+  .runInNewContext(sandbox);
 
 const TimelineMode       = sandbox.module.exports;
 const TimelineConnection = sandbox.module.exports.TimelineConnection;
@@ -90,6 +135,7 @@ function makeMindMap(boxes = [], timelineBarWidth = null) {
     timelineBarWidth,
     selectedBox: null,
     connectingFrom: null,
+    draggingConnection: null,
     timelineActive: true,
     timelineStartDate: new Date(),
     getTimelineBarWidth() {
@@ -166,7 +212,7 @@ describe('TimelineMode.isOverBarWorld / isDragHandle', () => {
 });
 
 // ============================================================
-// TimelineConnection – constructor and _getTickPoint
+// TimelineConnection – constructor and geometry
 // ============================================================
 describe('TimelineConnection', () => {
   test('constructor sets fromBox, dayIndex and mindMap', () => {
@@ -179,35 +225,41 @@ describe('TimelineConnection', () => {
     expect(conn.selected).toBe(false);
   });
 
-  test('_getTickPoint returns valid tick with mindMap', () => {
+  test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
     const box = makeBox('b1', 100, -50);
     const mm  = makeMindMap([box]);
     const conn = new TimelineConnection(box, 5, mm);
-    const tick = conn._getTickPoint();
-    expect(tick).not.toBeNull();
-    expect(tick.x).toBeCloseTo(TimelineMode.worldDayX(5, mm.getTimelineBarWidth()), 1);
+    const ep = conn._getConnectionEndpoints();
+    expect(ep).not.toBeNull();
+    expect(ep.end.x).toBeCloseTo(TimelineMode.worldDayX(5, mm.getTimelineBarWidth()), 1);
   });
 
-  test('_getTickPoint uses DEFAULT_WIDTH when mindMap is null', () => {
+  test('_getConnectionEndpoints uses DEFAULT_WIDTH when mindMap is null', () => {
     const box = makeBox('b1', 100, -50);
     const conn = new TimelineConnection(box, 5, null);
-    const tick = conn._getTickPoint();
-    expect(tick).not.toBeNull();
-    expect(tick.x).toBeCloseTo(TimelineMode.worldDayX(5, TimelineMode.DEFAULT_WIDTH), 1);
+    const ep = conn._getConnectionEndpoints();
+    expect(ep).not.toBeNull();
+    expect(ep.end.x).toBeCloseTo(TimelineMode.worldDayX(5, TimelineMode.DEFAULT_WIDTH), 1);
   });
 
   test('box above bar mid-line attaches to top (y=0)', () => {
     const box = makeBox('b1', 0, -100);   // y < BAR_HEIGHT/2
     const conn = new TimelineConnection(box, 10, null);
-    const tick = conn._getTickPoint();
-    expect(tick.y).toBe(0);
+    const ep = conn._getConnectionEndpoints();
+    expect(ep.end.y).toBe(0);
   });
 
   test('box below bar mid-line attaches to bottom (y=BAR_HEIGHT)', () => {
     const box = makeBox('b1', 0, 200);    // y > BAR_HEIGHT/2
     const conn = new TimelineConnection(box, 10, null);
-    const tick = conn._getTickPoint();
-    expect(tick.y).toBe(TimelineMode.BAR_HEIGHT);
+    const ep = conn._getConnectionEndpoints();
+    expect(ep.end.y).toBe(TimelineMode.BAR_HEIGHT);
+  });
+
+  test('TimelineConnection is a subclass of Connection', () => {
+    const box = makeBox('b1', 0, -100);
+    const conn = new TimelineConnection(box, 5, null);
+    expect(conn instanceof sandbox.Connection).toBe(true);
   });
 });
 
@@ -400,9 +452,9 @@ describe('TimelineMode._drawBoxDateLabels()', () => {
 });
 
 // ============================================================
-// _drawConnectionDragPreview – snap preview for endpoint drags
+// _drawConnectionDragPreview – snap preview for dragging connections
 // ============================================================
-describe('TimelineMode._drawConnectionDragPreview() with draggingTimelineConnection', () => {
+describe('TimelineMode._drawConnectionDragPreview() with draggingConnection', () => {
   const barWidth = TimelineMode.DEFAULT_WIDTH;
   const bh = TimelineMode.BAR_HEIGHT;
   const safeZ = 1;
@@ -414,12 +466,12 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingTimelineConnect
     sandbox.worldMouseY.mockReturnValue(-9999);
   });
 
-  test('draws snap preview when draggingTimelineConnection and mouse over bar', () => {
+  test('draws snap preview when draggingConnection and mouse over bar', () => {
     const box = makeBox('b1', 100, -200);
     const conn = new TimelineConnection(box, 5, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
-    mindMap.draggingTimelineConnection = { conn, origDayIndex: 5 };
+    mindMap.draggingConnection = { conn, originalTo: null };
     sandbox.worldMouseX.mockReturnValue(TimelineMode.worldDayX(10, barWidth));
     sandbox.worldMouseY.mockReturnValue(bh / 2);
     TimelineMode._drawConnectionDragPreview(barWidth, bh, safeZ, sw, mindMap);
@@ -431,7 +483,7 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingTimelineConnect
     const conn = new TimelineConnection(box, 5, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
-    mindMap.draggingTimelineConnection = { conn, origDayIndex: 5 };
+    mindMap.draggingConnection = { conn, originalTo: null };
     sandbox.worldMouseX.mockReturnValue(-9999);
     sandbox.worldMouseY.mockReturnValue(-9999);
     TimelineMode._drawConnectionDragPreview(barWidth, bh, safeZ, sw, mindMap);

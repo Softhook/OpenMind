@@ -151,8 +151,6 @@ class MindMap {
     this.timelineBarWidth = null;
     // Currently selected timeline connection (for delete, visual highlight)
     this.selectedTimelineConnection = null;
-    // In-progress endpoint drag for a timeline connection { conn, origDayIndex }
-    this.draggingTimelineConnection = null;
 
     // Timeline Mode active state (fully integrated — no more TimelineMode singleton)
     this.timelineActive = false;
@@ -887,7 +885,8 @@ class MindMap {
       }
     }
 
-    // Draw live reattach line if dragging an existing connection's arrow head
+    // Draw live reattach line if dragging an existing connection's arrow head.
+    // This also covers TimelineConnection endpoint drags since they now use draggingConnection.
     if (this.draggingConnection && this.draggingConnection.conn && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
       const conn = this.draggingConnection.conn;
       const from = conn.fromBox ? conn.fromBox.getConnectionPoint({ x: worldMouseX(), y: worldMouseY() }) : null;
@@ -908,32 +907,6 @@ class MindMap {
         rotate(angle);
         const size = (conn.arrowSize || 10);
         triangle(0, 0, -size, -size / 2, -size, size / 2);
-        pop();
-        pop();
-      }
-    }
-
-    // Draw live preview line when dragging a timeline connection endpoint
-    if (this.draggingTimelineConnection && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
-      const tc = this.draggingTimelineConnection.conn;
-      const bw = this.getTimelineBarWidth();
-      const bh = TimelineMode.BAR_HEIGHT;
-      const mx = worldMouseX();
-      const my = worldMouseY();
-      const from = tc.fromBox ? tc.fromBox.getConnectionPoint({ x: mx, y: my }) : null;
-      if (from && isFinite(from.x) && isFinite(from.y)) {
-        const lineColor = MindMap.COLORS.CONNECTING_LINE;
-        const dotColor  = MindMap.COLORS.CONNECTOR_DOT;
-        push();
-        Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
-        line(from.x, from.y, mx, my);
-        const angle = atan2(my - from.y, mx - from.x);
-        Utils.applyFill(dotColor);
-        noStroke();
-        push();
-        translate(mx, my);
-        rotate(angle);
-        triangle(0, 0, -12, -6, -12, 6);
         pop();
         pop();
       }
@@ -2322,7 +2295,9 @@ class MindMap {
     }
 
     // PRIORITY: Arrowhead reattach comes before connector dots to avoid conflict when overlapping
-    // Check if clicking on a timeline connection's arrow head to re-date or re-connect
+    // Check if clicking on a timeline connection's arrow head (inherited from Connection).
+    // These use the same draggingConnection mechanism as normal connections — drop on bar
+    // re-dates; drop on a box converts the timeline connection to a regular one.
     if (this.timelineActive && this.timelineConnections && this.timelineConnections.length > 0) {
       for (let i = this.timelineConnections.length - 1; i >= 0; i--) {
         const tc = this.timelineConnections[i];
@@ -2330,8 +2305,9 @@ class MindMap {
         try {
           if (tc.isMouseOverArrowHead()) {
             this.isArrowKeyNavigating = false;
-            this.draggingTimelineConnection = { conn: tc, origDayIndex: tc.dayIndex };
-            // Select this timeline connection
+            // Use the same draggingConnection state as normal connections.
+            // originalTo is null because timeline connections have no target box.
+            this.draggingConnection = { conn: tc, originalTo: null };
             if (this.selectedTimelineConnection && this.selectedTimelineConnection !== tc) {
               this.selectedTimelineConnection.selected = false;
             }
@@ -2587,47 +2563,84 @@ class MindMap {
    * Handles mouse release events
    */
   handleMouseReleased() {
-    // Complete timeline connection endpoint drag (re-date or discard)
-    if (this.draggingTimelineConnection) {
-      const { conn, origDayIndex } = this.draggingTimelineConnection;
-      this.draggingTimelineConnection = null;
-
-      if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
-        const wx = worldMouseX();
-        const wy = worldMouseY();
-        const barWidth = this.getTimelineBarWidth();
-
-        if (TimelineMode.isOverBarWorld(wx, wy, barWidth) &&
-            !TimelineMode.isDragHandle(wx, wy, barWidth)) {
-          // Dropped on bar → change the day
-          const newDay = TimelineMode.dayFromWorldX(wx, barWidth);
-          if (newDay !== origDayIndex) {
-            // Check for existing duplicate at newDay before committing
-            const duplicate = this.timelineConnections.some(
-              c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
-            );
-            if (!duplicate) {
-              this._wrapInTransaction(() => {
-                conn.dayIndex = newDay;
-                if (MindMap.onTimelineConnectionsChange) {
-                  MindMap.onTimelineConnectionsChange(true);
-                }
-              });
-            }
-            // else: duplicate at target day; restore original silently
-          }
-          // else: same day, nothing to change
-        }
-        // Dropped outside bar → discard (restore original, no change needed since
-        // dayIndex was never mutated during the drag)
-      }
-      // Don't fall through to other release logic
-      return;
-    }
-
-    // Complete reattachment if dragging an existing connection
+    // Complete reattachment if dragging an existing connection (including TimelineConnections).
     if (this.draggingConnection && this.draggingConnection.conn) {
       const { conn, originalTo } = this.draggingConnection;
+
+      // ── TimelineConnection dropped on bar → re-date; dropped on box → convert ──
+      if (typeof TimelineConnection !== 'undefined' && conn instanceof TimelineConnection) {
+        this.draggingConnection = null;
+        if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+          const wx = worldMouseX();
+          const wy = worldMouseY();
+          const bw = this.getTimelineBarWidth();
+
+          // Dropped on bar → change the day
+          if (TimelineMode.isOverBarWorld(wx, wy, bw) && !TimelineMode.isDragHandle(wx, wy, bw)) {
+            const newDay = TimelineMode.dayFromWorldX(wx, bw);
+            if (newDay !== conn.dayIndex) {
+              const dup = this.timelineConnections.some(
+                c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
+              );
+              if (!dup) {
+                this._wrapInTransaction(() => {
+                  conn.dayIndex = newDay;
+                  if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
+                });
+              }
+            }
+            return;
+          }
+
+          // Dropped on a box → convert to a regular Connection
+          let droppedBox = null;
+          for (const box of this.boxes) {
+            if (box && box !== conn.fromBox && box.isMouseOver && box.isMouseOver()) {
+              droppedBox = box;
+              break;
+            }
+          }
+          if (droppedBox) {
+            // Check lock
+            if (droppedBox.isLockedByRemoteEdit && droppedBox.isLockedByRemoteEdit()) {
+              const remoteState = TextBox.getRemoteEditingState(droppedBox.id);
+              if (droppedBox._showEditingBlockedNotification) {
+                droppedBox._showEditingBlockedNotification(remoteState);
+              }
+              return;
+            }
+            const dup = this.connections.some(c => c.fromBox === conn.fromBox && c.toBox === droppedBox);
+            if (!dup) {
+              this._wrapInTransaction(() => {
+                this.removeTimelineConnection(conn);
+                const newConn = new Connection(conn.fromBox, droppedBox);
+                this._registerConnection(newConn);
+                if (MindMap.onConnectionsChange) MindMap.onConnectionsChange(true);
+              });
+            }
+          }
+          // else: dropped nowhere → no change (dayIndex was never mutated)
+        }
+        return;
+      }
+
+      // ── Normal Connection dropped on timeline bar → convert to TimelineConnection ──
+      if (this.timelineActive && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
+        const wx = worldMouseX();
+        const wy = worldMouseY();
+        const bw = this.getTimelineBarWidth();
+        if (TimelineMode.isOverBarWorld(wx, wy, bw) && !TimelineMode.isDragHandle(wx, wy, bw)) {
+          const dayIndex = TimelineMode.dayFromWorldX(wx, bw);
+          this._wrapInTransaction(() => {
+            this._unregisterConnection(conn);
+            this.addTimelineConnection(conn.fromBox, dayIndex);
+          });
+          this.draggingConnection = null;
+          return;
+        }
+      }
+
+      // ── Standard Connection reattachment to another box ──
       let droppedOn = null;
       for (let box of this.boxes) {
         if (!box) continue;
@@ -2762,13 +2775,6 @@ class MindMap {
     // Validate mouse coordinates
     const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
     if (mx == null || my == null || isNaN(mx) || isNaN(my)) {
-      return;
-    }
-
-    // If dragging a timeline connection endpoint, just let the draw loop handle the
-    // live preview — no other drag processing should run.
-    if (this.draggingTimelineConnection) {
-      this.isSaved = false;
       return;
     }
 
@@ -3470,7 +3476,6 @@ class MindMap {
       this.selectedConnections.clear();
     }
     this.selectedTimelineConnection = null;
-    this.draggingTimelineConnection = null;
     this.timelineActive = false;
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;

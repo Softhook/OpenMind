@@ -38,141 +38,67 @@
  * Stored in mindMap.timelineConnections (separate from mindMap.connections so
  * that MindMap's Yjs connection sync does not interfere).
  */
-class TimelineConnection {
+/**
+ * TimelineConnection – arrow from a TextBox to a calendar-bar day tick.
+ *
+ * Extends Connection so it inherits identical draw/hit-test/drag machinery.
+ * The only overrides are the endpoint geometry methods, which compute the
+ * tick position from `dayIndex` instead of a target TextBox.
+ *
+ * Drag behaviour (via MindMap.draggingConnection):
+ *   - Drop on the timeline bar → re-date (update dayIndex)
+ *   - Drop on a TextBox        → remove from timelineConnections, create a
+ *                                 regular Connection to that box
+ */
+class TimelineConnection extends Connection {
   /**
    * @param {TextBox} fromBox   – source box
    * @param {number}  dayIndex  – 0 … TimelineMode.TOTAL_DAYS-1
    * @param {*}       mindMap   – MindMap instance (for bar width lookup)
    */
   constructor(fromBox, dayIndex, mindMap = null) {
-    this.fromBox  = fromBox;
+    super(fromBox, null); // toBox is virtual (computed from dayIndex)
     this.dayIndex = dayIndex;
     this.mindMap  = mindMap;
-    this.selected = false;
   }
 
   // ---------------------------------------------------------------------------
-  // Internal geometry helpers
+  // Geometry overrides  (Connection's caching machinery is bypassed)
   // ---------------------------------------------------------------------------
 
   /**
-   * Returns the world-space attachment point on the bar.
-   * Attaches to the top edge (y=0) when the box is above the bar mid-line,
-   * otherwise to the bottom edge (y=BAR_HEIGHT).
-   * @returns {{x:number, y:number}|null}
-   */
-  _getTickPoint() {
-    const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
-    if (!this.fromBox) return null;
-    const tx = TimelineMode.worldDayX(this.dayIndex, barWidth);
-    const ty = (this.fromBox.y < TimelineMode.BAR_HEIGHT / 2) ? 0 : TimelineMode.BAR_HEIGHT;
-    return { x: tx, y: ty };
-  }
-
-  /**
-   * Returns { start, end } world-space points (box edge → tick).
+   * Computes the world-space { start, end } pair.
+   * `start` is on the fromBox edge; `end` is the day tick on the bar.
+   * Overrides Connection._getConnectionEndpoints().
    * @returns {{start:{x,y}, end:{x,y}}|null}
    */
-  _getEndpoints() {
-    const tick = this._getTickPoint();
-    if (!tick) return null;
-    if (!this.fromBox || typeof this.fromBox.getConnectionPoint !== 'function') return null;
-    const start = this.fromBox.getConnectionPoint(tick);
+  _getConnectionEndpoints() {
+    if (!this.fromBox) return null;
+    const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
+    const tx = TimelineMode.worldDayX(this.dayIndex, barWidth);
+    const ty = (this.fromBox.y < TimelineMode.BAR_HEIGHT / 2) ? 0 : TimelineMode.BAR_HEIGHT;
+    const end = { x: tx, y: ty };
+    if (typeof this.fromBox.getConnectionPoint !== 'function') return null;
+    const start = this.fromBox.getConnectionPoint(end);
     if (!start || !isFinite(start.x) || !isFinite(start.y)) return null;
-    return { start, end: tick };
+    return { start, end };
   }
 
-  // ---------------------------------------------------------------------------
-  // Rendering  (called inside the camera transform – pure world space)
-  // ---------------------------------------------------------------------------
-
-  draw() {
-    const ep = this._getEndpoints();
-    if (!ep) return;
-    const { start, end } = ep;
-
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1) return;
-
-    const angle     = Math.atan2(dy, dx);
-    const arrowSize = 12;
-    // Shortened line endpoint (stops where the arrowhead begins)
-    const ex = end.x - arrowSize * Math.cos(angle);
-    const ey = end.y - arrowSize * Math.sin(angle);
-
-    // Reuse Connection's colour palette and weights when available
-    const colors  = (typeof Connection !== 'undefined') ? Connection.COLORS  : null;
-    const normalW = (typeof Connection !== 'undefined') ? Connection.STROKE_WEIGHT_NORMAL   : 2;
-    const selectW = (typeof Connection !== 'undefined') ? Connection.STROKE_WEIGHT_SELECTED : 3;
-    const col     = this.selected ? (colors ? colors.SELECTED : null) : (colors ? colors.NORMAL : null);
-    const weight  = this.selected ? selectW : normalW;
-
-    push();
-
-    // Line
-    if (col && typeof Utils !== 'undefined' && Utils.applyStroke) {
-      Utils.applyStroke(col, weight);
-    } else {
-      stroke(this.selected ? 255 : 80, this.selected ? 140 : 100, this.selected ? 0 : 160);
-      strokeWeight(weight);
-    }
-    noFill();
-    line(start.x, start.y, ex, ey);
-
-    // Arrowhead
-    if (col && typeof Utils !== 'undefined' && Utils.applyFill) {
-      Utils.applyFill(col);
-    } else {
-      fill(this.selected ? 255 : 80, this.selected ? 140 : 100, this.selected ? 0 : 160);
-    }
-    noStroke();
-    push();
-    translate(end.x, end.y);
-    rotate(angle);
-    triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
-    pop();
-
-    pop();
+  /**
+   * Returns the world-space position of the arrow tip (the day tick).
+   * Overrides Connection.getArrowHeadPosition().
+   * @returns {{x:number, y:number}|null}
+   */
+  getArrowHeadPosition() {
+    const ep = this._getConnectionEndpoints();
+    return ep ? ep.end : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // Hit testing  (world-space mouse coordinates via Utils)
-  // ---------------------------------------------------------------------------
-
-  isMouseOver() {
-    const ep = this._getEndpoints();
-    if (!ep) return false;
-    if (typeof Utils === 'undefined') return false;
-    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
-    if (!Utils.areValidCoordinates(mx, my)) return false;
-
-    const { start, end } = ep;
-    const angle     = Math.atan2(end.y - start.y, end.x - start.x);
-    const arrowSize = 12;
-    const ex = end.x - arrowSize * Math.cos(angle);
-    const ey = end.y - arrowSize * Math.sin(angle);
-    const threshold = (typeof Connection !== 'undefined') ? Connection.HIT_THRESHOLD : 7;
-    return Utils.distanceToSegment(mx, my, start.x, start.y, ex, ey) < threshold;
-  }
-
-  isMouseOverArrowHead() {
-    const ep = this._getEndpoints();
-    if (!ep) return false;
-    if (typeof Utils === 'undefined') return false;
-    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
-    if (!Utils.areValidCoordinates(mx, my)) return false;
-
-    const { end } = ep;
-    const currentZoom = (typeof Utils.getCurrentZoom === 'function') ? Utils.getCurrentZoom() : 1;
-    const safeZoom    = Math.max(0.25, Math.min(4, currentZoom));
-    const hitRadius   = 10 / Math.sqrt(safeZoom);
-    return Utils.distance(mx, my, end.x, end.y) <= hitRadius;
-  }
+  /** Timeline connections cannot be reversed (no target box). */
+  reverse() {}
 
   // ---------------------------------------------------------------------------
-  // Serialisation
+  // Serialisation  (dayIndex-aware — overrides Connection.toJSON/fromJSON)
   // ---------------------------------------------------------------------------
 
   toJSON() {
@@ -308,7 +234,10 @@ class TimelineMode {
     push();
 
     // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
+    // Skip the one being dragged — MindMap.draw() shows the live preview instead.
+    const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
     for (const conn of conns) {
+      if (conn === draggingConn) continue;
       if (typeof conn.draw === 'function') {
         try { conn.draw(); } catch (e) { /* skip broken connection */ }
       }
@@ -505,12 +434,14 @@ class TimelineMode {
     const mx = worldMouseX();
     const my = worldMouseY();
 
-    // Determine which source box drives the snap (new connection OR timeline endpoint drag)
+    // Determine which source box drives the snap:
+    //   - connectingFrom: dragging a new connection from a box connector dot
+    //   - draggingConnection: reattaching an arrowhead (timeline or normal) toward the bar
     let sourceBox = null;
     if (mindMap.connectingFrom) {
       sourceBox = mindMap.connectingFrom.box;
-    } else if (mindMap.draggingTimelineConnection) {
-      sourceBox = mindMap.draggingTimelineConnection.conn.fromBox;
+    } else if (mindMap.draggingConnection && mindMap.draggingConnection.conn) {
+      sourceBox = mindMap.draggingConnection.conn.fromBox;
     }
     if (!sourceBox) return;
     if (!TimelineMode.isOverBarWorld(mx, my, bw)) return;
