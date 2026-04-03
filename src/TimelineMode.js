@@ -232,12 +232,9 @@ class TimelineMode {
     const sw    = 1 / safeZ;  // stroke weight for 1px on screen
     const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
 
-    push();
-    // Move drawing origin to bar position so all internal drawing uses local (0,0) coords
-    translate(barX, barY);
-
     // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
-    // Skip the one being dragged — MindMap.draw() shows the live preview instead.
+    // These use world-space coordinates from _getConnectionEndpoints() and MUST NOT
+    // be drawn inside the translate(barX, barY) block — that would double-offset them.
     const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
     for (const conn of conns) {
       if (conn === draggingConn) continue;
@@ -247,7 +244,14 @@ class TimelineMode {
     }
 
     // --- Date labels above each connected box (world-space, outside bar) ---
+    // Also world-space — must remain outside the translate block.
+    push();
     TimelineMode.drawBoxDateLabels(conns, startDate, safeZ);
+    pop();
+
+    // From here everything is in bar-local coordinates (0,0 = bar top-left).
+    push();
+    translate(barX, barY);
 
     // --- Bar background ---
     noStroke();

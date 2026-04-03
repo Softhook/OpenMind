@@ -1562,18 +1562,22 @@ class CollaborationManager {
     /**
      * Syncs timeline state (active flag, bar position, bar width) to Yjs.
      * Called whenever createTimeline() or handleTimelineRelease() changes timeline state.
+     * Uses the tracked origin so the UndoManager can undo bar creation/move/resize.
      */
     syncTimelineActiveToYjs() {
         if (!this.ytimeline || !this.mindMap || this.isSyncing) return;
         const active = this.mindMap.timelineActive === true;
-        this.ydoc.transact(() => {
+        const barX = this.mindMap.timelineBarX || 0;
+        const barY = this.mindMap.timelineBarY || 0;
+        const barWidth = this.mindMap.timelineBarWidth;
+        this.transact(() => {
             this.ytimeline.set('active', active);
-            this.ytimeline.set('x', this.mindMap.timelineBarX || 0);
-            this.ytimeline.set('y', this.mindMap.timelineBarY || 0);
-            if (this.mindMap.timelineBarWidth) {
-                this.ytimeline.set('width', this.mindMap.timelineBarWidth);
+            this.ytimeline.set('x', barX);
+            this.ytimeline.set('y', barY);
+            if (barWidth) {
+                this.ytimeline.set('width', barWidth);
             }
-        });
+        }, CollaborationManager.TRACKED_ORIGIN);
     }
 
     /**
