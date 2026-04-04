@@ -140,7 +140,7 @@ class TimelineMode {
   // ============================================================================
 
   /** Height of the calendar bar in world units */
-  static BAR_HEIGHT = 80;
+  static BAR_HEIGHT = 60;
   /** Fixed world units per day — the scale never changes, handles extend the range */
   static DAY_WIDTH = 30;
   /** Default number of days shown (1 month) */
@@ -157,6 +157,9 @@ class TimelineMode {
   static HIT_EXTEND = 15;
   /** World-unit hit radius for the resize handles */
   static HANDLE_RADIUS = 20;
+
+  /** Abbreviated month names shared across all drawing methods */
+  static MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   /** Tick heights measured from bar bottom edge (world units) */
   static MONTH_TICK_H = 56;
@@ -326,235 +329,146 @@ class TimelineMode {
   /**
    * Draw the full timeline bar for the live canvas.
    * Must be called INSIDE the camera transform (push/translate/scale already applied).
-   * Reads all state from mindMap.
    *
    * @param {*} mindMap – current MindMap instance
    */
   static drawBar(mindMap) {
     if (!mindMap || !mindMap.timelineActive || !mindMap.timelineStartDate) return;
-
-    const bw      = mindMap.getTimelineBarWidth();
-    const bh      = TimelineMode.BAR_HEIGHT;
-    const barX    = mindMap.timelineBarX || 0;
-    const barY    = mindMap.timelineBarY || 0;
-    const conns   = mindMap.timelineConnections || [];
-    const startDate = mindMap.timelineStartDate;
-
-    // Zoom compensation: keep strokes and text the same pixel size on screen
-    const z     = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
+    const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
-    const sw    = 1 / safeZ;  // stroke weight for 1px on screen
-    const ts    = 11 / safeZ; // base font size in screen-pixel equivalents
-
-    const totalDays = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
-
-    // Only connections whose dayIndex falls within the visible range
-    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
-
-    // From here everything is in bar-local coordinates (0,0 = bar top-left).
-    push();
-    translate(barX, barY);
-
-    // --- Bar background ---
-    noStroke();
-    //fill(15, 20, 40, 210);
-    noFill();
-    rect(0, 0, bw, bh);
-
-    // --- Bar border ---
-    stroke(60, 80, 140, 180);
-    strokeWeight(sw);
-    noFill();
-    rect(0, 0, bw, bh);
-
-    // --- Gradations (ticks, labels) ---
-    const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
-    TimelineMode._drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate);
-
-    // --- Snap preview: highlight nearest tick while dragging a connection ---
-    TimelineMode._drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap, barX, barY);
-
-    // --- Resize handle ---
-    TimelineMode._drawResizeHandle(bw, bh, sw);
-
-    // --- Selection highlight (drawn on top when bar is selected) ---
-    if (mindMap.timelineSelected) {
-      const margin = 4 / safeZ;
-      stroke(100, 180, 255, 220);
-      strokeWeight(sw * 2);
-      noFill();
-      rect(-margin, -margin, bw + margin * 2, bh + margin * 2, 3 / safeZ);
-    }
-    pop();
+    TimelineMode._renderBar(new DrawCtx(null), mindMap, safeZ, { withDragPreview: true });
   }
 
   /**
-   * Draw the timeline bar into a p5 graphics buffer.
-   * Must be called INSIDE a pg.push() / pg.translate(contentOffX, contentOffY)
-   * block so that world (0, 0) maps to the correct export-canvas position.
-   * Text and stroke weights are drawn at world scale (zoom = 1 for exports).
+   * Draw the timeline bar into a p5 graphics buffer for export.
+   * Must be called INSIDE a pg.push() / pg.translate(contentOffX, contentOffY) block.
+   * Text and stroke weights are at world scale (zoom = 1).
    *
    * @param {p5.Graphics} pg      – offscreen graphics buffer
    * @param {*}           mindMap – used to resolve box positions and bar width
    */
   static drawToGraphics(pg, mindMap) {
     if (!mindMap) return;
-    const bw   = mindMap.getTimelineBarWidth ? mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
-    const bh   = TimelineMode.BAR_HEIGHT;
-    const barX = mindMap.timelineBarX || 0;
-    const barY = mindMap.timelineBarY || 0;
-    const conns = (mindMap && mindMap.timelineConnections) ? mindMap.timelineConnections : [];
-    const totalDaysForFilter = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
-    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDaysForFilter);
-    const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
-    const startDate = (mindMap && mindMap.timelineStartDate) ? mindMap.timelineStartDate : new Date();
-    const todayIndex = TimelineMode.todayDayIndex(startDate);
-
-    // Move drawing origin to bar position so local (0,0) coords are correct.
-    // The export caller already translates so world (0,0) maps to export-canvas origin,
-    // so adding barX/barY here places the bar at its world position.
-    pg.push();
-    pg.translate(barX, barY);
-
-    // --- TimelineConnection arrows (drawn behind the bar so the bar sits on top) ---
-    // Draw manually using pg.* calls because conn.draw() uses global p5 functions.
-    // Endpoints returned by _getConnectionEndpoints() are world-space; subtract barX/barY
-    // so they align with the translated drawing context.
-    for (const conn of visibleConns) {
-      if (!conn || typeof conn._getConnectionEndpoints !== 'function') continue;
-      const ep = conn._getConnectionEndpoints();
-      if (!ep) continue;
-      const { start, end: tick } = ep;
-      if (!isFinite(start.x) || !isFinite(start.y)) continue;
-
-      // Convert world-space endpoints to bar-local coords for the translated pg context
-      const sx = start.x - barX;
-      const sy = start.y - barY;
-      const tx = tick.x - barX;
-      const ty = tick.y - barY;
-
-      const dx = tx - sx;
-      const dy = ty - sy;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 1) continue;
-
-      const angle     = Math.atan2(dy, dx);
-      const arrowSize = 12;
-      const ex = tx - arrowSize * Math.cos(angle);
-      const ey = ty - arrowSize * Math.sin(angle);
-
-      pg.stroke(80, 100, 160);
-      pg.strokeWeight(2);
-      pg.noFill();
-      pg.line(sx, sy, ex, ey);
-      pg.fill(80, 100, 160);
-      pg.noStroke();
-      pg.push();
-      pg.translate(tx, ty);
-      pg.rotate(angle);
-      pg.triangle(0, 0, -arrowSize, -arrowSize / 2, -arrowSize, arrowSize / 2);
-      pg.pop();
-    }
-
-    // --- Bar background ---
-    pg.noStroke();
-    pg.fill(15, 20, 40, 210);
-    pg.rect(0, 0, bw, bh);
-
-    // --- Bar border ---
-    pg.stroke(60, 80, 140, 180);
-    pg.strokeWeight(1);
-    pg.noFill();
-    pg.rect(0, 0, bw, bh);
-
-    // --- Gradations ---
-    const totalDays = Math.round(bw / TimelineMode.DAY_WIDTH);
-    const dayWorldPx = TimelineMode.DAY_WIDTH; // fixed scale
-    const showDayNums  = dayWorldPx >= 14;
-    const showWeekNums = dayWorldPx >= 4;
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let currentMonth = -1;
-
-    for (let d = 0; d < totalDays; d++) {
-      const date = TimelineMode.dateForDay(d, startDate);
-      const x   = TimelineMode.worldDayX(d, bw);
-      const dom = date.getDate();
-      const mon = date.getMonth();
-      const dow = date.getDay();
-      const isHighlighted = highlightedDays.has(d);
-      const isToday = d === todayIndex;
-      const isWeekday = dow >= 1 && dow <= 5;
-      const cell = TimelineMode.dayCellRect(d, bh);
-
-      if (dom === 1 || mon !== currentMonth) {
-        if (dom === 1 || d === 0) {
-          currentMonth = mon;
-          pg.noStroke();
-          pg.fill(180, 200, 255, 220);
-          pg.textSize(11);
-          pg.textAlign(pg.LEFT, pg.TOP);
-          pg.text(monthNames[mon] + ' ' + date.getFullYear(), x + 3, 3);
-          pg.stroke(80, 100, 180, 200);
-          pg.strokeWeight(1);
-          pg.line(x, 0, x, bh);
-          pg.noStroke();
-        }
-      }
-
-      if (dow === 1 && showWeekNums) {
-        pg.stroke(60, 90, 160, 160);
-        pg.strokeWeight(1);
-        pg.line(x, bh - TimelineMode.WEEK_TICK_H, x, bh);
-        pg.noStroke();
-        if (showDayNums) {
-          pg.fill(140, 160, 220, 180);
-          pg.textSize(9);
-          pg.textAlign(pg.CENTER, pg.BOTTOM);
-          pg.text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2);
-        }
-      }
-
-      if (isToday) {
-        pg.fill(210, 70, 70, 240);
-        pg.stroke(180, 55, 55, 255);
-        pg.strokeWeight(1.6);
-      } else if (isHighlighted) {
-        pg.fill(95, 190, 255, 240);
-        pg.stroke(125, 225, 255, 255);
-        pg.strokeWeight(1.6);
-      } else if (isWeekday) {
-        pg.fill(88, 106, 168, 205);
-        pg.stroke(118, 140, 205, 210);
-        pg.strokeWeight(1);
-      } else {
-        pg.fill(58, 70, 118, 190);
-        pg.stroke(82, 98, 155, 180);
-        pg.strokeWeight(1);
-      }
-      pg.rect(cell.x, cell.y, cell.w, cell.h, 2);
-
-      if (showDayNums) {
-        pg.noStroke();
-        pg.fill(225, 235, 255, isToday ? 255 : (isHighlighted ? 255 : 220));
-        pg.textSize(8);
-        pg.textAlign(pg.CENTER, pg.CENTER);
-        pg.text(dom, cell.cx, cell.cy + 0.5);
-      }
-    }
-
-    // --- Resize handle visuals (left and right) ---
-    const hw = 6, hr2 = bh * 0.5;
-    pg.fill(80, 120, 200, 180);
-    pg.noStroke();
-    pg.rect(bw - hw, bh * 0.25, hw, hr2, 3); // right handle
-    pg.rect(0,       bh * 0.25, hw, hr2, 3); // left handle
-
-    pg.pop();
+    TimelineMode._renderBar(new DrawCtx(pg), mindMap, 1, {
+      bg: [15, 20, 40, 210],
+      withConnections: true,
+    });
   }
 
   // ============================================================================
   // STATIC DRAW HELPERS
   // ============================================================================
+
+  /**
+   * Core bar renderer — works for both live canvas and export buffer.
+   * Called by drawBar() and drawToGraphics() with an appropriate DrawCtx.
+   *
+   * @param {DrawCtx} ctx
+   * @param {*}       mindMap
+   * @param {number}  safeZ  – 1/zoom for live (keeps things screen-constant); 1 for export
+   * @param {Object}  [opts]
+   * @param {number[]} [opts.bg]              – fill(...bg) for bar background; null → transparent
+   * @param {boolean}  [opts.withConnections] – draw connection arrows behind bar (export)
+   * @param {boolean}  [opts.withDragPreview] – draw snap preview (live only)
+   */
+  static _renderBar(ctx, mindMap, safeZ, { bg = null, withConnections = false, withDragPreview = false } = {}) {
+    const bw  = mindMap.getTimelineBarWidth?.() ?? TimelineMode.DEFAULT_WIDTH;
+    const bh  = TimelineMode.BAR_HEIGHT;
+    const barX = mindMap.timelineBarX || 0;
+    const barY = mindMap.timelineBarY || 0;
+
+    const totalDays   = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const conns       = mindMap.timelineConnections || [];
+    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
+    const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
+    const startDate   = mindMap.timelineStartDate || new Date();
+
+    const sw = 1 / safeZ;  // 1 screen-pixel stroke
+    const ts = 11 / safeZ; // base label font size
+
+    ctx.push();
+    ctx.translate(barX, barY);
+
+    // Connections drawn behind bar (export path; live uses drawConnectionsUnderlay)
+    if (withConnections) {
+      TimelineMode._drawConnections(ctx, visibleConns, barX, barY);
+    }
+
+    // Bar background (export fills it; live is transparent over the canvas background)
+    if (bg) {
+      ctx.noStroke();
+      ctx.fill(...bg);
+      ctx.rect(0, 0, bw, bh);
+    }
+
+    // Bar border
+    ctx.stroke(60, 80, 140, 180);
+    ctx.strokeWeight(sw);
+    ctx.noFill();
+    ctx.rect(0, 0, bw, bh);
+
+    // Gradations: month dividers, week ticks, day cells
+    TimelineMode._drawGradations(ctx, bw, bh, highlightedDays, safeZ, sw, ts, startDate);
+
+    // Snap preview while dragging a connection to the bar (live only)
+    if (withDragPreview) {
+      TimelineMode._drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap, barX, barY);
+    }
+
+    // Resize handles
+    TimelineMode._drawResizeHandle(ctx, bw, bh, sw);
+
+    // Selection ring
+    if (mindMap.timelineSelected) {
+      const margin = 4 / safeZ;
+      ctx.stroke(100, 180, 255, 220);
+      ctx.strokeWeight(sw * 2);
+      ctx.noFill();
+      ctx.rect(-margin, -margin, bw + margin * 2, bh + margin * 2, 3 / safeZ);
+    }
+
+    ctx.pop();
+  }
+
+  /**
+   * Draw connection arrows behind the bar.  Endpoint world-coords are shifted into
+   * bar-local space because the caller has already applied translate(barX, barY).
+   * Only used in the export path; live connections are drawn by drawConnectionsUnderlay.
+   *
+   * @param {DrawCtx}             ctx
+   * @param {TimelineConnection[]} visibleConns
+   * @param {number}              barX
+   * @param {number}              barY
+   */
+  static _drawConnections(ctx, visibleConns, barX, barY) {
+    const ARROW_SIZE = 12;
+    for (const conn of visibleConns) {
+      if (!conn?._getConnectionEndpoints) continue;
+      const ep = conn._getConnectionEndpoints();
+      if (!ep) continue;
+      const { start, end: tick } = ep;
+      if (!isFinite(start.x) || !isFinite(start.y)) continue;
+
+      // World → bar-local (translate(barX,barY) is already in effect)
+      const sx = start.x - barX, sy = start.y - barY;
+      const tx = tick.x  - barX, ty = tick.y  - barY;
+      const dx = tx - sx, dy = ty - sy;
+      if (Math.sqrt(dx * dx + dy * dy) < 1) continue;
+
+      const angle = Math.atan2(dy, dx);
+      ctx.stroke(80, 100, 160);
+      ctx.strokeWeight(2);
+      ctx.noFill();
+      ctx.line(sx, sy, tx - ARROW_SIZE * Math.cos(angle), ty - ARROW_SIZE * Math.sin(angle));
+      ctx.fill(80, 100, 160);
+      ctx.noStroke();
+      ctx.push();
+      ctx.translate(tx, ty);
+      ctx.rotate(angle);
+      ctx.triangle(0, 0, -ARROW_SIZE, -ARROW_SIZE / 2, -ARROW_SIZE, ARROW_SIZE / 2);
+      ctx.pop();
+    }
+  }
 
   /** @private */
   static _drawConnectionDragPreview(bw, bh, safeZ, sw, mindMap, barX = 0, barY = 0) {
@@ -606,7 +520,6 @@ class TimelineMode {
    */
   static drawBoxDateLabels(conns, startDate, safeZ) {
     if (!conns || conns.length === 0) return;
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const fontSize = 9 / safeZ;
     const padding  = 3 / safeZ;
 
@@ -616,7 +529,7 @@ class TimelineMode {
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
 
       const date   = TimelineMode.dateForDay(conn.dayIndex, startDate);
-      const label  = date.getDate() + ' ' + monthNames[date.getMonth()];
+      const label  = date.getDate() + ' ' + TimelineMode.MONTH_NAMES[date.getMonth()];
 
       // Position: top-right corner of the box, shifted up so it doesn't overlap the box outline.
       // box.x is the box centre, so box.x + box.width/2 is the right edge in world space.
@@ -644,12 +557,11 @@ class TimelineMode {
   }
 
   /** @private */
-  static _drawGradations(bw, bh, highlightedDays, safeZ, sw, ts, startDate) {
+  static _drawGradations(ctx, bw, bh, highlightedDays, safeZ, sw, ts, startDate) {
     const totalDays    = Math.round(bw / TimelineMode.DAY_WIDTH);
     const dayWorldPx   = TimelineMode.DAY_WIDTH;            // fixed scale
     const showDayNums  = dayWorldPx * safeZ >= 14; // visible at ≥14 screen-px/day
     const showWeekNums = dayWorldPx * safeZ >= 4;
-    const monthNames   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const todayIndex   = TimelineMode.todayDayIndex(startDate); // may be outside [0, totalDays)
 
     let currentMonth = -1;
@@ -669,81 +581,81 @@ class TimelineMode {
       if (dom === 1 || mon !== currentMonth) {
         if (dom === 1 || d === 0) {
           currentMonth = mon;
-          noStroke();
-          fill(180, 200, 255, 220);
-          textSize(ts);
-          textAlign(LEFT, TOP);
-          text(monthNames[mon] + ' ' + date.getFullYear(), x + 3 / safeZ, 3 / safeZ);
-          stroke(80, 100, 180, 200);
-          strokeWeight(sw);
-          line(x, 0, x, bh);
-          noStroke();
+          ctx.noStroke();
+          ctx.fill(180, 200, 255, 220);
+          ctx.textSize(ts);
+          ctx.textAlign(ctx.LEFT, ctx.TOP);
+          ctx.text(TimelineMode.MONTH_NAMES[mon] + ' ' + date.getFullYear(), x + 3 / safeZ, 3 / safeZ);
+          ctx.stroke(80, 100, 180, 200);
+          ctx.strokeWeight(sw);
+          ctx.line(x, 0, x, bh);
+          ctx.noStroke();
         }
       }
 
       // Week marker (Monday)
       if (dow === 1 && showWeekNums) {
-        stroke(60, 90, 160, 160);
-        strokeWeight(sw);
-        line(x, bh - TimelineMode.WEEK_TICK_H, x, bh);
-        noStroke();
+        ctx.stroke(60, 90, 160, 160);
+        ctx.strokeWeight(sw);
+        ctx.line(x, bh - TimelineMode.WEEK_TICK_H, x, bh);
+        ctx.noStroke();
         if (showDayNums) {
-          fill(140, 160, 220, 180);
-          textSize(9 / safeZ);
-          textAlign(CENTER, BOTTOM);
-          text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2 / safeZ);
+          ctx.fill(140, 160, 220, 180);
+          ctx.textSize(9 / safeZ);
+          ctx.textAlign(ctx.CENTER, ctx.BOTTOM);
+          ctx.text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2 / safeZ);
         }
       }
 
       // Day cell
       if (isToday) {
-        fill(210, 70, 70, 240);
-        stroke(180, 55, 55, 255);
-        strokeWeight(1.5 * sw);
+        ctx.fill(210, 70, 70, 240);
+        ctx.stroke(180, 55, 55, 255);
+        ctx.strokeWeight(1.5 * sw);
       } else if (isHighlighted) {
-        fill(95, 190, 255, 240);
-        stroke(125, 225, 255, 255);
-        strokeWeight(1.5 * sw);
+        ctx.fill(95, 190, 255, 240);
+        ctx.stroke(125, 225, 255, 255);
+        ctx.strokeWeight(1.5 * sw);
       } else if (isWeekday) {
-        fill(88, 106, 168, 205);
-        stroke(118, 140, 205, 210);
-        strokeWeight(sw);
+        ctx.fill(88, 106, 168, 205);
+        ctx.stroke(118, 140, 205, 210);
+        ctx.strokeWeight(sw);
       } else {
-        fill(58, 70, 118, 190);
-        stroke(82, 98, 155, 180);
-        strokeWeight(sw);
+        ctx.fill(58, 70, 118, 190);
+        ctx.stroke(82, 98, 155, 180);
+        ctx.strokeWeight(sw);
       }
-      rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
+      ctx.rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
 
       if (showDayNums) {
-        noStroke();
-        fill(225, 235, 255, isToday ? 255 : (isHighlighted ? 255 : 220));
-        textSize(8 / safeZ);
-        textAlign(CENTER, CENTER);
-        text(dom, cell.cx, cell.cy + 0.5 / safeZ);
+        ctx.noStroke();
+        ctx.fill(225, 235, 255, isToday || isHighlighted ? 255 : 220);
+        ctx.textSize(8 / safeZ);
+        ctx.textAlign(ctx.CENTER, ctx.CENTER);
+        ctx.text(dom, cell.cx, cell.cy + 0.5 / safeZ);
       }
     }
   }
 
   /** @private – draws both the right-extend and left-extend grip handles */
-  static _drawResizeHandle(bw, bh, sw) {
+  static _drawResizeHandle(ctx, bw, bh, sw) {
     const hr = bh * 0.5;
     const hy = bh / 2;
     const hw = 5 * sw;
 
+    ctx.noStroke();
+    ctx.fill(80, 120, 200, 200);
+
     // Right handle (extend future)
-    fill(80, 120, 200, 200);
-    noStroke();
-    rect(bw - hw, hy - hr / 2, hw, hr, 2 * sw);
-    fill(180, 210, 255, 220);
-    for (let i = -1; i <= 1; i++) circle(bw - hw / 2, hy + i * 5 * sw, 2.5 * sw);
+    ctx.rect(bw - hw, hy - hr / 2, hw, hr, 2 * sw);
+    ctx.fill(180, 210, 255, 220);
+    for (let i = -1; i <= 1; i++) ctx.circle(bw - hw / 2, hy + i * 5 * sw, 2.5 * sw);
 
     // Left handle (extend past)
-    fill(80, 120, 200, 200);
-    noStroke();
-    rect(0, hy - hr / 2, hw, hr, 2 * sw);
-    fill(180, 210, 255, 220);
-    for (let i = -1; i <= 1; i++) circle(hw / 2, hy + i * 5 * sw, 2.5 * sw);
+    ctx.fill(80, 120, 200, 200);
+    ctx.rect(0, hy - hr / 2, hw, hr, 2 * sw);
+    ctx.fill(180, 210, 255, 220);
+    for (let i = -1; i <= 1; i++) ctx.circle(hw / 2, hy + i * 5 * sw, 2.5 * sw);
   }
 }
 

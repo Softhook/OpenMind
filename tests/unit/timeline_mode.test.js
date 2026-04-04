@@ -107,6 +107,12 @@ sandbox.Utils = {
 new vm.Script(fs.readFileSync(path.join(__dirname, '../../src/Connection.js'), 'utf8'))
   .runInNewContext(sandbox);
 
+// Load the shared draw adapter used by TimelineMode's live/export renderer.
+sandbox.module = { exports: {} };
+new vm.Script(fs.readFileSync(path.join(__dirname, '../../src/DrawCtx.js'), 'utf8'))
+  .runInNewContext(sandbox);
+sandbox.DrawCtx = sandbox.module.exports;
+
 // Reset module.exports so TimelineMode.js can use it for its own export.
 sandbox.module = { exports: {} };
 
