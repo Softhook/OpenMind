@@ -1440,6 +1440,8 @@ function draw() {
       if (isGridVisible) {
         drawGrid();
       }
+      mindMap.drawTimeline();
+      mindMap.drawTimelineConnectionsUnderlay();
       mindMap.draw();
 
       // Draw selection rectangle if selecting multiple boxes

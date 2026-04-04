@@ -606,15 +606,20 @@ class MindMap {
     TimelineMode.drawBar(this);
   }
 
+  /** Draw timeline connections under boxes so arrows do not overlay box content. */
+  drawTimelineConnectionsUnderlay() {
+    if (!this.timelineActive || !this.timelineStartDate) return;
+    if (typeof TimelineMode === 'undefined') return;
+    if (typeof TimelineMode.drawConnectionsUnderlay !== 'function') return;
+    TimelineMode.drawConnectionsUnderlay(this);
+  }
+
   /**
    * Draw date-assignment labels (day badges) above boxes that have a timeline
    * connection, even when the timeline bar itself is hidden.
    * Called every frame from sketch.js inside the camera transform.
-   * When the bar is visible, drawBar() already calls drawBoxDateLabels, so
-   * this method is a no-op in that case to avoid double-drawing.
    */
   drawTimelineDateLabels() {
-    if (this.timelineActive) return; // drawBar() already renders them
     if (typeof TimelineMode === 'undefined') return;
     if (!this.timelineConnections || this.timelineConnections.length === 0) return;
     // Use stored start date; fall back to today so labels can still show even

@@ -74,13 +74,16 @@ class TimelineConnection extends Connection {
     const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
     const barX = this.mindMap ? (this.mindMap.timelineBarX || 0) : 0;
     const barY = this.mindMap ? (this.mindMap.timelineBarY || 0) : 0;
-    // tx/ty are world-space coordinates of the tick on the bar
-    const tx = barX + TimelineMode.worldDayX(this.dayIndex, barWidth);
-    const ty = (this.fromBox.y < barY + TimelineMode.BAR_HEIGHT / 2) ? barY : barY + TimelineMode.BAR_HEIGHT;
-    const end = { x: tx, y: ty };
+    const center = {
+      x: barX + TimelineMode.worldDayCenterX(this.dayIndex, barWidth),
+      y: barY + TimelineMode.dayCellCenterY(TimelineMode.BAR_HEIGHT),
+      dayIndex: this.dayIndex,
+    };
     if (typeof this.fromBox.getConnectionPoint !== 'function') return null;
-    const start = this.fromBox.getConnectionPoint(end);
+    const start = this.fromBox.getConnectionPoint(center);
     if (!start || !isFinite(start.x) || !isFinite(start.y)) return null;
+    const end = TimelineMode._projectToDayCellEdge(start, center, barX, barY);
+    if (!end || !isFinite(end.x) || !isFinite(end.y)) return null;
     return { start, end };
   }
 
@@ -159,6 +162,10 @@ class TimelineMode {
   static MONTH_TICK_H = 56;
   static WEEK_TICK_H  = 32;
   static DAY_TICK_H   = 18;
+  /** Day cell visuals (world units) */
+  static DAY_CELL_HEIGHT = 14;
+  static DAY_CELL_INSET_X = 2;
+  static DAY_CELL_BOTTOM_MARGIN = 6;
 
   // ============================================================================
   // STATIC GEOMETRY UTILITIES
@@ -169,9 +176,69 @@ class TimelineMode {
     return dayIndex * TimelineMode.DAY_WIDTH;
   }
 
+  /** World X of the centre of a given day cell. */
+  static worldDayCenterX(dayIndex, _barWidth) {
+    return TimelineMode.worldDayX(dayIndex, _barWidth) + TimelineMode.DAY_WIDTH / 2;
+  }
+
+  /** Bar-local Y of the centre of day cells. */
+  static dayCellCenterY(barHeight) {
+    return barHeight - TimelineMode.DAY_CELL_BOTTOM_MARGIN - TimelineMode.DAY_CELL_HEIGHT / 2;
+  }
+
+  /** Geometry for a day cell in bar-local coordinates. */
+  static dayCellRect(dayIndex, barHeight) {
+    const x = TimelineMode.worldDayX(dayIndex, 0) + TimelineMode.DAY_CELL_INSET_X;
+    const y = barHeight - TimelineMode.DAY_CELL_BOTTOM_MARGIN - TimelineMode.DAY_CELL_HEIGHT;
+    const w = Math.max(1, TimelineMode.DAY_WIDTH - TimelineMode.DAY_CELL_INSET_X * 2);
+    const h = TimelineMode.DAY_CELL_HEIGHT;
+    return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+  }
+
+  /** Intersection point of the line from start to target with the day cell boundary. */
+  static _projectToDayCellEdge(start, target, barX, barY) {
+    const cell = TimelineMode.dayCellRect(target.dayIndex, TimelineMode.BAR_HEIGHT);
+    const rect = {
+      left: barX + cell.x,
+      right: barX + cell.x + cell.w,
+      top: barY + cell.y,
+      bottom: barY + cell.y + cell.h,
+    };
+    const dx = target.x - start.x;
+    const dy = target.y - start.y;
+    const candidates = [];
+    if (Math.abs(dx) > 1e-6) {
+      const tLeft = (rect.left - start.x) / dx;
+      const yLeft = start.y + dy * tLeft;
+      if (tLeft >= 0 && tLeft <= 1 && yLeft >= rect.top && yLeft <= rect.bottom) {
+        candidates.push({ t: tLeft, x: rect.left, y: yLeft });
+      }
+      const tRight = (rect.right - start.x) / dx;
+      const yRight = start.y + dy * tRight;
+      if (tRight >= 0 && tRight <= 1 && yRight >= rect.top && yRight <= rect.bottom) {
+        candidates.push({ t: tRight, x: rect.right, y: yRight });
+      }
+    }
+    if (Math.abs(dy) > 1e-6) {
+      const tTop = (rect.top - start.y) / dy;
+      const xTop = start.x + dx * tTop;
+      if (tTop >= 0 && tTop <= 1 && xTop >= rect.left && xTop <= rect.right) {
+        candidates.push({ t: tTop, x: xTop, y: rect.top });
+      }
+      const tBottom = (rect.bottom - start.y) / dy;
+      const xBottom = start.x + dx * tBottom;
+      if (tBottom >= 0 && tBottom <= 1 && xBottom >= rect.left && xBottom <= rect.right) {
+        candidates.push({ t: tBottom, x: xBottom, y: rect.bottom });
+      }
+    }
+    if (candidates.length === 0) return target;
+    candidates.sort((a, b) => a.t - b.t);
+    return { x: candidates[0].x, y: candidates[0].y };
+  }
+
   /** Day index from a world X coordinate — fixed scale, rounds to nearest day */
   static dayFromWorldX(worldX, _barWidth) {
-    return Math.max(0, Math.round(worldX / TimelineMode.DAY_WIDTH));
+    return Math.max(0, Math.floor(worldX / TimelineMode.DAY_WIDTH));
   }
 
   /**
@@ -238,6 +305,25 @@ class TimelineMode {
   // ============================================================================
 
   /**
+   * Draw timeline connections in world space so they can be layered under boxes.
+   * Called from sketch.js before mindMap.draw().
+   */
+  static drawConnectionsUnderlay(mindMap) {
+    if (!mindMap || !mindMap.timelineActive || !mindMap.timelineStartDate) return;
+    const conns = mindMap.timelineConnections || [];
+    const totalDays = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
+    const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
+
+    for (const conn of visibleConns) {
+      if (conn === draggingConn) continue;
+      if (typeof conn.draw === 'function') {
+        try { conn.draw(); } catch (_) { /* skip broken connection */ }
+      }
+    }
+  }
+
+  /**
    * Draw the full timeline bar for the live canvas.
    * Must be called INSIDE the camera transform (push/translate/scale already applied).
    * Reads all state from mindMap.
@@ -265,30 +351,14 @@ class TimelineMode {
     // Only connections whose dayIndex falls within the visible range
     const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
 
-    // --- TimelineConnection arrows (drawn behind bar so bar sits on top) ---
-    // These use world-space coordinates from _getConnectionEndpoints() and MUST NOT
-    // be drawn inside the translate(barX, barY) block — that would double-offset them.
-    const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
-    for (const conn of visibleConns) {
-      if (conn === draggingConn) continue;
-      if (typeof conn.draw === 'function') {
-        try { conn.draw(); } catch (e) { /* skip broken connection */ }
-      }
-    }
-
-    // --- Date labels above each connected box (world-space, outside bar) ---
-    // Also world-space — must remain outside the translate block.
-    push();
-    TimelineMode.drawBoxDateLabels(visibleConns, startDate, safeZ);
-    pop();
-
     // From here everything is in bar-local coordinates (0,0 = bar top-left).
     push();
     translate(barX, barY);
 
     // --- Bar background ---
     noStroke();
-    fill(15, 20, 40, 210);
+    //fill(15, 20, 40, 210);
+    noFill();
     rect(0, 0, bw, bh);
 
     // --- Bar border ---
@@ -413,6 +483,8 @@ class TimelineMode {
       const dow = date.getDay();
       const isHighlighted = highlightedDays.has(d);
       const isToday = d === todayIndex;
+      const isWeekday = dow >= 1 && dow <= 5;
+      const cell = TimelineMode.dayCellRect(d, bh);
 
       if (dom === 1 || mon !== currentMonth) {
         if (dom === 1 || d === 0) {
@@ -442,38 +514,31 @@ class TimelineMode {
         }
       }
 
-      const dh = TimelineMode.DAY_TICK_H;
-      if (isHighlighted) {
-        pg.stroke(100, 200, 255, 255);
-        pg.strokeWeight(2);
-        pg.line(x, bh - dh * 1.5, x, bh);
-        pg.fill(120, 210, 255, 255);
-        pg.noStroke();
-        pg.textSize(9);
-        pg.textAlign(pg.CENTER, pg.BOTTOM);
-        pg.text(dom, x, bh - dh * 1.5 - 2);
-      } else {
-        pg.stroke(50, 65, 120, 140);
-        pg.strokeWeight(0.8);
-        pg.line(x, bh - dh, x, bh);
-        pg.noStroke();
-        if (showDayNums) {
-          pg.fill(100, 120, 180, 160);
-          pg.textSize(8);
-          pg.textAlign(pg.CENTER, pg.BOTTOM);
-          pg.text(dom, x, bh - dh - 1);
-        }
-      }
-
       if (isToday) {
-        pg.stroke(255, 220, 50, 240);
-        pg.strokeWeight(2);
-        pg.line(x, 0, x, bh);
-        pg.fill(255, 220, 50, 240);
+        pg.fill(210, 70, 70, 240);
+        pg.stroke(180, 55, 55, 255);
+        pg.strokeWeight(1.6);
+      } else if (isHighlighted) {
+        pg.fill(95, 190, 255, 240);
+        pg.stroke(125, 225, 255, 255);
+        pg.strokeWeight(1.6);
+      } else if (isWeekday) {
+        pg.fill(88, 106, 168, 205);
+        pg.stroke(118, 140, 205, 210);
+        pg.strokeWeight(1);
+      } else {
+        pg.fill(58, 70, 118, 190);
+        pg.stroke(82, 98, 155, 180);
+        pg.strokeWeight(1);
+      }
+      pg.rect(cell.x, cell.y, cell.w, cell.h, 2);
+
+      if (showDayNums) {
         pg.noStroke();
-        pg.textSize(10);
-        pg.textAlign(pg.CENTER, pg.TOP);
-        pg.text('TODAY', x, 3);
+        pg.fill(225, 235, 255, isToday ? 255 : (isHighlighted ? 255 : 220));
+        pg.textSize(8);
+        pg.textAlign(pg.CENTER, pg.CENTER);
+        pg.text(dom, cell.cx, cell.cy + 0.5);
       }
     }
 
@@ -506,27 +571,21 @@ class TimelineMode {
     // Determine which source box drives the snap:
     //   - connectingFrom: dragging a new connection from a box connector dot
     //   - draggingConnection: reattaching an arrowhead (timeline or normal) toward the bar
-    let sourceBox = null;
-    if (mindMap.connectingFrom) {
-      sourceBox = mindMap.connectingFrom.box;
-    } else if (mindMap.draggingConnection && mindMap.draggingConnection.conn) {
-      sourceBox = mindMap.draggingConnection.conn.fromBox;
-    }
-    if (!sourceBox) return;
+    const hasSource = !!(mindMap.connectingFrom || (mindMap.draggingConnection && mindMap.draggingConnection.conn));
+    if (!hasSource) return;
     if (!TimelineMode.isOverBarWorld(lx, ly, bw)) return;
 
     const totalDays = Math.round(bw / TimelineMode.DAY_WIDTH);
     const dayIndex = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
-    const tx = TimelineMode.worldDayX(dayIndex, bw); // bar-local X (correct since we're inside translate)
-    // sourceBox.y is world-space; compare against world-space bar centre
-    const ty = (sourceBox.y < barY + bh / 2) ? 0 : bh;
+    const cell = TimelineMode.dayCellRect(dayIndex, bh);
+    const tx = cell.cx;
+    const ty = cell.cy;
 
-    // Highlight the snap tick
+    // Highlight the snapped day cell
     stroke(100, 200, 255, 255);
     strokeWeight(2 * sw);
     noFill();
-    const dh = TimelineMode.DAY_TICK_H;
-    line(tx, ty === 0 ? 0 : bh - dh * 1.5, tx, ty === 0 ? dh * 1.5 : bh);
+    rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
 
     // Snap dot
     noStroke();
@@ -603,6 +662,8 @@ class TimelineMode {
       const dow = date.getDay();   // 0=Sun … 6=Sat
       const isHighlighted = highlightedDays.has(d);
       const isToday       = d === todayIndex;
+      const isWeekday     = dow >= 1 && dow <= 5;
+      const cell          = TimelineMode.dayCellRect(d, bh);
 
       // Month divider
       if (dom === 1 || mon !== currentMonth) {
@@ -634,40 +695,32 @@ class TimelineMode {
         }
       }
 
-      // Day tick
-      const dh = TimelineMode.DAY_TICK_H;
-      if (isHighlighted) {
-        stroke(100, 200, 255, 255);
-        strokeWeight(2 * sw);
-        line(x, bh - dh * 1.5, x, bh);
-        noStroke();
-        fill(120, 210, 255, 255);
-        textSize(9 / safeZ);
-        textAlign(CENTER, BOTTOM);
-        text(dom, x, bh - dh * 1.5 - 2 / safeZ);
-      } else {
-        stroke(50, 65, 120, 140);
-        strokeWeight(0.8 * sw);
-        line(x, bh - dh, x, bh);
-        noStroke();
-        if (showDayNums) {
-          fill(100, 120, 180, 160);
-          textSize(8 / safeZ);
-          textAlign(CENTER, BOTTOM);
-          text(dom, x, bh - dh - 1 / safeZ);
-        }
-      }
-
-      // TODAY marker
+      // Day cell
       if (isToday) {
-        stroke(255, 220, 50, 240);
-        strokeWeight(2 * sw);
-        line(x, 0, x, bh);
+        fill(210, 70, 70, 240);
+        stroke(180, 55, 55, 255);
+        strokeWeight(1.5 * sw);
+      } else if (isHighlighted) {
+        fill(95, 190, 255, 240);
+        stroke(125, 225, 255, 255);
+        strokeWeight(1.5 * sw);
+      } else if (isWeekday) {
+        fill(88, 106, 168, 205);
+        stroke(118, 140, 205, 210);
+        strokeWeight(sw);
+      } else {
+        fill(58, 70, 118, 190);
+        stroke(82, 98, 155, 180);
+        strokeWeight(sw);
+      }
+      rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
+
+      if (showDayNums) {
         noStroke();
-        fill(255, 220, 50, 240);
-        textSize(10 / safeZ);
-        textAlign(CENTER, TOP);
-        text('TODAY', x, 3 / safeZ);
+        fill(225, 235, 255, isToday ? 255 : (isHighlighted ? 255 : 220));
+        textSize(8 / safeZ);
+        textAlign(CENTER, CENTER);
+        text(dom, cell.cx, cell.cy + 0.5 / safeZ);
       }
     }
   }
@@ -693,6 +746,7 @@ class TimelineMode {
     for (let i = -1; i <= 1; i++) circle(hw / 2, hy + i * 5 * sw, 2.5 * sw);
   }
 }
+
 
 // ==============================================================================
 // MODULE EXPORT (for Jest / Node.js)
