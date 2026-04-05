@@ -163,8 +163,15 @@ class TextImporter {
 
     let currentX = IMPORT_LAYOUT.START_X;
 
-    // Detect the title section index
-    const titleSectionIdx = this.detectTitleIndex(sections);
+    // When the file is a Markdown export (sections carry headingLevel), colour
+    // boxes by heading level so that round-trip editing preserves colours:
+    //   headingLevel 1  (`# `)  → red box
+    //   headingLevel 2+ (`## `) → orange box
+    //   no headingLevel          → fall back to NLP-based title detection
+    const isMarkdownFile = sections.some(s => s.headingLevel != null);
+
+    // Detect the title section index (only needed for non-Markdown files)
+    const titleSectionIdx = isMarkdownFile ? -1 : this.detectTitleIndex(sections);
 
     const allNewBoxes = [];
     const allNewConnections = [];
@@ -178,11 +185,21 @@ class TextImporter {
       // Create heading box
       const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
 
-      // Style title red (key 3), others orange (key 2)
-      if (sectionIdx === titleSectionIdx) {
-        headingBox.setBackgroundByKey('red');
+      // Colour the heading box based on source:
+      //   Markdown file  → use headingLevel (1=red, 2+=orange)
+      //   NLP/plain text → use detected title index (title=red, others=orange)
+      if (isMarkdownFile) {
+        if (section.headingLevel === 1) {
+          headingBox.setBackgroundByKey('red');
+        } else {
+          headingBox.setBackgroundByKey('orange');
+        }
       } else {
-        headingBox.setBackgroundByKey('orange');
+        if (sectionIdx === titleSectionIdx) {
+          headingBox.setBackgroundByKey('red');
+        } else {
+          headingBox.setBackgroundByKey('orange');
+        }
       }
 
       // Set fixed width for imported boxes
@@ -280,6 +297,7 @@ class TextImporter {
 
     const sections = [];
     let currentHeading = null;
+    let currentHeadingLevel = null; // 1 for `# `, 2 for `## `, null for NLP-detected
     let currentParagraphs = [];
     let wasPreviousLineEmpty = true;
     let inBibliography = false;
@@ -314,14 +332,23 @@ class TextImporter {
       if (headingDetected) {
         // If we found a NEW heading, commit previous
         if (currentHeading || currentParagraphs.length > 0) {
-          this.commitSection(sections, currentHeading, currentParagraphs);
+          this.commitSection(sections, currentHeading, currentParagraphs, currentHeadingLevel);
         }
 
-        currentHeading = line;
+        // For Markdown files, strip the `# ` / `## ` prefix and record the level.
+        // This enables colour-based import: `# ` → red, `## ` → orange.
+        const mdMatch = hasMarkdownHeaders ? line.match(/^(#+)\s+(.*)/) : null;
+        if (mdMatch) {
+          currentHeadingLevel = mdMatch[1].length;
+          currentHeading = mdMatch[2].trim();
+        } else {
+          currentHeadingLevel = null;
+          currentHeading = line;
+        }
         currentParagraphs = [];
 
         // Check if this new heading is a bibliography
-        inBibliography = this.isBibliographyHeading(line);
+        inBibliography = this.isBibliographyHeading(currentHeading);
 
         // If it was a Setext underline, skip the next line
         if (nextLine && /^(={3,}|-{3,})$/.test(nextLine)) {
@@ -329,6 +356,7 @@ class TextImporter {
         }
       } else if (!currentHeading) {
         currentHeading = line;
+        currentHeadingLevel = null;
         inBibliography = this.isBibliographyHeading(line);
       } else {
         // It's a paragraph
@@ -340,7 +368,7 @@ class TextImporter {
 
     // Final commit
     if (currentHeading || currentParagraphs.length > 0) {
-      this.commitSection(sections, currentHeading || 'Untitled', currentParagraphs);
+      this.commitSection(sections, currentHeading || 'Untitled', currentParagraphs, currentHeadingLevel);
     }
 
     return sections;
@@ -348,8 +376,8 @@ class TextImporter {
 
   /**
    * Identifies the index of the most likely title section.
-   * Scans early sections for Markdown H1, "Title:" markers, or short fragments
-   * that don't look like metadata.
+   * Scans early sections for Markdown H1 (via headingLevel), "Title:" markers,
+   * or short fragments that don't look like metadata.
    */
   static detectTitleIndex(sections) {
     if (sections.length === 0) return -1;
@@ -360,10 +388,10 @@ class TextImporter {
     // Scan the first few sections (title is usually near the top)
     const scanLimit = Math.min(sections.length, 5);
 
-    // Priority 1: Markdown H1 or "Title:" prefix
+    // Priority 1: Markdown H1 (headingLevel === 1 after prefix stripping) or "Title:" prefix
     for (let i = 0; i < scanLimit; i++) {
       const h = sections[i].heading.trim();
-      if (/^#\s/.test(h) || /^title:\s*/i.test(h)) {
+      if (sections[i].headingLevel === 1 || /^title:\s*/i.test(h)) {
         return i;
       }
     }
@@ -418,7 +446,7 @@ class TextImporter {
   /**
    * Helper to commit a section to the results
    */
-  static commitSection(sections, heading, paragraphs) {
+  static commitSection(sections, heading, paragraphs, headingLevel = null) {
     if (!heading && paragraphs.length === 0) return;
 
     let processedParagraphs = paragraphs;
@@ -433,7 +461,8 @@ class TextImporter {
 
     sections.push({
       heading: heading || 'Section',
-      paragraphs: processedParagraphs.length > 0 ? processedParagraphs : ['']
+      paragraphs: processedParagraphs.length > 0 ? processedParagraphs : [''],
+      headingLevel,
     });
   }
 

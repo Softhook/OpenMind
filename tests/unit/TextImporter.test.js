@@ -112,7 +112,9 @@ describe('TextImporter.parseTextIntoSections', () => {
             'Body text.'
         ];
         const sections = TextImporterClass.parseTextIntoSections(lines);
-        expect(sections[0].heading).toBe('# Main Title');
+        // Markdown prefix is stripped; headingLevel records the level
+        expect(sections[0].heading).toBe('Main Title');
+        expect(sections[0].headingLevel).toBe(1);
     });
 
     test('treats long sentences as paragraphs', () => {
@@ -238,11 +240,14 @@ describe('TextImporter.parseTextIntoSections', () => {
             '##### H5',
             '###### H6'
         ];
-        // Each will become its own section because they are headings
+        // Each will become its own section because they are headings.
+        // The `# ` prefix is stripped; headingLevel records the ATX level.
         const sections = TextImporterClass.parseTextIntoSections(lines);
         expect(sections).toHaveLength(6);
-        expect(sections[0].heading).toBe('# H1');
-        expect(sections[5].heading).toBe('###### H6');
+        expect(sections[0].heading).toBe('H1');
+        expect(sections[0].headingLevel).toBe(1);
+        expect(sections[5].heading).toBe('H6');
+        expect(sections[5].headingLevel).toBe(6);
     });
 
     test('detects Setext style underlined headings', () => {
@@ -401,11 +406,13 @@ Coskun, A., Cila, N., Nicenboim, I., Frauenberger, C., Wakkary, R., Hassenzahl, 
         expect(containsCitationHeading).toBeUndefined();
     });
 
-    test('detectTitleIndex identifies Markdown H1 as title', () => {
+    test('detectTitleIndex identifies Markdown H1 as title via headingLevel', () => {
+        // After parsing, Markdown headings have their prefix stripped and carry headingLevel.
+        // detectTitleIndex should recognise headingLevel=1 as the H1 title.
         const sections = [
-            { heading: 'Author: John Doe', paragraphs: [''] },
-            { heading: '# The Real Title', paragraphs: [''] },
-            { heading: 'Abstract', paragraphs: [''] }
+            { heading: 'Author: John Doe', paragraphs: [''], headingLevel: null },
+            { heading: 'The Real Title', paragraphs: [''], headingLevel: 1 },
+            { heading: 'Abstract', paragraphs: [''], headingLevel: null }
         ];
         const titleIdx = TextImporterClass.detectTitleIndex(sections);
         expect(titleIdx).toBe(1);
@@ -471,14 +478,18 @@ Coskun, A., Cila, N., Nicenboim, I., Frauenberger, C., Wakkary, R., Hassenzahl, 
 
         // Should have 3 sections regardless of double newlines between Paragraph 2 and 3
         expect(sections).toHaveLength(3);
-        expect(sections[0].heading).toBe('# Main Title');
-        expect(sections[1].heading).toBe('## Section 1');
+        // Markdown prefixes are stripped; headingLevel records the ATX level
+        expect(sections[0].heading).toBe('Main Title');
+        expect(sections[0].headingLevel).toBe(1);
+        expect(sections[1].heading).toBe('Section 1');
+        expect(sections[1].headingLevel).toBe(2);
 
         // Paragraphs 1, 2, and 3 should all be under Section 1
         expect(sections[1].paragraphs).toHaveLength(3);
         expect(sections[1].paragraphs).toContain('Paragraph 3');
 
-        expect(sections[2].heading).toBe('## Section 2');
+        expect(sections[2].heading).toBe('Section 2');
+        expect(sections[2].headingLevel).toBe(2);
     });
 });
 

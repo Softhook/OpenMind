@@ -70,97 +70,122 @@ function makePgMock(extras = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// buildTextHierarchy — Markdown output
+// buildTextHierarchy — colour-based Markdown output
 // ---------------------------------------------------------------------------
 
-describe('buildTextHierarchy — Markdown heading output', () => {
+// Helpers that produce boxes matching the actual ColorPalette values
+const RED_BG    = { r: 255, g: 140, b: 140 };
+const ORANGE_BG = { r: 255, g: 200, b: 140 };
+const WHITE_BG  = { r: 255, g: 255, b: 255 };
+
+function makeRedBox(id, text, extra = {})    { return makeBox(id, text, { backgroundColor: RED_BG,    ...extra }); }
+function makeOrangeBox(id, text, extra = {}) { return makeBox(id, text, { backgroundColor: ORANGE_BG, ...extra }); }
+function makeWhiteBox(id, text, extra = {})  { return makeBox(id, text, { backgroundColor: WHITE_BG,  ...extra }); }
+
+describe('buildTextHierarchy — colour-based Markdown output', () => {
   let em;
   beforeEach(() => {
     em = new ExportManagerClass();
   });
 
-  test('root box (depth 0) gets H1 heading', () => {
-    em.mindMap = { boxes: [makeBox('a', 'Root')], connections: [] };
-    expect(em.buildTextHierarchy()).toMatch(/^# Root/m);
+  // ---- colour-to-heading-level mapping ----
+
+  test('red box produces H1 heading', () => {
+    em.mindMap = { boxes: [makeRedBox('a', 'Title')], connections: [] };
+    expect(em.buildTextHierarchy()).toMatch(/^# Title/m);
   });
 
-  test('child box (depth 1) gets H2 heading', () => {
-    const a = makeBox('a', 'Parent');
-    const b = makeBox('b', 'Child');
-    em.mindMap = { boxes: [a, b], connections: [{ fromBox: a, toBox: b }] };
+  test('orange box produces H2 heading', () => {
+    em.mindMap = { boxes: [makeOrangeBox('a', 'Section')], connections: [] };
+    expect(em.buildTextHierarchy()).toMatch(/^## Section/m);
+  });
+
+  test('white box produces plain text (no heading prefix)', () => {
+    em.mindMap = { boxes: [makeWhiteBox('a', 'Paragraph')], connections: [] };
     const md = em.buildTextHierarchy();
-    expect(md).toMatch(/^# Parent/m);
-    expect(md).toMatch(/^## Child/m);
+    expect(md).not.toMatch(/^#/m);
+    expect(md).toContain('Paragraph');
   });
 
-  test('grandchild box (depth 2) gets H3 heading', () => {
-    const a = makeBox('a', 'A');
-    const b = makeBox('b', 'B');
-    const c = makeBox('c', 'C');
+  test('mixed colours in a connected tree produce correct prefixes', () => {
+    const red = makeRedBox('r', 'Red Title');
+    const orange = makeOrangeBox('o', 'Orange Section');
+    const white = makeWhiteBox('w', 'White Paragraph');
     em.mindMap = {
-      boxes: [a, b, c],
-      connections: [{ fromBox: a, toBox: b }, { fromBox: b, toBox: c }],
+      boxes: [red, orange, white],
+      connections: [{ fromBox: red, toBox: orange }, { fromBox: orange, toBox: white }],
     };
     const md = em.buildTextHierarchy();
-    expect(md).toMatch(/^# A/m);
-    expect(md).toMatch(/^## B/m);
-    expect(md).toMatch(/^### C/m);
+    expect(md).toMatch(/^# Red Title/m);
+    expect(md).toMatch(/^## Orange Section/m);
+    // White box: plain text, no # prefix
+    expect(md).toMatch(/^White Paragraph/m);
+    expect(md).not.toMatch(/^#{1,6} White Paragraph/m);
   });
 
-  test('depth 5 gets H6 heading (######)', () => {
-    const boxes = Array.from({ length: 6 }, (_, i) => makeBox(String(i), `Box${i}`));
-    const conns = boxes.slice(1).map((b, i) => ({ fromBox: boxes[i], toBox: b }));
-    em.mindMap = { boxes, connections: conns };
-    const md = em.buildTextHierarchy();
-    expect(md).toMatch(/^###### Box5/m);
-  });
+  // ---- connection-order traversal ----
 
-  test('depth ≥ 6 falls back to bullet points (no #######)', () => {
-    const boxes = Array.from({ length: 8 }, (_, i) => makeBox(String(i), `Box${i}`));
-    const conns = boxes.slice(1).map((b, i) => ({ fromBox: boxes[i], toBox: b }));
-    em.mindMap = { boxes, connections: conns };
-    const md = em.buildTextHierarchy();
-    expect(md).not.toMatch(/^#{7}/m);   // no H7
-    expect(md).toMatch(/- Box6/m);
-    expect(md).toMatch(/- Box7/m);
-  });
-
-  test('boxes in a cycle with no root appear in Disconnected section', () => {
-    // A→B, B→A forms a cycle — no roots
-    // C is standalone root (no incoming)
-    const a = makeBox('a', 'CycleA');
-    const b = makeBox('b', 'CycleB');
-    const c = makeBox('c', 'StandaloneC');
+  test('child boxes appear after their parent in the output', () => {
+    const red = makeRedBox('r', 'Root');
+    const orange = makeOrangeBox('o', 'Child');
     em.mindMap = {
-      boxes: [a, b, c],
+      boxes: [red, orange],
+      connections: [{ fromBox: red, toBox: orange }],
+    };
+    const md = em.buildTextHierarchy();
+    expect(md.indexOf('# Root')).toBeLessThan(md.indexOf('## Child'));
+  });
+
+  // ---- boxes unreachable from DFS (cycles / isolated) ----
+
+  test('isolated boxes appear in output with their colour-based prefix', () => {
+    const red = makeRedBox('r', 'Reached');
+    const orange = makeOrangeBox('u', 'Unreached');
+    // No connection — both are roots, both should appear
+    em.mindMap = { boxes: [red, orange], connections: [] };
+    const md = em.buildTextHierarchy();
+    expect(md).toMatch(/^# Reached/m);
+    expect(md).toMatch(/^## Unreached/m);
+  });
+
+  test('cyclic boxes not reachable from any root are appended with correct prefix', () => {
+    // A→B, B→A cycle; C is a standalone root
+    const c = makeRedBox('c', 'Root');
+    const a = makeOrangeBox('a', 'CycleA');
+    const b = makeWhiteBox('b', 'CycleB');
+    em.mindMap = {
+      boxes: [c, a, b],
       connections: [{ fromBox: a, toBox: b }, { fromBox: b, toBox: a }],
     };
     const md = em.buildTextHierarchy();
-    // C is the only root → H1
-    expect(md).toMatch(/^# StandaloneC/m);
-    // A and B form a cycle (never visited from any root) → Disconnected section
-    expect(md).toMatch(/## Disconnected/);
-    expect(md).toMatch(/- CycleA/m);
-    expect(md).toMatch(/- CycleB/m);
+    // C is the standalone root
+    expect(md).toMatch(/^# Root/m);
+    // CycleA and CycleB are unreachable; they should still appear with their colours
+    expect(md).toMatch(/^## CycleA/m);
+    expect(md).toMatch(/^CycleB/m);   // white → plain text
+    // No synthetic "## Disconnected" header
+    expect(md).not.toMatch(/## Disconnected/);
   });
 
-  test('unconnected boxes all appear as H1 headings (each is its own root)', () => {
-    em.mindMap = {
-      boxes: [makeBox('a', 'Alpha'), makeBox('b', 'Beta')],
-      connections: [],
-    };
-    const md = em.buildTextHierarchy();
-    expect(md).toMatch(/^# Alpha/m);
-    expect(md).toMatch(/^# Beta/m);
-  });
+  // ---- multi-line text ----
 
-  test('multi-line text in a box is collapsed to a single line for the heading', () => {
+  test('multi-line text in a box is collapsed to a single line', () => {
     em.mindMap = {
-      boxes: [makeBox('a', 'Line one\nLine two')],
+      boxes: [makeRedBox('a', 'Line one\nLine two')],
       connections: [],
     };
     const md = em.buildTextHierarchy();
     expect(md).toMatch(/^# Line one Line two/m);
+  });
+
+  // ---- no heading prefix emitted for non-red/orange colours ----
+
+  test('no Markdown heading syntax for any colour other than red or orange', () => {
+    const custom = makeBox('x', 'Custom', { backgroundColor: { r: 100, g: 200, b: 100 } });
+    em.mindMap = { boxes: [custom], connections: [] };
+    const md = em.buildTextHierarchy();
+    expect(md).not.toMatch(/^#/m);
+    expect(md).toContain('Custom');
   });
 });
 
@@ -202,7 +227,7 @@ describe('exportText — .md filename and MIME type', () => {
 
     em = new ExportManagerClass();
     em.mindMap = {
-      boxes: [makeBox('x', 'Hello')],
+      boxes: [makeBox('x', 'Hello', { backgroundColor: RED_BG })],
       connections: [],
     };
   });
@@ -216,7 +241,7 @@ describe('exportText — .md filename and MIME type', () => {
     expect(downloadAttr).toBe('mindmap.md');
   });
 
-  test('content contains proper Markdown heading', () => {
+  test('red box in content produces H1 Markdown heading', () => {
     let capturedContent = '';
     // Capture Blob content
     const OrigBlob = window.Blob || global.Blob;

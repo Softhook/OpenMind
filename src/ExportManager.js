@@ -1072,16 +1072,40 @@ class ExportManager {
   }
 
   /**
-   * Builds a Markdown representation of the mind map hierarchy from its connections.
-   * Root nodes (no incoming connections) become top-level headings (`# …`).
-   * Each level of depth adds one more `#` (up to H6); deeper levels fall back
-   * to indented bullet points.
+   * Builds a Markdown representation of the mind map.
+   *
+   * Heading level is determined by box background **colour**, not by connection
+   * depth, so that a plain text re-import can restore the exact colour:
+   *   • Red   boxes  →  `# text`   (H1 — highest heading)
+   *   • Orange boxes  →  `## text`  (H2 — next heading)
+   *   • All other boxes → plain text  (no Markdown heading prefix)
+   *
+   * Boxes are emitted in connection-traversal order (DFS from root nodes) so
+   * that grouped content stays together.  Boxes not reachable by DFS are
+   * appended at the end with the same colour-based prefix.
+   *
    * @returns {string} Markdown text
    */
   buildTextHierarchy() {
     if (!this.mindMap || !this.mindMap.boxes || this.mindMap.boxes.length === 0) {
       return 'Empty mind map';
     }
+
+    /**
+     * Returns the Markdown prefix for a box based on its background colour.
+     * Red   → `# `   (H1)
+     * Orange → `## `  (H2)
+     * Other  → ``    (plain text, no heading prefix)
+     * @param {Object} box
+     * @returns {string}
+     */
+    const getMarkdownPrefix = (box) => {
+      const bg = box.backgroundColor;
+      if (!bg) return '';
+      if (bg.r === 255 && bg.g === 140 && bg.b === 140) return '# ';
+      if (bg.r === 255 && bg.g === 200 && bg.b === 140) return '## ';
+      return '';
+    };
 
     // Build adjacency list from connections
     const children = new Map();
@@ -1094,7 +1118,6 @@ class ExportManager {
         const fromId = conn.fromBox.id;
         const toId = conn.toBox.id;
 
-        // Validate IDs exist
         if (fromId === undefined || fromId === null ||
           toId === undefined || toId === null) {
           console.warn('Connection with missing ID:', conn);
@@ -1117,72 +1140,43 @@ class ExportManager {
       }
     });
 
-    // Build text using DFS
+    // Emit box as a Markdown line with colour-based prefix
+    const emitBox = (box) => {
+      const text = (box.text || '').replace(/\n/g, ' ').trim();
+      if (!text) return;
+      result += getMarkdownPrefix(box) + text + '\n\n';
+    };
+
+    // Build text using DFS (connection order)
     const visited = new Set();
     let result = '';
 
-    /**
-     * Returns the Markdown prefix for a given hierarchy depth.
-     * Depths 0–5 map to ATX headings (# through ######).
-     * Deeper levels fall back to indented bullet points.
-     * @param {number} depth
-     * @returns {string}
-     */
-    const markdownPrefix = (depth) => {
-      if (depth < 6) return '#'.repeat(depth + 1) + ' ';
-      // Cap visual indentation at 95 extra levels (total depth capped at 1000 elsewhere)
-      // to avoid generating impractically long whitespace strings.
-      return '  '.repeat(Math.min(depth - 5, 95)) + '- ';
-    };
-
-    const dfs = (boxId, depth) => {
-      // Add depth limit protection
-      if (depth > 1000) {
-        console.warn('Max hierarchy depth reached:', depth);
-        result += '###### [Max depth reached]\n\n';
-        return;
-      }
-
+    const dfs = (boxId) => {
       if (visited.has(boxId)) return;
       visited.add(boxId);
 
       const box = this.mindMap.boxes.find(b => b && b.id === boxId);
       if (!box) return;
 
-      const text = (box.text || '').replace(/\n/g, ' ').trim();
-      result += markdownPrefix(depth) + text + '\n\n';
+      emitBox(box);
 
       const childIds = children.get(boxId) || [];
-      childIds.forEach(childId => dfs(childId, depth + 1));
+      childIds.forEach(childId => dfs(childId));
     };
 
-    // Process all roots
     if (roots.length > 0) {
-      roots.forEach(rootId => dfs(rootId, 0));
+      roots.forEach(rootId => dfs(rootId));
     } else {
-      // No connections — list all boxes as a flat Markdown list
+      // No connections — emit all boxes with colour-based prefixes
       this.mindMap.boxes.forEach(box => {
-        if (box && box.text) {
-          const text = box.text.replace(/\n/g, ' ').trim();
-          result += '- ' + text + '\n';
-        }
+        if (box) emitBox(box);
       });
     }
 
-    // Add disconnected boxes (collect first, then emit as single section)
-    const disconnectedLines = [];
+    // Append any boxes not reachable from roots (cycles, truly isolated)
     this.mindMap.boxes.forEach(box => {
-      if (box && box.id && !visited.has(box.id)) {
-        const text = (box.text || '').replace(/\n/g, ' ').trim();
-        if (text) {
-          disconnectedLines.push('- ' + text);
-        }
-      }
+      if (box && box.id && !visited.has(box.id)) emitBox(box);
     });
-
-    if (disconnectedLines.length > 0) {
-      result += '\n## Disconnected\n\n' + disconnectedLines.join('\n') + '\n';
-    }
 
     return result;
   }
