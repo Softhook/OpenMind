@@ -124,8 +124,9 @@ describe('TextImporter.parseTextIntoSections — Markdown headingLevel detection
   });
 
   test('sections without Markdown headers have headingLevel null', () => {
-    // No `# ` in input → hasMarkdownHeaders false → NLP path → headingLevel null
-    // (nlp stub returns hasVerbs=false, so short lines will be detected as headings)
+    // No `# ` in input → hasMarkdownHeaders false → NLP path → headingLevel null.
+    // The nlp stub returns verbs().found === false for all text, so short lines
+    // will be treated as headings by the heuristic.
     const sections = TextImporter.parseTextIntoSections(['Plain Heading', 'para']);
     sections.forEach(s => expect(s.headingLevel).toBeNull());
   });

@@ -337,7 +337,7 @@ class TextImporter {
 
         // For Markdown files, strip the `# ` / `## ` prefix and record the level.
         // This enables colour-based import: `# ` → red, `## ` → orange.
-        const mdMatch = hasMarkdownHeaders ? line.match(/^(#+)\s+(.*)/) : null;
+        const mdMatch = hasMarkdownHeaders ? line.match(/^(#{1,6})\s+(.*)/) : null;
         if (mdMatch) {
           currentHeadingLevel = mdMatch[1].length;
           currentHeading = mdMatch[2].trim();

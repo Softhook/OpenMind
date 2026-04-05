@@ -14,6 +14,12 @@
  */
 
 class ExportManager {
+  // Background colour values that map to Markdown heading levels.
+  // These match ColorPalette.BOX_BACKGROUNDS exactly:
+  //   { key: 'red',    color: { r: 255, g: 140, b: 140, a: 255 } }
+  //   { key: 'orange', color: { r: 255, g: 200, b: 140, a: 255 } }
+  static RED_BG    = { r: 255, g: 140, b: 140 };
+  static ORANGE_BG = { r: 255, g: 200, b: 140 };
   constructor() {
     this.p5Instance = null;
     this.mindMap = null;
@@ -1102,8 +1108,8 @@ class ExportManager {
     const getMarkdownPrefix = (box) => {
       const bg = box.backgroundColor;
       if (!bg) return '';
-      if (bg.r === 255 && bg.g === 140 && bg.b === 140) return '# ';
-      if (bg.r === 255 && bg.g === 200 && bg.b === 140) return '## ';
+      if (bg.r === ExportManager.RED_BG.r && bg.g === ExportManager.RED_BG.g && bg.b === ExportManager.RED_BG.b) return '# ';
+      if (bg.r === ExportManager.ORANGE_BG.r && bg.g === ExportManager.ORANGE_BG.g && bg.b === ExportManager.ORANGE_BG.b) return '## ';
       return '';
     };
 
