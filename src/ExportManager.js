@@ -1055,7 +1055,7 @@ class ExportManager {
     const hierarchy = this.buildTextHierarchy();
 
     // Create blob and download with proper cleanup
-    const blob = new Blob([hierarchy], { type: 'text/markdown; charset=utf-8' });
+    const blob = new Blob([hierarchy], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
 
     try {
@@ -1130,6 +1130,8 @@ class ExportManager {
      */
     const markdownPrefix = (depth) => {
       if (depth < 6) return '#'.repeat(depth + 1) + ' ';
+      // Cap visual indentation at 95 extra levels (total depth capped at 1000 elsewhere)
+      // to avoid generating impractically long whitespace strings.
       return '  '.repeat(Math.min(depth - 5, 95)) + '- ';
     };
 

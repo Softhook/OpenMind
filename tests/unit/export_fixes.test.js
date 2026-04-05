@@ -218,7 +218,6 @@ describe('exportText — .md filename and MIME type', () => {
 
   test('content contains proper Markdown heading', () => {
     let capturedContent = '';
-    const origBlob = global.Blob;
     // Capture Blob content
     const OrigBlob = window.Blob || global.Blob;
     global.Blob = class extends OrigBlob {
