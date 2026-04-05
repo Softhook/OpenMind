@@ -632,10 +632,8 @@ class MindMap {
     }
     const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
-    const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
-    const visibleConns = this.timelineConnections.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
     push();
-    TimelineMode.drawBoxDateLabels(visibleConns, startDate, safeZ);
+    TimelineMode.drawBoxDateLabels(this.timelineConnections, startDate, safeZ);
     pop();
   }
 

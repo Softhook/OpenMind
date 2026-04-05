@@ -455,6 +455,63 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
     TimelineMode.drawBoxDateLabels([conn1, conn2], today, 1);
     expect(sandbox.rect.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  test('label text includes abbreviated weekday', () => {
+    const box = makeBox('b1', 0, -200);
+    // Use a fixed start date: 2024-01-01 (Monday)
+    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    startDate.setHours(0, 0, 0, 0);
+    const conn = new TimelineConnection(box, 0, null); // day 0 = 2024-01-01 = Monday
+    sandbox.text.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], startDate, 1);
+    expect(sandbox.text).toHaveBeenCalled();
+    const labelArg = sandbox.text.mock.calls[0][0];
+    // Label should start with a 3-letter weekday abbreviation
+    expect(labelArg).toMatch(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/);
+  });
+
+  test('uses red fill for past dates', () => {
+    const box = makeBox('b1', 0, -200);
+    // Ensure the date is in the past: use a startDate far in the past
+    const pastStart = new Date('2000-01-01T00:00:00.000Z');
+    pastStart.setHours(0, 0, 0, 0);
+    const conn = new TimelineConnection(box, 0, null); // day 0 = 2000-01-01 — definitely past
+    sandbox.fill.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], pastStart, 1);
+    // The first fill() call after noStroke() should be the red past-date pill background
+    const fillCalls = sandbox.fill.mock.calls;
+    expect(fillCalls.length).toBeGreaterThan(0);
+    // Find the fill call for the pill: first fill with 4 args (r, g, b, alpha) or 3-arg (r, g, b)
+    // Red past pill: fill(200, 60, 60, 210)
+    const pillFill = fillCalls.find(args => args[0] === 200 && args[1] === 60 && args[2] === 60);
+    expect(pillFill).toBeDefined();
+  });
+
+  test('uses blue fill for future/today dates', () => {
+    const box = makeBox('b1', 0, -200);
+    // Use a startDate far in the future so dayIndex=0 is a future date
+    const futureStart = new Date('2099-01-01T00:00:00.000Z');
+    futureStart.setHours(0, 0, 0, 0);
+    const conn = new TimelineConnection(box, 0, null);
+    sandbox.fill.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], futureStart, 1);
+    const fillCalls = sandbox.fill.mock.calls;
+    // Blue future pill: fill(80, 140, 220, 210)
+    const pillFill = fillCalls.find(args => args[0] === 80 && args[1] === 140 && args[2] === 220);
+    expect(pillFill).toBeDefined();
+  });
+
+  test('uses orange fill for selected connection', () => {
+    const box = makeBox('b1', 0, -200);
+    const conn = new TimelineConnection(box, 0, null);
+    conn.selected = true;
+    sandbox.fill.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], today, 1);
+    const fillCalls = sandbox.fill.mock.calls;
+    // Orange selected pill: fill(255, 140, 0, 210)
+    const pillFill = fillCalls.find(args => args[0] === 255 && args[1] === 140 && args[2] === 0);
+    expect(pillFill).toBeDefined();
+  });
 });
 
 // ============================================================
