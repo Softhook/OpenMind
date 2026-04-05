@@ -160,6 +160,8 @@ class TimelineMode {
 
   /** Abbreviated month names shared across all drawing methods */
   static MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  /** Abbreviated day names (Sun=0 … Sat=6) for date badge labels */
+  static DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   /** Tick heights measured from bar bottom edge (world units) */
   static MONTH_TICK_H = 56;
@@ -523,13 +525,18 @@ class TimelineMode {
     const fontSize = 9 / safeZ;
     const padding  = 3 / safeZ;
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     for (const conn of conns) {
       if (!conn || !conn.fromBox || conn.dayIndex == null) continue;
       const box = conn.fromBox;
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
 
-      const date   = TimelineMode.dateForDay(conn.dayIndex, startDate);
-      const label  = date.getDate() + ' ' + TimelineMode.MONTH_NAMES[date.getMonth()];
+      const date    = TimelineMode.dateForDay(conn.dayIndex, startDate);
+      const dayName = TimelineMode.DAY_NAMES[date.getDay()];
+      const label   = dayName + ' ' + date.getDate() + ' ' + TimelineMode.MONTH_NAMES[date.getMonth()];
+      const isPast  = date < today;
 
       // Position: top-right corner of the box, shifted up so it doesn't overlap the box outline.
       // box.x is the box centre, so box.x + box.width/2 is the right edge in world space.
@@ -540,12 +547,15 @@ class TimelineMode {
       const lx = box.x + box.width / 2 - labelW;  // pill right edge aligns with box right edge
       const ly = box.y - box.height / 2 - labelH - 2 / safeZ; // just above the box
 
-      // Pill background
+      // Pill background — red for past dates, blue for future, highlighted when selected
       noStroke();
-      fill(conn.selected ? 255 : 80,
-           conn.selected ? 140 : 140,
-           conn.selected ? 0   : 220,
-           210);
+      if (conn.selected) {
+        fill(255, 140, 0, 210);
+      } else if (isPast) {
+        fill(200, 60, 60, 210);
+      } else {
+        fill(80, 140, 220, 210);
+      }
       rect(lx, ly, labelW, labelH, labelH / 2);
 
       // Label text
@@ -609,8 +619,8 @@ class TimelineMode {
 
       // Day cell
       if (isToday) {
-        ctx.fill(210, 70, 70, 240);
-        ctx.stroke(180, 55, 55, 255);
+        ctx.fill(255, 215, 0, 240);
+        ctx.stroke(200, 165, 0, 255);
         ctx.strokeWeight(1.5 * sw);
       } else if (isHighlighted) {
         ctx.fill(95, 190, 255, 240);
