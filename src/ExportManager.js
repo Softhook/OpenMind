@@ -14,6 +14,12 @@
  */
 
 class ExportManager {
+  // Background colour values that map to Markdown heading levels.
+  // These match ColorPalette.BOX_BACKGROUNDS exactly:
+  //   { key: 'red',    color: { r: 255, g: 140, b: 140, a: 255 } }
+  //   { key: 'orange', color: { r: 255, g: 200, b: 140, a: 255 } }
+  static RED_BG    = { r: 255, g: 140, b: 140 };
+  static ORANGE_BG = { r: 255, g: 200, b: 140 };
   constructor() {
     this.p5Instance = null;
     this.mindMap = null;
@@ -181,19 +187,25 @@ class ExportManager {
             // Draw image if present (using imageUrl/img properties)
             if (box.imageUrl && box.img) {
               try {
-                const imgW = box.width - 20;
-                const imgH = box.height - 20;
-                const imgX = box.x - imgW / 2;
-                const imgY = box.y - box.height / 2 + 10;
+                // Preserve aspect ratio and centre in box, matching TextBox.draw()
+                const iw = (box.naturalImageWidth && box.naturalImageWidth > 0)
+                  ? box.naturalImageWidth : box.img.width;
+                const ih = (box.naturalImageHeight && box.naturalImageHeight > 0)
+                  ? box.naturalImageHeight : box.img.height;
 
-                // Draw the loaded image
-                if (box.img.width && box.img.height) {
-                  pg.image(box.img, imgX, imgY, imgW, imgH);
+                if (iw && ih) {
+                  const imgScale = Math.min(box.width / iw, box.height / ih);
+                  const drawW = iw * imgScale;
+                  const drawH = ih * imgScale;
+                  pg.imageMode(pg.CENTER);
+                  pg.image(box.img, box.x, box.y, drawW, drawH);
+                  pg.imageMode(pg.CORNER);
                 } else {
                   // Fallback: draw placeholder
                   pg.fill(200);
                   pg.noStroke();
-                  pg.rect(imgX, imgY, imgW, imgH);
+                  pg.rect(box.x - box.width / 2 + 10, box.y - box.height / 2 + 10,
+                    box.width - 20, box.height - 20);
                 }
               } catch (e) {
                 console.warn('Error drawing image in PNG export:', e);
@@ -274,10 +286,12 @@ class ExportManager {
           });
         }
 
-        // Draw Timeline Mode bar at world (0,0) if active and has content
+        // Draw Timeline Mode bar if active and has content
         if (this.mindMap && this.mindMap.timelineActive) {
           try {
             TimelineMode.drawToGraphics(pg, this.mindMap);
+            // Draw date badge labels above connected boxes (matches screen appearance)
+            this._drawTimelineDateBadges(pg, this.mindMap);
           } catch (e) {
             console.warn('Error drawing timeline in PNG export:', e);
           }
@@ -712,28 +726,15 @@ class ExportManager {
       for (const box of this.mindMap.boxes) {
         if (box && box.imageUrl && box.img) {
           try {
-            // Validate image dimensions
-            const imgWidth = Math.max(1, Math.min(4096, box.img.width || 100));
-            const imgHeight = Math.max(1, Math.min(4096, box.img.height || 100));
-
-            if (!isFinite(imgWidth) || !isFinite(imgHeight)) {
-              console.warn('Invalid image dimensions for box:', box.id);
+            // p5.Image stores pixel data in its internal .canvas (HTMLCanvasElement).
+            // Use that directly instead of trying to pass the p5.Image to drawImage(),
+            // which only accepts native image sources (HTMLImageElement, HTMLCanvasElement, etc.).
+            const imgCanvas = box.img.canvas;
+            if (!imgCanvas || imgCanvas.width <= 0 || imgCanvas.height <= 0) {
+              console.warn('Invalid image canvas for box:', box.id);
               continue;
             }
-
-            // Convert image to data URL for PDF
-            const canvas = document.createElement('canvas');
-            canvas.width = imgWidth;
-            canvas.height = imgHeight;
-            const ctx = canvas.getContext('2d');
-
-            if (!ctx) {
-              console.warn('Failed to get 2D context for image export');
-              continue;
-            }
-
-            ctx.drawImage(box.img, 0, 0);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const dataUrl = imgCanvas.toDataURL('image/jpeg', 0.8);
             imageCache.set(box.id, dataUrl);
           } catch (e) {
             console.warn('Error preloading image for PDF:', e);
@@ -868,10 +869,18 @@ class ExportManager {
           if (box.imageUrl && imageCache.has(box.id)) {
             try {
               const dataUrl = imageCache.get(box.id);
-              const imgW = (box.width - 20) * scale;
-              const imgH = (box.height - 20) * scale;
-              const imgX = (box.x - (box.width - 20) / 2) * scale + offsetX;
-              const imgY = (box.y - box.height / 2 + 10) * scale + offsetY;
+              // Preserve aspect ratio and centre in box, matching TextBox.draw()
+              const iw = (box.naturalImageWidth && box.naturalImageWidth > 0)
+                ? box.naturalImageWidth : (box.img ? box.img.width : box.width);
+              const ih = (box.naturalImageHeight && box.naturalImageHeight > 0)
+                ? box.naturalImageHeight : (box.img ? box.img.height : box.height);
+              const imgScale = (iw && ih) ? Math.min(box.width / iw, box.height / ih) : 1;
+              const drawW = (iw && ih) ? iw * imgScale : box.width;
+              const drawH = (iw && ih) ? ih * imgScale : box.height;
+              const imgX = (box.x - drawW / 2) * scale + offsetX;
+              const imgY = (box.y - drawH / 2) * scale + offsetY;
+              const imgW = drawW * scale;
+              const imgH = drawH * scale;
 
               pdf.addImage(dataUrl, 'JPEG', imgX, imgY, imgW, imgH);
             } catch (e) {
@@ -1002,6 +1011,35 @@ class ExportManager {
       measureGraphics.remove();
     }
 
+    // Draw timeline as PNG overlay in PDF (if active)
+    if (this.mindMap && this.mindMap.timelineActive && typeof TimelineMode !== 'undefined') {
+      try {
+        // Create a full-content-sized graphics buffer (transparent background) and
+        // render the timeline into it at the same world-space offset used for boxes,
+        // then overlay the result on the PDF so it aligns with the other content.
+        const pgW = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + 2 * padding));
+        const pgH = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + 2 * padding));
+        const timelinePg = this.p5Instance.createGraphics(pgW, pgH);
+        try {
+          timelinePg.push();
+          timelinePg.translate(padding - bounds.minX, padding - bounds.minY);
+          TimelineMode.drawToGraphics(timelinePg, this.mindMap);
+          this._drawTimelineDateBadges(timelinePg, this.mindMap);
+          timelinePg.pop();
+
+          const tlDataUrl = timelinePg.canvas.toDataURL('image/png');
+          // Place the overlay at the same position as the rest of the PDF content
+          const pdfW = contentWidth * scale;
+          const pdfH = contentHeight * scale;
+          pdf.addImage(tlDataUrl, 'PNG', margin, margin, pdfW, pdfH);
+        } finally {
+          timelinePg.remove();
+        }
+      } catch (e) {
+        console.warn('Error drawing timeline in PDF export:', e);
+      }
+    }
+
     // Save PDF
     pdf.save('mindmap.pdf');
   }
@@ -1011,7 +1049,7 @@ class ExportManager {
   // ==========================================================================
 
   /**
-   * Exports the mind map as a plain text file with hierarchical structure
+   * Exports the mind map as a Markdown file with hierarchical heading structure
    */
   exportText() {
     if (!this.mindMap) {
@@ -1022,17 +1060,14 @@ class ExportManager {
     // Build hierarchy from connections
     const hierarchy = this.buildTextHierarchy();
 
-    // Create text content
-    const textContent = hierarchy;
-
     // Create blob and download with proper cleanup
-    const blob = new Blob([textContent], { type: 'text/plain' });
+    const blob = new Blob([hierarchy], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
 
     try {
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'mindmap.txt';
+      a.download = 'mindmap.md';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1043,13 +1078,40 @@ class ExportManager {
   }
 
   /**
-   * Builds text hierarchy from mind map connections
-   * @returns {string} Hierarchical text representation
+   * Builds a Markdown representation of the mind map.
+   *
+   * Heading level is determined by box background **colour**, not by connection
+   * depth, so that a plain text re-import can restore the exact colour:
+   *   • Red   boxes  →  `# text`   (H1 — highest heading)
+   *   • Orange boxes  →  `## text`  (H2 — next heading)
+   *   • All other boxes → plain text  (no Markdown heading prefix)
+   *
+   * Boxes are emitted in connection-traversal order (DFS from root nodes) so
+   * that grouped content stays together.  Boxes not reachable by DFS are
+   * appended at the end with the same colour-based prefix.
+   *
+   * @returns {string} Markdown text
    */
   buildTextHierarchy() {
     if (!this.mindMap || !this.mindMap.boxes || this.mindMap.boxes.length === 0) {
       return 'Empty mind map';
     }
+
+    /**
+     * Returns the Markdown prefix for a box based on its background colour.
+     * Red   → `# `   (H1)
+     * Orange → `## `  (H2)
+     * Other  → ``    (plain text, no heading prefix)
+     * @param {Object} box
+     * @returns {string}
+     */
+    const getMarkdownPrefix = (box) => {
+      const bg = box.backgroundColor;
+      if (!bg) return '';
+      if (bg.r === ExportManager.RED_BG.r && bg.g === ExportManager.RED_BG.g && bg.b === ExportManager.RED_BG.b) return '# ';
+      if (bg.r === ExportManager.ORANGE_BG.r && bg.g === ExportManager.ORANGE_BG.g && bg.b === ExportManager.ORANGE_BG.b) return '## ';
+      return '';
+    };
 
     // Build adjacency list from connections
     const children = new Map();
@@ -1062,7 +1124,6 @@ class ExportManager {
         const fromId = conn.fromBox.id;
         const toId = conn.toBox.id;
 
-        // Validate IDs exist
         if (fromId === undefined || fromId === null ||
           toId === undefined || toId === null) {
           console.warn('Connection with missing ID:', conn);
@@ -1085,60 +1146,43 @@ class ExportManager {
       }
     });
 
-    // Build text using DFS
+    // Emit box as a Markdown line with colour-based prefix
+    const emitBox = (box) => {
+      const text = (box.text || '').replace(/\n/g, ' ').trim();
+      if (!text) return;
+      result += getMarkdownPrefix(box) + text + '\n\n';
+    };
+
+    // Build text using DFS (connection order)
     const visited = new Set();
     let result = '';
 
-    const dfs = (boxId, depth) => {
-      // Add depth limit protection
-      if (depth > 1000) {
-        console.warn('Max hierarchy depth reached:', depth);
-        result += '  '.repeat(Math.min(depth, 100)) + '- [Max depth reached]\n';
-        return;
-      }
-
+    const dfs = (boxId) => {
       if (visited.has(boxId)) return;
       visited.add(boxId);
 
       const box = this.mindMap.boxes.find(b => b && b.id === boxId);
       if (!box) return;
 
-      const indent = '  '.repeat(Math.min(depth, 100)); // Cap indent rendering
-      const text = (box.text || '').replace(/\n/g, ' ').trim();
-      result += indent + '- ' + text + '\n';
+      emitBox(box);
 
       const childIds = children.get(boxId) || [];
-      childIds.forEach(childId => dfs(childId, depth + 1));
+      childIds.forEach(childId => dfs(childId));
     };
 
-    // Process all roots
     if (roots.length > 0) {
-      roots.forEach(rootId => dfs(rootId, 0));
+      roots.forEach(rootId => dfs(rootId));
     } else {
-      // No connections - just list all boxes
-      result = 'Boxes (no connections):\n';
+      // No connections — emit all boxes with colour-based prefixes
       this.mindMap.boxes.forEach(box => {
-        if (box && box.text) {
-          const text = box.text.replace(/\n/g, ' ').trim();
-          result += '- ' + text + '\n';
-        }
+        if (box) emitBox(box);
       });
     }
 
-    // Add disconnected boxes (collect first, then emit as single section)
-    const disconnectedLines = [];
+    // Append any boxes not reachable from roots (cycles, truly isolated)
     this.mindMap.boxes.forEach(box => {
-      if (box && box.id && !visited.has(box.id)) {
-        const text = (box.text || '').replace(/\n/g, ' ').trim();
-        if (text) {
-          disconnectedLines.push('- ' + text);
-        }
-      }
+      if (box && box.id && !visited.has(box.id)) emitBox(box);
     });
-
-    if (disconnectedLines.length > 0) {
-      result += '\nDisconnected:\n' + disconnectedLines.join('\n') + '\n';
-    }
 
     return result;
   }
@@ -1146,6 +1190,59 @@ class ExportManager {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
+
+  /**
+   * Draws date badge pills above each box that has a timeline connection,
+   * matching the on-screen appearance produced by TimelineMode.drawBoxDateLabels().
+   * Uses the provided p5.Graphics buffer so it works in the export context.
+   *
+   * @param {p5.Graphics} pg      - offscreen graphics buffer (with content translate active)
+   * @param {*}           mindMap - MindMap instance
+   * @private
+   */
+  _drawTimelineDateBadges(pg, mindMap) {
+    if (!mindMap || typeof TimelineMode === 'undefined') return;
+    const conns = mindMap.timelineConnections || [];
+    if (!conns || conns.length === 0) return;
+
+    const startDate = mindMap.timelineStartDate || new Date();
+    const fontSize = 9;   // safeZ = 1 for export (world-scale)
+    const badgePad = 3;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    pg.textSize(fontSize);
+    for (const conn of conns) {
+      if (!conn || !conn.fromBox || conn.dayIndex == null) continue;
+      const box = conn.fromBox;
+      if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
+
+      const date = TimelineMode.dateForDay(conn.dayIndex, startDate);
+      const dayName = TimelineMode.DAY_NAMES[date.getDay()];
+      const label = dayName + ' ' + date.getDate() + ' ' + TimelineMode.MONTH_NAMES[date.getMonth()];
+      const isPast = date < today;
+
+      pg.textSize(fontSize);
+      const labelW = pg.textWidth(label) + badgePad * 2;
+      const labelH = fontSize + badgePad * 2;
+      const lx = box.x + box.width / 2 - labelW;
+      const ly = box.y - box.height / 2 - labelH - 2;
+
+      pg.noStroke();
+      if (isPast) {
+        pg.fill(200, 60, 60, 210);
+      } else {
+        pg.fill(80, 140, 220, 210);
+      }
+      pg.rect(lx, ly, labelW, labelH, labelH / 2);
+
+      pg.fill(255, 255, 255, 245);
+      pg.noStroke();
+      pg.textAlign(pg.CENTER, pg.CENTER);
+      pg.text(label, lx + labelW / 2, ly + labelH / 2);
+    }
+  }
 
   /**
    * Get bounding box of all content in the mind map
