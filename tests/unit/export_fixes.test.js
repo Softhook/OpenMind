@@ -167,6 +167,20 @@ describe('buildTextHierarchy — colour-based Markdown output', () => {
     expect(md).not.toMatch(/## Disconnected/);
   });
 
+  test('rootless cycles are emitted once each', () => {
+    const a = makeOrangeBox('a', 'CycleA');
+    const b = makeWhiteBox('b', 'CycleB');
+    em.mindMap = {
+      boxes: [a, b],
+      connections: [{ fromBox: a, toBox: b }, { fromBox: b, toBox: a }],
+    };
+
+    const md = em.buildTextHierarchy();
+
+    expect((md.match(/^## CycleA$/gm) || []).length).toBe(1);
+    expect((md.match(/^CycleB$/gm) || []).length).toBe(1);
+  });
+
   // ---- multi-line text ----
 
   test('multi-line text in a box is collapsed to a single line', () => {

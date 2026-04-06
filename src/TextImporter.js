@@ -163,15 +163,12 @@ class TextImporter {
 
     let currentX = IMPORT_LAYOUT.START_X;
 
-    // When the file is a Markdown export (sections carry headingLevel), colour
-    // boxes by heading level so that round-trip editing preserves colours:
-    //   headingLevel 1  (`# `)  → red box
-    //   headingLevel 2+ (`## `) → orange box
-    //   no headingLevel          → fall back to NLP-based title detection
+    // When the file includes Markdown headings, preserve colour by heading
+    // level where available and fall back to title detection for any section
+    // that did not originate from an explicit Markdown heading.
     const isMarkdownFile = sections.some(s => s.headingLevel != null);
 
-    // Detect the title section index (only needed for non-Markdown files)
-    const titleSectionIdx = isMarkdownFile ? -1 : this.detectTitleIndex(sections);
+    const titleSectionIdx = this.detectTitleIndex(sections);
 
     const allNewBoxes = [];
     const allNewConnections = [];
@@ -186,9 +183,9 @@ class TextImporter {
       const headingBox = new TextBox(currentX, IMPORT_LAYOUT.START_Y, heading);
 
       // Colour the heading box based on source:
-      //   Markdown file  → use headingLevel (1=red, 2+=orange)
-      //   NLP/plain text → use detected title index (title=red, others=orange)
-      if (isMarkdownFile) {
+      //   explicit Markdown heading → use headingLevel (1=red, 2+=orange)
+      //   inferred/plain heading    → use detected title index (title=red)
+      if (isMarkdownFile && section.headingLevel != null) {
         if (section.headingLevel === 1) {
           headingBox.setBackgroundByKey('red');
         } else {

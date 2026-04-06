@@ -219,6 +219,18 @@ describe('importTextAsDiagram — Markdown file colours (nlp stub)', () => {
     );
     expect(hasColorCall).toBe(false);
   });
+
+  test('non-Markdown sections in a Markdown-bearing file fall back to title detection', async () => {
+    await TextImporter.importTextAsDiagram('Title: Front Matter\n\n## Section\nBody text');
+
+    const frontMatterBox = mockBoxes.find(b => b.text === 'Title: Front Matter');
+    const sectionBox = mockBoxes.find(b => b.text === 'Section');
+
+    expect(frontMatterBox).toBeDefined();
+    expect(sectionBox).toBeDefined();
+    expect(frontMatterBox.setBackgroundByKey).toHaveBeenCalledWith('red');
+    expect(sectionBox.setBackgroundByKey).toHaveBeenCalledWith('orange');
+  });
 });
 
 // ---------------------------------------------------------------------------

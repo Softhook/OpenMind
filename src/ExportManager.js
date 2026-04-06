@@ -1138,10 +1138,14 @@ class ExportManager {
       });
     }
 
+    const boxesById = new Map();
+
     // Find root nodes (boxes with no incoming connections)
     const roots = [];
     this.mindMap.boxes.forEach(box => {
-      if (box && box.id && !parents.has(box.id)) {
+      if (!box || box.id === undefined || box.id === null) return;
+      boxesById.set(box.id, box);
+      if (!parents.has(box.id)) {
         roots.push(box.id);
       }
     });
@@ -1153,35 +1157,44 @@ class ExportManager {
       result += getMarkdownPrefix(box) + text + '\n\n';
     };
 
-    // Build text using DFS (connection order)
+    // Build text using DFS (connection order) without recursive stack growth.
     const visited = new Set();
     let result = '';
 
-    const dfs = (boxId) => {
-      if (visited.has(boxId)) return;
-      visited.add(boxId);
+    const traverseFrom = (startId) => {
+      const stack = [startId];
 
-      const box = this.mindMap.boxes.find(b => b && b.id === boxId);
-      if (!box) return;
+      while (stack.length > 0) {
+        const boxId = stack.pop();
+        if (visited.has(boxId)) continue;
+        visited.add(boxId);
 
-      emitBox(box);
+        const box = boxesById.get(boxId);
+        if (!box) continue;
 
-      const childIds = children.get(boxId) || [];
-      childIds.forEach(childId => dfs(childId));
+        emitBox(box);
+
+        const childIds = children.get(boxId) || [];
+        for (let i = childIds.length - 1; i >= 0; i--) {
+          stack.push(childIds[i]);
+        }
+      }
     };
 
     if (roots.length > 0) {
-      roots.forEach(rootId => dfs(rootId));
+      roots.forEach(rootId => traverseFrom(rootId));
     } else {
-      // No connections — emit all boxes with colour-based prefixes
+      // Rootless graphs (for example pure cycles) still need a full traversal.
       this.mindMap.boxes.forEach(box => {
-        if (box) emitBox(box);
+        if (box && box.id !== undefined && box.id !== null) traverseFrom(box.id);
       });
     }
 
     // Append any boxes not reachable from roots (cycles, truly isolated)
     this.mindMap.boxes.forEach(box => {
-      if (box && box.id && !visited.has(box.id)) emitBox(box);
+      if (box && box.id !== undefined && box.id !== null && !visited.has(box.id)) {
+        traverseFrom(box.id);
+      }
     });
 
     return result;
