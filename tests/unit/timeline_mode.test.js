@@ -164,8 +164,11 @@ describe('TimelineMode.worldDayX / dayFromWorldX', () => {
     expect(TimelineMode.worldDayX(0, barWidth)).toBe(0);
   });
 
-  test('last day maps to barWidth', () => {
-    expect(TimelineMode.worldDayX(TimelineMode.TOTAL_DAYS - 1, barWidth)).toBeCloseTo(barWidth, 1);
+  test('last day maps to final day tick (barWidth - DAY_WIDTH)', () => {
+    expect(TimelineMode.worldDayX(TimelineMode.TOTAL_DAYS - 1, barWidth)).toBeCloseTo(
+      barWidth - TimelineMode.DAY_WIDTH,
+      1
+    );
   });
 
   test('round-trips correctly for a mid day', () => {
@@ -177,8 +180,8 @@ describe('TimelineMode.worldDayX / dayFromWorldX', () => {
     expect(TimelineMode.dayFromWorldX(0, barWidth)).toBe(0);
   });
 
-  test('worldX=barWidth maps back to last day', () => {
-    expect(TimelineMode.dayFromWorldX(barWidth, barWidth)).toBe(TimelineMode.TOTAL_DAYS - 1);
+  test('worldX=barWidth maps to one tick beyond last index (callers clamp)', () => {
+    expect(TimelineMode.dayFromWorldX(barWidth, barWidth)).toBe(TimelineMode.TOTAL_DAYS);
   });
 });
 
@@ -212,8 +215,8 @@ describe('TimelineMode.isOverBarWorld / isDragHandle', () => {
     expect(TimelineMode.isDragHandle(barWidth - TimelineMode.HANDLE_RADIUS + 1, 40, barWidth)).toBe(true);
   });
 
-  test('isDragHandle returns false far from the right edge', () => {
-    expect(TimelineMode.isDragHandle(0, 40, barWidth)).toBe(false);
+  test('isDragHandle returns false far from both handles', () => {
+    expect(TimelineMode.isDragHandle(barWidth / 2, 40, barWidth)).toBe(false);
   });
 });
 
@@ -236,30 +239,42 @@ describe('TimelineConnection', () => {
     const mm  = makeMindMap([box]);
     const conn = new TimelineConnection(box, 5, mm);
     const ep = conn._getConnectionEndpoints();
+    const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
     expect(ep).not.toBeNull();
-    expect(ep.end.x).toBeCloseTo(TimelineMode.worldDayX(5, mm.getTimelineBarWidth()), 1);
+    expect(ep.end.x).toBeGreaterThanOrEqual(cell.x);
+    expect(ep.end.x).toBeLessThanOrEqual(cell.x + cell.w);
+    expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
+    expect(ep.end.y).toBeLessThanOrEqual(cell.y + cell.h);
   });
 
   test('_getConnectionEndpoints uses DEFAULT_WIDTH when mindMap is null', () => {
     const box = makeBox('b1', 100, -50);
     const conn = new TimelineConnection(box, 5, null);
     const ep = conn._getConnectionEndpoints();
+    const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
     expect(ep).not.toBeNull();
-    expect(ep.end.x).toBeCloseTo(TimelineMode.worldDayX(5, TimelineMode.DEFAULT_WIDTH), 1);
+    expect(ep.end.x).toBeGreaterThanOrEqual(cell.x);
+    expect(ep.end.x).toBeLessThanOrEqual(cell.x + cell.w);
+    expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
+    expect(ep.end.y).toBeLessThanOrEqual(cell.y + cell.h);
   });
 
-  test('box above bar mid-line attaches to top (y=0)', () => {
+  test('box above bar mid-line projects to upper half of day-cell boundary', () => {
     const box = makeBox('b1', 0, -100);   // y < BAR_HEIGHT/2
     const conn = new TimelineConnection(box, 10, null);
     const ep = conn._getConnectionEndpoints();
-    expect(ep.end.y).toBe(0);
+    const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
+    expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
+    expect(ep.end.y).toBeLessThanOrEqual(cell.cy);
   });
 
-  test('box below bar mid-line attaches to bottom (y=BAR_HEIGHT)', () => {
+  test('box below bar mid-line projects to lower half of day-cell boundary', () => {
     const box = makeBox('b1', 0, 200);    // y > BAR_HEIGHT/2
     const conn = new TimelineConnection(box, 10, null);
     const ep = conn._getConnectionEndpoints();
-    expect(ep.end.y).toBe(TimelineMode.BAR_HEIGHT);
+    const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
+    expect(ep.end.y).toBeGreaterThanOrEqual(cell.cy);
+    expect(ep.end.y).toBeLessThanOrEqual(cell.y + cell.h);
   });
 
   test('TimelineConnection is a subclass of Connection', () => {
