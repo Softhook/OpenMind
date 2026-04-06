@@ -273,6 +273,8 @@ describe('TimelineConnection', () => {
     expect(ep).not.toBeNull();
     expect(ep.end.x).toBeGreaterThanOrEqual(cell.x);
     expect(ep.end.x).toBeLessThanOrEqual(cell.x + cell.w);
+    expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
+    expect(ep.end.y).toBeLessThanOrEqual(cell.y + cell.h);
   });
 
   test('box above bar mid-line projects to upper half of day-cell boundary', () => {

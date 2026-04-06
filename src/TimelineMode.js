@@ -156,8 +156,11 @@ class TimelineConnection extends Connection {
     } else if (data.dayIndex != null && mindMap && mindMap.timelineStartDate) {
       // Legacy: compute calendar date from dayIndex + startDate
       const d = TimelineMode.dateForDay(data.dayIndex, mindMap.timelineStartDate);
-      fromBox.timelineDate = d.toISOString().split('T')[0];
+      fromBox.timelineDate = TimelineMode.toISODateString(d);
     } else {
+      if (data.dayIndex != null) {
+        console.warn('[TimelineConnection] Skipping legacy connection: timelineStartDate unavailable for dayIndex migration', { fromId: data.fromId, dayIndex: data.dayIndex });
+      }
       return null;
     }
 
@@ -332,6 +335,17 @@ class TimelineMode {
     const s = new Date(startDate);
     s.setHours(0, 0, 0, 0);
     return Math.round((d - s) / 86400000);
+  }
+
+  /**
+   * Converts a Date (or Date-like value) to an ISO-8601 date-only string
+   * (e.g. "2024-01-15").  All timeline date storage goes through this
+   * helper so the format is consistent everywhere.
+   * @param {Date|string} date
+   * @returns {string}  "YYYY-MM-DD"
+   */
+  static toISODateString(date) {
+    return new Date(date).toISOString().split('T')[0];
   }
 
   /**

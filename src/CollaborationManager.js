@@ -1657,11 +1657,15 @@ class CollaborationManager {
     _syncTimelineConnectionsToYjsImpl(localConns) {
         const yjsConns = this.ytimelineConnections.toArray();
 
-        // Build a map of existing Yjs entries: "fromId:date" -> [index...]
+        // Build a stable key for each Yjs entry so we can diff-sync without
+        // destroying and recreating everything on every change.
+        // New entries use "fromId:YYYY-MM-DD" (from the {date} field).
+        // Legacy entries from pre-refactor peers used {dayIndex} instead of {date};
+        // they get a "fromId:dayN" key so they're still tracked and deleted when
+        // the local list moves to the date format.
         const yjsMap = new Map();
         yjsConns.forEach((c, i) => {
             if (c && c.fromId && (c.date || c.dayIndex != null)) {
-                // Support both new {date} and legacy {dayIndex} entries as keys
                 const key = c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`;
                 if (!yjsMap.has(key)) yjsMap.set(key, []);
                 yjsMap.get(key).push(i);
@@ -1721,10 +1725,11 @@ class CollaborationManager {
                 fromBox.timelineDate = entry.date;
             } else if (entry.dayIndex != null && this.mindMap.timelineStartDate) {
                 // Legacy: compute date from dayIndex
-                const d = typeof TimelineMode !== 'undefined'
-                    ? TimelineMode.dateForDay(entry.dayIndex, this.mindMap.timelineStartDate)
-                    : null;
-                if (d) fromBox.timelineDate = d.toISOString().split('T')[0];
+                if (typeof TimelineMode !== 'undefined') {
+                    fromBox.timelineDate = TimelineMode.toISODateString(
+                        TimelineMode.dateForDay(entry.dayIndex, this.mindMap.timelineStartDate)
+                    );
+                }
             }
 
             if (fromBox.timelineDate) {

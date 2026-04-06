@@ -512,8 +512,7 @@ class MindMap {
     if (!this.timelineConnections) this.timelineConnections = [];
 
     // Compute the calendar date for this day slot
-    const d = TimelineMode.dateForDay(dayIndex, this.timelineStartDate);
-    const date = d.toISOString().split('T')[0];
+    const date = TimelineMode.toISODateString(TimelineMode.dateForDay(dayIndex, this.timelineStartDate));
 
     // Prevent duplicate (same box already connected to the same date)
     const already = this.timelineConnections.some(
@@ -2803,7 +2802,7 @@ class MindMap {
             const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
             const newDay = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
             const newDate = this.timelineStartDate
-              ? TimelineMode.dateForDay(newDay, this.timelineStartDate).toISOString().split('T')[0]
+              ? TimelineMode.toISODateString(TimelineMode.dateForDay(newDay, this.timelineStartDate))
               : null;
             if (newDate && newDate !== conn.fromBox.timelineDate) {
               const dup = this.timelineConnections.some(
@@ -3843,8 +3842,9 @@ class MindMap {
             fromBox.timelineDate = tcData.date;
           } else if (tcData.dayIndex != null && this.timelineStartDate) {
             // Legacy dayIndex → compute the calendar date
-            const d = TimelineMode.dateForDay(tcData.dayIndex, this.timelineStartDate);
-            fromBox.timelineDate = d.toISOString().split('T')[0];
+            fromBox.timelineDate = TimelineMode.toISODateString(
+              TimelineMode.dateForDay(tcData.dayIndex, this.timelineStartDate)
+            );
           }
         } catch (e) {
           console.error('Failed to migrate legacy timeline connection:', e);
