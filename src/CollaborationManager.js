@@ -1703,6 +1703,11 @@ class CollaborationManager {
     /**
      * Rebuilds mindMap.timelineConnections from the Yjs array.
      * Handles both new {fromId, date} format and legacy {fromId, dayIndex} format.
+     *
+     * IMPORTANT: also clears box.timelineDate on any box that is no longer in
+     * ytimelineConnections.  Without this, undoing an "add connection" operation
+     * would leave box.timelineDate stale — the next save/reload would then
+     * resurrect the undone connection as a ghost.
      * @private
      */
     _rebuildTimelineConnectionsFromYjs() {
@@ -1713,6 +1718,25 @@ class CollaborationManager {
             this.mindMap.selectedTimelineConnection = null;
         }
         const data = this.ytimelineConnections.toArray();
+
+        // Build the set of box IDs that have connections in Yjs so we can
+        // efficiently clear stale timelineDate values below.
+        const connectedBoxIds = new Set(
+            data.filter(e => e && e.fromId).map(e => e.fromId)
+        );
+
+        // Clear timelineDate on any box that is no longer connected.
+        // This keeps box.timelineDate in sync with ytimelineConnections, which
+        // is the single authoritative Yjs source of truth.  It is critical for
+        // undo correctness: when undo removes an entry from ytimelineConnections
+        // we must also clear the date from the box so that a subsequent save does
+        // not persist a ghost connection.
+        for (const box of (this.mindMap.boxes || [])) {
+            if (box && box.timelineDate && !connectedBoxIds.has(box.id)) {
+                box.timelineDate = null;
+            }
+        }
+
         for (const entry of data) {
             if (!entry || !entry.fromId) continue;
             // Require either a date string or a legacy dayIndex

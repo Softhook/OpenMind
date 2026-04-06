@@ -525,8 +525,8 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('draws a rect and text for each connected box', () => {
-    const box = makeBox('b1', 0, -200);
-    const conn = new TimelineConnection(box, 10, null);
+    const box = makeBox('b1', 0, -200, '2024-06-01');
+    const conn = new TimelineConnection(box, null);
     TimelineMode.drawBoxDateLabels([conn], today, 1);
     // Should have drawn at least one rect (pill) and one text call
     expect(sandbox.rect).toHaveBeenCalled();
@@ -534,27 +534,27 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('skips connections with no fromBox', () => {
-    const conn = new TimelineConnection(null, 5, null);
+    const conn = new TimelineConnection(null, null);
     expect(() => TimelineMode.drawBoxDateLabels([conn], today, 1)).not.toThrow();
     expect(sandbox.rect).not.toHaveBeenCalled();
   });
 
   test('draws one badge per connection', () => {
-    const box1 = makeBox('b1', 0, -200);
-    const box2 = makeBox('b2', 300, -200);
-    const conn1 = new TimelineConnection(box1, 5, null);
-    const conn2 = new TimelineConnection(box2, 20, null);
+    const box1 = makeBox('b1', 0, -200, '2024-06-05');
+    const box2 = makeBox('b2', 300, -200, '2024-06-20');
+    const conn1 = new TimelineConnection(box1, null);
+    const conn2 = new TimelineConnection(box2, null);
     sandbox.rect.mockClear();
     TimelineMode.drawBoxDateLabels([conn1, conn2], today, 1);
     expect(sandbox.rect.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   test('label text includes abbreviated weekday', () => {
-    const box = makeBox('b1', 0, -200);
-    // Use a fixed start date: 2024-01-01 (Monday)
+    // 2024-01-01 is a Monday
     const startDate = new Date('2024-01-01T00:00:00.000Z');
     startDate.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null); // day 0 = 2024-01-01 = Monday
+    const box = makeBox('b1', 0, -200, '2024-01-01'); // stored date = start date (day 0)
+    const conn = new TimelineConnection(box, null);
     sandbox.text.mockClear();
     TimelineMode.drawBoxDateLabels([conn], startDate, 1);
     expect(sandbox.text).toHaveBeenCalled();
@@ -564,28 +564,27 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('uses red fill for past dates', () => {
-    const box = makeBox('b1', 0, -200);
-    // Ensure the date is in the past: use a startDate far in the past
+    // Ensure the date is in the past: 2000-01-01
     const pastStart = new Date('2000-01-01T00:00:00.000Z');
     pastStart.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null); // day 0 = 2000-01-01 — definitely past
+    const box = makeBox('b1', 0, -200, '2000-01-01');
+    const conn = new TimelineConnection(box, null);
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], pastStart, 1);
     // The first fill() call after noStroke() should be the red past-date pill background
     const fillCalls = sandbox.fill.mock.calls;
     expect(fillCalls.length).toBeGreaterThan(0);
-    // Find the fill call for the pill: first fill with 4 args (r, g, b, alpha) or 3-arg (r, g, b)
     // Red past pill: fill(200, 60, 60, 210)
     const pillFill = fillCalls.find(args => args[0] === 200 && args[1] === 60 && args[2] === 60);
     expect(pillFill).toBeDefined();
   });
 
   test('uses blue fill for future/today dates', () => {
-    const box = makeBox('b1', 0, -200);
-    // Use a startDate far in the future so dayIndex=0 is a future date
+    // Use a date far in the future
     const futureStart = new Date('2099-01-01T00:00:00.000Z');
     futureStart.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null);
+    const box = makeBox('b1', 0, -200, '2099-01-01');
+    const conn = new TimelineConnection(box, null);
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], futureStart, 1);
     const fillCalls = sandbox.fill.mock.calls;
@@ -595,8 +594,8 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('uses orange fill for selected connection', () => {
-    const box = makeBox('b1', 0, -200);
-    const conn = new TimelineConnection(box, 0, null);
+    const box = makeBox('b1', 0, -200, '2024-06-01');
+    const conn = new TimelineConnection(box, null);
     conn.selected = true;
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], today, 1);
@@ -604,6 +603,15 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
     // Orange selected pill: fill(255, 140, 0, 210)
     const pillFill = fillCalls.find(args => args[0] === 255 && args[1] === 140 && args[2] === 0);
     expect(pillFill).toBeDefined();
+  });
+
+  test('skips box with no timelineDate', () => {
+    // A box without a timelineDate should produce no badge
+    const box = makeBox('b1', 0, -200); // timelineDate = null
+    const conn = new TimelineConnection(box, null);
+    sandbox.rect.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], today, 1);
+    expect(sandbox.rect).not.toHaveBeenCalled();
   });
 });
 
@@ -623,8 +631,8 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingConnection', ()
   });
 
   test('draws snap preview when draggingConnection and mouse over bar', () => {
-    const box = makeBox('b1', 100, -200);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -200, '2024-01-01');
+    const conn = new TimelineConnection(box, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
     mindMap.draggingConnection = { conn, originalTo: null };
@@ -635,8 +643,8 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingConnection', ()
   });
 
   test('no preview when mouse outside bar and dragging endpoint', () => {
-    const box = makeBox('b1', 100, -200);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -200, '2024-01-01');
+    const conn = new TimelineConnection(box, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
     mindMap.draggingConnection = { conn, originalTo: null };

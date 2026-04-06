@@ -524,10 +524,8 @@ class MindMap {
       fromBox.timelineDate = date;
       const conn = new TimelineConnection(fromBox, this);
       this.timelineConnections.push(conn);
-      // Sync the box (which now carries timelineDate) as well as the connections list
-      if (MindMap.onBoxChange) {
-        MindMap.onBoxChange(fromBox);
-      }
+      // timelineDate is propagated via ytimelineConnections, not yboxes
+      // (CollaborationManager._boxToYjsData does not include timelineDate).
       if (MindMap.onTimelineConnectionsChange) {
         MindMap.onTimelineConnectionsChange(true);
       }
@@ -545,12 +543,11 @@ class MindMap {
 
     this._wrapInTransaction(() => {
       this.timelineConnections.splice(idx, 1);
-      // Clear the date stored on the box so it is no longer connected
+      // Clear the date stored on the box so it is no longer connected.
+      // On collaborators' clients this is handled by _rebuildTimelineConnectionsFromYjs
+      // which clears box.timelineDate for boxes absent from ytimelineConnections.
       if (conn.fromBox) {
         conn.fromBox.timelineDate = null;
-        if (MindMap.onBoxChange) {
-          MindMap.onBoxChange(conn.fromBox);
-        }
       }
       // Clear selection if this connection was selected
       if (this.selectedTimelineConnection === conn) {
@@ -1981,8 +1978,9 @@ class MindMap {
     // Paste all copied boxes with offset and track new boxes
     const newBoxes = [];
     for (const boxData of this.copiedBoxes) {
-      // Destructure to exclude id - pasted boxes must get new unique IDs
-      const { id: _excludedId, ...boxDataWithoutId } = boxData;
+      // Destructure to exclude id and timelineDate - pasted boxes must get new IDs
+      // and must not inherit the source box's timeline connection.
+      const { id: _excludedId, timelineDate: _excludedDate, ...boxDataWithoutId } = boxData;
       const newBoxData = {
         ...boxDataWithoutId,
         x: boxData.x + offsetX,

@@ -592,7 +592,7 @@ class TimelineMode {
     today.setHours(0, 0, 0, 0);
 
     for (const conn of conns) {
-      if (!conn || !conn.fromBox || conn.dayIndex == null) continue;
+      if (!conn || !conn.fromBox || !conn.fromBox.timelineDate) continue;
       const box = conn.fromBox;
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
 
