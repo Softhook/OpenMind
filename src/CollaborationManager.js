@@ -1176,16 +1176,16 @@ class CollaborationManager {
                 // Sync timeline connections
                 if (this.ytimelineConnections && this.mindMap.timelineConnections) {
                     const existingTlConns = new Set(
-                        this.ytimelineConnections.toArray().map(c => `${c.fromId}:${c.dayIndex}`)
+                        this.ytimelineConnections.toArray().map(c => `${c.fromId}:${c.date || ''}`)
                     );
                     for (const conn of this.mindMap.timelineConnections) {
-                        if (!conn) continue;
-                        const fromId   = conn.fromBox ? conn.fromBox.id : conn.fromId;
-                        const dayIndex = conn.dayIndex;
-                        if (fromId && dayIndex != null) {
-                            const key = `${fromId}:${dayIndex}`;
+                        if (!conn || !conn.fromBox) continue;
+                        const fromId = conn.fromBox.id;
+                        const date   = conn.fromBox.timelineDate;
+                        if (fromId && date) {
+                            const key = `${fromId}:${date}`;
                             if (!existingTlConns.has(key)) {
-                                this.ytimelineConnections.push([{ fromId, dayIndex }]);
+                                this.ytimelineConnections.push([{ fromId, date }]);
                                 existingTlConns.add(key);
                             }
                         }
@@ -1620,16 +1620,18 @@ class CollaborationManager {
     /**
      * Syncs timeline connections to Yjs.
      * Call this when mindMap.timelineConnections changes.
+     * Each entry is stored as {fromId, date} (ISO date string) so the connection
+     * always refers to a specific calendar date rather than a position index.
      * @param {boolean} skipTransactionWrapper - If true, sync directly (already inside a transaction)
      */
     syncTimelineConnectionsToYjs(skipTransactionWrapper = false) {
         if (!this.ytimelineConnections || !this.mindMap || this.isSyncing) return;
 
         const localConns = (this.mindMap.timelineConnections || [])
-            .filter(c => c && (c.fromBox ? c.fromBox.id : c.fromId) && c.dayIndex != null)
+            .filter(c => c && c.fromBox && c.fromBox.id && c.fromBox.timelineDate)
             .map(c => ({
-                fromId:   c.fromBox ? c.fromBox.id : c.fromId,
-                dayIndex: c.dayIndex
+                fromId: c.fromBox.id,
+                date:   c.fromBox.timelineDate,
             }));
 
         if (skipTransactionWrapper) {
@@ -1655,11 +1657,12 @@ class CollaborationManager {
     _syncTimelineConnectionsToYjsImpl(localConns) {
         const yjsConns = this.ytimelineConnections.toArray();
 
-        // Build a map of existing Yjs entries: "fromId:dayIndex" -> [index...]
+        // Build a map of existing Yjs entries: "fromId:date" -> [index...]
         const yjsMap = new Map();
         yjsConns.forEach((c, i) => {
-            if (c && c.fromId && c.dayIndex != null) {
-                const key = `${c.fromId}:${c.dayIndex}`;
+            if (c && c.fromId && (c.date || c.dayIndex != null)) {
+                // Support both new {date} and legacy {dayIndex} entries as keys
+                const key = c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`;
                 if (!yjsMap.has(key)) yjsMap.set(key, []);
                 yjsMap.get(key).push(i);
             }
@@ -1667,7 +1670,7 @@ class CollaborationManager {
 
         const toAdd = [];
         for (const conn of localConns) {
-            const key = `${conn.fromId}:${conn.dayIndex}`;
+            const key = `${conn.fromId}:${conn.date}`;
             if (yjsMap.has(key)) {
                 const indices = yjsMap.get(key);
                 if (indices.length > 0) {
@@ -1695,6 +1698,7 @@ class CollaborationManager {
 
     /**
      * Rebuilds mindMap.timelineConnections from the Yjs array.
+     * Handles both new {fromId, date} format and legacy {fromId, dayIndex} format.
      * @private
      */
     _rebuildTimelineConnectionsFromYjs() {
@@ -1706,10 +1710,25 @@ class CollaborationManager {
         }
         const data = this.ytimelineConnections.toArray();
         for (const entry of data) {
-            if (!entry || !entry.fromId || entry.dayIndex == null) continue;
+            if (!entry || !entry.fromId) continue;
+            // Require either a date string or a legacy dayIndex
+            if (!entry.date && entry.dayIndex == null) continue;
             const fromBox = this.mindMap.getBoxById(entry.fromId);
-            if (fromBox) {
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, entry.dayIndex, this.mindMap));
+            if (!fromBox) continue;
+
+            // Resolve the calendar date onto the box
+            if (entry.date) {
+                fromBox.timelineDate = entry.date;
+            } else if (entry.dayIndex != null && this.mindMap.timelineStartDate) {
+                // Legacy: compute date from dayIndex
+                const d = typeof TimelineMode !== 'undefined'
+                    ? TimelineMode.dateForDay(entry.dayIndex, this.mindMap.timelineStartDate)
+                    : null;
+                if (d) fromBox.timelineDate = d.toISOString().split('T')[0];
+            }
+
+            if (fromBox.timelineDate) {
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap));
             }
         }
     }

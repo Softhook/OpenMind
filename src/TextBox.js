@@ -156,6 +156,10 @@ class TextBox {
     this.italicRanges = [];     // Array of {start, end} for faux-italic slant
     this.cachedLinks = null;    // Cached array of {start, end, url}
 
+    // Timeline date connection (ISO date string like "2024-01-15", or null)
+    // A non-null value means this box is connected to that specific date on the timeline bar.
+    this.timelineDate = null;
+
     // Calculate initial dimensions
     this.updateDimensions();
   }
@@ -2769,7 +2773,9 @@ class TextBox {
       health: this.health < 5 ? this.health : undefined,
       // lastHitTime is saved alongside health so healing resumes correctly after hard refresh.
       // Only serialized when the box is actually damaged (same condition as health).
-      lastHitTime: (this.health !== undefined && this.health < 5) ? this.lastHitTime : undefined
+      lastHitTime: (this.health !== undefined && this.health < 5) ? this.lastHitTime : undefined,
+      // Timeline date connection – non-null means box is pinned to this calendar date.
+      timelineDate: this.timelineDate || undefined
     };
   }
 
@@ -2904,6 +2910,11 @@ class TextBox {
     }
     // PDF embedding removed: we no longer load or store PDF URLs. If a map
     // contains a PDF URL, it will be ignored to avoid embedding binary data.
+
+    // Restore timeline date connection (ISO date string stored directly on box)
+    if (data.timelineDate && typeof data.timelineDate === 'string') {
+      box.timelineDate = data.timelineDate;
+    }
 
     return box;
   }

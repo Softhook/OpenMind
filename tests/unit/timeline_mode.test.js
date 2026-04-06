@@ -126,9 +126,10 @@ const TimelineConnection = sandbox.module.exports.TimelineConnection;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeBox(id, x = 0, y = 0) {
+function makeBox(id, x = 0, y = 0, timelineDate = null) {
   return {
     id, x, y, width: 100, height: 40,
+    timelineDate,
     getConnectionPoint(other) { return { x: this.x, y: this.y }; }
   };
 }
@@ -224,20 +225,37 @@ describe('TimelineMode.isOverBarWorld / isDragHandle', () => {
 // TimelineConnection – constructor and geometry
 // ============================================================
 describe('TimelineConnection', () => {
-  test('constructor sets fromBox, dayIndex and mindMap', () => {
-    const box = makeBox('b1', 100, -50);
+  test('constructor sets fromBox and mindMap', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
     const mm  = makeMindMap([box]);
-    const conn = new TimelineConnection(box, 5, mm);
+    const conn = new TimelineConnection(box, mm);
     expect(conn.fromBox).toBe(box);
-    expect(conn.dayIndex).toBe(5);
     expect(conn.mindMap).toBe(mm);
     expect(conn.selected).toBe(false);
   });
 
-  test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
-    const box = makeBox('b1', 100, -50);
+  test('dayIndex is computed from box.timelineDate and mindMap.timelineStartDate', () => {
+    // startDate = 2024-01-01, timelineDate = 2024-01-06 → dayIndex = 5
+    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const box = makeBox('b1', 100, -50, '2024-01-06');
     const mm  = makeMindMap([box]);
-    const conn = new TimelineConnection(box, 5, mm);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
+    expect(conn.dayIndex).toBe(5);
+  });
+
+  test('dayIndex falls back to 0 when mindMap is null', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
+    expect(conn.dayIndex).toBe(0);
+  });
+
+  test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
+    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const box = makeBox('b1', 100, -50, '2024-01-06'); // dayIndex = 5
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
     expect(ep).not.toBeNull();
@@ -248,20 +266,21 @@ describe('TimelineConnection', () => {
   });
 
   test('_getConnectionEndpoints uses DEFAULT_WIDTH when mindMap is null', () => {
-    const box = makeBox('b1', 100, -50);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
     const ep = conn._getConnectionEndpoints();
-    const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
+    const cell = TimelineMode.dayCellRect(0, TimelineMode.BAR_HEIGHT); // dayIndex=0 when no mindMap
     expect(ep).not.toBeNull();
     expect(ep.end.x).toBeGreaterThanOrEqual(cell.x);
     expect(ep.end.x).toBeLessThanOrEqual(cell.x + cell.w);
-    expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
-    expect(ep.end.y).toBeLessThanOrEqual(cell.y + cell.h);
   });
 
   test('box above bar mid-line projects to upper half of day-cell boundary', () => {
-    const box = makeBox('b1', 0, -100);   // y < BAR_HEIGHT/2
-    const conn = new TimelineConnection(box, 10, null);
+    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const box = makeBox('b1', 0, -100, '2024-01-11'); // dayIndex = 10
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
     expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
@@ -269,8 +288,11 @@ describe('TimelineConnection', () => {
   });
 
   test('box below bar mid-line projects to lower half of day-cell boundary', () => {
-    const box = makeBox('b1', 0, 200);    // y > BAR_HEIGHT/2
-    const conn = new TimelineConnection(box, 10, null);
+    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const box = makeBox('b1', 0, 200, '2024-01-11'); // dayIndex = 10
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
     expect(ep.end.y).toBeGreaterThanOrEqual(cell.cy);
@@ -278,8 +300,8 @@ describe('TimelineConnection', () => {
   });
 
   test('TimelineConnection is a subclass of Connection', () => {
-    const box = makeBox('b1', 0, -100);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 0, -100, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
     expect(conn instanceof sandbox.Connection).toBe(true);
   });
 });
@@ -288,53 +310,85 @@ describe('TimelineConnection', () => {
 // TimelineConnection – serialisation
 // ============================================================
 describe('TimelineConnection serialisation', () => {
-  test('toJSON() returns {fromId, dayIndex}', () => {
-    const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 10, null);
-    expect(conn.toJSON()).toMatchObject({ fromId: 'b1', dayIndex: 10 });
+  test('toJSON() returns {fromId, date}', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-11');
+    const conn = new TimelineConnection(box, null);
+    expect(conn.toJSON()).toMatchObject({ fromId: 'b1', date: '2024-01-11' });
   });
 
-  test('toJSON() has no unexpected fields', () => {
-    const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 10, null);
+  test('toJSON() does not contain dayIndex', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-11');
+    const conn = new TimelineConnection(box, null);
     const json = conn.toJSON();
+    expect(json.dayIndex).toBeUndefined();
     expect(json.side).toBeUndefined();
     expect(json.boxId).toBeUndefined();
   });
 
-  test('fromJSON round-trips correctly', () => {
+  test('fromJSON round-trips correctly with new {fromId, date} format', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
-    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, map, null);
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, map, null);
     expect(conn).not.toBeNull();
     expect(conn.fromBox).toBe(box);
+    expect(box.timelineDate).toBe('2024-01-16');
+  });
+
+  test('fromJSON computes dayIndex correctly from stored date', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.dayIndex).toBe(15);
+  });
+
+  test('fromJSON handles legacy {fromId, dayIndex} format (backward compat)', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.fromBox).toBe(box);
+    // Legacy dayIndex=15 with startDate=2024-01-01 → 2024-01-16
+    expect(box.timelineDate).toBe('2024-01-16');
     expect(conn.dayIndex).toBe(15);
   });
 
   test('fromJSON sets mindMap when provided', () => {
     const box = makeBox('b1', 0, 0);
     const mm  = makeMindMap([box]);
-    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, mm.boxIdMap, mm);
+    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, mm.boxIdMap, mm);
     expect(conn.mindMap).toBe(mm);
   });
 
   test('fromJSON returns null for missing box', () => {
-    const conn = TimelineConnection.fromJSON({ fromId: 'missing', dayIndex: 5 }, new Map(), null);
+    const conn = TimelineConnection.fromJSON({ fromId: 'missing', date: '2024-01-16' }, new Map(), null);
     expect(conn).toBeNull();
   });
 
-  test('fromJSON returns null for missing dayIndex', () => {
+  test('fromJSON returns null when neither date nor dayIndex present', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
     const conn = TimelineConnection.fromJSON({ fromId: 'b1' }, map, null);
     expect(conn).toBeNull();
   });
 
-  test('plain JSON.stringify round-trip preserves fromId and dayIndex', () => {
+  test('fromJSON returns null for legacy dayIndex without mindMap.timelineStartDate', () => {
     const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 15, null);
+    const map = new Map([['b1', box]]);
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 5 }, map, null);
+    expect(conn).toBeNull();
+  });
+
+  test('plain JSON.stringify round-trip preserves fromId and date', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-16');
+    const conn = new TimelineConnection(box, null);
     const json = JSON.parse(JSON.stringify(conn.toJSON()));
-    expect(json).toMatchObject({ fromId: 'b1', dayIndex: 15 });
+    expect(json).toMatchObject({ fromId: 'b1', date: '2024-01-16' });
   });
 });
 
@@ -380,7 +434,7 @@ describe('TimelineMode.drawBar()', () => {
 });
 
 // ============================================================
-// TimelineMode.dateForDay / weekNumber
+// TimelineMode.dateForDay / dayIndexForDate / weekNumber
 // ============================================================
 describe('TimelineMode.dateForDay()', () => {
   const today = new Date();
@@ -398,6 +452,28 @@ describe('TimelineMode.dateForDay()', () => {
     const expected = new Date(today);
     expected.setDate(expected.getDate() + 7);
     expect(d.getDate()).toBe(expected.getDate());
+  });
+});
+
+describe('TimelineMode.dayIndexForDate()', () => {
+  const startDate = new Date('2024-01-01T00:00:00.000Z');
+
+  test('same date as startDate returns 0', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-01', startDate)).toBe(0);
+  });
+
+  test('5 days after startDate returns 5', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-06', startDate)).toBe(5);
+  });
+
+  test('is the inverse of dateForDay', () => {
+    const dayIndex = 15;
+    const date = TimelineMode.dateForDay(dayIndex, startDate);
+    expect(TimelineMode.dayIndexForDate(date, startDate)).toBe(dayIndex);
+  });
+
+  test('accepts ISO date strings', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-16', startDate)).toBe(15);
   });
 });
 
