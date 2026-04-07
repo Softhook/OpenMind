@@ -1176,7 +1176,15 @@ class CollaborationManager {
                 // Sync timeline connections
                 if (this.ytimelineConnections && this.mindMap.timelineConnections) {
                     const existingTlConns = new Set(
-                        this.ytimelineConnections.toArray().map(c => `${c.fromId}:${c.date || ''}`)
+                        // Build keys the same way _syncTimelineConnectionsToYjsImpl does:
+                        // new entries → "fromId:YYYY-MM-DD"; legacy {dayIndex} entries →
+                        // "fromId:dayN".  Using c.date || '' collapses all legacy entries
+                        // for a box to the same key, causing them to be skipped or duplicated.
+                        this.ytimelineConnections.toArray().map(c =>
+                            c && c.fromId
+                                ? (c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`)
+                                : ''
+                        )
                     );
                     for (const conn of this.mindMap.timelineConnections) {
                         if (!conn || !conn.fromBox) continue;
@@ -1749,8 +1757,16 @@ class CollaborationManager {
             const fromBox = this.mindMap.getBoxById(entry.fromId);
             if (!fromBox) continue;
 
-            // Resolve the calendar date onto the box
+            // Resolve the calendar date onto the box.
+            // Validate entry.date format: this value is remote-collaborator controlled
+            // (Yjs), so an unexpected string must not propagate into day-index math
+            // (which would yield NaN and break rendering/hit-testing).
+            const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
             if (entry.date) {
+                if (!ISO_DATE_RE.test(entry.date)) {
+                    console.warn('[CollaborationManager] _rebuildTimelineConnectionsFromYjs: invalid date format, skipping', entry.date);
+                    continue;
+                }
                 fromBox.timelineDate = entry.date;
             } else if (entry.dayIndex != null && this.mindMap.timelineStartDate) {
                 // Legacy: compute date from dayIndex

@@ -150,8 +150,15 @@ class TimelineConnection extends Connection {
     }
     if (!fromBox) return null;
 
-    // Resolve the calendar date to store on the box
+    // Resolve the calendar date to store on the box.
+    // Validate the format so that malformed persisted JSON cannot propagate into
+    // day-index calculations (which would yield NaN and break geometry/filtering).
+    const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
     if (data.date) {
+      if (!ISO_DATE_RE.test(data.date)) {
+        console.warn('[TimelineConnection] fromJSON: invalid date format, skipping', data.date);
+        return null;
+      }
       fromBox.timelineDate = data.date;
     } else if (data.dayIndex != null && mindMap && mindMap.timelineStartDate) {
       // Legacy: compute calendar date from dayIndex + startDate

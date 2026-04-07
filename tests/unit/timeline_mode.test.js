@@ -388,6 +388,25 @@ describe('TimelineConnection serialisation', () => {
     expect(conn).toBeNull();
   });
 
+  test('fromJSON returns null and logs warning for invalid date format', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const warnSpy = jest.spyOn(sandbox.console, 'warn').mockImplementation(() => {});
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: 'not-a-date' }, map, null);
+    expect(conn).toBeNull();
+    expect(box.timelineDate).toBeNull(); // must not write invalid string
+    warnSpy.mockRestore();
+  });
+
+  test('fromJSON rejects date with time component (non-date-only string)', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const warnSpy = jest.spyOn(sandbox.console, 'warn').mockImplementation(() => {});
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16T00:00:00.000Z' }, map, null);
+    expect(conn).toBeNull();
+    warnSpy.mockRestore();
+  });
+
   test('plain JSON.stringify round-trip preserves fromId and date', () => {
     const box = makeBox('b1', 0, 0, '2024-01-16');
     const conn = new TimelineConnection(box, null);

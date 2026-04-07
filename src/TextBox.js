@@ -2911,8 +2911,11 @@ class TextBox {
     // PDF embedding removed: we no longer load or store PDF URLs. If a map
     // contains a PDF URL, it will be ignored to avoid embedding binary data.
 
-    // Restore timeline date connection (ISO date string stored directly on box)
-    if (data.timelineDate && typeof data.timelineDate === 'string') {
+    // Restore timeline date connection (ISO date string stored directly on box).
+    // Validate the format so that hand-edited or older files with an unexpected
+    // string cannot propagate into date math (which would yield NaN day indices).
+    if (data.timelineDate && typeof data.timelineDate === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(data.timelineDate)) {
       box.timelineDate = data.timelineDate;
     }
 

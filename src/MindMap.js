@@ -3857,7 +3857,13 @@ class MindMap {
         if (!fromBox || fromBox.timelineDate) continue; // skip if already set from box JSON
         try {
           if (tcData.date) {
-            fromBox.timelineDate = tcData.date;
+            // Validate format before assigning: a malformed date would cause NaN
+            // day indices and break timeline arrow rendering.
+            if (/^\d{4}-\d{2}-\d{2}$/.test(tcData.date)) {
+              fromBox.timelineDate = tcData.date;
+            } else {
+              console.warn('[MindMap] fromJSON: invalid legacy timelineDate format, skipping', tcData.date);
+            }
           } else if (tcData.dayIndex != null && this.timelineStartDate) {
             // Legacy dayIndex → compute the calendar date
             fromBox.timelineDate = TimelineMode.toISODateString(
