@@ -2810,8 +2810,9 @@ class MindMap {
                 this._wrapInTransaction(() => {
                   conn.fromBox.timelineDate = newDate;
                   // Sync via ytimelineConnections only — _boxToYjsData does not include
-                  // timelineDate, so onBoxChange would be a no-op and must not be called
-                  // (it would create a spurious undo entry).
+                  // timelineDate, so an onBoxChange call would make no Yjs writes
+                  // (_boxDataEquals detects equality and returns early) and is therefore
+                  // a pure no-op.  Calling it is misleading and adds unnecessary overhead.
                   if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
                 });
               }
