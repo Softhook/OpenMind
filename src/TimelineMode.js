@@ -493,10 +493,17 @@ class TimelineMode {
       ctx.noStroke();
       ctx.fill(...bg);
       ctx.rect(0, 0, bw, bh);
+    } else if (!bg && !withConnections) {
+      // Live mode: use palette background
+      const barBg = ColorPalette.TIMELINE.BAR_BACKGROUND;
+      ctx.noStroke();
+      ctx.fill(barBg.r, barBg.g, barBg.b, barBg.a);
+      ctx.rect(0, 0, bw, bh);
     }
 
     // Bar border
-    ctx.stroke(60, 80, 140, 180);
+    const barBorder = ColorPalette.TIMELINE.BAR_BORDER;
+    ctx.stroke(barBorder.r, barBorder.g, barBorder.b, barBorder.a);
     ctx.strokeWeight(sw);
     ctx.noFill();
     ctx.rect(0, 0, bw, bh);
@@ -515,8 +522,9 @@ class TimelineMode {
     // Selection ring
     if (mindMap.timelineSelected) {
       const margin = 4 / safeZ;
-      ctx.stroke(100, 180, 255, 220);
-      ctx.strokeWeight(sw * 2);
+      const selectionRing = ColorPalette.TIMELINE.SELECTION_RING;
+      ctx.stroke(selectionRing.r, selectionRing.g, selectionRing.b, selectionRing.a);
+      ctx.strokeWeight(sw * ColorPalette.TIMELINE.SELECTION_RING_WEIGHT);
       ctx.noFill();
       ctx.rect(-margin, -margin, bw + margin * 2, bh + margin * 2, 3 / safeZ);
     }
@@ -536,6 +544,9 @@ class TimelineMode {
    */
   static _drawConnections(ctx, visibleConns, barX, barY) {
     const ARROW_SIZE = 12;
+    const connLine = ColorPalette.TIMELINE.CONNECTION_LINE;
+    const connArrow = ColorPalette.TIMELINE.CONNECTION_ARROW;
+    
     for (const conn of visibleConns) {
       if (!conn?._getConnectionEndpoints) continue;
       const ep = conn._getConnectionEndpoints();
@@ -550,11 +561,11 @@ class TimelineMode {
       if (Math.sqrt(dx * dx + dy * dy) < 1) continue;
 
       const angle = Math.atan2(dy, dx);
-      ctx.stroke(80, 100, 160);
+      ctx.stroke(connLine.r, connLine.g, connLine.b, connLine.a);
       ctx.strokeWeight(2);
       ctx.noFill();
       ctx.line(sx, sy, tx - ARROW_SIZE * Math.cos(angle), ty - ARROW_SIZE * Math.sin(angle));
-      ctx.fill(80, 100, 160);
+      ctx.fill(connArrow.r, connArrow.g, connArrow.b, connArrow.a);
       ctx.noStroke();
       ctx.push();
       ctx.translate(tx, ty);
@@ -590,14 +601,16 @@ class TimelineMode {
     const ty = cell.cy;
 
     // Highlight the snapped day cell
-    stroke(100, 200, 255, 255);
+    const snapHighlight = ColorPalette.TIMELINE.SNAP_HIGHLIGHT;
+    stroke(snapHighlight.r, snapHighlight.g, snapHighlight.b, snapHighlight.a);
     strokeWeight(2 * sw);
     noFill();
     rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
 
     // Snap dot
     noStroke();
-    fill(100, 200, 255, 220);
+    const snapDot = ColorPalette.TIMELINE.SNAP_DOT;
+    fill(snapDot.r, snapDot.g, snapDot.b, snapDot.a);
     circle(tx, ty, 8 * sw);
   }
 
@@ -639,19 +652,24 @@ class TimelineMode {
       const lx = box.x + box.width / 2 - labelW;  // pill right edge aligns with box right edge
       const ly = box.y - box.height / 2 - labelH - 2 / safeZ; // just above the box
 
-      // Pill background — red for past dates, blue for future, highlighted when selected
+      // Pill background — yellow for today, blue for future, red for past, highlighted when selected
       noStroke();
+      let pillBg;
       if (conn.selected) {
-        fill(255, 140, 0, 210);
+        pillBg = ColorPalette.TIMELINE.BADGE_SELECTED;
       } else if (isPast) {
-        fill(200, 60, 60, 210);
+        pillBg = ColorPalette.TIMELINE.BADGE_PAST;
+      } else if (date.getTime() === today.getTime()) {
+        pillBg = ColorPalette.TIMELINE.BADGE_TODAY;
       } else {
-        fill(80, 140, 220, 210);
+        pillBg = ColorPalette.TIMELINE.BADGE_FUTURE;
       }
+      fill(pillBg.r, pillBg.g, pillBg.b, pillBg.a);
       rect(lx, ly, labelW, labelH, labelH / 2);
 
-      // Label text
-      fill(255, 255, 255, 245);
+      // Label text — use contrast color based on pill background
+      const textColor = ColorPalette.getContrastColor(pillBg);
+      fill(textColor.r, textColor.g, textColor.b, textColor.a);
       noStroke();
       textAlign(CENTER, CENTER);
       text(label, lx + labelW / 2, ly + labelH / 2);
@@ -684,11 +702,13 @@ class TimelineMode {
         if (dom === 1 || d === 0) {
           currentMonth = mon;
           ctx.noStroke();
-          ctx.fill(180, 200, 255, 220);
+          const monthLabel = ColorPalette.TIMELINE.MONTH_LABEL;
+          ctx.fill(monthLabel.r, monthLabel.g, monthLabel.b, monthLabel.a);
           ctx.textSize(ts);
           ctx.textAlign(ctx.LEFT, ctx.TOP);
           ctx.text(TimelineMode.MONTH_NAMES[mon] + ' ' + date.getFullYear(), x + 3 / safeZ, 3 / safeZ);
-          ctx.stroke(80, 100, 180, 200);
+          const barBorder = ColorPalette.TIMELINE.BAR_BORDER;
+          ctx.stroke(barBorder.r, barBorder.g, barBorder.b, barBorder.a);
           ctx.strokeWeight(sw);
           ctx.line(x, 0, x, bh);
           ctx.noStroke();
@@ -697,41 +717,49 @@ class TimelineMode {
 
       // Week marker (Monday)
       if (dow === 1 && showWeekNums) {
-        ctx.stroke(60, 90, 160, 160);
+        const weekTick = ColorPalette.TIMELINE.WEEKDAY_STROKE;
+        ctx.stroke(weekTick.r, weekTick.g, weekTick.b, weekTick.a);
         ctx.strokeWeight(sw);
         ctx.line(x, bh - TimelineMode.WEEK_TICK_H, x, bh);
         ctx.noStroke();
         if (showDayNums) {
-          ctx.fill(140, 160, 220, 180);
+          const weekNum = ColorPalette.TIMELINE.WEEK_NUMBER;
+          ctx.fill(weekNum.r, weekNum.g, weekNum.b, weekNum.a);
           ctx.textSize(9 / safeZ);
           ctx.textAlign(ctx.CENTER, ctx.BOTTOM);
           ctx.text('W' + TimelineMode.weekNumber(date), x, bh - TimelineMode.WEEK_TICK_H - 2 / safeZ);
         }
       }
 
-      // Day cell
+      // Day cell — color based on day type
+      let cellFill, cellStroke, cellText;
+      
       if (isToday) {
-        ctx.fill(255, 215, 0, 240);
-        ctx.stroke(200, 165, 0, 255);
-        ctx.strokeWeight(1.5 * sw);
+        cellFill = ColorPalette.TIMELINE.TODAY_FILL;
+        cellStroke = ColorPalette.TIMELINE.TODAY_STROKE;
+        cellText = ColorPalette.TIMELINE.TODAY_TEXT;
       } else if (isHighlighted) {
-        ctx.fill(95, 190, 255, 240);
-        ctx.stroke(125, 225, 255, 255);
-        ctx.strokeWeight(1.5 * sw);
+        cellFill = ColorPalette.TIMELINE.DAY_FILL;
+        cellStroke = ColorPalette.TIMELINE.DAY_STROKE;
+        cellText = ColorPalette.TIMELINE.DAY_TEXT;
       } else if (isWeekday) {
-        ctx.fill(88, 106, 168, 205);
-        ctx.stroke(118, 140, 205, 210);
-        ctx.strokeWeight(sw);
+        cellFill = ColorPalette.TIMELINE.WEEKDAY_FILL;
+        cellStroke = ColorPalette.TIMELINE.WEEKDAY_STROKE;
+        cellText = ColorPalette.TIMELINE.WEEKDAY_TEXT;
       } else {
-        ctx.fill(58, 70, 118, 190);
-        ctx.stroke(82, 98, 155, 180);
-        ctx.strokeWeight(sw);
+        cellFill = ColorPalette.TIMELINE.WEEKEND_FILL;
+        cellStroke = ColorPalette.TIMELINE.WEEKEND_STROKE;
+        cellText = ColorPalette.TIMELINE.WEEKEND_TEXT;
       }
+      
+      ctx.fill(cellFill.r, cellFill.g, cellFill.b, cellFill.a);
+      ctx.stroke(cellStroke.r, cellStroke.g, cellStroke.b, cellStroke.a);
+      ctx.strokeWeight((isToday || isHighlighted) ? 1.5 * sw : sw);
       ctx.rect(cell.x, cell.y, cell.w, cell.h, 2 / safeZ);
 
       if (showDayNums) {
         ctx.noStroke();
-        ctx.fill(225, 235, 255, isToday || isHighlighted ? 255 : 220);
+        ctx.fill(cellText.r, cellText.g, cellText.b, cellText.a);
         ctx.textSize(8 / safeZ);
         ctx.textAlign(ctx.CENTER, ctx.CENTER);
         ctx.text(dom, cell.cx, cell.cy + 0.5 / safeZ);
@@ -745,18 +773,21 @@ class TimelineMode {
     const hy = bh / 2;
     const hw = 5 * sw;
 
+    const handleBg = ColorPalette.TIMELINE.RESIZE_HANDLE_BG;
+    const handleDot = ColorPalette.TIMELINE.RESIZE_HANDLE_DOT;
+
     ctx.noStroke();
-    ctx.fill(80, 120, 200, 200);
+    ctx.fill(handleBg.r, handleBg.g, handleBg.b, handleBg.a);
 
     // Right handle (extend future)
     ctx.rect(bw - hw, hy - hr / 2, hw, hr, 2 * sw);
-    ctx.fill(180, 210, 255, 220);
+    ctx.fill(handleDot.r, handleDot.g, handleDot.b, handleDot.a);
     for (let i = -1; i <= 1; i++) ctx.circle(bw - hw / 2, hy + i * 5 * sw, 2.5 * sw);
 
     // Left handle (extend past)
-    ctx.fill(80, 120, 200, 200);
+    ctx.fill(handleBg.r, handleBg.g, handleBg.b, handleBg.a);
     ctx.rect(0, hy - hr / 2, hw, hr, 2 * sw);
-    ctx.fill(180, 210, 255, 220);
+    ctx.fill(handleDot.r, handleDot.g, handleDot.b, handleDot.a);
     for (let i = -1; i <= 1; i++) ctx.circle(hw / 2, hy + i * 5 * sw, 2.5 * sw);
   }
 }

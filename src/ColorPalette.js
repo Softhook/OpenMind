@@ -165,8 +165,86 @@ class ColorPalette {
   ];
 
   // ============================================================================
+  // TIMELINE COLORS
+  // ============================================================================
+
+  /**
+   * Timeline bar styling with semantic color meanings.
+   * Uses Material Design yellow (WARNING) for today and blue (PRIMARY) for regular days.
+   * Text contrast is automatically handled via ColorPalette.getContrastColor().
+   */
+  static TIMELINE = {
+    BAR_BACKGROUND: { r: 15, g: 20, b: 40, a: 210 },
+    BAR_BORDER: { r: 60, g: 80, b: 140, a: 180 },
+    
+    // Day cell colors - maintains visual hierarchy
+    TODAY_FILL: ColorPalette.BASE.WARNING,           // Bright yellow (255, 193, 7)
+    TODAY_STROKE: { r: 200, g: 165, b: 0, a: 255 },
+    TODAY_TEXT: ColorPalette.BASE.BLACK,             // Black text on bright yellow
+    
+    DAY_FILL: ColorPalette.BASE.PRIMARY,             // Blue (60, 120, 255)
+    DAY_STROKE: { r: 125, g: 225, b: 255, a: 255 },
+    DAY_TEXT: ColorPalette.BASE.WHITE,               // White text on blue
+    
+    WEEKDAY_FILL: { r: 88, g: 106, b: 168, a: 205 },
+    WEEKDAY_STROKE: { r: 118, g: 140, b: 205, a: 210 },
+    WEEKDAY_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+    
+    WEEKEND_FILL: { r: 58, g: 70, b: 118, a: 190 },
+    WEEKEND_STROKE: { r: 82, g: 98, b: 155, a: 180 },
+    WEEKEND_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+    
+    // Text and labels
+    MONTH_LABEL: { r: 180, g: 200, b: 255, a: 220 },
+    WEEK_NUMBER: { r: 140, g: 160, b: 220, a: 180 },
+    
+    // Interactive elements
+    RESIZE_HANDLE_BG: { r: 80, g: 120, b: 200, a: 200 },
+    RESIZE_HANDLE_DOT: { r: 180, g: 210, b: 255, a: 220 },
+    
+    SELECTION_RING: { r: 100, g: 180, b: 255, a: 220 },
+    SELECTION_RING_WEIGHT: 2,
+    
+    // Connection preview on drag
+    SNAP_HIGHLIGHT: { r: 100, g: 200, b: 255, a: 255 },
+    SNAP_DOT: { r: 100, g: 200, b: 255, a: 220 },
+    
+    // Date badge pills on boxes
+    BADGE_TODAY: ColorPalette.BASE.WARNING,
+    BADGE_FUTURE: ColorPalette.BASE.PRIMARY,
+    BADGE_PAST: { r: 200, g: 60, b: 60, a: 210 },
+    BADGE_SELECTED: { r: 255, g: 140, b: 0, a: 210 },
+    BADGE_TEXT: ColorPalette.BASE.WHITE,
+    
+    // Connection arrows
+    CONNECTION_LINE: { r: 80, g: 100, b: 160, a: 255 },
+    CONNECTION_ARROW: { r: 80, g: 100, b: 160, a: 255 }
+  };
+
+  // ============================================================================
   // HELPER METHODS
   // ============================================================================
+
+  /**
+   * Determines appropriate text color based on background brightness.
+   * Uses luminance formula: 0.299*R + 0.587*G + 0.114*B
+   * Returns black text for bright backgrounds (luminance > 150),
+   * white text for dark backgrounds (luminance ≤ 150).
+   * 
+   * @param {Object} backgroundColor - RGBA color object
+   * @returns {Object} RGBA color object (either WHITE or BLACK)
+   */
+  static getContrastColor(backgroundColor) {
+    if (!backgroundColor || typeof backgroundColor !== 'object') {
+      return ColorPalette.BASE.BLACK;
+    }
+    const r = backgroundColor.r ?? 0;
+    const g = backgroundColor.g ?? 0;
+    const b = backgroundColor.b ?? 0;
+    // Standard luminance formula
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luminance > 150 ? ColorPalette.BASE.BLACK : ColorPalette.BASE.WHITE;
+  }
 
   /**
    * Converts a color object to a CSS rgba string

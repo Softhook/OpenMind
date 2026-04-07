@@ -70,7 +70,48 @@ const sandbox = {
       NORMAL:   { r: 80,  g: 100, b: 160, a: 255 },
       SELECTED: { r: 255, g: 140, b: 0,   a: 255 },
     },
-    BASE: { BLACK: { r: 0, g: 0, b: 0, a: 255 } },
+    BASE: { 
+      BLACK: { r: 0, g: 0, b: 0, a: 255 },
+      WHITE: { r: 255, g: 255, b: 255, a: 255 },
+      PRIMARY: { r: 60, g: 120, b: 255, a: 255 },
+      WARNING: { r: 255, g: 193, b: 7, a: 255 },
+    },
+    TIMELINE: {
+      BAR_BACKGROUND: { r: 15, g: 20, b: 40, a: 210 },
+      BAR_BORDER: { r: 60, g: 80, b: 140, a: 180 },
+      TODAY_FILL: { r: 255, g: 193, b: 7, a: 255 },
+      TODAY_STROKE: { r: 200, g: 165, b: 0, a: 255 },
+      TODAY_TEXT: { r: 0, g: 0, b: 0, a: 255 },
+      DAY_FILL: { r: 60, g: 120, b: 255, a: 255 },
+      DAY_STROKE: { r: 125, g: 225, b: 255, a: 255 },
+      DAY_TEXT: { r: 255, g: 255, b: 255, a: 255 },
+      WEEKDAY_FILL: { r: 88, g: 106, b: 168, a: 205 },
+      WEEKDAY_STROKE: { r: 118, g: 140, b: 205, a: 210 },
+      WEEKDAY_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+      WEEKEND_FILL: { r: 58, g: 70, b: 118, a: 190 },
+      WEEKEND_STROKE: { r: 82, g: 98, b: 155, a: 180 },
+      WEEKEND_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+      MONTH_LABEL: { r: 180, g: 200, b: 255, a: 220 },
+      WEEK_NUMBER: { r: 140, g: 160, b: 220, a: 180 },
+      RESIZE_HANDLE_BG: { r: 80, g: 120, b: 200, a: 200 },
+      RESIZE_HANDLE_DOT: { r: 180, g: 210, b: 255, a: 220 },
+      SELECTION_RING: { r: 100, g: 180, b: 255, a: 220 },
+      SELECTION_RING_WEIGHT: 2,
+      SNAP_HIGHLIGHT: { r: 100, g: 200, b: 255, a: 255 },
+      SNAP_DOT: { r: 100, g: 200, b: 255, a: 220 },
+      BADGE_TODAY: { r: 255, g: 193, b: 7, a: 255 },
+      BADGE_FUTURE: { r: 60, g: 120, b: 255, a: 255 },
+      BADGE_PAST: { r: 200, g: 60, b: 60, a: 210 },
+      BADGE_SELECTED: { r: 255, g: 140, b: 0, a: 210 },
+      BADGE_TEXT: { r: 255, g: 255, b: 255, a: 255 },
+      CONNECTION_LINE: { r: 80, g: 100, b: 160, a: 255 },
+      CONNECTION_ARROW: { r: 80, g: 100, b: 160, a: 255 },
+    },
+    getContrastColor: (bg) => {
+      if (!bg) return { r: 0, g: 0, b: 0, a: 255 };
+      const luminance = 0.299 * (bg.r || 0) + 0.587 * (bg.g || 0) + 0.114 * (bg.b || 0);
+      return luminance > 150 ? { r: 0, g: 0, b: 0, a: 255 } : { r: 255, g: 255, b: 255, a: 255 };
+    },
   },
   // Utils stub (subset used by Connection and TimelineConnection)
   Utils: null, // filled after sandbox creation so we can reference p5Stubs
@@ -657,8 +698,8 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], futureStart, 1);
     const fillCalls = sandbox.fill.mock.calls;
-    // Blue future pill: fill(80, 140, 220, 210)
-    const pillFill = fillCalls.find(args => args[0] === 80 && args[1] === 140 && args[2] === 220);
+    // Blue future pill: fill(60, 120, 255) from ColorPalette.BASE.PRIMARY (BADGE_FUTURE)
+    const pillFill = fillCalls.find(args => args[0] === 60 && args[1] === 120 && args[2] === 255);
     expect(pillFill).toBeDefined();
   });
 
