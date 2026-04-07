@@ -1737,6 +1737,11 @@ class CollaborationManager {
             }
         }
 
+        // Track which box IDs already have a connection built so that concurrent
+        // edits that insert duplicate entries for the same box (e.g. two peers
+        // simultaneously re-dating the same box) never produce two arrows.
+        const builtBoxIds = new Set();
+
         for (const entry of data) {
             if (!entry || !entry.fromId) continue;
             // Require either a date string or a legacy dayIndex
@@ -1756,7 +1761,11 @@ class CollaborationManager {
                 }
             }
 
-            if (fromBox.timelineDate) {
+            // Guard against duplicate arrows: if ytimelineConnections somehow
+            // contains two entries for the same box (possible with concurrent
+            // re-dating by two peers), only create one TimelineConnection.
+            if (fromBox.timelineDate && !builtBoxIds.has(entry.fromId)) {
+                builtBoxIds.add(entry.fromId);
                 this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap));
             }
         }

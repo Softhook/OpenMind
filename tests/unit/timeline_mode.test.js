@@ -235,8 +235,10 @@ describe('TimelineConnection', () => {
   });
 
   test('dayIndex is computed from box.timelineDate and mindMap.timelineStartDate', () => {
-    // startDate = 2024-01-01, timelineDate = 2024-01-06 → dayIndex = 5
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    // startDate = 2024-01-01 (local midnight), timelineDate = 2024-01-06 → dayIndex = 5.
+    // Use local-midnight constructor (same as createTimeline()) so the test is
+    // timezone-independent: no UTC vs local offset causes a spurious ±1 day shift.
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
     const box = makeBox('b1', 100, -50, '2024-01-06');
     const mm  = makeMindMap([box]);
     mm.timelineStartDate = startDate;
@@ -251,7 +253,7 @@ describe('TimelineConnection', () => {
   });
 
   test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const box = makeBox('b1', 100, -50, '2024-01-06'); // dayIndex = 5
     const mm  = makeMindMap([box]);
     mm.timelineStartDate = startDate;
@@ -278,7 +280,7 @@ describe('TimelineConnection', () => {
   });
 
   test('box above bar mid-line projects to upper half of day-cell boundary', () => {
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const box = makeBox('b1', 0, -100, '2024-01-11'); // dayIndex = 10
     const mm  = makeMindMap([box]);
     mm.timelineStartDate = startDate;
@@ -290,7 +292,7 @@ describe('TimelineConnection', () => {
   });
 
   test('box below bar mid-line projects to lower half of day-cell boundary', () => {
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const box = makeBox('b1', 0, 200, '2024-01-11'); // dayIndex = 10
     const mm  = makeMindMap([box]);
     mm.timelineStartDate = startDate;
@@ -340,7 +342,7 @@ describe('TimelineConnection serialisation', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
     const mm = makeMindMap([box]);
-    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, map, mm);
     expect(conn).not.toBeNull();
     expect(conn.dayIndex).toBe(15);
@@ -350,11 +352,11 @@ describe('TimelineConnection serialisation', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
     const mm  = makeMindMap([box]);
-    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, map, mm);
     expect(conn).not.toBeNull();
     expect(conn.fromBox).toBe(box);
-    // Legacy dayIndex=15 with startDate=2024-01-01 → 2024-01-16
+    // Legacy dayIndex=15 with startDate=Jan 1 local → Jan 16 local → "2024-01-16"
     expect(box.timelineDate).toBe('2024-01-16');
     expect(conn.dayIndex).toBe(15);
   });
@@ -362,7 +364,7 @@ describe('TimelineConnection serialisation', () => {
   test('fromJSON sets mindMap when provided', () => {
     const box = makeBox('b1', 0, 0);
     const mm  = makeMindMap([box]);
-    mm.timelineStartDate = new Date('2024-01-01T00:00:00.000Z');
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
     const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, mm.boxIdMap, mm);
     expect(conn.mindMap).toBe(mm);
   });
@@ -436,7 +438,7 @@ describe('TimelineMode.drawBar()', () => {
 });
 
 // ============================================================
-// TimelineMode.dateForDay / dayIndexForDate / weekNumber
+// TimelineMode.dateForDay / dayIndexForDate / toISODateString / weekNumber
 // ============================================================
 describe('TimelineMode.dateForDay()', () => {
   const today = new Date();
@@ -457,8 +459,33 @@ describe('TimelineMode.dateForDay()', () => {
   });
 });
 
+describe('TimelineMode.toISODateString()', () => {
+  test('returns the LOCAL calendar date as YYYY-MM-DD', () => {
+    // new Date(y, m, d) creates local midnight — result must match that local date
+    // regardless of the machine timezone.  This verifies that local getters are
+    // used (not UTC getters / toISOString which would shift UTC+ users by 1 day).
+    const localMidnight = new Date(2024, 0, 15); // Jan 15 local midnight
+    expect(TimelineMode.toISODateString(localMidnight)).toBe('2024-01-15');
+  });
+
+  test('round-trips through new Date(str) → toISODateString', () => {
+    // A date stored as a local-midnight Date must survive a round-trip.
+    const original = '2024-06-20';
+    const [y, mo, da] = original.split('-').map(Number);
+    const date = new Date(y, mo - 1, da); // local midnight — same approach as fromJSON
+    expect(TimelineMode.toISODateString(date)).toBe(original);
+  });
+
+  test('month and day are zero-padded', () => {
+    const d = new Date(2024, 2, 5); // March 5 (month index 2)
+    expect(TimelineMode.toISODateString(d)).toBe('2024-03-05');
+  });
+});
+
 describe('TimelineMode.dayIndexForDate()', () => {
-  const startDate = new Date('2024-01-01T00:00:00.000Z');
+  // Use the local-midnight constructor (same as createTimeline does) so the test
+  // is timezone-independent: all date math stays in local time.
+  const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
 
   test('same date as startDate returns 0', () => {
     expect(TimelineMode.dayIndexForDate('2024-01-01', startDate)).toBe(0);
@@ -476,6 +503,27 @@ describe('TimelineMode.dayIndexForDate()', () => {
 
   test('accepts ISO date strings', () => {
     expect(TimelineMode.dayIndexForDate('2024-01-16', startDate)).toBe(15);
+  });
+
+  test('ISO date string "YYYY-MM-DD" is treated as local midnight, not UTC midnight', () => {
+    // This is the key timezone-correctness test.
+    // "2024-01-15" must be treated as local Jan 15 (same as new Date(2024, 0, 15))
+    // regardless of timezone.  In UTC+ environments, new Date("2024-01-15") is UTC
+    // midnight which, after setHours(0,0,0,0), becomes local midnight of Jan 14
+    // (or Jan 15 depending on offset) — creating a 1-day mismatch.
+    // The fixed implementation always parses "YYYY-MM-DD" via new Date(y, m-1, d).
+    const start = new Date(2024, 0, 1); // Jan 1 local midnight
+    expect(TimelineMode.dayIndexForDate('2024-01-15', start)).toBe(14); // Jan 15 − Jan 1 = 14 days
+  });
+
+  test('cross-client consistency: date string round-trips via toISODateString', () => {
+    // Simulate: save a date with toISODateString, reload with dayIndexForDate.
+    // The dayIndex must be preserved regardless of timezone.
+    const start = new Date(2024, 0, 1); // Jan 1 local midnight
+    const dayIndex = 20;
+    const date = TimelineMode.dateForDay(dayIndex, start);
+    const stored = TimelineMode.toISODateString(date);     // e.g. "2024-01-21"
+    expect(TimelineMode.dayIndexForDate(stored, start)).toBe(dayIndex);
   });
 });
 
@@ -550,9 +598,9 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('label text includes abbreviated weekday', () => {
-    // 2024-01-01 is a Monday
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
-    startDate.setHours(0, 0, 0, 0);
+    // 2024-01-01 is a Monday — use local midnight so the weekday is correct
+    // in all timezones (UTC midnight would be Sun Dec 31 local in UTC-5).
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
     const box = makeBox('b1', 0, -200, '2024-01-01'); // stored date = start date (day 0)
     const conn = new TimelineConnection(box, null);
     sandbox.text.mockClear();

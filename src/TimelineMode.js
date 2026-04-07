@@ -325,27 +325,49 @@ class TimelineMode {
   /**
    * Returns the day index (0-based from startDate) for a given calendar date.
    * This is the inverse of dateForDay().
-   * @param {string|Date} date      – ISO date string or Date object
+   *
+   * "YYYY-MM-DD" strings are interpreted as LOCAL midnight (not UTC midnight).
+   * `new Date("YYYY-MM-DD")` parses as UTC midnight, which is the wrong local
+   * date for UTC+ users.  Using the Date(y, m, d) constructor forces local time
+   * so the same date string resolves to the same calendar day on every client.
+   *
+   * @param {string|Date} date      – ISO date string ("YYYY-MM-DD") or Date object
    * @param {Date}        startDate – timeline start date
    * @returns {number} integer day index (may be negative or beyond the bar)
    */
   static dayIndexForDate(date, startDate) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const s = new Date(startDate);
-    s.setHours(0, 0, 0, 0);
-    return Math.round((d - s) / 86400000);
+    // Parse "YYYY-MM-DD" strings as local midnight so all clients agree on which
+    // day they refer to.  Date objects are normalised to local midnight via setHours.
+    const toLocalMidnight = (d) => {
+      if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const [y, mo, da] = d.split('-').map(Number);
+        return new Date(y, mo - 1, da); // local midnight — timezone-invariant
+      }
+      const result = new Date(d);
+      result.setHours(0, 0, 0, 0);
+      return result;
+    };
+    return Math.round((toLocalMidnight(date) - toLocalMidnight(startDate)) / 86400000);
   }
 
   /**
    * Converts a Date (or Date-like value) to an ISO-8601 date-only string
-   * (e.g. "2024-01-15").  All timeline date storage goes through this
-   * helper so the format is consistent everywhere.
+   * (e.g. "2024-01-15") using LOCAL date components.
+   *
+   * Using toISOString() returns the UTC date, which is wrong for UTC+ users
+   * because local midnight (e.g. Jan 15 00:00 UTC+5) is Jan 14 19:00 UTC.
+   * Using getFullYear/getMonth/getDate() always returns the local calendar date.
+   *
+   * All timeline date storage goes through this helper so the format is consistent.
    * @param {Date|string} date
    * @returns {string}  "YYYY-MM-DD"
    */
   static toISODateString(date) {
-    return new Date(date).toISOString().split('T')[0];
+    const d = new Date(date);
+    const y  = d.getFullYear();
+    const m  = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
   }
 
   /**

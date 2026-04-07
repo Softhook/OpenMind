@@ -2809,7 +2809,9 @@ class MindMap {
               if (!dup) {
                 this._wrapInTransaction(() => {
                   conn.fromBox.timelineDate = newDate;
-                  if (MindMap.onBoxChange) MindMap.onBoxChange(conn.fromBox);
+                  // Sync via ytimelineConnections only — _boxToYjsData does not include
+                  // timelineDate, so onBoxChange would be a no-op and must not be called
+                  // (it would create a spurious undo entry).
                   if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
                 });
               }
@@ -3676,9 +3678,16 @@ class MindMap {
       timelineBarX: this.timelineBarX || 0,
       timelineBarY: this.timelineBarY || 0,
       timelineActive: this.timelineActive || false,
-      // Persist as ISO string so day-index labels show the same calendar dates
-      // across reloads (without this, labels would shift to today each time).
-      timelineStartDate: this.timelineStartDate ? this.timelineStartDate.toISOString() : null,
+      // Persist as a local "YYYY-MM-DD" date string so collaborators in different
+      // timezones all load the same calendar date.  Full ISO datetimes (the old
+      // format) embed the saving user's UTC offset, causing bar labels to differ
+      // between UTC+ and UTC- users.  TimelineMode.toISODateString() uses local
+      // date getters (not toISOString/UTC) to produce the correct string.
+      timelineStartDate: this.timelineStartDate
+        ? (typeof TimelineMode !== 'undefined'
+            ? TimelineMode.toISODateString(this.timelineStartDate)
+            : this.timelineStartDate.toISOString())
+        : null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3817,8 +3826,18 @@ class MindMap {
     // calendar dates across reloads rather than shifting to "today".
     this.timelineActive = data.timelineActive === true;
     if (data.timelineStartDate) {
-      const parsed = new Date(data.timelineStartDate);
-      this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
+      // New format: "YYYY-MM-DD" (date-only) — parse as LOCAL midnight so all
+      // clients in different timezones load the same calendar date.
+      // Old format: full ISO datetime (e.g. "2024-01-14T19:00:00.000Z") — parse
+      // as-is for backward compat; cross-timezone inconsistency is acceptable for
+      // old maps since we cannot recover the saving user's intended local date.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(data.timelineStartDate)) {
+        const [y, mo, da] = data.timelineStartDate.split('-').map(Number);
+        this.timelineStartDate = new Date(y, mo - 1, da); // local midnight
+      } else {
+        const parsed = new Date(data.timelineStartDate);
+        this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
+      }
     } else if (this.timelineActive) {
       // Fallback for maps saved before timelineStartDate was persisted.
       const today = new Date();
