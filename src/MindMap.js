@@ -178,7 +178,6 @@ class MindMap {
     this.timelineDragStartBarX = 0;
     this.timelineDragStartDate = null;
     this.timelineDragLastDeltaDays = 0;
-    this.timelineDragStartDayIndices = null;
     // Bar body drag state (moving the whole bar)
     this.timelineBarDragging = false;
     this.timelineBarDragOffsetX = 0;
@@ -501,24 +500,32 @@ class MindMap {
   }
 
   /**
-   * Adds a timeline connection (box → day-tick) with full undo tracking.
-   * Prevents duplicate connections for the same (fromBox, dayIndex) pair.
+   * Adds a timeline connection (box → calendar date) with full undo tracking.
+   * The date is computed from dayIndex + timelineStartDate and stored on the box,
+   * making connections resilient to timeline start-date changes on reload.
+   * Prevents duplicate connections for the same (fromBox, date) pair.
    * @param {TextBox} fromBox  – source box
    * @param {number}  dayIndex – 0 … TimelineMode.TOTAL_DAYS-1
    */
   addTimelineConnection(fromBox, dayIndex) {
-    if (!fromBox || dayIndex == null) return;
+    if (!fromBox || dayIndex == null || !this.timelineStartDate) return;
     if (!this.timelineConnections) this.timelineConnections = [];
 
-    // Prevent duplicate
+    // Compute the calendar date for this day slot
+    const date = TimelineMode.toISODateString(TimelineMode.dateForDay(dayIndex, this.timelineStartDate));
+
+    // Prevent duplicate (same box already connected to the same date)
     const already = this.timelineConnections.some(
-      c => c.fromBox === fromBox && c.dayIndex === dayIndex
+      c => c.fromBox === fromBox && c.fromBox.timelineDate === date
     );
     if (already) return;
 
     this._wrapInTransaction(() => {
-      const conn = new TimelineConnection(fromBox, dayIndex, this);
+      fromBox.timelineDate = date;
+      const conn = new TimelineConnection(fromBox, this);
       this.timelineConnections.push(conn);
+      // timelineDate is propagated via ytimelineConnections, not yboxes
+      // (CollaborationManager._boxToYjsData does not include timelineDate).
       if (MindMap.onTimelineConnectionsChange) {
         MindMap.onTimelineConnectionsChange(true);
       }
@@ -536,6 +543,12 @@ class MindMap {
 
     this._wrapInTransaction(() => {
       this.timelineConnections.splice(idx, 1);
+      // Clear the date stored on the box so it is no longer connected.
+      // On collaborators' clients this is handled by _rebuildTimelineConnectionsFromYjs
+      // which clears box.timelineDate for boxes absent from ytimelineConnections.
+      if (conn.fromBox) {
+        conn.fromBox.timelineDate = null;
+      }
       // Clear selection if this connection was selected
       if (this.selectedTimelineConnection === conn) {
         this.selectedTimelineConnection = null;
@@ -682,10 +695,8 @@ class MindMap {
       this.timelineDragStartBarX = this.timelineBarX || 0;
       this.timelineDragStartDate = new Date(this.timelineStartDate);
       this.timelineDragLastDeltaDays = 0;
-      // Snapshot current day indices so we can restore from absolute delta each frame
-      this.timelineDragStartDayIndices = new Map(
-        (this.timelineConnections || []).map(c => [c, c.dayIndex])
-      );
+      // No need to snapshot dayIndex values – they are computed dynamically from
+      // each connection's box.timelineDate, which is immutable during the drag.
     } else {
       // Bar body click: select the bar and begin a move drag
       this.timelineSelected = true;
@@ -742,10 +753,8 @@ class MindMap {
         this.timelineBarX = this.timelineDragStartBarX - deltaDays * DAY_WIDTH;
         // Grow/shrink total days
         this.timelineTotalDays = this.timelineDragStartTotalDays + deltaDays;
-        // Shift all connection day indices so dates are preserved
-        for (const [conn, origIdx] of (this.timelineDragStartDayIndices || [])) {
-          conn.dayIndex = origIdx + deltaDays;
-        }
+        // Connection dayIndex values update automatically because they are
+        // computed from each box's immutable timelineDate field.
         this.timelineDragLastDeltaDays = deltaDays;
       }
       this.isSaved = false;
@@ -761,7 +770,6 @@ class MindMap {
     this.timelineBarDragging = false;
     this.timelineDraggingResize = false;
     this.timelineDraggingLeftHandle = false;
-    this.timelineDragStartDayIndices = null;
     this.timelineDragLastDeltaDays = 0;
     if (wasDragging) {
       this.isSaved = false;
@@ -1970,8 +1978,9 @@ class MindMap {
     // Paste all copied boxes with offset and track new boxes
     const newBoxes = [];
     for (const boxData of this.copiedBoxes) {
-      // Destructure to exclude id - pasted boxes must get new unique IDs
-      const { id: _excludedId, ...boxDataWithoutId } = boxData;
+      // Destructure to exclude id and timelineDate - pasted boxes must get new IDs
+      // and must not inherit the source box's timeline connection.
+      const { id: _excludedId, timelineDate: _excludedDate, ...boxDataWithoutId } = boxData;
       const newBoxData = {
         ...boxDataWithoutId,
         x: boxData.x + offsetX,
@@ -2786,17 +2795,24 @@ class MindMap {
           const lx = wx - bx;
           const ly = wy - by;
 
-          // Dropped on bar → change the day
+          // Dropped on bar → change the day (re-date)
           if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
             const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
             const newDay = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
-            if (newDay !== conn.dayIndex) {
+            const newDate = this.timelineStartDate
+              ? TimelineMode.toISODateString(TimelineMode.dateForDay(newDay, this.timelineStartDate))
+              : null;
+            if (newDate && newDate !== conn.fromBox.timelineDate) {
               const dup = this.timelineConnections.some(
-                c => c !== conn && c.fromBox === conn.fromBox && c.dayIndex === newDay
+                c => c !== conn && c.fromBox === conn.fromBox && c.fromBox.timelineDate === newDate
               );
               if (!dup) {
                 this._wrapInTransaction(() => {
-                  conn.dayIndex = newDay;
+                  conn.fromBox.timelineDate = newDate;
+                  // Sync via ytimelineConnections only — _boxToYjsData does not include
+                  // timelineDate, so an onBoxChange call would make no Yjs writes
+                  // (_boxDataEquals detects equality and returns early) and is therefore
+                  // a pure no-op.  Calling it is misleading and adds unnecessary overhead.
                   if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
                 });
               }
@@ -2831,7 +2847,7 @@ class MindMap {
               });
             }
           }
-          // else: dropped nowhere → no change (dayIndex was never mutated)
+          // else: dropped nowhere → no change (box.timelineDate was never mutated)
         }
         return;
       }
@@ -3649,25 +3665,30 @@ class MindMap {
    * @returns {Object} JSON representation of the mind map
    */
   toJSON() {
-    const tlConns = (this.timelineConnections || []).map(c =>
-      (c && typeof c.toJSON === 'function') ? c.toJSON() : c
-    ).filter(Boolean);
-
     return {
       boxes: this.boxes.map(box => box.toJSON()),
       connections: this.connections.map(conn => conn.toJSON(this.boxes)),
       clusters: this.clusters
         ? this.clusters.filter(c => c).map(c => c.toJSON())
         : [],
-      timelineConnections: tlConns,
+      // Timeline connections are now implicit in each box's `timelineDate` field.
+      // The separate array is no longer written; loading old files that still have
+      // it is handled in fromJSON() for backward compatibility.
       timelineBarWidth: this.timelineBarWidth || null,
       timelineTotalDays: this.timelineTotalDays || null,
       timelineBarX: this.timelineBarX || 0,
       timelineBarY: this.timelineBarY || 0,
       timelineActive: this.timelineActive || false,
-      // Persist as ISO string so day-index labels show the same calendar dates
-      // across reloads (without this, labels would shift to today each time).
-      timelineStartDate: this.timelineStartDate ? this.timelineStartDate.toISOString() : null,
+      // Persist as a local "YYYY-MM-DD" date string so collaborators in different
+      // timezones all load the same calendar date.  Full ISO datetimes (the old
+      // format) embed the saving user's UTC offset, causing bar labels to differ
+      // between UTC+ and UTC- users.  TimelineMode.toISODateString() uses local
+      // date getters (not toISOString/UTC) to produce the correct string.
+      timelineStartDate: this.timelineStartDate
+        ? (typeof TimelineMode !== 'undefined'
+            ? TimelineMode.toISODateString(this.timelineStartDate)
+            : this.timelineStartDate.toISOString())
+        : null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
     };
@@ -3709,7 +3730,6 @@ class MindMap {
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;
     this.timelineDraggingLeftHandle = false;
-    this.timelineDragStartDayIndices = null;
 
     // Load boxes with error handling
     // Use safe iteration utility if available
@@ -3776,20 +3796,14 @@ class MindMap {
       }
     }
 
-    // Restore Timeline Mode connections
+    // Restore Timeline Mode connections.
+    // New format: each box carries its own timelineDate field; connections are
+    // rebuilt by scanning boxes so there is no separate array to maintain.
+    // Backward compat: if the JSON still contains a timelineConnections array
+    // (files saved before this refactor), migrate the dates onto the boxes first.
     this.timelineConnections = [];
     this.selectedTimelineConnection = null;
-    if (Array.isArray(data.timelineConnections)) {
-      for (const tcData of data.timelineConnections) {
-        if (!tcData) continue;
-        try {
-          const tc = TimelineConnection.fromJSON(tcData, this.boxIdMap, this);
-          if (tc) this.timelineConnections.push(tc);
-        } catch (e) {
-          console.error('Failed to load timeline connection:', e);
-        }
-      }
-    }
+
     // Restore persisted bar position and day count.
     // Legacy files without barX/barY default to (0, 0) so old maps still work.
     // Legacy files with timelineBarWidth are converted to timelineTotalDays.
@@ -3813,8 +3827,18 @@ class MindMap {
     // calendar dates across reloads rather than shifting to "today".
     this.timelineActive = data.timelineActive === true;
     if (data.timelineStartDate) {
-      const parsed = new Date(data.timelineStartDate);
-      this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
+      // New format: "YYYY-MM-DD" (date-only) — parse as LOCAL midnight so all
+      // clients in different timezones load the same calendar date.
+      // Old format: full ISO datetime (e.g. "2024-01-14T19:00:00.000Z") — parse
+      // as-is for backward compat; cross-timezone inconsistency is acceptable for
+      // old maps since we cannot recover the saving user's intended local date.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(data.timelineStartDate)) {
+        const [y, mo, da] = data.timelineStartDate.split('-').map(Number);
+        this.timelineStartDate = new Date(y, mo - 1, da); // local midnight
+      } else {
+        const parsed = new Date(data.timelineStartDate);
+        this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
+      }
     } else if (this.timelineActive) {
       // Fallback for maps saved before timelineStartDate was persisted.
       const today = new Date();
@@ -3822,6 +3846,41 @@ class MindMap {
       this.timelineStartDate = today;
     } else {
       this.timelineStartDate = null;
+    }
+
+    // Backward compat: migrate legacy {fromId, dayIndex} connections onto boxes.
+    // Only applied when boxes don't already carry timelineDate (old format).
+    if (Array.isArray(data.timelineConnections) && data.timelineConnections.length > 0) {
+      for (const tcData of data.timelineConnections) {
+        if (!tcData || !tcData.fromId) continue;
+        const fromBox = this.boxIdMap.get(tcData.fromId);
+        if (!fromBox || fromBox.timelineDate) continue; // skip if already set from box JSON
+        try {
+          if (tcData.date) {
+            // Validate format before assigning: a malformed date would cause NaN
+            // day indices and break timeline arrow rendering.
+            if (/^\d{4}-\d{2}-\d{2}$/.test(tcData.date)) {
+              fromBox.timelineDate = tcData.date;
+            } else {
+              console.warn('[MindMap] fromJSON: invalid legacy timelineDate format, skipping', tcData.date);
+            }
+          } else if (tcData.dayIndex != null && this.timelineStartDate) {
+            // Legacy dayIndex → compute the calendar date
+            fromBox.timelineDate = TimelineMode.toISODateString(
+              TimelineMode.dateForDay(tcData.dayIndex, this.timelineStartDate)
+            );
+          }
+        } catch (e) {
+          console.error('Failed to migrate legacy timeline connection:', e);
+        }
+      }
+    }
+
+    // Build TimelineConnection objects from boxes that have a timelineDate set
+    for (const box of this.boxes) {
+      if (box && box.timelineDate) {
+        this.timelineConnections.push(new TimelineConnection(box, this));
+      }
     }
 
     this.isDirty = true;

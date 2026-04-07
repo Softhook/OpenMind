@@ -1176,16 +1176,24 @@ class CollaborationManager {
                 // Sync timeline connections
                 if (this.ytimelineConnections && this.mindMap.timelineConnections) {
                     const existingTlConns = new Set(
-                        this.ytimelineConnections.toArray().map(c => `${c.fromId}:${c.dayIndex}`)
+                        // Build keys the same way _syncTimelineConnectionsToYjsImpl does:
+                        // new entries → "fromId:YYYY-MM-DD"; legacy {dayIndex} entries →
+                        // "fromId:dayN".  Using c.date || '' collapses all legacy entries
+                        // for a box to the same key, causing them to be skipped or duplicated.
+                        this.ytimelineConnections.toArray().map(c =>
+                            c && c.fromId
+                                ? (c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`)
+                                : ''
+                        )
                     );
                     for (const conn of this.mindMap.timelineConnections) {
-                        if (!conn) continue;
-                        const fromId   = conn.fromBox ? conn.fromBox.id : conn.fromId;
-                        const dayIndex = conn.dayIndex;
-                        if (fromId && dayIndex != null) {
-                            const key = `${fromId}:${dayIndex}`;
+                        if (!conn || !conn.fromBox) continue;
+                        const fromId = conn.fromBox.id;
+                        const date   = conn.fromBox.timelineDate;
+                        if (fromId && date) {
+                            const key = `${fromId}:${date}`;
                             if (!existingTlConns.has(key)) {
-                                this.ytimelineConnections.push([{ fromId, dayIndex }]);
+                                this.ytimelineConnections.push([{ fromId, date }]);
                                 existingTlConns.add(key);
                             }
                         }
@@ -1620,16 +1628,18 @@ class CollaborationManager {
     /**
      * Syncs timeline connections to Yjs.
      * Call this when mindMap.timelineConnections changes.
+     * Each entry is stored as {fromId, date} (ISO date string) so the connection
+     * always refers to a specific calendar date rather than a position index.
      * @param {boolean} skipTransactionWrapper - If true, sync directly (already inside a transaction)
      */
     syncTimelineConnectionsToYjs(skipTransactionWrapper = false) {
         if (!this.ytimelineConnections || !this.mindMap || this.isSyncing) return;
 
         const localConns = (this.mindMap.timelineConnections || [])
-            .filter(c => c && (c.fromBox ? c.fromBox.id : c.fromId) && c.dayIndex != null)
+            .filter(c => c && c.fromBox && c.fromBox.id && c.fromBox.timelineDate)
             .map(c => ({
-                fromId:   c.fromBox ? c.fromBox.id : c.fromId,
-                dayIndex: c.dayIndex
+                fromId: c.fromBox.id,
+                date:   c.fromBox.timelineDate,
             }));
 
         if (skipTransactionWrapper) {
@@ -1655,11 +1665,16 @@ class CollaborationManager {
     _syncTimelineConnectionsToYjsImpl(localConns) {
         const yjsConns = this.ytimelineConnections.toArray();
 
-        // Build a map of existing Yjs entries: "fromId:dayIndex" -> [index...]
+        // Build a stable key for each Yjs entry so we can diff-sync without
+        // destroying and recreating everything on every change.
+        // New entries use "fromId:YYYY-MM-DD" (from the {date} field).
+        // Legacy entries from pre-refactor peers used {dayIndex} instead of {date};
+        // they get a "fromId:dayN" key so they're still tracked and deleted when
+        // the local list moves to the date format.
         const yjsMap = new Map();
         yjsConns.forEach((c, i) => {
-            if (c && c.fromId && c.dayIndex != null) {
-                const key = `${c.fromId}:${c.dayIndex}`;
+            if (c && c.fromId && (c.date || c.dayIndex != null)) {
+                const key = c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`;
                 if (!yjsMap.has(key)) yjsMap.set(key, []);
                 yjsMap.get(key).push(i);
             }
@@ -1667,7 +1682,7 @@ class CollaborationManager {
 
         const toAdd = [];
         for (const conn of localConns) {
-            const key = `${conn.fromId}:${conn.dayIndex}`;
+            const key = `${conn.fromId}:${conn.date}`;
             if (yjsMap.has(key)) {
                 const indices = yjsMap.get(key);
                 if (indices.length > 0) {
@@ -1695,6 +1710,12 @@ class CollaborationManager {
 
     /**
      * Rebuilds mindMap.timelineConnections from the Yjs array.
+     * Handles both new {fromId, date} format and legacy {fromId, dayIndex} format.
+     *
+     * IMPORTANT: also clears box.timelineDate on any box that is no longer in
+     * ytimelineConnections.  Without this, undoing an "add connection" operation
+     * would leave box.timelineDate stale — the next save/reload would then
+     * resurrect the undone connection as a ghost.
      * @private
      */
     _rebuildTimelineConnectionsFromYjs() {
@@ -1705,11 +1726,63 @@ class CollaborationManager {
             this.mindMap.selectedTimelineConnection = null;
         }
         const data = this.ytimelineConnections.toArray();
+
+        // Build the set of box IDs that have connections in Yjs so we can
+        // efficiently clear stale timelineDate values below.
+        const connectedBoxIds = new Set(
+            data.filter(e => e && e.fromId).map(e => e.fromId)
+        );
+
+        // Clear timelineDate on any box that is no longer connected.
+        // This keeps box.timelineDate in sync with ytimelineConnections, which
+        // is the single authoritative Yjs source of truth.  It is critical for
+        // undo correctness: when undo removes an entry from ytimelineConnections
+        // we must also clear the date from the box so that a subsequent save does
+        // not persist a ghost connection.
+        for (const box of (this.mindMap.boxes || [])) {
+            if (box && box.timelineDate && !connectedBoxIds.has(box.id)) {
+                box.timelineDate = null;
+            }
+        }
+
+        // Track which box IDs already have a connection built so that concurrent
+        // edits that insert duplicate entries for the same box (e.g. two peers
+        // simultaneously re-dating the same box) never produce two arrows.
+        const builtBoxIds = new Set();
+
         for (const entry of data) {
-            if (!entry || !entry.fromId || entry.dayIndex == null) continue;
+            if (!entry || !entry.fromId) continue;
+            // Require either a date string or a legacy dayIndex
+            if (!entry.date && entry.dayIndex == null) continue;
             const fromBox = this.mindMap.getBoxById(entry.fromId);
-            if (fromBox) {
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, entry.dayIndex, this.mindMap));
+            if (!fromBox) continue;
+
+            // Resolve the calendar date onto the box.
+            // Validate entry.date format: this value is remote-collaborator controlled
+            // (Yjs), so an unexpected string must not propagate into day-index math
+            // (which would yield NaN and break rendering/hit-testing).
+            const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+            if (entry.date) {
+                if (!ISO_DATE_RE.test(entry.date)) {
+                    console.warn('[CollaborationManager] _rebuildTimelineConnectionsFromYjs: invalid date format, skipping', entry.date);
+                    continue;
+                }
+                fromBox.timelineDate = entry.date;
+            } else if (entry.dayIndex != null && this.mindMap.timelineStartDate) {
+                // Legacy: compute date from dayIndex
+                if (typeof TimelineMode !== 'undefined') {
+                    fromBox.timelineDate = TimelineMode.toISODateString(
+                        TimelineMode.dateForDay(entry.dayIndex, this.mindMap.timelineStartDate)
+                    );
+                }
+            }
+
+            // Guard against duplicate arrows: if ytimelineConnections somehow
+            // contains two entries for the same box (possible with concurrent
+            // re-dating by two peers), only create one TimelineConnection.
+            if (fromBox.timelineDate && !builtBoxIds.has(entry.fromId)) {
+                builtBoxIds.add(entry.fromId);
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap));
             }
         }
     }

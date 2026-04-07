@@ -126,9 +126,10 @@ const TimelineConnection = sandbox.module.exports.TimelineConnection;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeBox(id, x = 0, y = 0) {
+function makeBox(id, x = 0, y = 0, timelineDate = null) {
   return {
     id, x, y, width: 100, height: 40,
+    timelineDate,
     getConnectionPoint(other) { return { x: this.x, y: this.y }; }
   };
 }
@@ -224,20 +225,39 @@ describe('TimelineMode.isOverBarWorld / isDragHandle', () => {
 // TimelineConnection – constructor and geometry
 // ============================================================
 describe('TimelineConnection', () => {
-  test('constructor sets fromBox, dayIndex and mindMap', () => {
-    const box = makeBox('b1', 100, -50);
+  test('constructor sets fromBox and mindMap', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
     const mm  = makeMindMap([box]);
-    const conn = new TimelineConnection(box, 5, mm);
+    const conn = new TimelineConnection(box, mm);
     expect(conn.fromBox).toBe(box);
-    expect(conn.dayIndex).toBe(5);
     expect(conn.mindMap).toBe(mm);
     expect(conn.selected).toBe(false);
   });
 
-  test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
-    const box = makeBox('b1', 100, -50);
+  test('dayIndex is computed from box.timelineDate and mindMap.timelineStartDate', () => {
+    // startDate = 2024-01-01 (local midnight), timelineDate = 2024-01-06 → dayIndex = 5.
+    // Use local-midnight constructor (same as createTimeline()) so the test is
+    // timezone-independent: no UTC vs local offset causes a spurious ±1 day shift.
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
+    const box = makeBox('b1', 100, -50, '2024-01-06');
     const mm  = makeMindMap([box]);
-    const conn = new TimelineConnection(box, 5, mm);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
+    expect(conn.dayIndex).toBe(5);
+  });
+
+  test('dayIndex falls back to 0 when mindMap is null', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
+    expect(conn.dayIndex).toBe(0);
+  });
+
+  test('_getConnectionEndpoints returns valid endpoints with mindMap', () => {
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const box = makeBox('b1', 100, -50, '2024-01-06'); // dayIndex = 5
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
     expect(ep).not.toBeNull();
@@ -248,10 +268,10 @@ describe('TimelineConnection', () => {
   });
 
   test('_getConnectionEndpoints uses DEFAULT_WIDTH when mindMap is null', () => {
-    const box = makeBox('b1', 100, -50);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
     const ep = conn._getConnectionEndpoints();
-    const cell = TimelineMode.dayCellRect(5, TimelineMode.BAR_HEIGHT);
+    const cell = TimelineMode.dayCellRect(0, TimelineMode.BAR_HEIGHT); // dayIndex=0 when no mindMap
     expect(ep).not.toBeNull();
     expect(ep.end.x).toBeGreaterThanOrEqual(cell.x);
     expect(ep.end.x).toBeLessThanOrEqual(cell.x + cell.w);
@@ -260,8 +280,11 @@ describe('TimelineConnection', () => {
   });
 
   test('box above bar mid-line projects to upper half of day-cell boundary', () => {
-    const box = makeBox('b1', 0, -100);   // y < BAR_HEIGHT/2
-    const conn = new TimelineConnection(box, 10, null);
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const box = makeBox('b1', 0, -100, '2024-01-11'); // dayIndex = 10
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
     expect(ep.end.y).toBeGreaterThanOrEqual(cell.y);
@@ -269,8 +292,11 @@ describe('TimelineConnection', () => {
   });
 
   test('box below bar mid-line projects to lower half of day-cell boundary', () => {
-    const box = makeBox('b1', 0, 200);    // y > BAR_HEIGHT/2
-    const conn = new TimelineConnection(box, 10, null);
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const box = makeBox('b1', 0, 200, '2024-01-11'); // dayIndex = 10
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = startDate;
+    const conn = new TimelineConnection(box, mm);
     const ep = conn._getConnectionEndpoints();
     const cell = TimelineMode.dayCellRect(10, TimelineMode.BAR_HEIGHT);
     expect(ep.end.y).toBeGreaterThanOrEqual(cell.cy);
@@ -278,8 +304,8 @@ describe('TimelineConnection', () => {
   });
 
   test('TimelineConnection is a subclass of Connection', () => {
-    const box = makeBox('b1', 0, -100);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 0, -100, '2024-01-06');
+    const conn = new TimelineConnection(box, null);
     expect(conn instanceof sandbox.Connection).toBe(true);
   });
 });
@@ -288,53 +314,106 @@ describe('TimelineConnection', () => {
 // TimelineConnection – serialisation
 // ============================================================
 describe('TimelineConnection serialisation', () => {
-  test('toJSON() returns {fromId, dayIndex}', () => {
-    const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 10, null);
-    expect(conn.toJSON()).toMatchObject({ fromId: 'b1', dayIndex: 10 });
+  test('toJSON() returns {fromId, date}', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-11');
+    const conn = new TimelineConnection(box, null);
+    expect(conn.toJSON()).toMatchObject({ fromId: 'b1', date: '2024-01-11' });
   });
 
-  test('toJSON() has no unexpected fields', () => {
-    const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 10, null);
+  test('toJSON() does not contain dayIndex', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-11');
+    const conn = new TimelineConnection(box, null);
     const json = conn.toJSON();
+    expect(json.dayIndex).toBeUndefined();
     expect(json.side).toBeUndefined();
     expect(json.boxId).toBeUndefined();
   });
 
-  test('fromJSON round-trips correctly', () => {
+  test('fromJSON round-trips correctly with new {fromId, date} format', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
-    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, map, null);
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, map, null);
     expect(conn).not.toBeNull();
     expect(conn.fromBox).toBe(box);
+    expect(box.timelineDate).toBe('2024-01-16');
+  });
+
+  test('fromJSON computes dayIndex correctly from stored date', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.dayIndex).toBe(15);
+  });
+
+  test('fromJSON handles legacy {fromId, dayIndex} format (backward compat)', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm  = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.fromBox).toBe(box);
+    // Legacy dayIndex=15 with startDate=Jan 1 local → Jan 16 local → "2024-01-16"
+    expect(box.timelineDate).toBe('2024-01-16');
     expect(conn.dayIndex).toBe(15);
   });
 
   test('fromJSON sets mindMap when provided', () => {
     const box = makeBox('b1', 0, 0);
     const mm  = makeMindMap([box]);
-    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 15 }, mm.boxIdMap, mm);
+    mm.timelineStartDate = new Date(2024, 0, 1); // Jan 1 local midnight — timezone-independent
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16' }, mm.boxIdMap, mm);
     expect(conn.mindMap).toBe(mm);
   });
 
   test('fromJSON returns null for missing box', () => {
-    const conn = TimelineConnection.fromJSON({ fromId: 'missing', dayIndex: 5 }, new Map(), null);
+    const conn = TimelineConnection.fromJSON({ fromId: 'missing', date: '2024-01-16' }, new Map(), null);
     expect(conn).toBeNull();
   });
 
-  test('fromJSON returns null for missing dayIndex', () => {
+  test('fromJSON returns null when neither date nor dayIndex present', () => {
     const box = makeBox('b1', 0, 0);
     const map = new Map([['b1', box]]);
     const conn = TimelineConnection.fromJSON({ fromId: 'b1' }, map, null);
     expect(conn).toBeNull();
   });
 
-  test('plain JSON.stringify round-trip preserves fromId and dayIndex', () => {
+  test('fromJSON returns null for legacy dayIndex without mindMap.timelineStartDate', () => {
     const box = makeBox('b1', 0, 0);
-    const conn = new TimelineConnection(box, 15, null);
+    const map = new Map([['b1', box]]);
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', dayIndex: 5 }, map, null);
+    expect(conn).toBeNull();
+  });
+
+  test('fromJSON returns null and logs warning for invalid date format', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const warnSpy = jest.spyOn(sandbox.console, 'warn').mockImplementation(() => {});
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: 'not-a-date' }, map, null);
+    expect(conn).toBeNull();
+    expect(box.timelineDate).toBeNull(); // must not write invalid string
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  test('fromJSON rejects date with time component (non-date-only string)', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const warnSpy = jest.spyOn(sandbox.console, 'warn').mockImplementation(() => {});
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16T00:00:00.000Z' }, map, null);
+    expect(conn).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  test('plain JSON.stringify round-trip preserves fromId and date', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-16');
+    const conn = new TimelineConnection(box, null);
     const json = JSON.parse(JSON.stringify(conn.toJSON()));
-    expect(json).toMatchObject({ fromId: 'b1', dayIndex: 15 });
+    expect(json).toMatchObject({ fromId: 'b1', date: '2024-01-16' });
   });
 });
 
@@ -380,7 +459,7 @@ describe('TimelineMode.drawBar()', () => {
 });
 
 // ============================================================
-// TimelineMode.dateForDay / weekNumber
+// TimelineMode.dateForDay / dayIndexForDate / toISODateString / weekNumber
 // ============================================================
 describe('TimelineMode.dateForDay()', () => {
   const today = new Date();
@@ -398,6 +477,74 @@ describe('TimelineMode.dateForDay()', () => {
     const expected = new Date(today);
     expected.setDate(expected.getDate() + 7);
     expect(d.getDate()).toBe(expected.getDate());
+  });
+});
+
+describe('TimelineMode.toISODateString()', () => {
+  test('returns the LOCAL calendar date as YYYY-MM-DD', () => {
+    // new Date(y, m, d) creates local midnight — result must match that local date
+    // regardless of the machine timezone.  This verifies that local getters are
+    // used (not UTC getters / toISOString which would shift UTC+ users by 1 day).
+    const localMidnight = new Date(2024, 0, 15); // Jan 15 local midnight
+    expect(TimelineMode.toISODateString(localMidnight)).toBe('2024-01-15');
+  });
+
+  test('round-trips through new Date(str) → toISODateString', () => {
+    // A date stored as a local-midnight Date must survive a round-trip.
+    const original = '2024-06-20';
+    const [y, mo, da] = original.split('-').map(Number);
+    const date = new Date(y, mo - 1, da); // local midnight — same approach as fromJSON
+    expect(TimelineMode.toISODateString(date)).toBe(original);
+  });
+
+  test('month and day are zero-padded', () => {
+    const d = new Date(2024, 2, 5); // March 5 (month index 2)
+    expect(TimelineMode.toISODateString(d)).toBe('2024-03-05');
+  });
+});
+
+describe('TimelineMode.dayIndexForDate()', () => {
+  // Use the local-midnight constructor (same as createTimeline does) so the test
+  // is timezone-independent: all date math stays in local time.
+  const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
+
+  test('same date as startDate returns 0', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-01', startDate)).toBe(0);
+  });
+
+  test('5 days after startDate returns 5', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-06', startDate)).toBe(5);
+  });
+
+  test('is the inverse of dateForDay', () => {
+    const dayIndex = 15;
+    const date = TimelineMode.dateForDay(dayIndex, startDate);
+    expect(TimelineMode.dayIndexForDate(date, startDate)).toBe(dayIndex);
+  });
+
+  test('accepts ISO date strings', () => {
+    expect(TimelineMode.dayIndexForDate('2024-01-16', startDate)).toBe(15);
+  });
+
+  test('ISO date string "YYYY-MM-DD" is treated as local midnight, not UTC midnight', () => {
+    // This is the key timezone-correctness test.
+    // "2024-01-15" must be treated as local Jan 15 (same as new Date(2024, 0, 15))
+    // regardless of timezone.  In UTC+ environments, new Date("2024-01-15") is UTC
+    // midnight which, after setHours(0,0,0,0), becomes local midnight of Jan 14
+    // (or Jan 15 depending on offset) — creating a 1-day mismatch.
+    // The fixed implementation always parses "YYYY-MM-DD" via new Date(y, m-1, d).
+    const start = new Date(2024, 0, 1); // Jan 1 local midnight
+    expect(TimelineMode.dayIndexForDate('2024-01-15', start)).toBe(14); // Jan 15 − Jan 1 = 14 days
+  });
+
+  test('cross-client consistency: date string round-trips via toISODateString', () => {
+    // Simulate: save a date with toISODateString, reload with dayIndexForDate.
+    // The dayIndex must be preserved regardless of timezone.
+    const start = new Date(2024, 0, 1); // Jan 1 local midnight
+    const dayIndex = 20;
+    const date = TimelineMode.dateForDay(dayIndex, start);
+    const stored = TimelineMode.toISODateString(date);     // e.g. "2024-01-21"
+    expect(TimelineMode.dayIndexForDate(stored, start)).toBe(dayIndex);
   });
 });
 
@@ -447,8 +594,8 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('draws a rect and text for each connected box', () => {
-    const box = makeBox('b1', 0, -200);
-    const conn = new TimelineConnection(box, 10, null);
+    const box = makeBox('b1', 0, -200, '2024-06-01');
+    const conn = new TimelineConnection(box, null);
     TimelineMode.drawBoxDateLabels([conn], today, 1);
     // Should have drawn at least one rect (pill) and one text call
     expect(sandbox.rect).toHaveBeenCalled();
@@ -456,27 +603,27 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('skips connections with no fromBox', () => {
-    const conn = new TimelineConnection(null, 5, null);
+    const conn = new TimelineConnection(null, null);
     expect(() => TimelineMode.drawBoxDateLabels([conn], today, 1)).not.toThrow();
     expect(sandbox.rect).not.toHaveBeenCalled();
   });
 
   test('draws one badge per connection', () => {
-    const box1 = makeBox('b1', 0, -200);
-    const box2 = makeBox('b2', 300, -200);
-    const conn1 = new TimelineConnection(box1, 5, null);
-    const conn2 = new TimelineConnection(box2, 20, null);
+    const box1 = makeBox('b1', 0, -200, '2024-06-05');
+    const box2 = makeBox('b2', 300, -200, '2024-06-20');
+    const conn1 = new TimelineConnection(box1, null);
+    const conn2 = new TimelineConnection(box2, null);
     sandbox.rect.mockClear();
     TimelineMode.drawBoxDateLabels([conn1, conn2], today, 1);
     expect(sandbox.rect.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   test('label text includes abbreviated weekday', () => {
-    const box = makeBox('b1', 0, -200);
-    // Use a fixed start date: 2024-01-01 (Monday)
-    const startDate = new Date('2024-01-01T00:00:00.000Z');
-    startDate.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null); // day 0 = 2024-01-01 = Monday
+    // 2024-01-01 is a Monday — use local midnight so the weekday is correct
+    // in all timezones (UTC midnight would be Sun Dec 31 local in UTC-5).
+    const startDate = new Date(2024, 0, 1); // Jan 1 local midnight
+    const box = makeBox('b1', 0, -200, '2024-01-01'); // stored date = start date (day 0)
+    const conn = new TimelineConnection(box, null);
     sandbox.text.mockClear();
     TimelineMode.drawBoxDateLabels([conn], startDate, 1);
     expect(sandbox.text).toHaveBeenCalled();
@@ -486,28 +633,27 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('uses red fill for past dates', () => {
-    const box = makeBox('b1', 0, -200);
-    // Ensure the date is in the past: use a startDate far in the past
+    // Ensure the date is in the past: 2000-01-01
     const pastStart = new Date('2000-01-01T00:00:00.000Z');
     pastStart.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null); // day 0 = 2000-01-01 — definitely past
+    const box = makeBox('b1', 0, -200, '2000-01-01');
+    const conn = new TimelineConnection(box, null);
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], pastStart, 1);
     // The first fill() call after noStroke() should be the red past-date pill background
     const fillCalls = sandbox.fill.mock.calls;
     expect(fillCalls.length).toBeGreaterThan(0);
-    // Find the fill call for the pill: first fill with 4 args (r, g, b, alpha) or 3-arg (r, g, b)
     // Red past pill: fill(200, 60, 60, 210)
     const pillFill = fillCalls.find(args => args[0] === 200 && args[1] === 60 && args[2] === 60);
     expect(pillFill).toBeDefined();
   });
 
   test('uses blue fill for future/today dates', () => {
-    const box = makeBox('b1', 0, -200);
-    // Use a startDate far in the future so dayIndex=0 is a future date
+    // Use a date far in the future
     const futureStart = new Date('2099-01-01T00:00:00.000Z');
     futureStart.setHours(0, 0, 0, 0);
-    const conn = new TimelineConnection(box, 0, null);
+    const box = makeBox('b1', 0, -200, '2099-01-01');
+    const conn = new TimelineConnection(box, null);
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], futureStart, 1);
     const fillCalls = sandbox.fill.mock.calls;
@@ -517,8 +663,8 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   });
 
   test('uses orange fill for selected connection', () => {
-    const box = makeBox('b1', 0, -200);
-    const conn = new TimelineConnection(box, 0, null);
+    const box = makeBox('b1', 0, -200, '2024-06-01');
+    const conn = new TimelineConnection(box, null);
     conn.selected = true;
     sandbox.fill.mockClear();
     TimelineMode.drawBoxDateLabels([conn], today, 1);
@@ -526,6 +672,15 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
     // Orange selected pill: fill(255, 140, 0, 210)
     const pillFill = fillCalls.find(args => args[0] === 255 && args[1] === 140 && args[2] === 0);
     expect(pillFill).toBeDefined();
+  });
+
+  test('skips box with no timelineDate', () => {
+    // A box without a timelineDate should produce no badge
+    const box = makeBox('b1', 0, -200); // timelineDate = null
+    const conn = new TimelineConnection(box, null);
+    sandbox.rect.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], today, 1);
+    expect(sandbox.rect).not.toHaveBeenCalled();
   });
 });
 
@@ -545,8 +700,8 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingConnection', ()
   });
 
   test('draws snap preview when draggingConnection and mouse over bar', () => {
-    const box = makeBox('b1', 100, -200);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -200, '2024-01-01');
+    const conn = new TimelineConnection(box, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
     mindMap.draggingConnection = { conn, originalTo: null };
@@ -557,8 +712,8 @@ describe('TimelineMode._drawConnectionDragPreview() with draggingConnection', ()
   });
 
   test('no preview when mouse outside bar and dragging endpoint', () => {
-    const box = makeBox('b1', 100, -200);
-    const conn = new TimelineConnection(box, 5, null);
+    const box = makeBox('b1', 100, -200, '2024-01-01');
+    const conn = new TimelineConnection(box, null);
     const mindMap = makeMindMap([box]);
     mindMap.connectingFrom = null;
     mindMap.draggingConnection = { conn, originalTo: null };

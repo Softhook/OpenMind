@@ -49,14 +49,25 @@
  */
 class TimelineConnection extends Connection {
   /**
-   * @param {TextBox} fromBox   – source box
-   * @param {number}  dayIndex  – 0 … TimelineMode.TOTAL_DAYS-1
-   * @param {*}       mindMap   – MindMap instance (for bar width lookup)
+   * @param {TextBox} fromBox  – source box (its timelineDate field holds the calendar date)
+   * @param {*}       mindMap  – MindMap instance (for bar geometry lookup)
    */
-  constructor(fromBox, dayIndex, mindMap = null) {
-    super(fromBox, null); // toBox is virtual (computed from dayIndex)
-    this.dayIndex = dayIndex;
+  constructor(fromBox, mindMap = null) {
+    super(fromBox, null); // toBox is virtual (computed from fromBox.timelineDate)
     this.mindMap  = mindMap;
+  }
+
+  /**
+   * The day index (0-based from timelineStartDate) is computed dynamically from
+   * the box's timelineDate field, so it always tracks the correct calendar date
+   * even when the timeline start date is shifted.
+   * @returns {number}
+   */
+  get dayIndex() {
+    if (this.fromBox && this.fromBox.timelineDate && this.mindMap && this.mindMap.timelineStartDate) {
+      return TimelineMode.dayIndexForDate(this.fromBox.timelineDate, this.mindMap.timelineStartDate);
+    }
+    return 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -71,13 +82,14 @@ class TimelineConnection extends Connection {
    */
   _getConnectionEndpoints() {
     if (!this.fromBox) return null;
+    const dayIndex = this.dayIndex;
     const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
     const barX = this.mindMap ? (this.mindMap.timelineBarX || 0) : 0;
     const barY = this.mindMap ? (this.mindMap.timelineBarY || 0) : 0;
     const center = {
-      x: barX + TimelineMode.worldDayCenterX(this.dayIndex, barWidth),
+      x: barX + TimelineMode.worldDayCenterX(dayIndex, barWidth),
       y: barY + TimelineMode.dayCellCenterY(TimelineMode.BAR_HEIGHT),
-      dayIndex: this.dayIndex,
+      dayIndex,
     };
     if (typeof this.fromBox.getConnectionPoint !== 'function') return null;
     const start = this.fromBox.getConnectionPoint(center);
@@ -101,25 +113,35 @@ class TimelineConnection extends Connection {
   reverse() {}
 
   // ---------------------------------------------------------------------------
-  // Serialisation  (dayIndex-aware — overrides Connection.toJSON/fromJSON)
+  // Serialisation  (date-aware — overrides Connection.toJSON/fromJSON)
   // ---------------------------------------------------------------------------
 
   toJSON() {
     return {
-      fromId:   this.fromBox ? this.fromBox.id : null,
-      dayIndex: this.dayIndex,
+      fromId: this.fromBox ? this.fromBox.id : null,
+      date:   this.fromBox ? this.fromBox.timelineDate : null,
     };
   }
 
   /**
    * Reconstruct a TimelineConnection from stored JSON.
-   * @param {Object}              data        – {fromId, dayIndex}
+   *
+   * Accepts both the new format  {fromId, date}  and the legacy format
+   * {fromId, dayIndex} (maps saved before this refactor).  When the legacy
+   * format is encountered, the calendar date is computed from dayIndex +
+   * mindMap.timelineStartDate and stored on the box so future saves use the
+   * new format.
+   *
+   * @param {Object}              data        – {fromId, date} or {fromId, dayIndex}
    * @param {Map|Array<TextBox>}  boxesOrMap  – boxIdMap or boxes array
    * @param {*}                   mindMap     – MindMap instance (optional)
    * @returns {TimelineConnection|null}
    */
   static fromJSON(data, boxesOrMap, mindMap = null) {
-    if (!data || !data.fromId || data.dayIndex == null) return null;
+    if (!data || !data.fromId) return null;
+    // Require either a date string or a legacy dayIndex
+    if (!data.date && data.dayIndex == null) return null;
+
     let fromBox = null;
     if (boxesOrMap instanceof Map) {
       fromBox = boxesOrMap.get(data.fromId);
@@ -127,7 +149,29 @@ class TimelineConnection extends Connection {
       fromBox = boxesOrMap.find(b => b && b.id === data.fromId);
     }
     if (!fromBox) return null;
-    return new TimelineConnection(fromBox, data.dayIndex, mindMap);
+
+    // Resolve the calendar date to store on the box.
+    // Validate the format so that malformed persisted JSON cannot propagate into
+    // day-index calculations (which would yield NaN and break geometry/filtering).
+    const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    if (data.date) {
+      if (!ISO_DATE_RE.test(data.date)) {
+        console.warn('[TimelineConnection] fromJSON: invalid date format, skipping', data.date);
+        return null;
+      }
+      fromBox.timelineDate = data.date;
+    } else if (data.dayIndex != null && mindMap && mindMap.timelineStartDate) {
+      // Legacy: compute calendar date from dayIndex + startDate
+      const d = TimelineMode.dateForDay(data.dayIndex, mindMap.timelineStartDate);
+      fromBox.timelineDate = TimelineMode.toISODateString(d);
+    } else {
+      if (data.dayIndex != null) {
+        console.warn('[TimelineConnection] Skipping legacy connection: timelineStartDate unavailable for dayIndex migration', { fromId: data.fromId, dayIndex: data.dayIndex });
+      }
+      return null;
+    }
+
+    return new TimelineConnection(fromBox, mindMap);
   }
 }
 
@@ -283,6 +327,54 @@ class TimelineMode {
     const d = new Date(startDate);
     d.setDate(d.getDate() + dayIndex);
     return d;
+  }
+
+  /**
+   * Returns the day index (0-based from startDate) for a given calendar date.
+   * This is the inverse of dateForDay().
+   *
+   * "YYYY-MM-DD" strings are interpreted as LOCAL midnight (not UTC midnight).
+   * `new Date("YYYY-MM-DD")` parses as UTC midnight, which is the wrong local
+   * date for UTC+ users.  Using the Date(y, m, d) constructor forces local time
+   * so the same date string resolves to the same calendar day on every client.
+   *
+   * @param {string|Date} date      – ISO date string ("YYYY-MM-DD") or Date object
+   * @param {Date}        startDate – timeline start date
+   * @returns {number} integer day index (may be negative or beyond the bar)
+   */
+  static dayIndexForDate(date, startDate) {
+    // Parse "YYYY-MM-DD" strings as local midnight so all clients agree on which
+    // day they refer to.  Date objects are normalised to local midnight via setHours.
+    const toLocalMidnight = (d) => {
+      if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const [y, mo, da] = d.split('-').map(Number);
+        return new Date(y, mo - 1, da); // local midnight — timezone-invariant
+      }
+      const result = new Date(d);
+      result.setHours(0, 0, 0, 0);
+      return result;
+    };
+    return Math.round((toLocalMidnight(date) - toLocalMidnight(startDate)) / 86400000);
+  }
+
+  /**
+   * Converts a Date (or Date-like value) to an ISO-8601 date-only string
+   * (e.g. "2024-01-15") using LOCAL date components.
+   *
+   * Using toISOString() returns the UTC date, which is wrong for UTC+ users
+   * because local midnight (e.g. Jan 15 00:00 UTC+5) is Jan 14 19:00 UTC.
+   * Using getFullYear/getMonth/getDate() always returns the local calendar date.
+   *
+   * All timeline date storage goes through this helper so the format is consistent.
+   * @param {Date|string} date
+   * @returns {string}  "YYYY-MM-DD"
+   */
+  static toISODateString(date) {
+    const d = new Date(date);
+    const y  = d.getFullYear();
+    const m  = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
   }
 
   /**
@@ -529,7 +621,7 @@ class TimelineMode {
     today.setHours(0, 0, 0, 0);
 
     for (const conn of conns) {
-      if (!conn || !conn.fromBox || conn.dayIndex == null) continue;
+      if (!conn || !conn.fromBox || !conn.fromBox.timelineDate) continue;
       const box = conn.fromBox;
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
 
