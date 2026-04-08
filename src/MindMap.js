@@ -1128,13 +1128,13 @@ class MindMap {
         // Tail drag: line from mouse to the fixed end (arrowhead position), arrow at that end
         const arrowEnd = conn.getArrowHeadPosition ? conn.getArrowHeadPosition() : null;
         if (arrowEnd && !isNaN(arrowEnd.x) && !isNaN(arrowEnd.y)) {
-          const angle = atan2(arrowEnd.y - my, arrowEnd.x - mx);
-          // Shorten line so it terminates inside the arrowhead triangle
           const dx = arrowEnd.x - mx;
           const dy = arrowEnd.y - my;
           const segLen = Math.sqrt(dx * dx + dy * dy);
-          const shortenedX = segLen > size ? arrowEnd.x - size * Math.cos(angle) : mx;
-          const shortenedY = segLen > size ? arrowEnd.y - size * Math.sin(angle) : my;
+          // Shorten line so it terminates inside the arrowhead triangle
+          const shortenedX = segLen > size ? arrowEnd.x - size * (dx / segLen) : mx;
+          const shortenedY = segLen > size ? arrowEnd.y - size * (dy / segLen) : my;
+          const angle = atan2(dy, dx);
           push();
           Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
           line(mx, my, shortenedX, shortenedY);
@@ -2887,10 +2887,11 @@ class MindMap {
               const dup = this.timelineConnections.some(c => c !== conn && c.fromBox === droppedBox);
               if (!dup) {
                 this._wrapInTransaction(() => {
-                  // Clear the old box's timelineDate and set on the new box
+                  // Save the date before clearing it from the old box
+                  const dateToTransfer = conn.fromBox ? conn.fromBox.timelineDate : null;
                   if (conn.fromBox) conn.fromBox.timelineDate = null;
                   conn.fromBox = droppedBox;
-                  droppedBox.timelineDate = originalFrom ? originalFrom.timelineDate : null;
+                  droppedBox.timelineDate = dateToTransfer;
                   if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
                 });
               }
