@@ -702,11 +702,12 @@ class TimelineMode {
         if (dom === 1 || d === 0) {
           currentMonth = mon;
           ctx.noStroke();
-          const monthLabel = ColorPalette.TIMELINE.MONTH_LABEL;
-          ctx.fill(monthLabel.r, monthLabel.g, monthLabel.b, monthLabel.a);
+          const barBg = ColorPalette.TIMELINE.BAR_BACKGROUND;
+          const monthTextColor = ColorPalette.getContrastColor(barBg);
+          ctx.fill(monthTextColor.r, monthTextColor.g, monthTextColor.b, monthTextColor.a);
           ctx.textSize(ts);
           ctx.textAlign(ctx.LEFT, ctx.TOP);
-          ctx.text(TimelineMode.MONTH_NAMES[mon] + ' ' + date.getFullYear(), x + 3 / safeZ, 3 / safeZ);
+          ctx.text(TimelineMode.MONTH_NAMES[mon] + ' ' + date.getFullYear(), x + 12 / safeZ, 3 / safeZ);
           const barBorder = ColorPalette.TIMELINE.BAR_BORDER;
           ctx.stroke(barBorder.r, barBorder.g, barBorder.b, barBorder.a);
           ctx.strokeWeight(sw);
@@ -770,7 +771,7 @@ class TimelineMode {
   /** @private – draws both the right-extend and left-extend grip handles */
   static _drawResizeHandle(ctx, bw, bh, sw) {
     const hr = bh * 0.5;
-    const hy = bh / 2;
+    const hy = hr / 2;
     const hw = 5 * sw;
 
     const handleBg = ColorPalette.TIMELINE.RESIZE_HANDLE_BG;
