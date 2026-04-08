@@ -1592,13 +1592,25 @@ function updateCursorForHover() {
   const thrustModeActive = (ExtensionBridge.draw && ExtensionBridge.draw.active);
   if (!isEditing && !thrustModeActive && keyIsDown(32)) { cursor('grab'); return; }
 
-  // PRIORITY: Arrowhead hover should override connector-dot hover when overlapping
+  // PRIORITY: Arrowhead/tail hover should override connector-dot hover when overlapping
   if (mindMap && mindMap.connections) {
     for (let i = mindMap.connections.length - 1; i >= 0; i--) {
       const conn = mindMap.connections[i];
-      if (!conn || !conn.isMouseOverArrowHead) continue;
+      if (!conn) continue;
       try {
-        if (conn.isMouseOverArrowHead()) { cursor('alias'); return; }
+        if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) { cursor('alias'); return; }
+        if (conn.isMouseOverTail && conn.isMouseOverTail()) { cursor('alias'); return; }
+      } catch (_) { }
+    }
+  }
+  // Also check timeline connections for tail hover
+  if (mindMap && mindMap.timelineConnections) {
+    for (let i = mindMap.timelineConnections.length - 1; i >= 0; i--) {
+      const tc = mindMap.timelineConnections[i];
+      if (!tc) continue;
+      try {
+        if (tc.isMouseOverArrowHead && tc.isMouseOverArrowHead()) { cursor('alias'); return; }
+        if (tc.isMouseOverTail && tc.isMouseOverTail()) { cursor('alias'); return; }
       } catch (_) { }
     }
   }
@@ -3489,9 +3501,10 @@ function isOverAnyInteractive() {
     try {
       if (conn.isMouseOver && conn.isMouseOver()) return true;
       if (conn.isMouseOverArrowHead && conn.isMouseOverArrowHead()) return true;
+      if (conn.isMouseOverTail && conn.isMouseOverTail()) return true;
     } catch (_) { }
   }
-  // Check timeline connections (so arrowhead clicks are not swallowed by the marquee-select path)
+  // Check timeline connections (so arrowhead/tail clicks are not swallowed by the marquee-select path)
   if (mindMap.timelineConnections) {
     for (let i = 0; i < mindMap.timelineConnections.length; i++) {
       const tc = mindMap.timelineConnections[i];
@@ -3499,6 +3512,7 @@ function isOverAnyInteractive() {
       try {
         if (tc.isMouseOver && tc.isMouseOver()) return true;
         if (tc.isMouseOverArrowHead && tc.isMouseOverArrowHead()) return true;
+        if (tc.isMouseOverTail && tc.isMouseOverTail()) return true;
       } catch (_) { }
     }
   }
