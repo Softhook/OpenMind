@@ -112,7 +112,7 @@ class MindMap {
     this.selectedConnection = null;
     this.connectingFrom = null;
     this.connectingFromInitiatedByKeyboard = false;
-    this.draggingConnection = null; // { conn, originalTo }
+    this.draggingConnection = null; // { conn, originalFrom, originalTo, draggingEnd } – draggingEnd is 'to' (arrowhead) or 'from' (tail)
 
     // Multi-selection of boxes
     this.selectedBoxes = new Set();
@@ -1096,30 +1096,57 @@ class MindMap {
       }
     }
 
-    // Draw live reattach line if dragging an existing connection's arrow head.
+    // Draw live reattach line if dragging an existing connection's arrow head or tail.
     // This also covers TimelineConnection endpoint drags since they now use draggingConnection.
     if (this.draggingConnection && this.draggingConnection.conn && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
       const conn = this.draggingConnection.conn;
-      const from = conn.fromBox ? conn.fromBox.getConnectionPoint({ x: worldMouseX(), y: worldMouseY() }) : null;
-      if (from && !isNaN(from.x) && !isNaN(from.y)) {
-        const mx = worldMouseX();
-        const my = worldMouseY();
-        const lineColor = MindMap.COLORS.CONNECTING_LINE;
-        const dotColor = MindMap.COLORS.CONNECTOR_DOT;
-        push();
-        Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
-        line(from.x, from.y, mx, my);
-        // Arrow head at mouse
-        const angle = atan2(my - from.y, mx - from.x);
-        Utils.applyFill(dotColor);
-        noStroke();
-        push();
-        translate(mx, my);
-        rotate(angle);
-        const size = (conn.arrowSize || 10);
-        triangle(0, 0, -size, -size / 2, -size, size / 2);
-        pop();
-        pop();
+      const draggingEnd = this.draggingConnection.draggingEnd || 'to';
+      const mx = worldMouseX();
+      const my = worldMouseY();
+      const lineColor = MindMap.COLORS.CONNECTING_LINE;
+      const dotColor = MindMap.COLORS.CONNECTOR_DOT;
+      const size = (conn.arrowSize || 10);
+
+      if (draggingEnd === 'to') {
+        // Arrowhead drag: line from fromBox edge to mouse, arrow at mouse
+        const from = conn.fromBox ? conn.fromBox.getConnectionPoint({ x: mx, y: my }) : null;
+        if (from && !isNaN(from.x) && !isNaN(from.y)) {
+          push();
+          Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
+          line(from.x, from.y, mx, my);
+          const angle = atan2(my - from.y, mx - from.x);
+          Utils.applyFill(dotColor);
+          noStroke();
+          push();
+          translate(mx, my);
+          rotate(angle);
+          triangle(0, 0, -size, -size / 2, -size, size / 2);
+          pop();
+          pop();
+        }
+      } else {
+        // Tail drag: line from mouse to the fixed end (arrowhead position), arrow at that end
+        const arrowEnd = conn.getArrowHeadPosition ? conn.getArrowHeadPosition() : null;
+        if (arrowEnd && !isNaN(arrowEnd.x) && !isNaN(arrowEnd.y)) {
+          const angle = atan2(arrowEnd.y - my, arrowEnd.x - mx);
+          // Shorten line so it terminates inside the arrowhead triangle
+          const dx = arrowEnd.x - mx;
+          const dy = arrowEnd.y - my;
+          const segLen = Math.sqrt(dx * dx + dy * dy);
+          const shortenedX = segLen > size ? arrowEnd.x - size * Math.cos(angle) : mx;
+          const shortenedY = segLen > size ? arrowEnd.y - size * Math.sin(angle) : my;
+          push();
+          Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
+          line(mx, my, shortenedX, shortenedY);
+          Utils.applyFill(dotColor);
+          noStroke();
+          push();
+          translate(arrowEnd.x, arrowEnd.y);
+          rotate(angle);
+          triangle(0, 0, -size, -size / 2, -size, size / 2);
+          pop();
+          pop();
+        }
       }
     }
   }
@@ -2519,7 +2546,24 @@ class MindMap {
             this.isArrowKeyNavigating = false;
             // Use the same draggingConnection state as normal connections.
             // originalTo is null because timeline connections have no target box.
-            this.draggingConnection = { conn: tc, originalTo: null };
+            this.draggingConnection = { conn: tc, originalFrom: tc.fromBox, originalTo: null, draggingEnd: 'to' };
+            if (this.selectedTimelineConnection && this.selectedTimelineConnection !== tc) {
+              this.selectedTimelineConnection.selected = false;
+            }
+            this.selectedTimelineConnection = tc;
+            tc.selected = true;
+            return;
+          }
+        } catch (_) { }
+      }
+      // Check if clicking on a timeline connection's tail (fromBox end) to reattach fromBox.
+      for (let i = this.timelineConnections.length - 1; i >= 0; i--) {
+        const tc = this.timelineConnections[i];
+        if (!tc || typeof tc.isMouseOverTail !== 'function') continue;
+        try {
+          if (tc.isMouseOverTail()) {
+            this.isArrowKeyNavigating = false;
+            this.draggingConnection = { conn: tc, originalFrom: tc.fromBox, originalTo: null, draggingEnd: 'from' };
             if (this.selectedTimelineConnection && this.selectedTimelineConnection !== tc) {
               this.selectedTimelineConnection.selected = false;
             }
@@ -2547,8 +2591,35 @@ class MindMap {
 
           // Begin dragging the arrow head to a new target
           this.isArrowKeyNavigating = false; // Clear navigation when reattaching
-          this.draggingConnection = { conn, originalTo: conn.toBox };
+          this.draggingConnection = { conn, originalFrom: conn.fromBox, originalTo: conn.toBox, draggingEnd: 'to' };
           // Select this connection
+          if (this.selectedConnection && this.selectedConnection !== conn) {
+            this.selectedConnection.selected = false;
+          }
+          this.selectedConnection = conn;
+          conn.selected = true;
+          return;
+        }
+      } catch (_) { }
+    }
+
+    // Check if clicking on an existing connection's tail (fromBox end) to reattach fromBox
+    for (let i = this.connections.length - 1; i >= 0; i--) {
+      const conn = this.connections[i];
+      if (!conn || !conn.isMouseOverTail) continue;
+      try {
+        if (conn.isMouseOverTail()) {
+          // Drag Lock Protection: Check if either end of the connection is locked
+          const lockedBox = this._isAnyBoxLocked([conn.fromBox, conn.toBox]);
+          if (lockedBox) {
+            const remoteState = TextBox.getRemoteEditingState(lockedBox.id);
+            lockedBox._showEditingBlockedNotification(remoteState);
+            return;
+          }
+
+          // Begin dragging the tail to a new source box
+          this.isArrowKeyNavigating = false;
+          this.draggingConnection = { conn, originalFrom: conn.fromBox, originalTo: conn.toBox, draggingEnd: 'from' };
           if (this.selectedConnection && this.selectedConnection !== conn) {
             this.selectedConnection.selected = false;
           }
@@ -2781,9 +2852,9 @@ class MindMap {
   handleMouseReleased() {
     // Complete reattachment if dragging an existing connection (including TimelineConnections).
     if (this.draggingConnection && this.draggingConnection.conn) {
-      const { conn, originalTo } = this.draggingConnection;
+      const { conn, originalFrom, originalTo, draggingEnd } = this.draggingConnection;
 
-      // ── TimelineConnection dropped on bar → re-date; dropped on box → convert ──
+      // ── TimelineConnection: arrowhead end (re-date) or tail end (re-box) ──
       if (typeof TimelineConnection !== 'undefined' && conn instanceof TimelineConnection) {
         this.draggingConnection = null;
         if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
@@ -2794,6 +2865,39 @@ class MindMap {
           const by = this.timelineBarY || 0;
           const lx = wx - bx;
           const ly = wy - by;
+
+          if (draggingEnd === 'from') {
+            // Tail drag: move the connection to a different fromBox
+            let droppedBox = null;
+            for (const box of this.boxes) {
+              if (box && box !== conn.fromBox && box.isMouseOver && box.isMouseOver()) {
+                droppedBox = box;
+                break;
+              }
+            }
+            if (droppedBox) {
+              if (droppedBox.isLockedByRemoteEdit && droppedBox.isLockedByRemoteEdit()) {
+                const remoteState = TextBox.getRemoteEditingState(droppedBox.id);
+                if (droppedBox._showEditingBlockedNotification) {
+                  droppedBox._showEditingBlockedNotification(remoteState);
+                }
+                return;
+              }
+              // Prevent duplicate timeline connections on the target box
+              const dup = this.timelineConnections.some(c => c !== conn && c.fromBox === droppedBox);
+              if (!dup) {
+                this._wrapInTransaction(() => {
+                  // Clear the old box's timelineDate and set on the new box
+                  if (conn.fromBox) conn.fromBox.timelineDate = null;
+                  conn.fromBox = droppedBox;
+                  droppedBox.timelineDate = originalFrom ? originalFrom.timelineDate : null;
+                  if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
+                });
+              }
+            }
+            // else: dropped nowhere → no change
+            return;
+          }
 
           // Dropped on bar → change the day (re-date)
           if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
@@ -2875,13 +2979,44 @@ class MindMap {
         }
       }
 
-      // ── Standard Connection reattachment to another box ──
+      // ── Standard Connection reattachment ──
       let droppedOn = null;
       for (let box of this.boxes) {
         if (!box) continue;
         if (box.isMouseOver && box.isMouseOver()) { droppedOn = box; break; }
       }
 
+      if (draggingEnd === 'from') {
+        // Tail drag: change fromBox
+        let changed = false;
+        if (droppedOn && conn.toBox && droppedOn !== conn.toBox) {
+          const duplicate = this.connections.some(c => c !== conn && c.fromBox === droppedOn && c.toBox === conn.toBox);
+          if (!duplicate) {
+            if (droppedOn !== originalFrom) {
+              if (droppedOn && droppedOn.isLockedByRemoteEdit && droppedOn.isLockedByRemoteEdit()) {
+                const remoteState = TextBox.getRemoteEditingState(droppedOn.id);
+                if (droppedOn._showEditingBlockedNotification) {
+                  droppedOn._showEditingBlockedNotification(remoteState);
+                }
+              } else {
+                changed = true;
+                this._wrapInTransaction(() => {
+                  conn.fromBox = droppedOn;
+                  this.isSaved = false;
+                  if (MindMap.onConnectionsChange) MindMap.onConnectionsChange(true);
+                });
+              }
+            }
+          }
+        }
+        if (!changed) {
+          conn.fromBox = originalFrom;
+        }
+        this.draggingConnection = null;
+        return;
+      }
+
+      // Arrowhead (to-end) drag: change toBox
       let changed = false;
       if (droppedOn && conn.fromBox && droppedOn !== conn.fromBox) {
         // Avoid creating duplicates

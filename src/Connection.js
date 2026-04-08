@@ -155,6 +155,17 @@ class Connection {
   }
 
   /**
+   * Gets the world-space position of the tail (start point at fromBox edge).
+   * This is the non-arrow end of the connection line.
+   * @returns {Object|null} Point with x and y coordinates, or null if invalid
+   */
+  getTailPosition() {
+    if (this._boxesOverlap()) return null;
+    const endpoints = this._getConnectionEndpoints();
+    return endpoints ? endpoints.start : null;
+  }
+
+  /**
    * Checks if mouse is over the arrow head (for reattachment).
    * The hit radius scales with zoom to remain usable at different zoom levels.
    * @returns {boolean} true if mouse is over arrow head
@@ -174,6 +185,28 @@ class Connection {
     const hitRadius = 10 / Math.sqrt(safeZoom);
 
     const distance = Utils.distance(mx, my, end.x, end.y);
+    return distance <= hitRadius;
+  }
+
+  /**
+   * Checks if mouse is over the tail (fromBox end) of the connection.
+   * Uses the same hit radius logic as isMouseOverArrowHead() so both ends
+   * feel equally responsive to pick up.
+   * @returns {boolean} true if mouse is over the tail
+   */
+  isMouseOverTail() {
+    if (this._boxesOverlap()) return false;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) return false;
+
+    const start = this.getTailPosition();
+    if (!start) return false;
+
+    const currentZoom = Utils.getCurrentZoom();
+    const safeZoom = Utils.clamp(currentZoom, 0.25, 4);
+    const hitRadius = 10 / Math.sqrt(safeZoom);
+
+    const distance = Utils.distance(mx, my, start.x, start.y);
     return distance <= hitRadius;
   }
 
