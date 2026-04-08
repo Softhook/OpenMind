@@ -83,6 +83,8 @@ function makeBox(x, y, label) {
 
 describe('Connection – tail position methods', () => {
   let box1, box2, conn;
+  let getWorldMouseCoordinatesSpy;
+  let getCurrentZoomSpy;
 
   beforeEach(() => {
     // Place boxes far enough apart that they don't overlap
@@ -91,6 +93,17 @@ describe('Connection – tail position methods', () => {
     box2 = makeBox(400, 0, 'B');
     box2.width = 80; box2.height = 40;
     conn = new Connection(box1, box2);
+  });
+
+  afterEach(() => {
+    if (getWorldMouseCoordinatesSpy) {
+      getWorldMouseCoordinatesSpy.mockRestore();
+      getWorldMouseCoordinatesSpy = null;
+    }
+    if (getCurrentZoomSpy) {
+      getCurrentZoomSpy.mockRestore();
+      getCurrentZoomSpy = null;
+    }
   });
 
   test('getTailPosition() returns the start (fromBox) endpoint', () => {
@@ -112,43 +125,44 @@ describe('Connection – tail position methods', () => {
   });
 
   test('isMouseOverTail() returns true when mouse is near start point', () => {
-    // Stub getWorldMouseCoordinates to return a point near box1
-    const origGetCoords = Utils.getWorldMouseCoordinates;
-    Utils.getWorldMouseCoordinates = jest.fn(() => ({ x: 0, y: 0 }));
-    Utils.getCurrentZoom = jest.fn(() => 1);
+    getWorldMouseCoordinatesSpy = jest
+      .spyOn(Utils, 'getWorldMouseCoordinates')
+      .mockImplementation(() => ({ x: 0, y: 0 }));
+    getCurrentZoomSpy = jest
+      .spyOn(Utils, 'getCurrentZoom')
+      .mockImplementation(() => 1);
 
     const result = conn.isMouseOverTail();
     expect(result).toBe(true);
-
-    Utils.getWorldMouseCoordinates = origGetCoords;
   });
 
   test('isMouseOverTail() returns false when mouse is far from start point', () => {
-    const origGetCoords = Utils.getWorldMouseCoordinates;
-    Utils.getWorldMouseCoordinates = jest.fn(() => ({ x: 9999, y: 9999 }));
-    Utils.getCurrentZoom = jest.fn(() => 1);
+    getWorldMouseCoordinatesSpy = jest
+      .spyOn(Utils, 'getWorldMouseCoordinates')
+      .mockImplementation(() => ({ x: 9999, y: 9999 }));
+    getCurrentZoomSpy = jest
+      .spyOn(Utils, 'getCurrentZoom')
+      .mockImplementation(() => 1);
 
     const result = conn.isMouseOverTail();
     expect(result).toBe(false);
-
-    Utils.getWorldMouseCoordinates = origGetCoords;
   });
 
   test('isMouseOverArrowHead() and isMouseOverTail() target opposite ends', () => {
-    const origGetCoords = Utils.getWorldMouseCoordinates;
-    Utils.getCurrentZoom = jest.fn(() => 1);
+    getCurrentZoomSpy = jest
+      .spyOn(Utils, 'getCurrentZoom')
+      .mockImplementation(() => 1);
+    getWorldMouseCoordinatesSpy = jest.spyOn(Utils, 'getWorldMouseCoordinates');
 
     // Mouse near box1 (tail)
-    Utils.getWorldMouseCoordinates = jest.fn(() => ({ x: box1.x, y: box1.y }));
+    getWorldMouseCoordinatesSpy.mockImplementation(() => ({ x: box1.x, y: box1.y }));
     expect(conn.isMouseOverTail()).toBe(true);
     expect(conn.isMouseOverArrowHead()).toBe(false);
 
     // Mouse near box2 (arrowhead)
-    Utils.getWorldMouseCoordinates = jest.fn(() => ({ x: box2.x, y: box2.y }));
+    getWorldMouseCoordinatesSpy.mockImplementation(() => ({ x: box2.x, y: box2.y }));
     expect(conn.isMouseOverTail()).toBe(false);
     expect(conn.isMouseOverArrowHead()).toBe(true);
-
-    Utils.getWorldMouseCoordinates = origGetCoords;
   });
 });
 
