@@ -174,7 +174,7 @@ class ColorPalette {
    * Text contrast is automatically handled via ColorPalette.getContrastColor().
    */
   static TIMELINE = {
-    BAR_BACKGROUND: { r: 211, g: 211, b: 211, a: 255 },
+    BAR_BACKGROUND: { r: 211, g: 211, b: 211, a: 255 }, // Light gray background for timeline bars
     BAR_BORDER: { r: 60, g: 80, b: 140, a: 180 },
     
     // Day cell colors - maintains visual hierarchy
