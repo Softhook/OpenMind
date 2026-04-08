@@ -1132,8 +1132,11 @@ class MindMap {
           const dy = arrowEnd.y - my;
           const segLen = Math.sqrt(dx * dx + dy * dy);
           // Shorten line so it terminates inside the arrowhead triangle
-          const shortenedX = segLen > size ? arrowEnd.x - size * (dx / segLen) : mx;
-          const shortenedY = segLen > size ? arrowEnd.y - size * (dy / segLen) : my;
+          const invLen = segLen > 0 ? 1 / segLen : 0;
+          const ux = dx * invLen;
+          const uy = dy * invLen;
+          const shortenedX = segLen > size ? arrowEnd.x - size * ux : mx;
+          const shortenedY = segLen > size ? arrowEnd.y - size * uy : my;
           const angle = atan2(dy, dx);
           push();
           Utils.applyStroke(lineColor, MindMap.STROKE_WEIGHT_PREVIEW);
@@ -2887,9 +2890,10 @@ class MindMap {
               const dup = this.timelineConnections.some(c => c !== conn && c.fromBox === droppedBox);
               if (!dup) {
                 this._wrapInTransaction(() => {
-                  // Save the date before clearing it from the old box
-                  const dateToTransfer = conn.fromBox ? conn.fromBox.timelineDate : null;
-                  if (conn.fromBox) conn.fromBox.timelineDate = null;
+                  // Save a stable reference and the date before mutating
+                  const oldBox = conn.fromBox;
+                  const dateToTransfer = oldBox ? oldBox.timelineDate : null;
+                  if (oldBox) oldBox.timelineDate = null;
                   conn.fromBox = droppedBox;
                   droppedBox.timelineDate = dateToTransfer;
                   if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
