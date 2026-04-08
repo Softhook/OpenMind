@@ -166,48 +166,41 @@ class Connection {
   }
 
   /**
+   * Returns true if the world-space mouse is within the zoom-scaled hit radius of
+   * the given point.  Shared by isMouseOverArrowHead() and isMouseOverTail() so
+   * that the hit-detection logic lives in exactly one place.
+   * @param {{x:number, y:number}|null} point
+   * @returns {boolean}
+   * @private
+   */
+  _isMouseOverEndpoint(point) {
+    if (!point) return false;
+    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
+    if (!Utils.areValidCoordinates(mx, my)) return false;
+    // Scale hit radius with zoom: smaller at high zoom, larger at low zoom
+    const safeZoom = Utils.clamp(Utils.getCurrentZoom(), 0.25, 4);
+    const hitRadius = 10 / Math.sqrt(safeZoom);
+    return Utils.distance(mx, my, point.x, point.y) <= hitRadius;
+  }
+
+  /**
    * Checks if mouse is over the arrow head (for reattachment).
-   * The hit radius scales with zoom to remain usable at different zoom levels.
    * @returns {boolean} true if mouse is over arrow head
    */
   isMouseOverArrowHead() {
     if (this._boxesOverlap()) return false;
-    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
-    if (!Utils.areValidCoordinates(mx, my)) return false;
-
-    const end = this.getArrowHeadPosition();
-    if (!end) return false;
-
-    // Scale hit radius with zoom for better usability
-    // At higher zoom, smaller hit radius; at lower zoom, larger hit radius
-    const currentZoom = Utils.getCurrentZoom();
-    const safeZoom = Utils.clamp(currentZoom, 0.25, 4);
-    const hitRadius = 10 / Math.sqrt(safeZoom);
-
-    const distance = Utils.distance(mx, my, end.x, end.y);
-    return distance <= hitRadius;
+    return this._isMouseOverEndpoint(this.getArrowHeadPosition());
   }
 
   /**
    * Checks if mouse is over the tail (fromBox end) of the connection.
-   * Uses the same hit radius logic as isMouseOverArrowHead() so both ends
-   * feel equally responsive to pick up.
+   * Uses the same hit radius as isMouseOverArrowHead() so both ends feel
+   * equally responsive to pick up.
    * @returns {boolean} true if mouse is over the tail
    */
   isMouseOverTail() {
     if (this._boxesOverlap()) return false;
-    const { x: mx, y: my } = Utils.getWorldMouseCoordinates();
-    if (!Utils.areValidCoordinates(mx, my)) return false;
-
-    const start = this.getTailPosition();
-    if (!start) return false;
-
-    const currentZoom = Utils.getCurrentZoom();
-    const safeZoom = Utils.clamp(currentZoom, 0.25, 4);
-    const hitRadius = 10 / Math.sqrt(safeZoom);
-
-    const distance = Utils.distance(mx, my, start.x, start.y);
-    return distance <= hitRadius;
+    return this._isMouseOverEndpoint(this.getTailPosition());
   }
 
   /**
