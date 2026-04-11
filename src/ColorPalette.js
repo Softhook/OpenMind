@@ -186,13 +186,13 @@ class ColorPalette {
     DAY_STROKE: { r: 125, g: 225, b: 255, a: 255 },
     DAY_TEXT: ColorPalette.BASE.WHITE,               // White text on blue
     
-    WEEKDAY_FILL: { r: 88, g: 106, b: 168, a: 205 },
-    WEEKDAY_STROKE: { r: 118, g: 140, b: 205, a: 210 },
-    WEEKDAY_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+    WEEKDAY_FILL: { r: 255, g: 255, b: 255, a: 255 },
+    WEEKDAY_STROKE: { r: 0, g: 0, b: 0, a: 255 },
+    WEEKDAY_TEXT: { r: 0, g: 0, b: 0, a: 255 },
     
-    WEEKEND_FILL: { r: 58, g: 70, b: 118, a: 190 },
-    WEEKEND_STROKE: { r: 82, g: 98, b: 155, a: 180 },
-    WEEKEND_TEXT: { r: 225, g: 235, b: 255, a: 220 },
+    WEEKEND_FILL: { r: 0, g: 0, b: 0, a: 255 },
+    WEEKEND_STROKE: { r: 0, g: 0, b: 0, a: 255 },
+    WEEKEND_TEXT: { r: 255, g: 255, b: 255, a: 255 },
     
     // Text and labels
     MONTH_LABEL: { r: 180, g: 200, b: 255, a: 220 },
