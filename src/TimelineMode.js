@@ -5,7 +5,7 @@
  *   - TimelineConnection class (arrow from a TextBox to a calendar-bar day tick)
  *   - TimelineMode class with static constants and static draw/utility methods
  *
- * Keyboard shortcut: Ctrl+K – creates timeline at cursor if inactive, or removes it if already active (MindMap.createTimeline())
+ * Keyboard shortcut: Ctrl+K – creates a new timeline at the cursor (MindMap.createTimeline()).
  *
  * World-space placement:
  *   The bar is placed at the cursor position when created (Ctrl+K) and stored in
@@ -52,9 +52,22 @@ class TimelineConnection extends Connection {
    * @param {TextBox} fromBox  – source box (its timelineDate field holds the calendar date)
    * @param {*}       mindMap  – MindMap instance (for bar geometry lookup)
    */
-  constructor(fromBox, mindMap = null) {
+  constructor(fromBox, mindMap = null, timelineId = null) {
     super(fromBox, null); // toBox is virtual (computed from fromBox.timelineDate)
     this.mindMap  = mindMap;
+    this.timelineId = timelineId || (mindMap && mindMap.activeTimelineId) || null;
+  }
+
+  get timeline() {
+    if (!this.mindMap) return null;
+    if (this.timelineId && typeof this.mindMap.getTimelineById === 'function') {
+      const byId = this.mindMap.getTimelineById(this.timelineId);
+      if (byId) return byId;
+    }
+    if (typeof this.mindMap.getActiveTimeline === 'function') {
+      return this.mindMap.getActiveTimeline();
+    }
+    return null;
   }
 
   /**
@@ -64,8 +77,12 @@ class TimelineConnection extends Connection {
    * @returns {number}
    */
   get dayIndex() {
-    if (this.fromBox && this.fromBox.timelineDate && this.mindMap && this.mindMap.timelineStartDate) {
-      return TimelineMode.dayIndexForDate(this.fromBox.timelineDate, this.mindMap.timelineStartDate);
+    const timeline = this.timeline;
+    const startDate = timeline && timeline.startDate
+      ? timeline.startDate
+      : (this.mindMap ? this.mindMap.timelineStartDate : null);
+    if (this.fromBox && this.fromBox.timelineDate && startDate) {
+      return TimelineMode.dayIndexForDate(this.fromBox.timelineDate, startDate);
     }
     return 0;
   }
@@ -83,9 +100,10 @@ class TimelineConnection extends Connection {
   _getConnectionEndpoints() {
     if (!this.fromBox) return null;
     const dayIndex = this.dayIndex;
-    const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth() : TimelineMode.DEFAULT_WIDTH;
-    const barX = this.mindMap ? (this.mindMap.timelineBarX || 0) : 0;
-    const barY = this.mindMap ? (this.mindMap.timelineBarY || 0) : 0;
+    const timeline = this.timeline;
+    const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth(timeline) : TimelineMode.DEFAULT_WIDTH;
+    const barX = timeline ? (timeline.barX || 0) : (this.mindMap ? (this.mindMap.timelineBarX || 0) : 0);
+    const barY = timeline ? (timeline.barY || 0) : (this.mindMap ? (this.mindMap.timelineBarY || 0) : 0);
     const center = {
       x: barX + TimelineMode.worldDayCenterX(dayIndex, barWidth),
       y: barY + TimelineMode.dayCellCenterY(TimelineMode.BAR_HEIGHT),
@@ -117,10 +135,12 @@ class TimelineConnection extends Connection {
   // ---------------------------------------------------------------------------
 
   toJSON() {
-    return {
+    const data = {
       fromId: this.fromBox ? this.fromBox.id : null,
       date:   this.fromBox ? this.fromBox.timelineDate : null,
     };
+    if (this.timelineId) data.timelineId = this.timelineId;
+    return data;
   }
 
   /**
@@ -160,9 +180,12 @@ class TimelineConnection extends Connection {
         return null;
       }
       fromBox.timelineDate = data.date;
-    } else if (data.dayIndex != null && mindMap && mindMap.timelineStartDate) {
+    } else if (data.dayIndex != null && mindMap) {
       // Legacy: compute calendar date from dayIndex + startDate
-      const d = TimelineMode.dateForDay(data.dayIndex, mindMap.timelineStartDate);
+      const tl = (data.timelineId && mindMap.getTimelineById) ? mindMap.getTimelineById(data.timelineId) : null;
+      const startDate = (tl && tl.startDate) ? tl.startDate : mindMap.timelineStartDate;
+      if (!startDate) return null;
+      const d = TimelineMode.dateForDay(data.dayIndex, startDate);
       fromBox.timelineDate = TimelineMode.toISODateString(d);
     } else {
       if (data.dayIndex != null) {
@@ -171,7 +194,7 @@ class TimelineConnection extends Connection {
       return null;
     }
 
-    return new TimelineConnection(fromBox, mindMap);
+    return new TimelineConnection(fromBox, mindMap, data.timelineId || null);
   }
 }
 
@@ -378,6 +401,22 @@ class TimelineMode {
   }
 
   /**
+   * Parses date input into a Date instance.
+   * Date-only ISO strings ("YYYY-MM-DD") are parsed as local midnight to avoid
+   * UTC date shifts between clients in different time zones.
+   * @param {string|Date} dateValue
+   * @returns {Date|null}
+   */
+  static parseLocalISODate(dateValue) {
+    if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      const [y, mo, da] = dateValue.split('-').map(Number);
+      return new Date(y, mo - 1, da);
+    }
+    const parsed = new Date(dateValue);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /**
    * Returns the day index of today relative to startDate, or -1 if today is
    * before startDate (i.e. not visible on the bar).
    */
@@ -406,14 +445,17 @@ class TimelineMode {
    * Called from sketch.js before mindMap.draw().
    */
   static drawConnectionsUnderlay(mindMap) {
-    if (!mindMap || !mindMap.timelineActive || !mindMap.timelineStartDate) return;
+    if (!mindMap || !mindMap.timelineActive) return;
     const conns = mindMap.timelineConnections || [];
-    const totalDays = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
-    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
     const draggingConn = mindMap.draggingConnection ? mindMap.draggingConnection.conn : null;
 
-    for (const conn of visibleConns) {
+    for (const conn of conns) {
       if (conn === draggingConn) continue;
+      const timeline = conn ? conn.timeline : null;
+      const totalDays = (timeline && typeof timeline.totalDays === 'number')
+        ? timeline.totalDays
+        : (mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS);
+      if (!conn || conn.dayIndex < 0 || conn.dayIndex >= totalDays) continue;
       if (typeof conn.draw === 'function') {
         try { conn.draw(); } catch (_) { /* skip broken connection */ }
       }
@@ -427,10 +469,23 @@ class TimelineMode {
    * @param {*} mindMap – current MindMap instance
    */
   static drawBar(mindMap) {
-    if (!mindMap || !mindMap.timelineActive || !mindMap.timelineStartDate) return;
+    if (!mindMap || !mindMap.timelineActive) return;
     const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
-    TimelineMode._renderBar(new DrawCtx(null), mindMap, safeZ, { withDragPreview: true });
+    const timelines = (typeof mindMap.getTimelines === 'function')
+      ? mindMap.getTimelines()
+      : [{ id: mindMap.activeTimelineId || 'legacy', barX: mindMap.timelineBarX || 0, barY: mindMap.timelineBarY || 0, totalDays: mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS, startDate: mindMap.timelineStartDate }];
+    const drawableTimelines = (timelines || []).filter(t => t && t.startDate);
+    if (drawableTimelines.length === 0) return;
+    const activeTimelineId = mindMap.activeTimelineId || (mindMap.getActiveTimeline && mindMap.getActiveTimeline() ? mindMap.getActiveTimeline().id : null);
+    for (const timeline of drawableTimelines) {
+      if (!timeline) continue;
+      TimelineMode._renderBar(new DrawCtx(null), mindMap, safeZ, {
+        withDragPreview: true,
+        timeline,
+        isSelectedTimeline: !!(mindMap.timelineSelected && activeTimelineId && timeline.id === activeTimelineId),
+      });
+    }
   }
 
   /**
@@ -443,10 +498,16 @@ class TimelineMode {
    */
   static drawToGraphics(pg, mindMap) {
     if (!mindMap) return;
-    TimelineMode._renderBar(new DrawCtx(pg), mindMap, 1, {
-      bg: [15, 20, 40, 210],
-      withConnections: true,
-    });
+    const timelines = (typeof mindMap.getTimelines === 'function')
+      ? mindMap.getTimelines()
+      : [{ id: mindMap.activeTimelineId || 'legacy', barX: mindMap.timelineBarX || 0, barY: mindMap.timelineBarY || 0, totalDays: mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS, startDate: mindMap.timelineStartDate }];
+    for (const timeline of (timelines || []).filter(t => t && t.startDate)) {
+      TimelineMode._renderBar(new DrawCtx(pg), mindMap, 1, {
+        bg: [15, 20, 40, 210],
+        withConnections: true,
+        timeline,
+      });
+    }
   }
 
   // ============================================================================
@@ -465,17 +526,28 @@ class TimelineMode {
    * @param {boolean}  [opts.withConnections] – draw connection arrows behind bar (export)
    * @param {boolean}  [opts.withDragPreview] – draw snap preview (live only)
    */
-  static _renderBar(ctx, mindMap, safeZ, { bg = null, withConnections = false, withDragPreview = false } = {}) {
-    const bw  = mindMap.getTimelineBarWidth?.() ?? TimelineMode.DEFAULT_WIDTH;
+  static _renderBar(ctx, mindMap, safeZ, { bg = null, withConnections = false, withDragPreview = false, timeline = null, isSelectedTimeline = false } = {}) {
+    const tl = timeline || (mindMap.getActiveTimeline ? mindMap.getActiveTimeline() : null);
+    const bw  = mindMap.getTimelineBarWidth?.(tl) ?? TimelineMode.DEFAULT_WIDTH;
     const bh  = TimelineMode.BAR_HEIGHT;
-    const barX = mindMap.timelineBarX || 0;
-    const barY = mindMap.timelineBarY || 0;
+    const barX = tl ? (tl.barX || 0) : (mindMap.timelineBarX || 0);
+    const barY = tl ? (tl.barY || 0) : (mindMap.timelineBarY || 0);
 
-    const totalDays   = mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const totalDays   = (tl && tl.totalDays) || mindMap.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
     const conns       = mindMap.timelineConnections || [];
-    const visibleConns = conns.filter(c => c.dayIndex >= 0 && c.dayIndex < totalDays);
+    const visibleConns = conns.filter(c => {
+      if (!c) return false;
+      const connTimelineId = c.timelineId || null;
+      const targetTimelineId = tl ? tl.id : null;
+      if (targetTimelineId && connTimelineId && connTimelineId !== targetTimelineId) return false;
+      if (targetTimelineId && !connTimelineId) {
+        const active = mindMap.getActiveTimeline ? mindMap.getActiveTimeline() : null;
+        if (!active || active.id !== targetTimelineId) return false;
+      }
+      return c.dayIndex >= 0 && c.dayIndex < totalDays;
+    });
     const highlightedDays = new Set(visibleConns.map(c => c.dayIndex));
-    const startDate   = mindMap.timelineStartDate || new Date();
+    const startDate   = (tl && tl.startDate) || mindMap.timelineStartDate || new Date();
 
     const sw = 1 / safeZ;  // 1 screen-pixel stroke
     const ts = 11 / safeZ; // base label font size
@@ -520,7 +592,7 @@ class TimelineMode {
     TimelineMode._drawResizeHandle(ctx, bw, bh, sw);
 
     // Selection ring
-    if (mindMap.timelineSelected) {
+    if (isSelectedTimeline) {
       const margin = 4 / safeZ;
       const selectionRing = ColorPalette.TIMELINE.SELECTION_RING;
       ctx.stroke(selectionRing.r, selectionRing.g, selectionRing.b, selectionRing.a);
@@ -638,7 +710,11 @@ class TimelineMode {
       const box = conn.fromBox;
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;
 
-      const date    = TimelineMode.dateForDay(conn.dayIndex, startDate);
+      let date = TimelineMode.parseLocalISODate(conn.fromBox.timelineDate);
+      if (!date && startDate) {
+        date = TimelineMode.dateForDay(conn.dayIndex, startDate);
+      }
+      if (!date) continue;
       const dayName = TimelineMode.DAY_NAMES[date.getDay()];
       const label   = dayName + ' ' + date.getDate() + ' ' + TimelineMode.MONTH_NAMES[date.getMonth()];
       const isPast  = date < today;

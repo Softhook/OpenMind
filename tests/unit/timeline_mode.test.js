@@ -275,6 +275,26 @@ describe('TimelineConnection', () => {
     expect(conn.selected).toBe(false);
   });
 
+  test('uses timelineId geometry when multiple timelines exist', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelineBarX = 400;
+    mm.timelineBarY = 200;
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+      { id: 'tl-b', barX: 400, barY: 200, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+    mm.getTimelineBarWidth = () => TimelineMode.DEFAULT_WIDTH;
+    const conn = new TimelineConnection(box, mm, 'tl-b');
+    const ep = conn._getConnectionEndpoints();
+    expect(ep).not.toBeNull();
+    expect(ep.end.x).toBeGreaterThan(350);
+    expect(ep.end.y).toBeGreaterThan(180);
+  });
+
   test('dayIndex is computed from box.timelineDate and mindMap.timelineStartDate', () => {
     // startDate = 2024-01-01 (local midnight), timelineDate = 2024-01-06 → dayIndex = 5.
     // Use local-midnight constructor (same as createTimeline()) so the test is
@@ -361,6 +381,12 @@ describe('TimelineConnection serialisation', () => {
     expect(conn.toJSON()).toMatchObject({ fromId: 'b1', date: '2024-01-11' });
   });
 
+  test('toJSON() includes timelineId when provided', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-11');
+    const conn = new TimelineConnection(box, null, 'tl-1');
+    expect(conn.toJSON()).toMatchObject({ fromId: 'b1', date: '2024-01-11', timelineId: 'tl-1' });
+  });
+
   test('toJSON() does not contain dayIndex', () => {
     const box = makeBox('b1', 0, 0, '2024-01-11');
     const conn = new TimelineConnection(box, null);
@@ -377,6 +403,13 @@ describe('TimelineConnection serialisation', () => {
     expect(conn).not.toBeNull();
     expect(conn.fromBox).toBe(box);
     expect(box.timelineDate).toBe('2024-01-16');
+  });
+
+  test('fromJSON preserves timelineId', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16', timelineId: 'tl-2' }, map, null);
+    expect(conn.timelineId).toBe('tl-2');
   });
 
   test('fromJSON computes dayIndex correctly from stored date', () => {
@@ -496,6 +529,24 @@ describe('TimelineMode.drawBar()', () => {
     sandbox.pop.mockClear();
     TimelineMode.drawBar(mm);
     expect(sandbox.pop).toHaveBeenCalledTimes(sandbox.push.mock.calls.length);
+  });
+});
+
+describe('TimelineMode.drawConnectionsUnderlay()', () => {
+  test('draws only connections visible on their own timeline', () => {
+    const drawA = jest.fn();
+    const drawB = jest.fn();
+    const mm = makeMindMap();
+    mm.timelineActive = true;
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelineTotalDays = 31;
+    mm.timelineConnections = [
+      { dayIndex: 10, draw: drawA, timeline: { id: 'a', totalDays: 31 } },
+      { dayIndex: 10, draw: drawB, timeline: { id: 'b', totalDays: 7 } }, // out of range on its own timeline
+    ];
+    TimelineMode.drawConnectionsUnderlay(mm);
+    expect(drawA).toHaveBeenCalledTimes(1);
+    expect(drawB).not.toHaveBeenCalled();
   });
 });
 

@@ -1047,8 +1047,8 @@ class CollaborationManager {
                 this.syncTimelineConnectionsToYjs(skipTransactionWrapper);
             };
 
-            MindMap.onTimelineActiveChange = () => {
-                this.syncTimelineActiveToYjs();
+            MindMap.onTimelineActiveChange = (skipTransactionWrapper = false) => {
+                this.syncTimelineActiveToYjs(skipTransactionWrapper);
             };
         }
 
@@ -1177,12 +1177,18 @@ class CollaborationManager {
                 if (this.ytimelineConnections && this.mindMap.timelineConnections) {
                     const existingTlConns = new Set(
                         // Build keys the same way _syncTimelineConnectionsToYjsImpl does:
-                        // new entries → "fromId:YYYY-MM-DD"; legacy {dayIndex} entries →
-                        // "fromId:dayN".  Using c.date || '' collapses all legacy entries
+                        // new entries → "fromId:YYYY-MM-DD:timelineId"; legacy {dayIndex}
+                        // entries → "fromId:dayN:timelineId".  Using c.date || '' collapses
+                        // all legacy entries
                         // for a box to the same key, causing them to be skipped or duplicated.
                         this.ytimelineConnections.toArray().map(c =>
                             c && c.fromId
-                                ? (c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`)
+                                ? (() => {
+                                    const timelineId = c.timelineId || 'default';
+                                    return c.date
+                                        ? `${c.fromId}:${c.date}:${timelineId}`
+                                        : `${c.fromId}:day${c.dayIndex}:${timelineId}`;
+                                })()
                                 : ''
                         )
                     );
@@ -1190,10 +1196,11 @@ class CollaborationManager {
                         if (!conn || !conn.fromBox) continue;
                         const fromId = conn.fromBox.id;
                         const date   = conn.fromBox.timelineDate;
+                        const timelineId = conn.timelineId || 'default';
                         if (fromId && date) {
-                            const key = `${fromId}:${date}`;
+                            const key = `${fromId}:${date}:${timelineId}`;
                             if (!existingTlConns.has(key)) {
-                                this.ytimelineConnections.push([{ fromId, date }]);
+                                this.ytimelineConnections.push([{ fromId, date, timelineId: conn.timelineId || null }]);
                                 existingTlConns.add(key);
                             }
                         }
@@ -1203,6 +1210,21 @@ class CollaborationManager {
                 // Sync timeline active state
                 if (this.ytimeline && this.mindMap.timelineActive) {
                     this.ytimeline.set('active', true);
+                    if (Array.isArray(this.mindMap.timelines)) {
+                        const timelines = this.mindMap.timelines.map((tl) => ({
+                            id: tl.id,
+                            x: tl.barX || 0,
+                            y: tl.barY || 0,
+                            totalDays: tl.totalDays || null,
+                            startDate: tl.startDate
+                                ? (typeof TimelineMode !== 'undefined'
+                                    ? TimelineMode.toISODateString(tl.startDate)
+                                    : new Date(tl.startDate).toISOString())
+                                : null,
+                        }));
+                        this.ytimeline.set('timelines', timelines);
+                        this.ytimeline.set('activeTimelineId', this.mindMap.activeTimelineId || null);
+                    }
                 }
             }, null); // null origin = don't track in undo
         }
@@ -1572,20 +1594,44 @@ class CollaborationManager {
      * Called whenever createTimeline() or handleTimelineRelease() changes timeline state.
      * Uses the tracked origin so the UndoManager can undo bar creation/move/resize.
      */
-    syncTimelineActiveToYjs() {
+    syncTimelineActiveToYjs(skipTransactionWrapper = false) {
         if (!this.ytimeline || !this.mindMap || this.isSyncing) return;
         const active = this.mindMap.timelineActive === true;
         const barX = this.mindMap.timelineBarX || 0;
         const barY = this.mindMap.timelineBarY || 0;
         const totalDays = this.mindMap.timelineTotalDays;
-        this.transact(() => {
+        const timelines = Array.isArray(this.mindMap.timelines)
+            ? this.mindMap.timelines.map((tl) => ({
+                id: tl.id,
+                x: tl.barX || 0,
+                y: tl.barY || 0,
+                totalDays: tl.totalDays || null,
+                startDate: tl.startDate
+                    ? (typeof TimelineMode !== 'undefined'
+                        ? TimelineMode.toISODateString(tl.startDate)
+                        : new Date(tl.startDate).toISOString())
+                    : null,
+            }))
+            : null;
+        const syncImpl = () => {
             this.ytimeline.set('active', active);
             this.ytimeline.set('x', barX);
             this.ytimeline.set('y', barY);
             if (totalDays) {
                 this.ytimeline.set('totalDays', totalDays);
             }
-        }, CollaborationManager.TRACKED_ORIGIN);
+            if (timelines) {
+                this.ytimeline.set('timelines', timelines);
+                this.ytimeline.set('activeTimelineId', this.mindMap.activeTimelineId || null);
+            }
+        };
+
+        if (skipTransactionWrapper) {
+            syncImpl();
+            return;
+        }
+
+        this.transact(syncImpl, CollaborationManager.TRACKED_ORIGIN);
     }
 
     /**
@@ -1596,6 +1642,8 @@ class CollaborationManager {
     _applyRemoteTimelineActive() {
         if (!this.mindMap || !this.ytimeline) return;
         const active = this.ytimeline.get('active') === true;
+        const remoteTimelines = this.ytimeline.get('timelines');
+        const remoteActiveTimelineId = this.ytimeline.get('activeTimelineId');
         // Apply position and width whenever the map changes (even if active flag is unchanged)
         const remoteX = this.ytimeline.get('x');
         const remoteY = this.ytimeline.get('y');
@@ -1603,6 +1651,44 @@ class CollaborationManager {
         if (typeof remoteX === 'number') this.mindMap.timelineBarX = remoteX;
         if (typeof remoteY === 'number') this.mindMap.timelineBarY = remoteY;
         if (typeof remoteTotalDays === 'number') this.mindMap.timelineTotalDays = remoteTotalDays;
+        if (Array.isArray(remoteTimelines)) {
+            const parseStartDate = (v) => {
+                if (!v) return null;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                    const [y, mo, d] = v.split('-').map(Number);
+                    return new Date(y, mo - 1, d);
+                }
+                const parsed = new Date(v);
+                return isNaN(parsed.getTime()) ? null : parsed;
+            };
+            const defaultTotalDays = (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+                ? TimelineMode.DEFAULT_TOTAL_DAYS
+                : 31;
+            this.mindMap.timelines = remoteTimelines
+                .filter((tl) => tl && tl.id)
+                .map((tl) => ({
+                    id: tl.id,
+                    barX: (typeof tl.x === 'number') ? tl.x : 0,
+                    barY: (typeof tl.y === 'number') ? tl.y : 0,
+                    totalDays: (typeof tl.totalDays === 'number') ? tl.totalDays : defaultTotalDays,
+                    startDate: parseStartDate(tl.startDate),
+                }));
+            this.mindMap.timelineActive = this.mindMap.timelines.length > 0;
+            if (this.mindMap.timelineActive && typeof this.mindMap._setActiveTimeline === 'function') {
+                const fallbackTimeline = this.mindMap.timelines.length > 0
+                    ? this.mindMap.timelines[this.mindMap.timelines.length - 1]
+                    : null;
+                if (fallbackTimeline) {
+                    // Resolve the ID against the actual timelines array first.
+                    // If the ID is missing or stale (e.g. concurrent delete), fall back to the
+                    // last timeline so legacy fields are always kept consistent.
+                    const resolvedActive = remoteActiveTimelineId
+                        ? this.mindMap.timelines.find((t) => t && t.id === remoteActiveTimelineId) || null
+                        : null;
+                    this.mindMap._setActiveTimeline(resolvedActive || fallbackTimeline);
+                }
+            }
+        }
 
         if (active === this.mindMap.timelineActive) {
             if (this.mindMap) this.mindMap.isDirty = true;
@@ -1640,6 +1726,7 @@ class CollaborationManager {
             .map(c => ({
                 fromId: c.fromBox.id,
                 date:   c.fromBox.timelineDate,
+                timelineId: c.timelineId || null,
             }));
 
         if (skipTransactionWrapper) {
@@ -1674,7 +1761,8 @@ class CollaborationManager {
         const yjsMap = new Map();
         yjsConns.forEach((c, i) => {
             if (c && c.fromId && (c.date || c.dayIndex != null)) {
-                const key = c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`;
+                const timelineId = c.timelineId || 'default';
+                const key = c.date ? `${c.fromId}:${c.date}:${timelineId}` : `${c.fromId}:day${c.dayIndex}:${timelineId}`;
                 if (!yjsMap.has(key)) yjsMap.set(key, []);
                 yjsMap.get(key).push(i);
             }
@@ -1682,7 +1770,7 @@ class CollaborationManager {
 
         const toAdd = [];
         for (const conn of localConns) {
-            const key = `${conn.fromId}:${conn.date}`;
+            const key = `${conn.fromId}:${conn.date}:${conn.timelineId || 'default'}`;
             if (yjsMap.has(key)) {
                 const indices = yjsMap.get(key);
                 if (indices.length > 0) {
@@ -1782,7 +1870,7 @@ class CollaborationManager {
             // re-dating by two peers), only create one TimelineConnection.
             if (fromBox.timelineDate && !builtBoxIds.has(entry.fromId)) {
                 builtBoxIds.add(entry.fromId);
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap));
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap, entry.timelineId || null));
             }
         }
     }
