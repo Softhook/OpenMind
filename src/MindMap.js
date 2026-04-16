@@ -4084,7 +4084,13 @@ class MindMap {
         };
       });
       this.timelineActive = this.timelines.length > 0;
-      this._setActiveTimeline(data.activeTimelineId || this.timelines[this.timelines.length - 1]);
+      // Resolve the stored activeTimelineId against the restored timelines array.
+      // If the ID is present but stale/corrupt (e.g. from an edited file), fall back
+      // to the last timeline so multi-timeline state and legacy fields stay consistent.
+      const restoredActive = data.activeTimelineId
+        ? (this.timelines.find((t) => t && t.id === data.activeTimelineId) || null)
+        : null;
+      this._setActiveTimeline(restoredActive || this.timelines[this.timelines.length - 1]);
     } else {
       const legacyTotalDays = (data.timelineTotalDays && typeof data.timelineTotalDays === 'number')
         ? data.timelineTotalDays

@@ -1679,7 +1679,13 @@ class CollaborationManager {
                     ? this.mindMap.timelines[this.mindMap.timelines.length - 1]
                     : null;
                 if (fallbackTimeline) {
-                    this.mindMap._setActiveTimeline(remoteActiveTimelineId || fallbackTimeline);
+                    // Resolve the ID against the actual timelines array first.
+                    // If the ID is missing or stale (e.g. concurrent delete), fall back to the
+                    // last timeline so legacy fields are always kept consistent.
+                    const resolvedActive = remoteActiveTimelineId
+                        ? this.mindMap.timelines.find((t) => t && t.id === remoteActiveTimelineId) || null
+                        : null;
+                    this.mindMap._setActiveTimeline(resolvedActive || fallbackTimeline);
                 }
             }
         }
