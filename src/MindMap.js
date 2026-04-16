@@ -692,6 +692,8 @@ class MindMap {
   removeActiveTimeline() {
     const selected = this.getActiveTimeline();
     if (!selected) return;
+    // This flag is for callback sync methods only; the operation itself is still
+    // wrapped in a tracked Yjs transaction by _wrapInTransaction().
     const skipTransactionWrapper = true;
     this._wrapInTransaction(() => {
       if (this.timelineConnections && this.timelineConnections.length > 0) {
@@ -749,6 +751,8 @@ class MindMap {
    * @param {number} worldY – world-space Y to vertically centre the bar on
    */
   createTimeline(worldX = 0, worldY = 0) {
+    // This flag is for callback sync methods only; the operation itself is still
+    // wrapped in a tracked Yjs transaction by _wrapInTransaction().
     const skipTransactionWrapper = true;
     this._wrapInTransaction(() => {
       const timeline = this._makeTimelineObject(worldX, worldY);

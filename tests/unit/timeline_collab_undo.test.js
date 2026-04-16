@@ -83,7 +83,7 @@ describe('Timeline collaboration + Yjs undo integration', () => {
     mindMap.addBox(box);
     mindMap.addTimelineConnection(box, 3, createdTimelineId);
 
-    // Baseline the undo stack to focus this test on timeline deletion action only.
+    // Clear the undo stack to focus this test on timeline deletion action only.
     cm.undoManager.clear();
 
     mindMap.removeActiveTimeline();
