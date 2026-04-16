@@ -153,6 +153,10 @@ class MindMap {
 
     // Timeline Mode connections (TimelineConnection objects; TimelineMode.js reads/writes this)
     this.timelineConnections = [];
+    // Multi-timeline support: each entry is { id, barX, barY, totalDays, startDate }.
+    // Legacy single-timeline fields below mirror the currently active timeline.
+    this.timelines = [];
+    this.activeTimelineId = null;
     // Persisted bar width (null = use TimelineMode.DEFAULT_WIDTH) — legacy, now derived from timelineTotalDays
     this.timelineBarWidth = null;
     // Number of days shown on the bar (null = use TimelineMode.DEFAULT_TOTAL_DAYS)
@@ -507,12 +511,16 @@ class MindMap {
    * @param {TextBox} fromBox  – source box
    * @param {number}  dayIndex – 0 … TimelineMode.TOTAL_DAYS-1
    */
-  addTimelineConnection(fromBox, dayIndex) {
-    if (!fromBox || dayIndex == null || !this.timelineStartDate) return;
+  addTimelineConnection(fromBox, dayIndex, timelineId = null) {
+    const targetTimeline = timelineId ? this.getTimelineById(timelineId) : this.getActiveTimeline();
+    const startDate = targetTimeline && targetTimeline.startDate
+      ? new Date(targetTimeline.startDate)
+      : this.timelineStartDate;
+    if (!fromBox || dayIndex == null || !startDate) return;
     if (!this.timelineConnections) this.timelineConnections = [];
 
     // Compute the calendar date for this day slot
-    const date = TimelineMode.toISODateString(TimelineMode.dateForDay(dayIndex, this.timelineStartDate));
+    const date = TimelineMode.toISODateString(TimelineMode.dateForDay(dayIndex, startDate));
 
     // Prevent duplicate (same box already connected to the same date)
     const already = this.timelineConnections.some(
@@ -522,7 +530,7 @@ class MindMap {
 
     this._wrapInTransaction(() => {
       fromBox.timelineDate = date;
-      const conn = new TimelineConnection(fromBox, this);
+      const conn = new TimelineConnection(fromBox, this, targetTimeline ? targetTimeline.id : null);
       this.timelineConnections.push(conn);
       // timelineDate is propagated via ytimelineConnections, not yboxes
       // (CollaborationManager._boxToYjsData does not include timelineDate).
@@ -560,52 +568,174 @@ class MindMap {
   }
 
   /** Returns the current bar width: totalDays × DAY_WIDTH (fixed scale). */
-  getTimelineBarWidth() {
+  getTimelineBarWidth(timeline = null) {
     // Guard: TimelineMode may be undefined in Jest/Node test environments (no browser globals)
     if (typeof TimelineMode === 'undefined') return MindMap.FALLBACK_TIMELINE_WIDTH;
-    const days = (this.timelineTotalDays && typeof this.timelineTotalDays === 'number')
-      ? this.timelineTotalDays
-      : TimelineMode.DEFAULT_TOTAL_DAYS;
+    const source = timeline || this.getActiveTimeline();
+    const days = (source && source.totalDays && typeof source.totalDays === 'number')
+      ? source.totalDays
+      : ((this.timelineTotalDays && typeof this.timelineTotalDays === 'number')
+        ? this.timelineTotalDays
+        : TimelineMode.DEFAULT_TOTAL_DAYS);
     return days * TimelineMode.DAY_WIDTH;
   }
 
+  getTimelines() {
+    if (!Array.isArray(this.timelines)) this.timelines = [];
+    return this.timelines;
+  }
+
+  getTimelineById(id) {
+    if (!id) return null;
+    const timelines = this.getTimelines();
+    return timelines.find(t => t && t.id === id) || null;
+  }
+
+  getActiveTimeline() {
+    const timelines = this.getTimelines();
+    if (timelines.length === 0) return null;
+    let active = this.getTimelineById(this.activeTimelineId);
+    if (!active) {
+      active = timelines[timelines.length - 1];
+      this.activeTimelineId = active ? active.id : null;
+    }
+    return active;
+  }
+
+  _syncLegacyTimelineFromActive() {
+    const active = this.getActiveTimeline();
+    if (!active) return;
+    this.timelineBarX = active.barX || 0;
+    this.timelineBarY = active.barY || 0;
+    this.timelineTotalDays = active.totalDays || null;
+    this.timelineStartDate = active.startDate ? new Date(active.startDate) : null;
+  }
+
+  _syncActiveTimelineFromLegacy() {
+    const active = this.getActiveTimeline();
+    if (!active) return;
+    active.barX = this.timelineBarX || 0;
+    active.barY = this.timelineBarY || 0;
+    active.totalDays = this.timelineTotalDays || (
+      (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+        ? TimelineMode.DEFAULT_TOTAL_DAYS
+        : 31
+    );
+    active.startDate = this.timelineStartDate ? new Date(this.timelineStartDate) : null;
+  }
+
+  _setActiveTimeline(timelineOrId) {
+    const timeline = (timelineOrId && typeof timelineOrId === 'object')
+      ? timelineOrId
+      : this.getTimelineById(timelineOrId);
+    if (!timeline) return null;
+    this.activeTimelineId = timeline.id;
+    this._syncLegacyTimelineFromActive();
+    return timeline;
+  }
+
+  _makeTimelineObject(worldX = 0, worldY = 0) {
+    const barHalfHeight = (typeof TimelineMode !== 'undefined' &&
+      typeof TimelineMode.BAR_HEIGHT === 'number')
+      ? TimelineMode.BAR_HEIGHT / 2
+      : 40;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      id: this._generateTimelineId(),
+      barX: worldX,
+      barY: worldY - barHalfHeight,
+      totalDays: (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+        ? TimelineMode.DEFAULT_TOTAL_DAYS
+        : 31,
+      startDate: today,
+    };
+  }
+
+  /** Generates a best-effort unique timeline identifier for local timeline objects. */
+  _generateTimelineId() {
+    return `tl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  getTimelineAtWorld(worldX, worldY, { excludeHandles = false } = {}) {
+    const timelines = this.getTimelines();
+    if (timelines.length === 0) return null;
+    for (let i = timelines.length - 1; i >= 0; i--) {
+      const tl = timelines[i];
+      if (!tl) continue;
+      const barWidth = this.getTimelineBarWidth(tl);
+      const localX = worldX - (tl.barX || 0);
+      const localY = worldY - (tl.barY || 0);
+      if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) continue;
+      if (excludeHandles && TimelineMode.isDragHandle(localX, localY, barWidth)) continue;
+      return tl;
+    }
+    return null;
+  }
+
+  removeActiveTimeline() {
+    const selected = this.getActiveTimeline();
+    if (!selected) return;
+    if (this.timelineConnections && this.timelineConnections.length > 0) {
+      this.timelineConnections = this.timelineConnections.filter((conn) => {
+        if (!conn) return false;
+        const belongsToSelected = conn.timelineId
+          ? conn.timelineId === selected.id
+          : selected.id === this.activeTimelineId;
+        if (!belongsToSelected) return true;
+        if (conn.fromBox) conn.fromBox.timelineDate = null;
+        return false;
+      });
+      if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
+    }
+    const remaining = this.getTimelines().filter(t => t && t.id !== selected.id);
+    this.timelines = remaining;
+    this.timelineActive = remaining.length > 0;
+    this.timelineSelected = false;
+    this.timelineBarDragging = false;
+    this.timelineDraggingResize = false;
+    this.timelineDraggingLeftHandle = false;
+    if (this.timelineActive) {
+      this._setActiveTimeline(remaining[remaining.length - 1]);
+    } else {
+      this.activeTimelineId = null;
+      this.timelineStartDate = null;
+      this.timelineTotalDays = null;
+      this.timelineBarX = 0;
+      this.timelineBarY = 0;
+    }
+    if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
+  }
+
+  /** Returns the timeline currently used for new timeline connections. */
+  getTargetTimelineForConnections(worldX = null, worldY = null) {
+    if (typeof worldX === 'number' && typeof worldY === 'number') {
+      const hit = this.getTimelineAtWorld(worldX, worldY, { excludeHandles: true });
+      if (hit) return this._setActiveTimeline(hit);
+    }
+    return this.getActiveTimeline();
+  }
+
+  /** Returns total days for a timeline (legacy helper preserved). */
+  getTimelineTotalDays(timeline = null) {
+    const source = timeline || this.getActiveTimeline();
+    return (source && source.totalDays && typeof source.totalDays === 'number')
+      ? source.totalDays
+      : TimelineMode.DEFAULT_TOTAL_DAYS;
+  }
+
   /**
-   * Create a new timeline bar at the given world position, or remove it if already active.
-   * Replaces the old toggle behaviour with placement at cursor (like the N key for boxes).
+   * Create a new timeline bar at the given world position.
    * @param {number} worldX – world-space X to place the bar's left edge at
    * @param {number} worldY – world-space Y to vertically centre the bar on
    */
   createTimeline(worldX = 0, worldY = 0) {
-    const barHalfHeight = (typeof TimelineMode !== 'undefined' &&
-      typeof TimelineMode.BAR_HEIGHT === 'number')
-      ? TimelineMode.BAR_HEIGHT / 2
-      : 40; // fallback: half of the default 80px bar height
-
-    if (!this.timelineActive) {
-      this.timelineActive = true;
-      // Only initialise position and start date for a genuinely fresh timeline.
-      // If the bar was previously active (timelineStartDate already set), preserve
-      // the original bar position, start date, and total days so that existing
-      // connections remain anchored to the correct calendar dates.
-      if (!this.timelineStartDate) {
-        // Fresh create: place bar so its vertical centre is at the cursor
-        this.timelineBarX = worldX;
-        this.timelineBarY = worldY - barHalfHeight;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        this.timelineStartDate = today;
-        this.timelineTotalDays = (typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
-          ? TimelineMode.DEFAULT_TOTAL_DAYS
-          : 31;
-      }
-      // Ensure the connections array exists (may have been cleared by a hard reset)
-      if (!this.timelineConnections) this.timelineConnections = [];
-    } else {
-      this.timelineActive = false;
-      this.timelineDraggingResize = false;
-      this.timelineBarDragging = false;
-      this.timelineSelected = false;
-    }
+    const timeline = this._makeTimelineObject(worldX, worldY);
+    this.getTimelines().push(timeline);
+    this.timelineActive = true;
+    this._setActiveTimeline(timeline);
+    // Ensure the connections array exists (may have been cleared by a hard reset)
+    if (!this.timelineConnections) this.timelineConnections = [];
     this.isSaved = false;
     this.isDirty = true;
     // Notify collaboration layer so remote users see the change
@@ -614,14 +744,14 @@ class MindMap {
 
   /** Draw the timeline bar (thin wrapper around TimelineMode.drawBar). */
   drawTimeline() {
-    if (!this.timelineActive || !this.timelineStartDate) return;
+    if (!this.timelineActive || this.getTimelines().length === 0) return;
     if (typeof TimelineMode === 'undefined') return; // guard: script not loaded
     TimelineMode.drawBar(this);
   }
 
   /** Draw timeline connections under boxes so arrows do not overlay box content. */
   drawTimelineConnectionsUnderlay() {
-    if (!this.timelineActive || !this.timelineStartDate) return;
+    if (!this.timelineActive || this.getTimelines().length === 0) return;
     if (typeof TimelineMode === 'undefined') return;
     if (typeof TimelineMode.drawConnectionsUnderlay !== 'function') return;
     TimelineMode.drawConnectionsUnderlay(this);
@@ -635,18 +765,10 @@ class MindMap {
   drawTimelineDateLabels() {
     if (typeof TimelineMode === 'undefined') return;
     if (!this.timelineConnections || this.timelineConnections.length === 0) return;
-    // Use stored start date; fall back to today so labels can still show even
-    // when the timeline bar has been toggled off (timelineStartDate is preserved).
-    let startDate = this.timelineStartDate;
-    if (!startDate) {
-      startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      this.timelineStartDate = startDate; // cache so all callers agree
-    }
     const z = typeof CameraUtils !== 'undefined' ? (CameraUtils.zoom || 1) : 1;
     const safeZ = Math.max(0.01, z);
     push();
-    TimelineMode.drawBoxDateLabels(this.timelineConnections, startDate, safeZ);
+    TimelineMode.drawBoxDateLabels(this.timelineConnections, this.timelineStartDate, safeZ);
     pop();
   }
 
@@ -659,9 +781,15 @@ class MindMap {
       this.timelineSelected = false;
       return false;
     }
+    const timeline = this.getTimelineAtWorld(worldX, worldY);
+    if (!timeline) {
+      this.timelineSelected = false;
+      return false;
+    }
+    this._setActiveTimeline(timeline);
     const barX = this.timelineBarX || 0;
     const barY = this.timelineBarY || 0;
-    const barWidth = this.getTimelineBarWidth();
+    const barWidth = this.getTimelineBarWidth(timeline);
     // Convert to bar-local coordinates for all geometry checks
     const localX = worldX - barX;
     const localY = worldY - barY;
@@ -720,6 +848,7 @@ class MindMap {
       // Move the bar: offset was recorded at mousedown so dragging feels natural
       this.timelineBarX = worldX - this.timelineBarDragOffsetX;
       this.timelineBarY = worldY - this.timelineBarDragOffsetY;
+      this._syncActiveTimelineFromLegacy();
       this.isSaved = false;
       this.isDirty = true;
       return true;
@@ -732,6 +861,7 @@ class MindMap {
       const startDays = this.timelineDragStartWidth / DAY_WIDTH;
       const newDays = Math.max(MIN_DAYS, Math.round(startDays + deltaX / DAY_WIDTH));
       this.timelineTotalDays = newDays;
+      this._syncActiveTimelineFromLegacy();
       this.isSaved = false;
       this.isDirty = true;
       return true;
@@ -753,6 +883,7 @@ class MindMap {
         this.timelineBarX = this.timelineDragStartBarX - deltaDays * DAY_WIDTH;
         // Grow/shrink total days
         this.timelineTotalDays = this.timelineDragStartTotalDays + deltaDays;
+        this._syncActiveTimelineFromLegacy();
         // Connection dayIndex values update automatically because they are
         // computed from each box's immutable timelineDate field.
         this.timelineDragLastDeltaDays = deltaDays;
@@ -772,6 +903,7 @@ class MindMap {
     this.timelineDraggingLeftHandle = false;
     this.timelineDragLastDeltaDays = 0;
     if (wasDragging) {
+      this._syncActiveTimelineFromLegacy();
       this.isSaved = false;
       this.isDirty = true;
       // Sync updated position or width to collaborators
@@ -785,17 +917,19 @@ class MindMap {
    */
   handleTimelineConnectionDropped(worldX, worldY, fromBox) {
     if (!this.timelineActive) return false;
-    const barX = this.timelineBarX || 0;
-    const barY = this.timelineBarY || 0;
-    const barWidth = this.getTimelineBarWidth();
+    const timeline = this.getTargetTimelineForConnections(worldX, worldY);
+    if (!timeline) return false;
+    const barX = timeline.barX || 0;
+    const barY = timeline.barY || 0;
+    const barWidth = this.getTimelineBarWidth(timeline);
     const localX = worldX - barX;
     const localY = worldY - barY;
     if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) return false;
     if (!fromBox) return false;
     if (TimelineMode.isDragHandle(localX, localY, barWidth)) return false;
-    const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+    const totalDays = this.getTimelineTotalDays(timeline);
     const dayIndex = Math.min(TimelineMode.dayFromWorldX(localX, barWidth), totalDays - 1);
-    this.addTimelineConnection(fromBox, dayIndex);
+    this.addTimelineConnection(fromBox, dayIndex, timeline.id);
     return true;
   }
 
@@ -2820,9 +2954,10 @@ class MindMap {
         if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
           const wx = worldMouseX();
           const wy = worldMouseY();
-          const bw = this.getTimelineBarWidth();
-          const bx = this.timelineBarX || 0;
-          const by = this.timelineBarY || 0;
+          const targetTimeline = this.getTargetTimelineForConnections(wx, wy) || this.getActiveTimeline();
+          const bw = this.getTimelineBarWidth(targetTimeline);
+          const bx = targetTimeline ? (targetTimeline.barX || 0) : 0;
+          const by = targetTimeline ? (targetTimeline.barY || 0) : 0;
           const lx = wx - bx;
           const ly = wy - by;
 
@@ -2863,10 +2998,13 @@ class MindMap {
 
           // Dropped on bar → change the day (re-date)
           if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
-            const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+            const totalDays = this.getTimelineTotalDays(targetTimeline);
             const newDay = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
-            const newDate = this.timelineStartDate
-              ? TimelineMode.toISODateString(TimelineMode.dateForDay(newDay, this.timelineStartDate))
+            const startDate = targetTimeline && targetTimeline.startDate
+              ? new Date(targetTimeline.startDate)
+              : this.timelineStartDate;
+            const newDate = startDate
+              ? TimelineMode.toISODateString(TimelineMode.dateForDay(newDay, startDate))
               : null;
             if (newDate && newDate !== conn.fromBox.timelineDate) {
               const dup = this.timelineConnections.some(
@@ -2875,6 +3013,7 @@ class MindMap {
               if (!dup) {
                 this._wrapInTransaction(() => {
                   conn.fromBox.timelineDate = newDate;
+                  conn.timelineId = targetTimeline ? targetTimeline.id : conn.timelineId;
                   // Sync via ytimelineConnections only — _boxToYjsData does not include
                   // timelineDate, so an onBoxChange call would make no Yjs writes
                   // (_boxDataEquals detects equality and returns early) and is therefore
@@ -2922,19 +3061,20 @@ class MindMap {
       if (this.timelineActive && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
         const wx = worldMouseX();
         const wy = worldMouseY();
-        const bw = this.getTimelineBarWidth();
-        const bx = this.timelineBarX || 0;
-        const by = this.timelineBarY || 0;
+        const targetTimeline = this.getTargetTimelineForConnections(wx, wy);
+        const bw = this.getTimelineBarWidth(targetTimeline);
+        const bx = targetTimeline ? (targetTimeline.barX || 0) : 0;
+        const by = targetTimeline ? (targetTimeline.barY || 0) : 0;
         const lx = wx - bx;
         const ly = wy - by;
-        if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
-          const totalDays = this.timelineTotalDays || TimelineMode.DEFAULT_TOTAL_DAYS;
+        if (targetTimeline && TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
+          const totalDays = this.getTimelineTotalDays(targetTimeline);
           const dayIndex = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
           this._wrapInTransaction(() => {
             this._unregisterConnection(conn);
             // Notify Yjs that the regular connection was removed
             if (MindMap.onConnectionsChange) MindMap.onConnectionsChange(true);
-            this.addTimelineConnection(conn.fromBox, dayIndex);
+            this.addTimelineConnection(conn.fromBox, dayIndex, targetTimeline.id);
           });
           this.draggingConnection = null;
           return;
@@ -3674,8 +3814,8 @@ class MindMap {
         // Delete selected timeline connection
         this.removeTimelineConnection(this.selectedTimelineConnection);
       } else if (this.timelineSelected) {
-        // Delete the timeline bar itself
-        this.createTimeline();
+        // Delete the selected timeline bar itself
+        this.removeActiveTimeline();
       }
       // Clear navigation mode after deleting single connection
       this.isArrowKeyNavigating = false;
@@ -3728,29 +3868,44 @@ class MindMap {
    * @returns {Object} JSON representation of the mind map
    */
   toJSON() {
+    const timelines = this.getTimelines().map(tl => ({
+      id: tl.id,
+      timelineBarX: tl.barX || 0,
+      timelineBarY: tl.barY || 0,
+      timelineTotalDays: tl.totalDays || null,
+      timelineStartDate: tl.startDate
+        ? (typeof TimelineMode !== 'undefined'
+            ? TimelineMode.toISODateString(tl.startDate)
+            : new Date(tl.startDate).toISOString())
+        : null,
+    }));
+    const activeTimeline = this.getActiveTimeline();
+    const activeStartDate = activeTimeline && activeTimeline.startDate ? activeTimeline.startDate : this.timelineStartDate;
     return {
       boxes: this.boxes.map(box => box.toJSON()),
       connections: this.connections.map(conn => conn.toJSON(this.boxes)),
       clusters: this.clusters
         ? this.clusters.filter(c => c).map(c => c.toJSON())
         : [],
-      // Timeline connections are now implicit in each box's `timelineDate` field.
-      // The separate array is no longer written; loading old files that still have
-      // it is handled in fromJSON() for backward compatibility.
+      // Explicitly persist timeline connections so each connection can keep a
+      // timelineId when multiple timeline bars exist.
+      timelineConnections: (this.timelineConnections || []).map(tc => tc.toJSON()),
+      timelines,
+      activeTimelineId: activeTimeline ? activeTimeline.id : null,
       timelineBarWidth: this.timelineBarWidth || null,
-      timelineTotalDays: this.timelineTotalDays || null,
-      timelineBarX: this.timelineBarX || 0,
-      timelineBarY: this.timelineBarY || 0,
-      timelineActive: this.timelineActive || false,
+      timelineTotalDays: activeTimeline ? (activeTimeline.totalDays || null) : (this.timelineTotalDays || null),
+      timelineBarX: activeTimeline ? (activeTimeline.barX || 0) : (this.timelineBarX || 0),
+      timelineBarY: activeTimeline ? (activeTimeline.barY || 0) : (this.timelineBarY || 0),
+      timelineActive: this.timelineActive || timelines.length > 0,
       // Persist as a local "YYYY-MM-DD" date string so collaborators in different
       // timezones all load the same calendar date.  Full ISO datetimes (the old
       // format) embed the saving user's UTC offset, causing bar labels to differ
       // between UTC+ and UTC- users.  TimelineMode.toISODateString() uses local
       // date getters (not toISOString/UTC) to produce the correct string.
-      timelineStartDate: this.timelineStartDate
+      timelineStartDate: activeStartDate
         ? (typeof TimelineMode !== 'undefined'
-            ? TimelineMode.toISODateString(this.timelineStartDate)
-            : this.timelineStartDate.toISOString())
+            ? TimelineMode.toISODateString(activeStartDate)
+            : activeStartDate.toISOString())
         : null,
       lastModified: Date.now(),
       name: this.getLastUsedFilename() || 'openmind.json'
@@ -3790,6 +3945,8 @@ class MindMap {
     this.timelineSelected = false;
     this.timelineBarDragging = false;
     this.timelineActive = false;
+    this.timelines = [];
+    this.activeTimelineId = null;
     this.timelineStartDate = null;
     this.timelineDraggingResize = false;
     this.timelineDraggingLeftHandle = false;
@@ -3867,49 +4024,68 @@ class MindMap {
     this.timelineConnections = [];
     this.selectedTimelineConnection = null;
 
-    // Restore persisted bar position and day count.
-    // Legacy files without barX/barY default to (0, 0) so old maps still work.
-    // Legacy files with timelineBarWidth are converted to timelineTotalDays.
-    this.timelineBarX = (typeof data.timelineBarX === 'number') ? data.timelineBarX : 0;
-    this.timelineBarY = (typeof data.timelineBarY === 'number') ? data.timelineBarY : 0;
-    if (data.timelineTotalDays && typeof data.timelineTotalDays === 'number') {
-      this.timelineTotalDays = data.timelineTotalDays;
-    } else if (data.timelineBarWidth && typeof data.timelineBarWidth === 'number' && typeof TimelineMode !== 'undefined') {
-      // Migrate legacy width to day count
-      this.timelineTotalDays = Math.max(
-        TimelineMode.MIN_TOTAL_DAYS,
-        Math.round(data.timelineBarWidth / TimelineMode.DAY_WIDTH)
-      );
+    // Restore timelines (new format), else migrate legacy single timeline fields.
+    const parseTimelineStartDate = (startDateValue, fallbackActive = false) => {
+      if (startDateValue) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(startDateValue)) {
+          const [y, mo, da] = startDateValue.split('-').map(Number);
+          return new Date(y, mo - 1, da);
+        }
+        const parsed = new Date(startDateValue);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+      if (fallbackActive) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today;
+      }
+      return null;
+    };
+
+    if (Array.isArray(data.timelines) && data.timelines.length > 0) {
+      this.timelines = data.timelines.map((tl) => {
+        const totalDays = (tl && typeof tl.timelineTotalDays === 'number')
+          ? tl.timelineTotalDays
+          : ((typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS)
+            ? TimelineMode.DEFAULT_TOTAL_DAYS
+            : 31);
+        return {
+          id: (tl && tl.id) ? tl.id : this._generateTimelineId(),
+          barX: (tl && typeof tl.timelineBarX === 'number') ? tl.timelineBarX : 0,
+          barY: (tl && typeof tl.timelineBarY === 'number') ? tl.timelineBarY : 0,
+          totalDays,
+          startDate: parseTimelineStartDate(tl ? tl.timelineStartDate : null, true),
+        };
+      });
+      this.timelineActive = this.timelines.length > 0;
+      this._setActiveTimeline(data.activeTimelineId || this.timelines[this.timelines.length - 1]);
     } else {
-      this.timelineTotalDays = null; // will use DEFAULT_TOTAL_DAYS
+      const legacyTotalDays = (data.timelineTotalDays && typeof data.timelineTotalDays === 'number')
+        ? data.timelineTotalDays
+        : ((data.timelineBarWidth && typeof data.timelineBarWidth === 'number' && typeof TimelineMode !== 'undefined')
+          ? Math.max(TimelineMode.MIN_TOTAL_DAYS, Math.round(data.timelineBarWidth / TimelineMode.DAY_WIDTH))
+          : ((typeof TimelineMode !== 'undefined' && TimelineMode.DEFAULT_TOTAL_DAYS) ? TimelineMode.DEFAULT_TOTAL_DAYS : 31));
+      const legacyActive = data.timelineActive === true;
+      const legacyStartDate = parseTimelineStartDate(data.timelineStartDate, legacyActive);
+      if (legacyActive || legacyStartDate) {
+        this.timelines = [{
+          id: 'tl_legacy',
+          barX: (typeof data.timelineBarX === 'number') ? data.timelineBarX : 0,
+          barY: (typeof data.timelineBarY === 'number') ? data.timelineBarY : 0,
+          totalDays: legacyTotalDays,
+          startDate: legacyStartDate,
+        }];
+        this.timelineActive = true;
+        this._setActiveTimeline(this.timelines[0]);
+      } else {
+        this.timelineActive = false;
+        this.timelineBarX = 0;
+        this.timelineBarY = 0;
+        this.timelineTotalDays = null;
+        this.timelineStartDate = null;
+      }
     }
     this.timelineBarWidth = null; // no longer used
-
-    // Restore timeline active state and start date.
-    // timelineStartDate is persisted so that day-index labels show the same
-    // calendar dates across reloads rather than shifting to "today".
-    this.timelineActive = data.timelineActive === true;
-    if (data.timelineStartDate) {
-      // New format: "YYYY-MM-DD" (date-only) — parse as LOCAL midnight so all
-      // clients in different timezones load the same calendar date.
-      // Old format: full ISO datetime (e.g. "2024-01-14T19:00:00.000Z") — parse
-      // as-is for backward compat; cross-timezone inconsistency is acceptable for
-      // old maps since we cannot recover the saving user's intended local date.
-      if (/^\d{4}-\d{2}-\d{2}$/.test(data.timelineStartDate)) {
-        const [y, mo, da] = data.timelineStartDate.split('-').map(Number);
-        this.timelineStartDate = new Date(y, mo - 1, da); // local midnight
-      } else {
-        const parsed = new Date(data.timelineStartDate);
-        this.timelineStartDate = isNaN(parsed.getTime()) ? null : parsed;
-      }
-    } else if (this.timelineActive) {
-      // Fallback for maps saved before timelineStartDate was persisted.
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      this.timelineStartDate = today;
-    } else {
-      this.timelineStartDate = null;
-    }
 
     // Backward compat: migrate legacy {fromId, dayIndex} connections onto boxes.
     // Only applied when boxes don't already carry timelineDate (old format).
@@ -3927,10 +4103,13 @@ class MindMap {
             } else {
               console.warn('[MindMap] fromJSON: invalid legacy timelineDate format, skipping', tcData.date);
             }
-          } else if (tcData.dayIndex != null && this.timelineStartDate) {
+          } else if (tcData.dayIndex != null && (this.timelineStartDate || (tcData.timelineId && this.getTimelineById(tcData.timelineId)))) {
             // Legacy dayIndex → compute the calendar date
+            const targetTimeline = tcData.timelineId ? this.getTimelineById(tcData.timelineId) : null;
+            const startDate = targetTimeline && targetTimeline.startDate ? targetTimeline.startDate : this.timelineStartDate;
+            if (!startDate) continue;
             fromBox.timelineDate = TimelineMode.toISODateString(
-              TimelineMode.dateForDay(tcData.dayIndex, this.timelineStartDate)
+              TimelineMode.dateForDay(tcData.dayIndex, startDate)
             );
           }
         } catch (e) {
@@ -3939,10 +4118,22 @@ class MindMap {
       }
     }
 
-    // Build TimelineConnection objects from boxes that have a timelineDate set
-    for (const box of this.boxes) {
-      if (box && box.timelineDate) {
-        this.timelineConnections.push(new TimelineConnection(box, this));
+    // Build TimelineConnection objects.
+    if (Array.isArray(data.timelineConnections) && data.timelineConnections.length > 0) {
+      for (const tcData of data.timelineConnections) {
+        const tc = TimelineConnection.fromJSON(tcData, this.boxIdMap, this);
+        if (tc) this.timelineConnections.push(tc);
+      }
+    } else {
+      const fallbackTimeline = this.getActiveTimeline();
+      for (const box of this.boxes) {
+        if (box && box.timelineDate) {
+          this.timelineConnections.push(new TimelineConnection(
+            box,
+            this,
+            fallbackTimeline ? fallbackTimeline.id : null
+          ));
+        }
       }
     }
 

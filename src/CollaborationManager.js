@@ -1640,6 +1640,7 @@ class CollaborationManager {
             .map(c => ({
                 fromId: c.fromBox.id,
                 date:   c.fromBox.timelineDate,
+                timelineId: c.timelineId || null,
             }));
 
         if (skipTransactionWrapper) {
@@ -1674,7 +1675,8 @@ class CollaborationManager {
         const yjsMap = new Map();
         yjsConns.forEach((c, i) => {
             if (c && c.fromId && (c.date || c.dayIndex != null)) {
-                const key = c.date ? `${c.fromId}:${c.date}` : `${c.fromId}:day${c.dayIndex}`;
+                const timelineId = c.timelineId || 'default';
+                const key = c.date ? `${c.fromId}:${c.date}:${timelineId}` : `${c.fromId}:day${c.dayIndex}:${timelineId}`;
                 if (!yjsMap.has(key)) yjsMap.set(key, []);
                 yjsMap.get(key).push(i);
             }
@@ -1682,7 +1684,7 @@ class CollaborationManager {
 
         const toAdd = [];
         for (const conn of localConns) {
-            const key = `${conn.fromId}:${conn.date}`;
+            const key = `${conn.fromId}:${conn.date}:${conn.timelineId || 'default'}`;
             if (yjsMap.has(key)) {
                 const indices = yjsMap.get(key);
                 if (indices.length > 0) {
@@ -1782,7 +1784,7 @@ class CollaborationManager {
             // re-dating by two peers), only create one TimelineConnection.
             if (fromBox.timelineDate && !builtBoxIds.has(entry.fromId)) {
                 builtBoxIds.add(entry.fromId);
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap));
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap, entry.timelineId || null));
             }
         }
     }

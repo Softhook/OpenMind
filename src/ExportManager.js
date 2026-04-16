@@ -1298,17 +1298,22 @@ class ExportManager {
     // Expand bounds to include the Timeline Mode bar when active.
     // Use the bar's world position (barX, barY) — legacy files default to (0, 0).
     if (this.mindMap && this.mindMap.timelineActive) {
-      const barX = this.mindMap.timelineBarX || 0;
-      const barY = this.mindMap.timelineBarY || 0;
+      const timelines = (typeof this.mindMap.getTimelines === 'function')
+        ? this.mindMap.getTimelines()
+        : [{ barX: this.mindMap.timelineBarX || 0, barY: this.mindMap.timelineBarY || 0 }];
       const barHeight = (typeof TimelineMode !== 'undefined' &&
         typeof TimelineMode.BAR_HEIGHT === 'number' &&
         isFinite(TimelineMode.BAR_HEIGHT))
         ? TimelineMode.BAR_HEIGHT
         : 80; // fallback matches TimelineMode.BAR_HEIGHT default
-      minX = Math.min(minX, barX);
-      maxX = Math.max(maxX, barX + this.mindMap.getTimelineBarWidth());
-      minY = Math.min(minY, barY);
-      maxY = Math.max(maxY, barY + barHeight);
+      for (const timeline of (timelines || [])) {
+        const barX = timeline ? (timeline.barX || 0) : 0;
+        const barY = timeline ? (timeline.barY || 0) : 0;
+        minX = Math.min(minX, barX);
+        maxX = Math.max(maxX, barX + this.mindMap.getTimelineBarWidth(timeline));
+        minY = Math.min(minY, barY);
+        maxY = Math.max(maxY, barY + barHeight);
+      }
     }
 
     return { minX, maxX, minY, maxY };
