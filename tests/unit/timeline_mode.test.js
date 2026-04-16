@@ -295,6 +295,44 @@ describe('TimelineConnection', () => {
     expect(ep.end.y).toBeGreaterThan(180);
   });
 
+  test('does not fall back to active timeline when explicit timelineId is missing', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelineBarX = 0;
+    mm.timelineBarY = 0;
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+    mm.getTimelineBarWidth = () => TimelineMode.DEFAULT_WIDTH;
+
+    // Connection explicitly targets a non-existent timeline; it must not
+    // be drawn on the active timeline during transient undo states.
+    const conn = new TimelineConnection(box, mm, 'tl-missing');
+    expect(conn.timeline).toBeNull();
+    expect(conn._getConnectionEndpoints()).toBeNull();
+  });
+
+  test('does not fall back to active timeline when explicit timelineId is null', () => {
+    const box = makeBox('b1', 100, -50, '2024-01-06');
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+    mm.getTimelineBarWidth = () => TimelineMode.DEFAULT_WIDTH;
+
+    // Explicit null means legacy/ambiguous binding, not "use active timeline".
+    const conn = new TimelineConnection(box, mm, null);
+    expect(conn.timelineId).toBeNull();
+    expect(conn.timeline).toBeNull();
+    expect(conn._getConnectionEndpoints()).toBeNull();
+  });
+
   test('dayIndex is computed from box.timelineDate and mindMap.timelineStartDate', () => {
     // startDate = 2024-01-01 (local midnight), timelineDate = 2024-01-06 → dayIndex = 5.
     // Use local-midnight constructor (same as createTimeline()) so the test is
@@ -410,6 +448,41 @@ describe('TimelineConnection serialisation', () => {
     const map = new Map([['b1', box]]);
     const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16', timelineId: 'tl-2' }, map, null);
     expect(conn.timelineId).toBe('tl-2');
+  });
+
+  test('fromJSON normalizes null timelineId to the sole timeline when exactly one exists', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm = makeMindMap([box]);
+    mm.timelines = [
+      { id: 'tl-only', barX: 0, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelines = () => mm.timelines;
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16', timelineId: null }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.timelineId).toBe('tl-only');
+    expect(conn.timeline).toBe(mm.timelines[0]);
+  });
+
+  test('fromJSON keeps null timelineId unresolved when multiple timelines exist', () => {
+    const box = makeBox('b1', 0, 0);
+    const map = new Map([['b1', box]]);
+    const mm = makeMindMap([box]);
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+      { id: 'tl-b', barX: 400, barY: 0, totalDays: TimelineMode.DEFAULT_TOTAL_DAYS, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelines = () => mm.timelines;
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+
+    const conn = TimelineConnection.fromJSON({ fromId: 'b1', date: '2024-01-16', timelineId: null }, map, mm);
+    expect(conn).not.toBeNull();
+    expect(conn.timelineId).toBeNull();
+    expect(conn.timeline).toBeNull();
   });
 
   test('fromJSON computes dayIndex correctly from stored date', () => {
@@ -547,6 +620,52 @@ describe('TimelineMode.drawConnectionsUnderlay()', () => {
     TimelineMode.drawConnectionsUnderlay(mm);
     expect(drawA).toHaveBeenCalledTimes(1);
     expect(drawB).not.toHaveBeenCalled();
+  });
+
+  test('does not draw unresolved explicit null-id connection on the active timeline', () => {
+    const draw = jest.fn();
+    const box = makeBox('b1', 0, 0, '2024-01-05');
+    const mm = makeMindMap([box]);
+    mm.timelineActive = true;
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelineTotalDays = 31;
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: 31, startDate: new Date(2024, 0, 1) },
+      { id: 'tl-b', barX: 300, barY: 0, totalDays: 31, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+    mm.getTimelineBarWidth = () => TimelineMode.DEFAULT_WIDTH;
+
+    const conn = new TimelineConnection(box, mm, null);
+    conn.draw = draw;
+    mm.timelineConnections = [conn];
+
+    TimelineMode.drawConnectionsUnderlay(mm);
+    expect(draw).not.toHaveBeenCalled();
+  });
+});
+
+describe('TimelineMode.drawBoxDateLabels()', () => {
+  test('does not draw date bubble for unresolved explicit null-id connection', () => {
+    const box = makeBox('b1', 0, 0, '2024-01-05');
+    const mm = makeMindMap([box]);
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelines = [
+      { id: 'tl-a', barX: 0, barY: 0, totalDays: 31, startDate: new Date(2024, 0, 1) },
+      { id: 'tl-b', barX: 300, barY: 0, totalDays: 31, startDate: new Date(2024, 0, 1) },
+    ];
+    mm.getTimelineById = (id) => mm.timelines.find(t => t.id === id) || null;
+    mm.getActiveTimeline = () => mm.timelines[0];
+
+    const conn = new TimelineConnection(box, mm, null);
+
+    sandbox.rect.mockClear();
+    sandbox.text.mockClear();
+    TimelineMode.drawBoxDateLabels([conn], mm.timelineStartDate, 1);
+
+    expect(sandbox.rect).not.toHaveBeenCalled();
+    expect(sandbox.text).not.toHaveBeenCalled();
   });
 });
 

@@ -55,18 +55,33 @@ class TimelineConnection extends Connection {
   constructor(fromBox, mindMap = null, timelineId = null) {
     super(fromBox, null); // toBox is virtual (computed from fromBox.timelineDate)
     this.mindMap  = mindMap;
-    this.timelineId = timelineId || (mindMap && mindMap.activeTimelineId) || null;
+    // Distinguish implicit construction (no 3rd arg supplied) from an explicit
+    // null timelineId. Implicit callers want "current active timeline" behavior;
+    // explicit null means legacy/ambiguous data that must not silently rebind.
+    this._usesImplicitActiveTimeline = arguments.length < 3;
+    this.timelineId = this._usesImplicitActiveTimeline
+      ? ((mindMap && mindMap.activeTimelineId) || null)
+      : (timelineId || null);
   }
 
   get timeline() {
     if (!this.mindMap) return null;
+    if (this._usesImplicitActiveTimeline) {
+      if (typeof this.mindMap.getActiveTimeline === 'function') {
+        return this.mindMap.getActiveTimeline();
+      }
+      return null;
+    }
     if (this.timelineId && typeof this.mindMap.getTimelineById === 'function') {
       const byId = this.mindMap.getTimelineById(this.timelineId);
       if (byId) return byId;
+      // Do not silently fall back to the active timeline when an explicit ID
+      // is missing: during undo/replay this temporarily reattaches arrows to
+      // the wrong bar and looks like timeline IDs are "switching".
+      return null;
     }
-    if (typeof this.mindMap.getActiveTimeline === 'function') {
-      return this.mindMap.getActiveTimeline();
-    }
+    // Explicit null timelineId is ambiguous legacy data. Leave it unresolved so
+    // it cannot drift to whatever timeline happens to be active right now.
     return null;
   }
 
@@ -101,6 +116,10 @@ class TimelineConnection extends Connection {
     if (!this.fromBox) return null;
     const dayIndex = this.dayIndex;
     const timeline = this.timeline;
+    // If this connection has an explicit binding (including explicit null for
+    // legacy/ambiguous data) that doesn't currently resolve, avoid drawing it
+    // against legacy/active geometry.
+    if (!this._usesImplicitActiveTimeline && !timeline) return null;
     const barWidth = this.mindMap ? this.mindMap.getTimelineBarWidth(timeline) : TimelineMode.DEFAULT_WIDTH;
     const barX = timeline ? (timeline.barX || 0) : (this.mindMap ? (this.mindMap.timelineBarX || 0) : 0);
     const barY = timeline ? (timeline.barY || 0) : (this.mindMap ? (this.mindMap.timelineBarY || 0) : 0);
@@ -194,7 +213,12 @@ class TimelineConnection extends Connection {
       return null;
     }
 
-    return new TimelineConnection(fromBox, mindMap, data.timelineId || null);
+    const fallbackTimelineId = (!data.timelineId && mindMap && typeof mindMap.getTimelines === 'function')
+      ? (((mindMap.getTimelines() || []).length === 1 && mindMap.getTimelines()[0])
+          ? mindMap.getTimelines()[0].id
+          : null)
+      : null;
+    return new TimelineConnection(fromBox, mindMap, data.timelineId || fallbackTimelineId || null);
   }
 }
 
@@ -451,6 +475,7 @@ class TimelineMode {
 
     for (const conn of conns) {
       if (conn === draggingConn) continue;
+      if (conn && conn._usesImplicitActiveTimeline === false && !conn.timeline) continue;
       const timeline = conn ? conn.timeline : null;
       const totalDays = (timeline && typeof timeline.totalDays === 'number')
         ? timeline.totalDays
@@ -478,12 +503,15 @@ class TimelineMode {
     const drawableTimelines = (timelines || []).filter(t => t && t.startDate);
     if (drawableTimelines.length === 0) return;
     const activeTimelineId = mindMap.activeTimelineId || (mindMap.getActiveTimeline && mindMap.getActiveTimeline() ? mindMap.getActiveTimeline().id : null);
+    const selectedTimelineId = mindMap.timelineSelected
+      ? (mindMap.selectedTimelineId || activeTimelineId)
+      : null;
     for (const timeline of drawableTimelines) {
       if (!timeline) continue;
       TimelineMode._renderBar(new DrawCtx(null), mindMap, safeZ, {
         withDragPreview: true,
         timeline,
-        isSelectedTimeline: !!(mindMap.timelineSelected && activeTimelineId && timeline.id === activeTimelineId),
+        isSelectedTimeline: !!(selectedTimelineId && timeline.id === selectedTimelineId),
       });
     }
   }
@@ -537,6 +565,10 @@ class TimelineMode {
     const conns       = mindMap.timelineConnections || [];
     const visibleConns = conns.filter(c => {
       if (!c) return false;
+      // Explicit bindings that currently resolve to no timeline (including explicit
+      // null legacy bindings when multiple timelines exist) must not highlight the
+      // active bar.  Without this, the arrow is hidden but the day cell still lights up.
+      if (c._usesImplicitActiveTimeline === false && !c.timeline) return false;
       const connTimelineId = c.timelineId || null;
       const targetTimelineId = tl ? tl.id : null;
       if (targetTimelineId && connTimelineId && connTimelineId !== targetTimelineId) return false;
@@ -706,6 +738,10 @@ class TimelineMode {
     today.setHours(0, 0, 0, 0);
 
     for (const conn of conns) {
+      // Match the same unresolved-binding behavior as arrow rendering: if an
+      // explicit timeline binding (including explicit null legacy data) no
+      // longer resolves to a timeline, do not leave a stale date bubble behind.
+      if (conn && conn._usesImplicitActiveTimeline === false && !conn.timeline) continue;
       if (!conn || !conn.fromBox || !conn.fromBox.timelineDate) continue;
       const box = conn.fromBox;
       if (box.x == null || box.y == null || box.width == null || box.height == null) continue;

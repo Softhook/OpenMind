@@ -1617,9 +1617,9 @@ class CollaborationManager {
             this.ytimeline.set('active', active);
             this.ytimeline.set('x', barX);
             this.ytimeline.set('y', barY);
-            if (totalDays) {
-                this.ytimeline.set('totalDays', totalDays);
-            }
+            // Always write totalDays (even null/0) so a reset clears the stale
+            // value from prior sessions rather than leaving it in the Yjs map.
+            this.ytimeline.set('totalDays', totalDays ?? null);
             if (timelines) {
                 this.ytimeline.set('timelines', timelines);
                 this.ytimeline.set('activeTimelineId', this.mindMap.activeTimelineId || null);
@@ -1688,6 +1688,31 @@ class CollaborationManager {
                     this.mindMap._setActiveTimeline(resolvedActive || fallbackTimeline);
                 }
             }
+        } else if (!active) {
+            // The 'timelines' key is absent from Yjs (e.g. undoing the very first createTimeline
+            // when the key did not exist beforehand). Clear the stale local timelines array so
+            // it matches the reverted Yjs snapshot; otherwise the stale entry persists and the
+            // next createTimeline pushes into it, producing ghost bars.
+            this.mindMap.timelines = [];
+            this.mindMap.activeTimelineId = null;
+            this.mindMap.timelineStartDate = null;
+            this.mindMap.timelineTotalDays = null;
+            this.mindMap.timelineBarX = 0;
+            this.mindMap.timelineBarY = 0;
+            this.mindMap.timelineActive = false;
+        }
+
+        // Unconditionally clean up all interaction state when the timeline is now
+        // inactive.  This MUST run before the early return so it isn't skipped
+        // when the timelines block above already set timelineActive=false (which
+        // makes `active === mindMap.timelineActive` true and triggers the early
+        // return before the old else-cleanup block was ever reached).
+        if (!this.mindMap.timelineActive) {
+            this.mindMap.timelineDraggingResize = false;
+            this.mindMap.timelineDraggingLeftHandle = false;
+            this.mindMap.timelineBarDragging = false;
+            this.mindMap.timelineSelected = false;
+            this.mindMap.selectedTimelineId = null;
         }
 
         if (active === this.mindMap.timelineActive) {
@@ -1703,10 +1728,12 @@ class CollaborationManager {
             }
             if (!this.mindMap.timelineConnections) this.mindMap.timelineConnections = [];
         } else {
+            // Deactivation path for non-timelines-block (legacy toggle only).
             this.mindMap.timelineDraggingResize = false;
             this.mindMap.timelineDraggingLeftHandle = false;
             this.mindMap.timelineBarDragging = false;
             this.mindMap.timelineSelected = false;
+            this.mindMap.selectedTimelineId = null;
         }
         if (this.mindMap) this.mindMap.isDirty = true;
     }
@@ -1865,12 +1892,19 @@ class CollaborationManager {
                 }
             }
 
-            // Guard against duplicate arrows: if ytimelineConnections somehow
-            // contains two entries for the same box (possible with concurrent
-            // re-dating by two peers), only create one TimelineConnection.
+            // Guard against duplicate arrows: ytimelineConnections may contain
+            // two entries for the same box if two peers append concurrently before
+            // the Yjs CRDT merge arrives (e.g. both peers add an entry in the same
+            // Yjs transaction window).  Only the first entry wins; the extras are
+            // cleaned up on the next syncTimelineConnectionsToYjs diff-pass.
             if (fromBox.timelineDate && !builtBoxIds.has(entry.fromId)) {
                 builtBoxIds.add(entry.fromId);
-                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap, entry.timelineId || null));
+                const fallbackTimelineId = (!entry.timelineId && this.mindMap && typeof this.mindMap.getTimelines === 'function')
+                    ? (((this.mindMap.getTimelines() || []).length === 1 && this.mindMap.getTimelines()[0])
+                        ? this.mindMap.getTimelines()[0].id
+                        : null)
+                    : null;
+                this.mindMap.timelineConnections.push(new TimelineConnection(fromBox, this.mindMap, entry.timelineId || fallbackTimelineId || null));
             }
         }
     }
@@ -2185,39 +2219,53 @@ class CollaborationManager {
                     this.isSyncing = false;
                 }
             });
+        }
 
-            // Observe timeline connection changes (undo/redo + remote)
-            if (this.ytimelineConnections) {
-                this.ytimelineConnections.observe((event) => {
-                    const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
-                    if (this.isSyncing && !isUndoRedo) return;
-                    if (event.transaction.local && !isUndoRedo) return;
+        // Observe timeline connection changes (undo/redo + remote).
+        // Registered at the top level — independent of yclusters availability.
+        if (this.ytimelineConnections) {
+            this.ytimelineConnections.observe((event) => {
+                const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
+                if (this.isSyncing && !isUndoRedo) return;
+                if (event.transaction.local && !isUndoRedo) return;
 
-                    if (isUndoRedo) {
-                        // If boxes also changed, yboxes observer will call rebuild after boxes
-                        const hasBoxChanges = event.transaction.changed.has(this.yboxes);
-                        if (hasBoxChanges) return;
-                    }
+                if (isUndoRedo) {
+                    // If boxes also changed, yboxes observer will call rebuild after boxes
+                    const hasBoxChanges = event.transaction.changed.has(this.yboxes);
+                    if (hasBoxChanges) return;
+                    // If timeline state also changed, defer to the ytimeline observer so
+                    // connections are rebuilt only after the active timelines snapshot has
+                    // been applied. Otherwise legacy null-ID connections can be normalized
+                    // against stale pre-undo local timeline state.
+                    const hasTimelineChanges = event.transaction.changed.has(this.ytimeline);
+                    if (hasTimelineChanges) return;
+                }
 
-                    this.isSyncing = true;
-                    try {
-                        this._rebuildTimelineConnectionsFromYjs();
-                        if (this.mindMap) this.mindMap.isDirty = true;
-                    } finally {
-                        this.isSyncing = false;
-                    }
-                });
-            }
+                this.isSyncing = true;
+                try {
+                    this._rebuildTimelineConnectionsFromYjs();
+                    if (this.mindMap) this.mindMap.isDirty = true;
+                } finally {
+                    this.isSyncing = false;
+                }
+            });
+        }
 
-            // Observe timeline active state changes (remote toggle and undo/redo)
-            if (this.ytimeline) {
-                this.ytimeline.observe((event) => {
-                    const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
-                    if (this.isSyncing && !isUndoRedo) return;
-                    if (event.transaction.local && !isUndoRedo) return;
-                    this._applyRemoteTimelineActive();
-                });
-            }
+        // Observe timeline active state changes (remote toggle and undo/redo).
+        // Registered at the top level — independent of yclusters availability.
+        if (this.ytimeline) {
+            this.ytimeline.observe((event) => {
+                const isUndoRedo = event.transaction.origin === this.undoManager && this._isPerformingUndoRedo;
+                if (this.isSyncing && !isUndoRedo) return;
+                if (event.transaction.local && !isUndoRedo) return;
+                this._applyRemoteTimelineActive();
+                // If the same transaction also changed timeline connections, rebuild them
+                // after applying the updated timeline snapshot so any legacy/null timelineId
+                // normalization uses the correct post-transaction timelines array.
+                if (event.transaction.changed.has(this.ytimelineConnections)) {
+                    this._rebuildTimelineConnectionsFromYjs();
+                }
+            });
         }
     }
 

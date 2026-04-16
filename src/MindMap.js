@@ -168,6 +168,10 @@ class MindMap {
     this.selectedTimelineConnection = null;
     // Whether the bar itself is selected (for move / delete)
     this.timelineSelected = false;
+    // ID of the timeline bar that was clicked to become selected.
+    // Stored separately from activeTimelineId so a concurrent remote update
+    // cannot retarget the delete action between click and keypress.
+    this.selectedTimelineId = null;
 
     // Timeline Mode active state and configuration
     this.timelineActive = false;
@@ -690,7 +694,10 @@ class MindMap {
   }
 
   removeActiveTimeline() {
-    const selected = this.getActiveTimeline();
+    // Use selectedTimelineId when available so a concurrent remote Yjs update
+    // between click and Delete keypress cannot retarget the deletion.
+    const selected = (this.selectedTimelineId && this.getTimelineById(this.selectedTimelineId))
+      || this.getActiveTimeline();
     if (!selected) return;
     // This flag is for callback sync methods only; the operation itself is still
     // wrapped in a tracked Yjs transaction by _wrapInTransaction().
@@ -699,9 +706,11 @@ class MindMap {
       if (this.timelineConnections && this.timelineConnections.length > 0) {
         this.timelineConnections = this.timelineConnections.filter((conn) => {
           if (!conn) return false;
-          const belongsToSelected = conn.timelineId
-            ? conn.timelineId === selected.id
-            : selected.id === this.activeTimelineId;
+          // Match only by explicit timelineId — a null timelineId is ambiguous and
+          // should not be blindly deleted (the tautology `selected.id === activeTimelineId`
+          // was always true and caused over-deletion).
+          const belongsToSelected = conn.timelineId === selected.id
+            || (conn.timelineId == null && this.timelines.length === 1 && this.timelines[0] && this.timelines[0].id === selected.id);
           if (!belongsToSelected) return true;
           if (conn.fromBox) conn.fromBox.timelineDate = null;
           return false;
@@ -712,6 +721,7 @@ class MindMap {
       this.timelines = remaining;
       this.timelineActive = remaining.length > 0;
       this.timelineSelected = false;
+      this.selectedTimelineId = null;
       this.timelineBarDragging = false;
       this.timelineDraggingResize = false;
       this.timelineDraggingLeftHandle = false;
@@ -805,11 +815,13 @@ class MindMap {
   handleTimelineMousePressed(worldX, worldY) {
     if (!this.timelineActive) {
       this.timelineSelected = false;
+      this.selectedTimelineId = null;
       return false;
     }
     const timeline = this.getTimelineAtWorld(worldX, worldY);
     if (!timeline) {
       this.timelineSelected = false;
+      this.selectedTimelineId = null;
       return false;
     }
     this._setActiveTimeline(timeline);
@@ -823,6 +835,7 @@ class MindMap {
     if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) {
       // Click outside the bar — clear bar selection and let normal handling proceed
       this.timelineSelected = false;
+      this.selectedTimelineId = null;
       return false;
     }
 
@@ -854,6 +867,7 @@ class MindMap {
     } else {
       // Bar body click: select the bar and begin a move drag
       this.timelineSelected = true;
+      this.selectedTimelineId = timeline.id;
       this.timelineBarDragging = true;
       this.timelineBarDragOffsetX = localX;
       this.timelineBarDragOffsetY = localY;
@@ -2964,6 +2978,7 @@ class MindMap {
 
     // Clear timeline bar selection when clicking empty background
     this.timelineSelected = false;
+    this.selectedTimelineId = null;
   }
 
   /**
@@ -3969,6 +3984,7 @@ class MindMap {
     }
     this.selectedTimelineConnection = null;
     this.timelineSelected = false;
+    this.selectedTimelineId = null;
     this.timelineBarDragging = false;
     this.timelineActive = false;
     this.timelines = [];
