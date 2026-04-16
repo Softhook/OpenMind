@@ -513,6 +513,7 @@ class MindMap {
    */
   addTimelineConnection(fromBox, dayIndex, timelineId = null) {
     const targetTimeline = timelineId ? this.getTimelineById(timelineId) : this.getActiveTimeline();
+    const targetTimelineId = targetTimeline ? targetTimeline.id : null;
     const startDate = targetTimeline && targetTimeline.startDate
       ? new Date(targetTimeline.startDate)
       : this.timelineStartDate;
@@ -522,16 +523,31 @@ class MindMap {
     // Compute the calendar date for this day slot
     const date = TimelineMode.toISODateString(TimelineMode.dateForDay(dayIndex, startDate));
 
-    // Prevent duplicate (same box already connected to the same date)
-    const already = this.timelineConnections.some(
-      c => c.fromBox === fromBox && c.fromBox.timelineDate === date
-    );
+    // A box stores a single timelineDate, so enforce a single timeline connection
+    // per source box to avoid stale duplicate arrows across timelines.
+    const existing = this.timelineConnections.find(c => c && c.fromBox === fromBox);
+    const already = !!existing &&
+      fromBox.timelineDate === date &&
+      (existing.timelineId || null) === targetTimelineId;
     if (already) return;
 
     this._wrapInTransaction(() => {
       fromBox.timelineDate = date;
-      const conn = new TimelineConnection(fromBox, this, targetTimeline ? targetTimeline.id : null);
-      this.timelineConnections.push(conn);
+      if (existing) {
+        existing.timelineId = targetTimelineId;
+      } else {
+        const conn = new TimelineConnection(fromBox, this, targetTimelineId);
+        this.timelineConnections.push(conn);
+      }
+      // Defensive cleanup: if older state already has duplicates for the same box,
+      // keep only one connection entry.
+      let seen = false;
+      this.timelineConnections = this.timelineConnections.filter((conn) => {
+        if (!conn || conn.fromBox !== fromBox) return true;
+        if (seen) return false;
+        seen = true;
+        return true;
+      });
       // timelineDate is propagated via ytimelineConnections, not yboxes
       // (CollaborationManager._boxToYjsData does not include timelineDate).
       if (MindMap.onTimelineConnectionsChange) {

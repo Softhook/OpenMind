@@ -2106,7 +2106,9 @@ function mouseReleased() {
     if (mindMap.connectingFrom && mindMap.timelineActive) {
       const wx = worldMouseX();
       const wy = worldMouseY();
-      const timeline = mindMap.getTimelineAtWorld ? mindMap.getTimelineAtWorld(wx, wy) : null;
+      const timeline = mindMap.getTimelineAtWorld
+        ? mindMap.getTimelineAtWorld(wx, wy, { excludeHandles: true })
+        : null;
       if (timeline) {
         const sourceBox = mindMap.connectingFrom.box;
         // Clear connectingFrom BEFORE handleMouseReleased to prevent completeConnection()

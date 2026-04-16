@@ -532,6 +532,24 @@ describe('TimelineMode.drawBar()', () => {
   });
 });
 
+describe('TimelineMode.drawConnectionsUnderlay()', () => {
+  test('draws only connections visible on their own timeline', () => {
+    const drawA = jest.fn();
+    const drawB = jest.fn();
+    const mm = makeMindMap();
+    mm.timelineActive = true;
+    mm.timelineStartDate = new Date(2024, 0, 1);
+    mm.timelineTotalDays = 31;
+    mm.timelineConnections = [
+      { dayIndex: 10, draw: drawA, timeline: { id: 'a', totalDays: 31 } },
+      { dayIndex: 10, draw: drawB, timeline: { id: 'b', totalDays: 7 } }, // out of range on its own timeline
+    ];
+    TimelineMode.drawConnectionsUnderlay(mm);
+    expect(drawA).toHaveBeenCalledTimes(1);
+    expect(drawB).not.toHaveBeenCalled();
+  });
+});
+
 // ============================================================
 // TimelineMode.dateForDay / dayIndexForDate / toISODateString / weekNumber
 // ============================================================
