@@ -99,7 +99,11 @@ describe('Timeline collaboration + Yjs undo integration', () => {
     expect(mindMap.timelineConnections).toHaveLength(1);
     expect(mindMap.timelineConnections[0].fromBox.id).toBe(box.id);
     expect(mindMap.timelineConnections[0].timelineId).toBe(createdTimelineId);
-    expect(box.timelineDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const restoredTimeline = mindMap.getTimelineById(createdTimelineId);
+    const expectedDate = TimelineMode.toISODateString(
+      TimelineMode.dateForDay(3, restoredTimeline.startDate)
+    );
+    expect(box.timelineDate).toBe(expectedDate);
   });
 
   test('loadFromJSON syncs multi-timeline state into shared ytimeline map', () => {

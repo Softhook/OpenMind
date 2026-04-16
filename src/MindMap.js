@@ -692,6 +692,7 @@ class MindMap {
   removeActiveTimeline() {
     const selected = this.getActiveTimeline();
     if (!selected) return;
+    const skipTransactionWrapper = true;
     this._wrapInTransaction(() => {
       if (this.timelineConnections && this.timelineConnections.length > 0) {
         this.timelineConnections = this.timelineConnections.filter((conn) => {
@@ -703,7 +704,7 @@ class MindMap {
           if (conn.fromBox) conn.fromBox.timelineDate = null;
           return false;
         });
-        if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
+        if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(skipTransactionWrapper);
       }
       const remaining = this.getTimelines().filter(t => t && t.id !== selected.id);
       this.timelines = remaining;
@@ -721,7 +722,7 @@ class MindMap {
         this.timelineBarX = 0;
         this.timelineBarY = 0;
       }
-      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(true);
+      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(skipTransactionWrapper);
     });
   }
 
@@ -748,6 +749,7 @@ class MindMap {
    * @param {number} worldY – world-space Y to vertically centre the bar on
    */
   createTimeline(worldX = 0, worldY = 0) {
+    const skipTransactionWrapper = true;
     this._wrapInTransaction(() => {
       const timeline = this._makeTimelineObject(worldX, worldY);
       this.getTimelines().push(timeline);
@@ -758,7 +760,7 @@ class MindMap {
       this.isSaved = false;
       this.isDirty = true;
       // Notify collaboration layer so remote users see the change
-      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(true);
+      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(skipTransactionWrapper);
     });
   }
 
