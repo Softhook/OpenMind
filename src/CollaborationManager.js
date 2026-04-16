@@ -1047,8 +1047,8 @@ class CollaborationManager {
                 this.syncTimelineConnectionsToYjs(skipTransactionWrapper);
             };
 
-            MindMap.onTimelineActiveChange = () => {
-                this.syncTimelineActiveToYjs();
+            MindMap.onTimelineActiveChange = (skipTransactionWrapper = false) => {
+                this.syncTimelineActiveToYjs(skipTransactionWrapper);
             };
         }
 
@@ -1594,7 +1594,7 @@ class CollaborationManager {
      * Called whenever createTimeline() or handleTimelineRelease() changes timeline state.
      * Uses the tracked origin so the UndoManager can undo bar creation/move/resize.
      */
-    syncTimelineActiveToYjs() {
+    syncTimelineActiveToYjs(skipTransactionWrapper = false) {
         if (!this.ytimeline || !this.mindMap || this.isSyncing) return;
         const active = this.mindMap.timelineActive === true;
         const barX = this.mindMap.timelineBarX || 0;
@@ -1613,7 +1613,7 @@ class CollaborationManager {
                     : null,
             }))
             : null;
-        this.transact(() => {
+        const syncImpl = () => {
             this.ytimeline.set('active', active);
             this.ytimeline.set('x', barX);
             this.ytimeline.set('y', barY);
@@ -1624,7 +1624,14 @@ class CollaborationManager {
                 this.ytimeline.set('timelines', timelines);
                 this.ytimeline.set('activeTimelineId', this.mindMap.activeTimelineId || null);
             }
-        }, CollaborationManager.TRACKED_ORIGIN);
+        };
+
+        if (skipTransactionWrapper) {
+            syncImpl();
+            return;
+        }
+
+        this.transact(syncImpl, CollaborationManager.TRACKED_ORIGIN);
     }
 
     /**

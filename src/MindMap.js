@@ -692,35 +692,37 @@ class MindMap {
   removeActiveTimeline() {
     const selected = this.getActiveTimeline();
     if (!selected) return;
-    if (this.timelineConnections && this.timelineConnections.length > 0) {
-      this.timelineConnections = this.timelineConnections.filter((conn) => {
-        if (!conn) return false;
-        const belongsToSelected = conn.timelineId
-          ? conn.timelineId === selected.id
-          : selected.id === this.activeTimelineId;
-        if (!belongsToSelected) return true;
-        if (conn.fromBox) conn.fromBox.timelineDate = null;
-        return false;
-      });
-      if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
-    }
-    const remaining = this.getTimelines().filter(t => t && t.id !== selected.id);
-    this.timelines = remaining;
-    this.timelineActive = remaining.length > 0;
-    this.timelineSelected = false;
-    this.timelineBarDragging = false;
-    this.timelineDraggingResize = false;
-    this.timelineDraggingLeftHandle = false;
-    if (this.timelineActive) {
-      this._setActiveTimeline(remaining[remaining.length - 1]);
-    } else {
-      this.activeTimelineId = null;
-      this.timelineStartDate = null;
-      this.timelineTotalDays = null;
-      this.timelineBarX = 0;
-      this.timelineBarY = 0;
-    }
-    if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
+    this._wrapInTransaction(() => {
+      if (this.timelineConnections && this.timelineConnections.length > 0) {
+        this.timelineConnections = this.timelineConnections.filter((conn) => {
+          if (!conn) return false;
+          const belongsToSelected = conn.timelineId
+            ? conn.timelineId === selected.id
+            : selected.id === this.activeTimelineId;
+          if (!belongsToSelected) return true;
+          if (conn.fromBox) conn.fromBox.timelineDate = null;
+          return false;
+        });
+        if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
+      }
+      const remaining = this.getTimelines().filter(t => t && t.id !== selected.id);
+      this.timelines = remaining;
+      this.timelineActive = remaining.length > 0;
+      this.timelineSelected = false;
+      this.timelineBarDragging = false;
+      this.timelineDraggingResize = false;
+      this.timelineDraggingLeftHandle = false;
+      if (this.timelineActive) {
+        this._setActiveTimeline(remaining[remaining.length - 1]);
+      } else {
+        this.activeTimelineId = null;
+        this.timelineStartDate = null;
+        this.timelineTotalDays = null;
+        this.timelineBarX = 0;
+        this.timelineBarY = 0;
+      }
+      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(true);
+    });
   }
 
   /** Returns the timeline currently used for new timeline connections. */
@@ -746,16 +748,18 @@ class MindMap {
    * @param {number} worldY – world-space Y to vertically centre the bar on
    */
   createTimeline(worldX = 0, worldY = 0) {
-    const timeline = this._makeTimelineObject(worldX, worldY);
-    this.getTimelines().push(timeline);
-    this.timelineActive = true;
-    this._setActiveTimeline(timeline);
-    // Ensure the connections array exists (may have been cleared by a hard reset)
-    if (!this.timelineConnections) this.timelineConnections = [];
-    this.isSaved = false;
-    this.isDirty = true;
-    // Notify collaboration layer so remote users see the change
-    if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange();
+    this._wrapInTransaction(() => {
+      const timeline = this._makeTimelineObject(worldX, worldY);
+      this.getTimelines().push(timeline);
+      this.timelineActive = true;
+      this._setActiveTimeline(timeline);
+      // Ensure the connections array exists (may have been cleared by a hard reset)
+      if (!this.timelineConnections) this.timelineConnections = [];
+      this.isSaved = false;
+      this.isDirty = true;
+      // Notify collaboration layer so remote users see the change
+      if (MindMap.onTimelineActiveChange) MindMap.onTimelineActiveChange(true);
+    });
   }
 
   /** Draw the timeline bar (thin wrapper around TimelineMode.drawBar). */
@@ -4173,6 +4177,9 @@ class MindMap {
     }
     if (MindMap.onTimelineConnectionsChange) {
       MindMap.onTimelineConnectionsChange();
+    }
+    if (MindMap.onTimelineActiveChange) {
+      MindMap.onTimelineActiveChange();
     }
   }
 
