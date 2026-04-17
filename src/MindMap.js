@@ -966,7 +966,6 @@ class MindMap {
     const localY = worldY - barY;
     if (!TimelineMode.isOverBarWorld(localX, localY, barWidth)) return false;
     if (!fromBox) return false;
-    if (TimelineMode.isDragHandle(localX, localY, barWidth)) return false;
     const totalDays = this.getTimelineTotalDays(timeline);
     const dayIndex = Math.min(TimelineMode.dayFromWorldX(localX, barWidth), totalDays - 1);
     this.addTimelineConnection(fromBox, dayIndex, timeline.id);
@@ -3019,18 +3018,13 @@ class MindMap {
                 }
                 return;
               }
-              // Prevent duplicate timeline connections on the target box
-              const dup = this.timelineConnections.some(c => c !== conn && c.fromBox === droppedBox);
-              if (!dup) {
-                this._wrapInTransaction(() => {
-                  // Save a stable reference and the date before mutating
-                  const oldBox = conn.fromBox;
-                  const dateToTransfer = oldBox ? oldBox.timelineDate : null;
-                  if (oldBox) oldBox.timelineDate = null;
-                  conn.fromBox = droppedBox;
-                  droppedBox.timelineDate = dateToTransfer;
-                  if (MindMap.onTimelineConnectionsChange) MindMap.onTimelineConnectionsChange(true);
-                });
+              const transferDayIndex = conn.dayIndex;
+              if (Number.isFinite(transferDayIndex) && transferDayIndex >= 0) {
+                this.addTimelineConnection(droppedBox, transferDayIndex, conn.timelineId || null);
+                const targetConn = this.timelineConnections.find(c => c && c !== conn && c.fromBox === droppedBox);
+                if (targetConn) {
+                  this.removeTimelineConnection(conn);
+                }
               }
             }
             // else: dropped nowhere → no change
@@ -3038,7 +3032,7 @@ class MindMap {
           }
 
           // Dropped on bar → change the day (re-date)
-          if (TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
+          if (TimelineMode.isOverBarWorld(lx, ly, bw)) {
             const totalDays = this.getTimelineTotalDays(targetTimeline);
             const newDay = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
             const startDate = targetTimeline && targetTimeline.startDate
@@ -3108,7 +3102,7 @@ class MindMap {
         const by = targetTimeline ? (targetTimeline.barY || 0) : 0;
         const lx = wx - bx;
         const ly = wy - by;
-        if (targetTimeline && TimelineMode.isOverBarWorld(lx, ly, bw) && !TimelineMode.isDragHandle(lx, ly, bw)) {
+        if (targetTimeline && TimelineMode.isOverBarWorld(lx, ly, bw)) {
           const totalDays = this.getTimelineTotalDays(targetTimeline);
           const dayIndex = Math.min(TimelineMode.dayFromWorldX(lx, bw), totalDays - 1);
           this._wrapInTransaction(() => {

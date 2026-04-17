@@ -58,11 +58,15 @@ global.worldMouseY = jest.fn(() => 0);
 const TextBox = require('../../src/TextBox');
 const Connection = require('../../src/Connection');
 const Cluster = require('../../src/Cluster');
+const TimelineMode = require('../../src/TimelineMode');
+const TimelineConnection = TimelineMode.TimelineConnection;
 const MindMap = require('../../src/MindMap');
 
 global.TextBox = TextBox;
 global.Connection = Connection;
 global.Cluster = Cluster;
+global.TimelineMode = TimelineMode;
+global.TimelineConnection = TimelineConnection;
 global.MindMap = MindMap;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -310,5 +314,59 @@ describe('MindMap – tail drag (draggingEnd: from)', () => {
     // conn.fromBox stays as originalFrom (reverted) because duplicate was detected
     expect(conn.fromBox).toBe(box1);
     expect(mindMap.draggingConnection).toBeNull();
+  });
+});
+
+describe('MindMap – timeline connection drag/drop regressions', () => {
+  let mindMap, box1, box2, box3;
+
+  beforeEach(() => {
+    mindMap = new MindMap();
+    box1 = makeBox(0, 0, 'A');
+    box2 = makeBox(220, 0, 'B');
+    box3 = makeBox(440, 0, 'C');
+    mindMap._registerBox(box1);
+    mindMap._registerBox(box2);
+    mindMap._registerBox(box3);
+    mindMap.timelineActive = true;
+    mindMap.createTimeline(0, 120);
+    jest.clearAllMocks();
+  });
+
+  test('handleTimelineConnectionDropped allows drops in drag-handle area', () => {
+    const tl = mindMap.getActiveTimeline();
+    const bw = mindMap.getTimelineBarWidth(tl);
+    const wx = tl.barX + bw - 2;
+    const wy = tl.barY + TimelineMode.BAR_HEIGHT / 2;
+
+    const created = mindMap.handleTimelineConnectionDropped(wx, wy, box1);
+
+    expect(created).toBe(true);
+    expect(mindMap.timelineConnections.length).toBe(1);
+    expect(mindMap.timelineConnections[0].fromBox).toBe(box1);
+  });
+
+  test('timeline tail drag can move onto a box that already has a timeline connection', () => {
+    mindMap.addTimelineConnection(box1, 2);
+    mindMap.addTimelineConnection(box2, 4);
+    const connFromBox1 = mindMap.timelineConnections.find(c => c.fromBox === box1);
+    const connFromBox2 = mindMap.timelineConnections.find(c => c.fromBox === box2);
+    const transferredDate = box1.timelineDate;
+
+    mindMap.draggingConnection = {
+      conn: connFromBox1,
+      originalFrom: box1,
+      originalTo: null,
+      draggingEnd: 'from'
+    };
+    box2.isMouseOver = jest.fn(() => true);
+
+    mindMap.handleMouseReleased();
+
+    expect(mindMap.timelineConnections).not.toContain(connFromBox1);
+    expect(mindMap.timelineConnections).toContain(connFromBox2);
+    expect(connFromBox2.fromBox).toBe(box2);
+    expect(box1.timelineDate).toBeNull();
+    expect(box2.timelineDate).toBe(transferredDate);
   });
 });
