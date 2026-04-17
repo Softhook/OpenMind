@@ -346,12 +346,31 @@ describe('MindMap – timeline connection drag/drop regressions', () => {
     expect(mindMap.timelineConnections[0].fromBox).toBe(box1);
   });
 
+  test('handle-area drop targets timeline under cursor even when another timeline is active', () => {
+    const firstTimeline = mindMap.getActiveTimeline();
+    mindMap.createTimeline(600, 120);
+    const secondTimeline = mindMap.getActiveTimeline();
+    mindMap._setActiveTimeline(firstTimeline);
+
+    const bw = mindMap.getTimelineBarWidth(secondTimeline);
+    const wx = secondTimeline.barX + bw - 2;
+    const wy = secondTimeline.barY + TimelineMode.BAR_HEIGHT / 2;
+
+    const created = mindMap.handleTimelineConnectionDropped(wx, wy, box1);
+
+    expect(created).toBe(true);
+    expect(mindMap.timelineConnections.length).toBe(1);
+    expect(mindMap.timelineConnections[0].timelineId).toBe(secondTimeline.id);
+    expect(mindMap.activeTimelineId).toBe(secondTimeline.id);
+  });
+
   test('timeline tail drag can move onto a box that already has a timeline connection', () => {
     mindMap.addTimelineConnection(box1, 2);
     mindMap.addTimelineConnection(box2, 4);
     const connFromBox1 = mindMap.timelineConnections.find(c => c.fromBox === box1);
     const connFromBox2 = mindMap.timelineConnections.find(c => c.fromBox === box2);
     const transferredDate = box1.timelineDate;
+    const wrapSpy = jest.spyOn(mindMap, '_wrapInTransaction');
 
     mindMap.draggingConnection = {
       conn: connFromBox1,
@@ -368,5 +387,6 @@ describe('MindMap – timeline connection drag/drop regressions', () => {
     expect(connFromBox2.fromBox).toBe(box2);
     expect(box1.timelineDate).toBeNull();
     expect(box2.timelineDate).toBe(transferredDate);
+    expect(wrapSpy).toHaveBeenCalledTimes(1);
   });
 });

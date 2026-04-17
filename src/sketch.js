@@ -2107,7 +2107,7 @@ function mouseReleased() {
       const wx = worldMouseX();
       const wy = worldMouseY();
       const timeline = mindMap.getTimelineAtWorld
-        ? mindMap.getTimelineAtWorld(wx, wy, { excludeHandles: true })
+        ? mindMap.getTimelineAtWorld(wx, wy, { excludeHandles: false })
         : null;
       if (timeline) {
         const sourceBox = mindMap.connectingFrom.box;

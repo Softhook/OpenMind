@@ -515,7 +515,7 @@ class MindMap {
    * @param {TextBox} fromBox  – source box
    * @param {number}  dayIndex – 0 … TimelineMode.TOTAL_DAYS-1
    */
-  addTimelineConnection(fromBox, dayIndex, timelineId = null) {
+  addTimelineConnection(fromBox, dayIndex, timelineId = null, skipTransactionWrapper = false) {
     const targetTimeline = timelineId ? this.getTimelineById(timelineId) : this.getActiveTimeline();
     const targetTimelineId = targetTimeline ? targetTimeline.id : null;
     const startDate = targetTimeline && targetTimeline.startDate
@@ -535,7 +535,7 @@ class MindMap {
       (existing.timelineId || null) === targetTimelineId;
     if (already) return;
 
-    this._wrapInTransaction(() => {
+    const commit = () => {
       fromBox.timelineDate = date;
       if (existing) {
         existing.timelineId = targetTimelineId;
@@ -557,19 +557,25 @@ class MindMap {
       if (MindMap.onTimelineConnectionsChange) {
         MindMap.onTimelineConnectionsChange(true);
       }
-    });
+    };
+
+    if (skipTransactionWrapper) {
+      commit();
+    } else {
+      this._wrapInTransaction(commit);
+    }
   }
 
   /**
    * Removes a timeline connection with full undo tracking.
    * @param {TimelineConnection} conn – the connection to remove
    */
-  removeTimelineConnection(conn) {
+  removeTimelineConnection(conn, skipTransactionWrapper = false) {
     if (!conn || !this.timelineConnections) return;
     const idx = this.timelineConnections.indexOf(conn);
     if (idx < 0) return;
 
-    this._wrapInTransaction(() => {
+    const commit = () => {
       this.timelineConnections.splice(idx, 1);
       // Clear the date stored on the box so it is no longer connected.
       // On collaborators' clients this is handled by _rebuildTimelineConnectionsFromYjs
@@ -584,7 +590,13 @@ class MindMap {
       if (MindMap.onTimelineConnectionsChange) {
         MindMap.onTimelineConnectionsChange(true);
       }
-    });
+    };
+
+    if (skipTransactionWrapper) {
+      commit();
+    } else {
+      this._wrapInTransaction(commit);
+    }
   }
 
   /** Returns the current bar width: totalDays × DAY_WIDTH (fixed scale). */
@@ -739,9 +751,9 @@ class MindMap {
   }
 
   /** Returns the timeline currently used for new timeline connections. */
-  getTargetTimelineForConnections(worldX = null, worldY = null) {
+  getTargetTimelineForConnections(worldX = null, worldY = null, { includeHandles = false } = {}) {
     if (typeof worldX === 'number' && typeof worldY === 'number') {
-      const hit = this.getTimelineAtWorld(worldX, worldY, { excludeHandles: true });
+      const hit = this.getTimelineAtWorld(worldX, worldY, { excludeHandles: !includeHandles });
       if (hit) return this._setActiveTimeline(hit);
     }
     return this.getActiveTimeline();
@@ -957,7 +969,7 @@ class MindMap {
    */
   handleTimelineConnectionDropped(worldX, worldY, fromBox) {
     if (!this.timelineActive) return false;
-    const timeline = this.getTargetTimelineForConnections(worldX, worldY);
+    const timeline = this.getTargetTimelineForConnections(worldX, worldY, { includeHandles: true });
     if (!timeline) return false;
     const barX = timeline.barX || 0;
     const barY = timeline.barY || 0;
@@ -2994,7 +3006,7 @@ class MindMap {
         if (typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
           const wx = worldMouseX();
           const wy = worldMouseY();
-          const targetTimeline = this.getTargetTimelineForConnections(wx, wy) || this.getActiveTimeline();
+          const targetTimeline = this.getTargetTimelineForConnections(wx, wy, { includeHandles: true }) || this.getActiveTimeline();
           const bw = this.getTimelineBarWidth(targetTimeline);
           const bx = targetTimeline ? (targetTimeline.barX || 0) : 0;
           const by = targetTimeline ? (targetTimeline.barY || 0) : 0;
@@ -3020,11 +3032,13 @@ class MindMap {
               }
               const transferDayIndex = conn.dayIndex;
               if (Number.isFinite(transferDayIndex) && transferDayIndex >= 0) {
-                this.addTimelineConnection(droppedBox, transferDayIndex, conn.timelineId || null);
-                const targetConn = this.timelineConnections.find(c => c && c !== conn && c.fromBox === droppedBox);
-                if (targetConn) {
-                  this.removeTimelineConnection(conn);
-                }
+                this._wrapInTransaction(() => {
+                  this.addTimelineConnection(droppedBox, transferDayIndex, conn.timelineId || null, true);
+                  const targetConn = this.timelineConnections.find(c => c && c !== conn && c.fromBox === droppedBox);
+                  if (targetConn) {
+                    this.removeTimelineConnection(conn, true);
+                  }
+                });
               }
             }
             // else: dropped nowhere → no change
@@ -3096,7 +3110,7 @@ class MindMap {
       if (this.timelineActive && typeof worldMouseX === 'function' && typeof worldMouseY === 'function') {
         const wx = worldMouseX();
         const wy = worldMouseY();
-        const targetTimeline = this.getTargetTimelineForConnections(wx, wy);
+        const targetTimeline = this.getTargetTimelineForConnections(wx, wy, { includeHandles: true });
         const bw = this.getTimelineBarWidth(targetTimeline);
         const bx = targetTimeline ? (targetTimeline.barX || 0) : 0;
         const by = targetTimeline ? (targetTimeline.barY || 0) : 0;
