@@ -88,7 +88,6 @@ global.AppConfig = {
   BOX: { MAX_WIDTH: 280 },
 };
 global.ExtensionBridge = { handleInput: null, handleKeyReleased: null, load: noOp };
-
 // Load sketch.js
 let KeyRepeat, _testSetMindMap;
 try {
@@ -228,3 +227,21 @@ describe('KeyRepeat.update - arrow key repeat gating', () => {
     expect(handleKeyPressed).toHaveBeenCalledWith('', BK, true);
   });
 });
+
+describe('draw - timeline layering order', () => {
+  test('keeps timeline connection underlay call before mindMap.draw()', () => {
+    const sketchSource = fs.readFileSync(path.join(__dirname, '../../src/sketch.js'), 'utf8');
+    const drawTimelineIndex = sketchSource.indexOf('mindMap.drawTimeline();');
+    const underlayIndex = sketchSource.indexOf('mindMap.drawTimelineConnectionsUnderlay();');
+    const drawMindMapIndex = sketchSource.indexOf('mindMap.draw();');
+
+    expect(drawTimelineIndex).toBeGreaterThan(-1);
+    expect(underlayIndex).toBeGreaterThan(drawTimelineIndex);
+    expect(drawMindMapIndex).toBeGreaterThan(underlayIndex);
+
+    const underlayCalls = sketchSource.match(/mindMap\.drawTimelineConnectionsUnderlay\(\);/g) || [];
+    expect(underlayCalls).toHaveLength(1);
+  });
+});
+const fs = require('fs');
+const path = require('path');

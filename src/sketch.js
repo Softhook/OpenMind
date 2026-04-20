@@ -1441,6 +1441,7 @@ function draw() {
         drawGrid();
       }
       mindMap.drawTimeline();
+      mindMap.drawTimelineConnectionsUnderlay(); // Keep timeline connection lines below boxes
       mindMap.draw();
 
       // Draw selection rectangle if selecting multiple boxes
@@ -1468,7 +1469,6 @@ function draw() {
 
       // Timeline Mode: world-space overlay (drawn inside camera transform so it
       // zooms and pans with the map)
-      mindMap.drawTimelineConnectionsUnderlay(); // Draw connections ON TOP of everything
       // Date-assignment badges: visible even when the timeline bar is hidden
       mindMap.drawTimelineDateLabels();
 
