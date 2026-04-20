@@ -15,6 +15,9 @@
  *    box-navigation mode).
  */
 
+const fs = require('fs');
+const path = require('path');
+
 // Use real ColorPalette so sketch.js can access ColorPalette.GRID etc.
 const RealColorPalette = require('../../src/ColorPalette');
 global.ColorPalette = RealColorPalette;
@@ -243,5 +246,3 @@ describe('draw - timeline layering order', () => {
     expect(underlayCalls).toHaveLength(1);
   });
 });
-const fs = require('fs');
-const path = require('path');

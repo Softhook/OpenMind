@@ -1467,8 +1467,8 @@ function draw() {
         ExtensionBridge.draw(collaborationManager, mindMap);
       }
 
-      // Timeline Mode: world-space overlay (drawn inside camera transform so it
-      // zooms and pans with the map)
+      // Timeline Mode: world-space overlays that should appear above boxes
+      // (drawn inside camera transform so they zoom/pan with the map)
       // Date-assignment badges: visible even when the timeline bar is hidden
       mindMap.drawTimelineDateLabels();
 
