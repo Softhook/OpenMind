@@ -316,7 +316,7 @@ describe('MindMap box alignment', () => {
 
       // Not selected; used only as distant external anchors
       const externalLeft = makeBox(-2500, 300, 80, 40);
-      const externalMiddle = makeBox(0, 300, 80, 40);
+      const externalMiddle = makeBox(1200, 300, 80, 40);
       const externalRight = makeBox(2500, 300, 80, 40);
 
       mindMap.connections = [
