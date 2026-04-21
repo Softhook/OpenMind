@@ -1947,9 +1947,23 @@ class MindMap {
     const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
     const START_X = MindMap.LAYOUT.START_X;
     const START_Y = MindMap.LAYOUT.START_Y;
-    const MIN_GAP_X = Math.max(60, HORIZONTAL_SPACING * 0.55);
-    const MAX_GAP_X = Math.max(MIN_GAP_X * 1.25, HORIZONTAL_SPACING * 1.15);
-    const MIN_GAP_Y = Math.max(60, VERTICAL_SPACING);
+    const MIN_GAP_X_RATIO = 0.3;
+    const MAX_GAP_X_RATIO = 0.72;
+    const MIN_GAP_X_LOWER_BOUND = 28;
+    const MIN_GAP_X_UPPER_BOUND = 72;
+    const MAX_GAP_X_MIN_DELTA = 32;
+    const RELATED_MIN_GAP_X_RATIO = 0.75;
+    const RELATED_MAX_GAP_X_RATIO = 0.78;
+    const RELATED_MIN_GAP_X_LOWER_BOUND = 24;
+    const RELATED_MAX_GAP_MIN_DELTA = 20;
+    const MIN_GAP_Y_RATIO = 0.7;
+    const MIN_GAP_Y_LOWER_BOUND = 50;
+    const EXTERNAL_ANCHOR_PROXIMITY_RATIO = 0.7;
+    const MIN_GAP_X = Math.max(MIN_GAP_X_LOWER_BOUND, Math.min(MIN_GAP_X_UPPER_BOUND, HORIZONTAL_SPACING * MIN_GAP_X_RATIO));
+    const MAX_GAP_X = Math.max(MIN_GAP_X + MAX_GAP_X_MIN_DELTA, HORIZONTAL_SPACING * MAX_GAP_X_RATIO);
+    const RELATED_MIN_GAP_X = Math.max(RELATED_MIN_GAP_X_LOWER_BOUND, MIN_GAP_X * RELATED_MIN_GAP_X_RATIO);
+    const RELATED_MAX_GAP_X = Math.max(RELATED_MIN_GAP_X + RELATED_MAX_GAP_MIN_DELTA, MAX_GAP_X * RELATED_MAX_GAP_X_RATIO);
+    const MIN_GAP_Y = Math.max(MIN_GAP_Y_LOWER_BOUND, VERTICAL_SPACING * MIN_GAP_Y_RATIO);
     const EXTERNAL_PULL = 0.4; // weight for external anchors vs parents
     const GROUP_EXTERNAL_BLEND = 0.35; // how much group centering leans toward external anchors
 
@@ -1975,6 +1989,39 @@ class MindMap {
       }
     }
     const externalCenterX = avg(Array.from(externalAnchors.values()));
+    const parentSetCache = new Map();
+    const getParentSet = (box) => {
+      if (!parentSetCache.has(box)) {
+        parentSetCache.set(box, new Set(parents.get(box) || []));
+      }
+      return parentSetCache.get(box);
+    };
+    const areMeaningfullyRelated = (left, right) => {
+      if (!left || !right) return false;
+      if ((children.get(left) || []).includes(right) || (children.get(right) || []).includes(left)) {
+        return true;
+      }
+      const leftParents = getParentSet(left);
+      const rightParents = getParentSet(right);
+      for (const parent of leftParents) {
+        if (rightParents.has(parent)) return true;
+      }
+      const leftAnchor = externalAnchors.get(left);
+      const rightAnchor = externalAnchors.get(right);
+      if (Number.isFinite(leftAnchor) && Number.isFinite(rightAnchor)) {
+        return Math.abs(leftAnchor - rightAnchor) <= HORIZONTAL_SPACING * EXTERNAL_ANCHOR_PROXIMITY_RATIO;
+      }
+      return false;
+    };
+    const getPairGapBounds = (left, right) => {
+      const related = areMeaningfullyRelated(left, right);
+      const minGap = related ? RELATED_MIN_GAP_X : MIN_GAP_X;
+      const maxGap = related ? RELATED_MAX_GAP_X : MAX_GAP_X;
+      return {
+        minGap,
+        maxGap: Math.max(minGap, maxGap),
+      };
+    };
 
     // Assign levels using BFS from roots
     const levels = new Map(); // box -> level (0 = root)
@@ -2106,8 +2153,9 @@ class MindMap {
           const curr = boxes[i];
           const prevHalf = getBoxWidth(prev) / 2;
           const currHalf = getBoxWidth(curr) / 2;
-          const lower = provisional.get(prev) + prevHalf + MIN_GAP_X + currHalf;
-          const upper = provisional.get(prev) + prevHalf + MAX_GAP_X + currHalf;
+          const { minGap, maxGap } = getPairGapBounds(prev, curr);
+          const lower = provisional.get(prev) + prevHalf + minGap + currHalf;
+          const upper = provisional.get(prev) + prevHalf + maxGap + currHalf;
           const clamped = clamp(provisional.get(curr), lower, upper);
           provisional.set(curr, clamped);
         }
@@ -2118,8 +2166,9 @@ class MindMap {
           const next = boxes[i + 1];
           const currHalf = getBoxWidth(curr) / 2;
           const nextHalf = getBoxWidth(next) / 2;
-          const upper = provisional.get(next) - nextHalf - MIN_GAP_X - currHalf;
-          const lower = provisional.get(next) - nextHalf - MAX_GAP_X - currHalf;
+          const { minGap, maxGap } = getPairGapBounds(curr, next);
+          const upper = provisional.get(next) - nextHalf - minGap - currHalf;
+          const lower = provisional.get(next) - nextHalf - maxGap - currHalf;
           const clamped = clamp(provisional.get(curr), lower, upper);
           provisional.set(curr, clamped);
         }
