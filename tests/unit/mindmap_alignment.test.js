@@ -304,4 +304,45 @@ describe('MindMap box alignment', () => {
       expect(mindMap.distributeSelectedBoxesHorizontally()).toBe(false);
     });
   });
+
+  // ── hierarchicalLayout (R key auto-layout) ──────────────────────────────
+
+  describe('hierarchicalLayout', () => {
+    test('keeps sibling boxes compact even when external anchors are far apart', () => {
+      const root = makeBox(0, 0, 80, 40);
+      const left = makeBox(-600, 300, 80, 40);
+      const middle = makeBox(0, 300, 80, 40);
+      const right = makeBox(600, 300, 80, 40);
+
+      // Not selected; used only as distant external anchors
+      const externalLeft = makeBox(-2500, 300, 80, 40);
+      const externalMiddle = makeBox(0, 300, 80, 40);
+      const externalRight = makeBox(2500, 300, 80, 40);
+
+      mindMap.connections = [
+        { fromBox: root, toBox: left },
+        { fromBox: root, toBox: middle },
+        { fromBox: root, toBox: right },
+        { fromBox: left, toBox: externalLeft },
+        { fromBox: middle, toBox: externalMiddle },
+        { fromBox: right, toBox: externalRight },
+      ];
+      selectBoxes(mindMap, [root, left, middle, right]);
+
+      const result = mindMap.hierarchicalLayout();
+
+      expect(result).toBe(true);
+      expect(left.y).toBeCloseTo(middle.y);
+      expect(middle.y).toBeCloseTo(right.y);
+
+      const siblings = [left, middle, right].sort((a, b) => a.x - b.x);
+      for (let i = 1; i < siblings.length; i++) {
+        const prev = siblings[i - 1];
+        const curr = siblings[i];
+        const edgeGap = (curr.x - curr.width / 2) - (prev.x + prev.width / 2);
+        expect(edgeGap).toBeGreaterThanOrEqual(0);
+        expect(edgeGap).toBeLessThanOrEqual(150);
+      }
+    });
+  });
 });

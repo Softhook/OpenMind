@@ -1947,9 +1947,11 @@ class MindMap {
     const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
     const START_X = MindMap.LAYOUT.START_X;
     const START_Y = MindMap.LAYOUT.START_Y;
-    const MIN_GAP_X = Math.max(60, HORIZONTAL_SPACING * 0.55);
-    const MAX_GAP_X = Math.max(MIN_GAP_X * 1.25, HORIZONTAL_SPACING * 1.15);
-    const MIN_GAP_Y = Math.max(60, VERTICAL_SPACING);
+    const MIN_GAP_X = Math.max(28, Math.min(72, HORIZONTAL_SPACING * 0.3));
+    const MAX_GAP_X = Math.max(MIN_GAP_X + 32, HORIZONTAL_SPACING * 0.72);
+    const RELATED_MIN_GAP_X = Math.max(24, MIN_GAP_X * 0.75);
+    const RELATED_MAX_GAP_X = Math.max(RELATED_MIN_GAP_X + 20, MAX_GAP_X * 0.78);
+    const MIN_GAP_Y = Math.max(50, VERTICAL_SPACING * 0.7);
     const EXTERNAL_PULL = 0.4; // weight for external anchors vs parents
     const GROUP_EXTERNAL_BLEND = 0.35; // how much group centering leans toward external anchors
 
@@ -1975,6 +1977,39 @@ class MindMap {
       }
     }
     const externalCenterX = avg(Array.from(externalAnchors.values()));
+    const parentSetCache = new Map();
+    const getParentSet = (box) => {
+      if (!parentSetCache.has(box)) {
+        parentSetCache.set(box, new Set(parents.get(box) || []));
+      }
+      return parentSetCache.get(box);
+    };
+    const areMeaningfullyRelated = (left, right) => {
+      if (!left || !right) return false;
+      if ((children.get(left) || []).includes(right) || (children.get(right) || []).includes(left)) {
+        return true;
+      }
+      const leftParents = getParentSet(left);
+      const rightParents = getParentSet(right);
+      for (const parent of leftParents) {
+        if (rightParents.has(parent)) return true;
+      }
+      const leftAnchor = externalAnchors.get(left);
+      const rightAnchor = externalAnchors.get(right);
+      if (Number.isFinite(leftAnchor) && Number.isFinite(rightAnchor)) {
+        return Math.abs(leftAnchor - rightAnchor) <= HORIZONTAL_SPACING * 0.7;
+      }
+      return false;
+    };
+    const getPairGapBounds = (left, right) => {
+      const related = areMeaningfullyRelated(left, right);
+      const minGap = related ? RELATED_MIN_GAP_X : MIN_GAP_X;
+      const maxGap = related ? RELATED_MAX_GAP_X : MAX_GAP_X;
+      return {
+        minGap,
+        maxGap: Math.max(minGap, maxGap),
+      };
+    };
 
     // Assign levels using BFS from roots
     const levels = new Map(); // box -> level (0 = root)
@@ -2106,8 +2141,9 @@ class MindMap {
           const curr = boxes[i];
           const prevHalf = getBoxWidth(prev) / 2;
           const currHalf = getBoxWidth(curr) / 2;
-          const lower = provisional.get(prev) + prevHalf + MIN_GAP_X + currHalf;
-          const upper = provisional.get(prev) + prevHalf + MAX_GAP_X + currHalf;
+          const { minGap, maxGap } = getPairGapBounds(prev, curr);
+          const lower = provisional.get(prev) + prevHalf + minGap + currHalf;
+          const upper = provisional.get(prev) + prevHalf + maxGap + currHalf;
           const clamped = clamp(provisional.get(curr), lower, upper);
           provisional.set(curr, clamped);
         }
@@ -2118,8 +2154,9 @@ class MindMap {
           const next = boxes[i + 1];
           const currHalf = getBoxWidth(curr) / 2;
           const nextHalf = getBoxWidth(next) / 2;
-          const upper = provisional.get(next) - nextHalf - MIN_GAP_X - currHalf;
-          const lower = provisional.get(next) - nextHalf - MAX_GAP_X - currHalf;
+          const { minGap, maxGap } = getPairGapBounds(curr, next);
+          const upper = provisional.get(next) - nextHalf - minGap - currHalf;
+          const lower = provisional.get(next) - nextHalf - maxGap - currHalf;
           const clamped = clamp(provisional.get(curr), lower, upper);
           provisional.set(curr, clamped);
         }
