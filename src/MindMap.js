@@ -1947,11 +1947,23 @@ class MindMap {
     const VERTICAL_SPACING = MindMap.LAYOUT.VERTICAL_SPACING;
     const START_X = MindMap.LAYOUT.START_X;
     const START_Y = MindMap.LAYOUT.START_Y;
-    const MIN_GAP_X = Math.max(28, Math.min(72, HORIZONTAL_SPACING * 0.3));
-    const MAX_GAP_X = Math.max(MIN_GAP_X + 32, HORIZONTAL_SPACING * 0.72);
-    const RELATED_MIN_GAP_X = Math.max(24, MIN_GAP_X * 0.75);
-    const RELATED_MAX_GAP_X = Math.max(RELATED_MIN_GAP_X + 20, MAX_GAP_X * 0.78);
-    const MIN_GAP_Y = Math.max(50, VERTICAL_SPACING * 0.7);
+    const MIN_GAP_X_RATIO = 0.3;
+    const MAX_GAP_X_RATIO = 0.72;
+    const MIN_GAP_X_LOWER_BOUND = 28;
+    const MIN_GAP_X_UPPER_BOUND = 72;
+    const MAX_GAP_X_MIN_DELTA = 32;
+    const RELATED_MIN_GAP_X_RATIO = 0.75;
+    const RELATED_MAX_GAP_X_RATIO = 0.78;
+    const RELATED_MIN_GAP_X_LOWER_BOUND = 24;
+    const RELATED_MAX_GAP_MIN_DELTA = 20;
+    const MIN_GAP_Y_RATIO = 0.7;
+    const MIN_GAP_Y_LOWER_BOUND = 50;
+    const EXTERNAL_ANCHOR_PROXIMITY_RATIO = 0.7;
+    const MIN_GAP_X = Math.max(MIN_GAP_X_LOWER_BOUND, Math.min(MIN_GAP_X_UPPER_BOUND, HORIZONTAL_SPACING * MIN_GAP_X_RATIO));
+    const MAX_GAP_X = Math.max(MIN_GAP_X + MAX_GAP_X_MIN_DELTA, HORIZONTAL_SPACING * MAX_GAP_X_RATIO);
+    const RELATED_MIN_GAP_X = Math.max(RELATED_MIN_GAP_X_LOWER_BOUND, MIN_GAP_X * RELATED_MIN_GAP_X_RATIO);
+    const RELATED_MAX_GAP_X = Math.max(RELATED_MIN_GAP_X + RELATED_MAX_GAP_MIN_DELTA, MAX_GAP_X * RELATED_MAX_GAP_X_RATIO);
+    const MIN_GAP_Y = Math.max(MIN_GAP_Y_LOWER_BOUND, VERTICAL_SPACING * MIN_GAP_Y_RATIO);
     const EXTERNAL_PULL = 0.4; // weight for external anchors vs parents
     const GROUP_EXTERNAL_BLEND = 0.35; // how much group centering leans toward external anchors
 
@@ -1997,7 +2009,7 @@ class MindMap {
       const leftAnchor = externalAnchors.get(left);
       const rightAnchor = externalAnchors.get(right);
       if (Number.isFinite(leftAnchor) && Number.isFinite(rightAnchor)) {
-        return Math.abs(leftAnchor - rightAnchor) <= HORIZONTAL_SPACING * 0.7;
+        return Math.abs(leftAnchor - rightAnchor) <= HORIZONTAL_SPACING * EXTERNAL_ANCHOR_PROXIMITY_RATIO;
       }
       return false;
     };
