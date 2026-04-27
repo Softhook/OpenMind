@@ -64,9 +64,11 @@ function resizeHandleCenter(box) {
 
 /**
  * Set up mindMap global so isMouseOverResizeHandle() can read _topHoverBox.
+ * @param {object} box - The top-hover box.
+ * @param {boolean} [isArrowKeyNavigating=false] - Whether arrow-key navigation is active.
  */
-function setTopHoverBox(box) {
-  global.mindMap = { _topHoverBox: box };
+function setTopHoverBox(box, isArrowKeyNavigating = false) {
+  global.mindMap = { _topHoverBox: box, isArrowKeyNavigating };
 }
 
 describe('Resize handle priority over edge-drag at bottom-right corner', () => {
@@ -145,5 +147,42 @@ describe('Resize handle priority over edge-drag at bottom-right corner', () => {
     jest.spyOn(Utils, 'getWorldMouseCoordinates').mockReturnValue({ x: bottomEdgeX, y: bottomEdgeY });
 
     expect(box.isMouseOnEdge()).toBe(true);
+  });
+
+  test('isMouseOverResizeHandle returns false for unselected top-hover box during arrow-key navigation', () => {
+    const box = new TextBox(100, 100, 'Hello');
+    box.selected = false;
+    setTopHoverBox(box, true); // isArrowKeyNavigating = true
+
+    const { cx, cy } = resizeHandleCenter(box);
+    jest.spyOn(Utils, 'getWorldMouseCoordinates').mockReturnValue({ x: cx, y: cy });
+
+    // Hover-based activation must be suppressed during arrow-key navigation
+    expect(box.isMouseOverResizeHandle()).toBe(false);
+  });
+
+  test('isMouseOnEdge is NOT suppressed at corner during arrow-key navigation (handle is hidden)', () => {
+    const box = new TextBox(100, 100, 'Hello');
+    box.selected = false;
+    setTopHoverBox(box, true); // isArrowKeyNavigating = true
+
+    // Mouse at the resize handle position — but handle is hidden so edge-drag should not be blocked
+    const { cx, cy } = resizeHandleCenter(box);
+    jest.spyOn(Utils, 'getWorldMouseCoordinates').mockReturnValue({ x: cx, y: cy });
+
+    // isMouseOverResizeHandle returns false → isMouseOnEdge may return true if in the edge zone
+    expect(box.isMouseOverResizeHandle()).toBe(false);
+  });
+
+  test('isMouseOverResizeHandle returns true for a selected box during arrow-key navigation', () => {
+    // Selected boxes retain their resize-handle hit detection even during navigation
+    const box = new TextBox(100, 100, 'Hello');
+    box.selected = true;
+    setTopHoverBox(box, true); // isArrowKeyNavigating = true
+
+    const { cx, cy } = resizeHandleCenter(box);
+    jest.spyOn(Utils, 'getWorldMouseCoordinates').mockReturnValue({ x: cx, y: cy });
+
+    expect(box.isMouseOverResizeHandle()).toBe(true);
   });
 });

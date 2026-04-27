@@ -1202,14 +1202,17 @@ class TextBox {
 
   /**
    * Checks if mouse is over the resize handle (bottom-right corner).
-   * The handle is visible and interactive for any top-hovered box (selected or not),
-   * matching the draw condition which shows the handle on hover.
+   * The handle is interactive for:
+   *   - selected boxes (existing behaviour), and
+   *   - the currently top-hovered box, provided arrow-key navigation is not active
+   *     (matching the draw condition which hides the hover-triggered handle during navigation).
    * @returns {boolean} true if mouse is over resize handle
    */
   isMouseOverResizeHandle() {
     const isTopHover = typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox === this;
-    // The handle is accessible for selected boxes and for the currently top-hovered box
-    if (!this.selected && !isTopHover) return false;
+    const isNavigating = typeof mindMap !== 'undefined' && mindMap && mindMap.isArrowKeyNavigating;
+    // Hover-based activation is suppressed during arrow-key navigation (matches draw condition)
+    if (!this.selected && (!isTopHover || isNavigating)) return false;
     // Only the top-most hovered box should expose its resize handle
     if (typeof mindMap !== 'undefined' && mindMap && mindMap._topHoverBox && mindMap._topHoverBox !== this) {
       return false;
