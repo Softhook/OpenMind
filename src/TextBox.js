@@ -2574,13 +2574,19 @@ class TextBox {
         }
       }
 
-      // Minimum width to fit the longest word (so words don't overflow)
+      // Minimum width to fit the longest word (so words don't overflow).
+      // URLs are excluded from this calculation because they can wrap
+      // character-by-character and should not force the box to be as wide
+      // as the full URL string.
       let minRequiredWidth = this.minWidth;
       textSize(this.fontSize);
       if (this.text) {
         let words = this.text.split(/[\s\n]+/);
         for (let word of words) {
           if (word) {
+            // Skip URL-like tokens — they wrap via character-level breaking.
+            // Mirrors TextBox.URL_PATTERN: https://, http://, file://, ./path, ../path, /abs/path
+            if (/^(?:https?:\/\/|file:\/\/|\.\.?\/|\/)/.test(word)) continue;
             let wordWidth = textWidth(word) + this.padding * 2;
             if (wordWidth > minRequiredWidth) minRequiredWidth = wordWidth;
           }
