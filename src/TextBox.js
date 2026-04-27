@@ -2581,12 +2581,21 @@ class TextBox {
       let minRequiredWidth = this.minWidth;
       textSize(this.fontSize);
       if (this.text) {
+        // Build a non-global, case-insensitive matcher from URL_PATTERN so that
+        // tokens like "(https://...)" and "HTTPS://..." are also skipped.
+        let urlSkipPattern;
+        if (TextBox.URL_PATTERN instanceof RegExp) {
+          let flags = TextBox.URL_PATTERN.flags.replace(/g/g, '');
+          if (!flags.includes('i')) flags += 'i';
+          urlSkipPattern = new RegExp(TextBox.URL_PATTERN.source, flags);
+        } else {
+          urlSkipPattern = /(?:https?:\/\/|file:\/\/|\.\.?\/|\/)/i;
+        }
         let words = this.text.split(/[\s\n]+/);
         for (let word of words) {
           if (word) {
             // Skip URL-like tokens — they wrap via character-level breaking.
-            // Mirrors TextBox.URL_PATTERN: https://, http://, file://, ./path, ../path, /abs/path
-            if (/^(?:https?:\/\/|file:\/\/|\.\.?\/|\/)/.test(word)) continue;
+            if (urlSkipPattern.test(word)) continue;
             let wordWidth = textWidth(word) + this.padding * 2;
             if (wordWidth > minRequiredWidth) minRequiredWidth = wordWidth;
           }
