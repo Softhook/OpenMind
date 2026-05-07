@@ -818,7 +818,6 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
   test('forces CORNER rect mode for badge positioning', () => {
     const box = makeBox('b1', 0, -200, '2024-06-01');
     const conn = new TimelineConnection(box, null);
-    sandbox.rectMode.mockClear();
     TimelineMode.drawBoxDateLabels([conn], today, 1);
     expect(sandbox.rectMode).toHaveBeenCalledWith(sandbox.CORNER);
   });
