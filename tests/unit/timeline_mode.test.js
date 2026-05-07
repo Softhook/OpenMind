@@ -27,6 +27,7 @@ const p5Stubs = {
   noStroke:     jest.fn(),
   strokeWeight: jest.fn(),
   rect:         jest.fn(),
+  rectMode:     jest.fn(),
   line:         jest.fn(),
   circle:       jest.fn(),
   triangle:     jest.fn(),
@@ -39,6 +40,7 @@ const p5Stubs = {
   LEFT:   'left',
   RIGHT:  'right',
   CENTER: 'center',
+  CORNER: 'corner',
   TOP:    'top',
   BOTTOM: 'bottom',
   keyIsDown: jest.fn(() => false),
@@ -811,6 +813,13 @@ describe('TimelineMode.drawBoxDateLabels()', () => {
     // Should have drawn at least one rect (pill) and one text call
     expect(sandbox.rect).toHaveBeenCalled();
     expect(sandbox.text).toHaveBeenCalled();
+  });
+
+  test('forces CORNER rect mode for badge positioning', () => {
+    const box = makeBox('b1', 0, -200, '2024-06-01');
+    const conn = new TimelineConnection(box, null);
+    TimelineMode.drawBoxDateLabels([conn], today, 1);
+    expect(sandbox.rectMode).toHaveBeenCalledWith(sandbox.CORNER);
   });
 
   test('skips connections with no fromBox', () => {
