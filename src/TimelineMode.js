@@ -765,6 +765,7 @@ class TimelineMode {
       const ly = box.y - box.height / 2 - labelH - 2 / safeZ; // just above the box
 
       // Pill background — yellow for today, blue for future, red for past, highlighted when selected
+      rectMode(CORNER);
       noStroke();
       let pillBg;
       if (conn.selected) {
