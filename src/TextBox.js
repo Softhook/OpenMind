@@ -989,7 +989,7 @@ class TextBox {
           for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
             let grapheme = graphemes[charIdx];
 
-            // Check if this character is part of a link
+            // Check if this grapheme is part of a link
             let isInLink = false;
             for (const link of links) {
               if (absCharPos >= link.start && absCharPos < link.end) {
