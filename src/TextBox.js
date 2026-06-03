@@ -605,10 +605,20 @@ class TextBox {
     return { line, lineStartOffset };
   }
 
-  static segmentGraphemes(text) {
+  static getGraphemeSegmenter() {
+    if (this._graphemeSegmenter !== undefined) {
+      return this._graphemeSegmenter;
+    }
+    this._graphemeSegmenter = (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function')
+      ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+      : null;
+    return this._graphemeSegmenter;
+  }
+
+  static splitGraphemes(text) {
     const str = text == null ? '' : String(text);
-    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-      const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    const segmenter = TextBox.getGraphemeSegmenter();
+    if (segmenter) {
       return Array.from(segmenter.segment(str), (part) => part.segment);
     }
     return Array.from(str);
@@ -729,7 +739,7 @@ class TextBox {
                   break;
                 }
               }
-              const graphemes = TextBox.segmentGraphemes(wp.word);
+              const graphemes = TextBox.splitGraphemes(wp.word);
               for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
                 let char = graphemes[charIdx];
                 if (textWidth(charLine + char) <= maxTextWidth) {
@@ -974,7 +984,7 @@ class TextBox {
           // Always render character by character for precise spacing control
           // This ensures multiple spaces are visible
           let xPos = textX;
-          const graphemes = TextBox.segmentGraphemes(lineText);
+          const graphemes = TextBox.splitGraphemes(lineText);
           let absCharPos = lineStartPos;
           for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
             let char = graphemes[charIdx];

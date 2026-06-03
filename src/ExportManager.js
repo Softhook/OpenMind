@@ -25,13 +25,15 @@ class ExportManager {
     this.mindMap = null;
     this.config = null;
     this._initialized = false;
+    this.graphemeSegmenter = (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function')
+      ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+      : null;
   }
 
   splitGraphemes(text) {
     const str = text == null ? '' : String(text);
-    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-      const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-      return Array.from(segmenter.segment(str), (part) => part.segment);
+    if (this.graphemeSegmenter) {
+      return Array.from(this.graphemeSegmenter.segment(str), (part) => part.segment);
     }
     return Array.from(str);
   }
