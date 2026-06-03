@@ -152,4 +152,14 @@ describe('TextBox wrapText', () => {
     expect(box.wrapText('zzzz')).toEqual(['zz', 'zz']);
     expect(box.cachedLineCharMap).toEqual([0, 2]);
   });
+
+  test('does not split grapheme emoji clusters when wrapping long words', () => {
+    const TextBox = loadTextBox();
+    const box = new TextBox(0, 0, '');
+    box.width = 12;
+    box.padding = 0;
+
+    expect(box.wrapText('🏴‍☠️')).toEqual(['🏴‍☠️']);
+    expect(box.cachedLineCharMap).toEqual([0]);
+  });
 });

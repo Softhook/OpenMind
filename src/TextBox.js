@@ -605,6 +605,15 @@ class TextBox {
     return { line, lineStartOffset };
   }
 
+  static segmentGraphemes(text) {
+    const str = text == null ? '' : String(text);
+    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+      const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      return Array.from(segmenter.segment(str), (part) => part.segment);
+    }
+    return Array.from(str);
+  }
+
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
@@ -720,8 +729,9 @@ class TextBox {
                   break;
                 }
               }
-              for (let charIdx = 0; charIdx < wp.word.length; charIdx++) {
-                let char = wp.word[charIdx];
+              const graphemes = TextBox.segmentGraphemes(wp.word);
+              for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
+                let char = graphemes[charIdx];
                 if (textWidth(charLine + char) <= maxTextWidth) {
                   charLine += char;
                 } else {
@@ -964,9 +974,10 @@ class TextBox {
           // Always render character by character for precise spacing control
           // This ensures multiple spaces are visible
           let xPos = textX;
-          for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
-            let char = lineText[charIdx];
-            let absCharPos = lineStartPos + charIdx;
+          const graphemes = TextBox.segmentGraphemes(lineText);
+          let absCharPos = lineStartPos;
+          for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
+            let char = graphemes[charIdx];
 
             // Check if this character is part of a link
             let isInLink = false;
@@ -1017,6 +1028,7 @@ class TextBox {
               }
               xPos += textWidth(char);
             }
+            absCharPos += char.length;
           }
         }
       }

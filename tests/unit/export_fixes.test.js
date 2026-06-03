@@ -351,6 +351,17 @@ describe('PNG export — image drawn with CENTER mode and aspect-ratio scaling',
     expect(drawW).toBeCloseTo(200, 1);
     expect(drawH).toBeCloseTo(50, 1);
   });
+
+  test('emoji grapheme clusters are rendered as single glyphs in PNG text export', () => {
+    const box = makeBox('txt', '🏴‍☠️ 👻', {
+      x: 100, y: 100, width: 300, height: 120,
+      imageUrl: null,
+    });
+    runPNGExport(box);
+
+    const drawnGlyphs = pgMock.text.mock.calls.map(call => call[0]);
+    expect(drawnGlyphs).toEqual(['🏴‍☠️', '👻']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -379,6 +390,17 @@ describe('PDF export — image data extracted from p5.Image.canvas', () => {
     window.jspdf = { jsPDF: jest.fn(() => pdfMock) };
     global.TimelineMode = undefined;
     global.Cluster = undefined;
+  });
+
+  describe('wrapTextForExport — emoji-safe wrapping', () => {
+    test('does not split grapheme emoji clusters when token exceeds max width', () => {
+      const em = new ExportManagerClass();
+      const pg = makePgMock();
+
+      const { lines, charMap } = em.wrapTextForExport(pg, '🏴‍☠️', 12, 14);
+      expect(lines).toEqual(['🏴‍☠️']);
+      expect(charMap).toEqual([0]);
+    });
   });
 
   function makeMeasurePg() {

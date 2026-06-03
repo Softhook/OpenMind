@@ -27,6 +27,15 @@ class ExportManager {
     this._initialized = false;
   }
 
+  splitGraphemes(text) {
+    const str = text == null ? '' : String(text);
+    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+      const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      return Array.from(segmenter.segment(str), (part) => part.segment);
+    }
+    return Array.from(str);
+  }
+
   /**
    * Initialize the ExportManager with dependencies
    * @param {Object} p5Instance - p5.js instance
@@ -246,9 +255,10 @@ class ExportManager {
                 const yPos = startY + i * lineHeight;
                 let xPos = textX;
 
-                for (let ci = 0; ci < line.length; ci++) {
-                  const char = line[ci];
-                  const absPos = lineStartPos + ci;
+                const graphemes = this.splitGraphemes(line);
+                let absPos = lineStartPos;
+                for (let ci = 0; ci < graphemes.length; ci++) {
+                  const char = graphemes[ci];
                   const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                   const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
                   const isInLink = this.getLinkAtIndex(links, absPos) !== null;
@@ -280,6 +290,7 @@ class ExportManager {
                     pg.noStroke();
                     xPos += pg.textWidth(char);
                   }
+                  absPos += char.length;
                 }
               }
             }
@@ -400,8 +411,9 @@ class ExportManager {
               // Single token too wide — break by character while preserving indices
               let charLine = '';
               let charLineStart = token.start;
-              for (let ci = 0; ci < token.text.length; ci++) {
-                const c = token.text[ci];
+              const graphemes = this.splitGraphemes(token.text);
+              for (let ci = 0; ci < graphemes.length; ci++) {
+                const c = graphemes[ci];
                 if (pg.textWidth(charLine + c) <= maxTextWidth) {
                   charLine += c;
                 } else {
@@ -943,8 +955,10 @@ class ExportManager {
               let segLink = false;
               let segUrl = '';
 
-              for (let ci = 0; ci < line.length; ci++) {
-                const absPos = lineStartPos + ci;
+              const graphemes = this.splitGraphemes(line);
+              let absPos = lineStartPos;
+              for (let ci = 0; ci < graphemes.length; ci++) {
+                const char = graphemes[ci];
                 const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                 const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
                 const linkObj = this.getLinkAtIndex(links, absPos);
@@ -961,14 +975,15 @@ class ExportManager {
                 if (isBold !== segBold || isItalic !== segItalic || isLink !== segLink || linkUrl !== segUrl) {
                   // Style changed — flush current segment
                   if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
-                  segText = line[ci];
+                  segText = char;
                   segBold = isBold;
                   segItalic = isItalic;
                   segLink = isLink;
                   segUrl = linkUrl;
                 } else {
-                  segText += line[ci];
+                  segText += char;
                 }
+                absPos += char.length;
               }
               if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
 
