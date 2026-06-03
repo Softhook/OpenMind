@@ -260,7 +260,7 @@ class ExportManager {
                 const graphemes = this.splitGraphemes(line);
                 let absPos = lineStartPos;
                 for (let ci = 0; ci < graphemes.length; ci++) {
-                  const char = graphemes[ci];
+                  const grapheme = graphemes[ci];
                   const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                   const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
                   const isInLink = this.getLinkAtIndex(links, absPos) !== null;
@@ -270,7 +270,7 @@ class ExportManager {
                   } else {
                     pg.fill(0);
                   }
-                  if (char === ' ') {
+                  if (grapheme === ' ') {
                     xPos += pg.textWidth(' ');
                   } else {
                     if (isBold) {
@@ -284,15 +284,15 @@ class ExportManager {
                       pg.push();
                       pg.translate(xPos, yPos);
                       pg.shearX(italicShear);
-                      pg.text(char, 0, 0);
+                      pg.text(grapheme, 0, 0);
                       pg.pop();
                     } else {
-                      pg.text(char, xPos, yPos);
+                      pg.text(grapheme, xPos, yPos);
                     }
                     pg.noStroke();
-                    xPos += pg.textWidth(char);
+                    xPos += pg.textWidth(grapheme);
                   }
-                  absPos += char.length;
+                  absPos += grapheme.length;
                 }
               }
             }
@@ -415,16 +415,16 @@ class ExportManager {
               let charLineStart = token.start;
               const graphemes = this.splitGraphemes(token.text);
               for (let ci = 0; ci < graphemes.length; ci++) {
-                const c = graphemes[ci];
-                if (pg.textWidth(charLine + c) <= maxTextWidth) {
-                  charLine += c;
+                const grapheme = graphemes[ci];
+                if (pg.textWidth(charLine + grapheme) <= maxTextWidth) {
+                  charLine += grapheme;
                 } else {
                   if (charLine) {
                     lines.push(charLine);
                     charMap.push(lineStartPos + charLineStart);
                     charLineStart += charLine.length;
                   }
-                  charLine = c;
+                  charLine = grapheme;
                 }
               }
               currentLine = charLine;
@@ -960,7 +960,7 @@ class ExportManager {
               const graphemes = this.splitGraphemes(line);
               let absPos = lineStartPos;
               for (let ci = 0; ci < graphemes.length; ci++) {
-                const char = graphemes[ci];
+                const grapheme = graphemes[ci];
                 const isBold = this.isIndexInRanges(box.boldRanges, absPos);
                 const isItalic = this.isIndexInRanges(box.italicRanges, absPos);
                 const linkObj = this.getLinkAtIndex(links, absPos);
@@ -977,15 +977,15 @@ class ExportManager {
                 if (isBold !== segBold || isItalic !== segItalic || isLink !== segLink || linkUrl !== segUrl) {
                   // Style changed — flush current segment
                   if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
-                  segText = char;
+                  segText = grapheme;
                   segBold = isBold;
                   segItalic = isItalic;
                   segLink = isLink;
                   segUrl = linkUrl;
                 } else {
-                  segText += char;
+                  segText += grapheme;
                 }
-                absPos += char.length;
+                absPos += grapheme.length;
               }
               if (segText) segments.push({ text: segText, bold: segBold, italic: segItalic, link: segLink, url: segUrl });
 

@@ -741,16 +741,16 @@ class TextBox {
               }
               const graphemes = TextBox.splitGraphemes(wp.word);
               for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
-                let char = graphemes[charIdx];
-                if (textWidth(charLine + char) <= maxTextWidth) {
-                  charLine += char;
+                let grapheme = graphemes[charIdx];
+                if (textWidth(charLine + grapheme) <= maxTextWidth) {
+                  charLine += grapheme;
                 } else {
                   if (charLine) {
                     wrappedLines.push(charLine);
                     lineCharMap.push(lineStartPos + charStartPos);
                     charStartPos += charLine.length;
                   }
-                  charLine = char;
+                  charLine = grapheme;
                 }
               }
               currentLine = charLine;
@@ -987,7 +987,7 @@ class TextBox {
           const graphemes = TextBox.splitGraphemes(lineText);
           let absCharPos = lineStartPos;
           for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
-            let char = graphemes[charIdx];
+            let grapheme = graphemes[charIdx];
 
             // Check if this character is part of a link
             let isInLink = false;
@@ -1010,7 +1010,7 @@ class TextBox {
             const isItalic = this._isIndexInRanges(this.italicRanges, absCharPos);
 
             // For spaces, use measured width to ensure they take up space
-            if (char === ' ') {
+            if (grapheme === ' ') {
               // Draw a space by moving position (p5 text(' ') might collapse)
               xPos += textWidth(' ');
             } else {
@@ -1025,7 +1025,7 @@ class TextBox {
                 } else {
                   noStroke();
                 }
-                text(char, 0, 0);
+                text(grapheme, 0, 0);
                 pop();
               } else {
                 if (isBold) {
@@ -1034,11 +1034,11 @@ class TextBox {
                 } else {
                   noStroke();
                 }
-                text(char, xPos, yPos);
+                text(grapheme, xPos, yPos);
               }
-              xPos += textWidth(char);
+              xPos += textWidth(grapheme);
             }
-            absCharPos += char.length;
+            absCharPos += grapheme.length;
           }
         }
       }
