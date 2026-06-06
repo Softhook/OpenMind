@@ -53,7 +53,7 @@ const noOp = () => {};
   'constrain', 'lerp', 'map', 'abs', 'max', 'min', 'dist',
   'floor', 'ceil', 'round', 'sqrt', 'pow', 'sin', 'cos', 'atan2',
   'random', 'int', 'color', 'red', 'green', 'blue', 'alpha', 'lerpColor',
-  'drawingContext', 'keyIsDown', 'keyCode', 'key',
+  'drawingContext', 'keyCode', 'key',
   'mouseIsPressed', 'mouseButton',
   'LEFT', 'RIGHT', 'CENTER',
   'ARROW', 'CROSS', 'HAND', 'MOVE', 'TEXT', 'WAIT',
@@ -91,6 +91,11 @@ global.AppConfig = {
   BOX: { MAX_WIDTH: 280 },
 };
 global.ExtensionBridge = { handleInput: null, handleKeyReleased: null, load: noOp };
+
+// keyIsDown: stub that returns true for any key code by default.
+// Tests that need to simulate a "key not held" scenario can override it.
+global.keyIsDown = jest.fn(() => true);
+
 // Load sketch.js
 let KeyRepeat, _testSetMindMap;
 try {
@@ -228,6 +233,185 @@ describe('KeyRepeat.update - arrow key repeat gating', () => {
     global.millis.mockReturnValue(500);
     KeyRepeat.update();
     expect(handleKeyPressed).toHaveBeenCalledWith('', BK, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keyIsDown safety net (missed-keyup guard)
+// ---------------------------------------------------------------------------
+
+describe('KeyRepeat keyIsDown safety net', () => {
+  let handleKeyPressed;
+
+  beforeEach(() => {
+    resetKeyRepeat();
+    handleKeyPressed = jest.fn();
+    global.millis.mockReturnValue(0);
+    global.keyIsDown.mockReturnValue(true); // default: key IS held
+  });
+
+  afterEach(() => {
+    _testSetMindMap(null);
+  });
+
+  test('stops synthesizing when keyIsDown returns false (keyup was missed)', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    KeyRepeat.start(BK);
+    global.millis.mockReturnValue(500);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    // Simulate the key being released but keyReleased() never called
+    global.keyIsDown.mockReturnValue(false);
+    global.millis.mockReturnValue(560);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1); // no new calls
+  });
+
+  test('continues synthesizing while keyIsDown returns true', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    KeyRepeat.start(BK);
+    global.millis.mockReturnValue(500);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    global.millis.mockReturnValue(560);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(2);
+  });
+
+  test('ignores keyIsDown for arrow keys when not editing (already gated)', () => {
+    _testSetMindMap({ selectedBox: { isEditing: false }, handleKeyPressed });
+    KeyRepeat.start(RIGHT);
+    global.millis.mockReturnValue(500);
+    global.keyIsDown.mockReturnValue(true);
+    KeyRepeat.update();
+    // Arrow keys when not editing are skipped by the editing gate, not keyIsDown
+    expect(handleKeyPressed).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isNativeRepeat flag (cadence coordination + race-condition prevention)
+// ---------------------------------------------------------------------------
+
+describe('KeyRepeat isNativeRepeat flag', () => {
+  let handleKeyPressed;
+
+  beforeEach(() => {
+    resetKeyRepeat();
+    handleKeyPressed = jest.fn();
+    global.millis.mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    _testSetMindMap(null);
+  });
+
+  test('start(key, false) sets pressedAt — synthetic fires after initialDelay', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+    KeyRepeat.start(BK, false);
+
+    global.millis.mockReturnValue(500);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+  });
+
+  test('start(key, true) does NOT reset pressedAt — preserves original press time', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    KeyRepeat.start(BK, false);  // T=0, pressedAt=0
+    global.millis.mockReturnValue(100);
+    KeyRepeat.start(BK, true);   // T=100, native repeat — pressedAt stays 0
+
+    // At T=450, initialDelay (400ms from T=0) has elapsed → repeat fires
+    global.millis.mockReturnValue(450);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    // If pressedAt had been reset to 100, the 400ms delay would expire at 500
+  });
+
+  test('start(key, true) still resets lastEventAt for cadence coordination', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    KeyRepeat.start(BK, false);  // T=0, lastEventAt=0
+    global.millis.mockReturnValue(400);
+    KeyRepeat.start(BK, true);   // T=400, lastEventAt=400
+
+    // At T=450: now - lastEventAt = 50 >= repeatInterval → fires
+    global.millis.mockReturnValue(450);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    // At T=455: now - lastEventAt = 5 < 50 → does NOT fire
+    global.millis.mockReturnValue(455);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+  });
+
+  test('fast native repeats (< 150ms) suppress synthetic', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    KeyRepeat.start(BK, false);       // T=0
+    KeyRepeat.noteNativeKeydown(BK);
+
+    global.millis.mockReturnValue(30);
+    KeyRepeat.noteNativeKeydown(BK);
+    KeyRepeat.start(BK, true);
+
+    global.millis.mockReturnValue(60);
+    KeyRepeat.noteNativeKeydown(BK);
+    KeyRepeat.start(BK, true);
+
+    // At T=450, initialDelay elapsed but hasNativeRepeat=true (30ms < 150ms)
+    global.millis.mockReturnValue(450);
+    KeyRepeat.update();
+    expect(handleKeyPressed).not.toHaveBeenCalled();
+  });
+
+  test('synthetic interleaves with slow native repeats (cadence coordination)', () => {
+    _testSetMindMap({ selectedBox: { isEditing: true }, handleKeyPressed });
+
+    // Slow native repeats: 200ms apart (above 150ms threshold)
+    KeyRepeat.start(BK, false);       // T=0, pressedAt=0, lastEventAt=0
+    KeyRepeat.noteNativeKeydown(BK);
+
+    global.millis.mockReturnValue(200);
+    KeyRepeat.noteNativeKeydown(BK);
+    KeyRepeat.start(BK, true);        // lastEventAt=200
+
+    // At T=400: native repeat, resets lastEventAt to 400
+    global.millis.mockReturnValue(400);
+    KeyRepeat.noteNativeKeydown(BK);
+    KeyRepeat.start(BK, true);        // lastEventAt=400
+
+    // At T=400: now-lastEventAt=0 < 50 → no fire (cadence is relative to last native)
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(0);
+
+    // At T=450: now-lastEventAt=50 >= 50 → synthetic fires
+    global.millis.mockReturnValue(450);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    // At T=460: now-lastEventAt=10 (since lastEventAt was updated to 450 by the
+    // synthetic fire above) → no fire
+    global.millis.mockReturnValue(460);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(1);
+
+    // At T=600: native repeat, resets lastEventAt to 600
+    global.millis.mockReturnValue(600);
+    KeyRepeat.noteNativeKeydown(BK);
+    KeyRepeat.start(BK, true);        // lastEventAt=600
+
+    // At T=650: now-lastEventAt=50 >= 50 → synthetic fires
+    global.millis.mockReturnValue(650);
+    KeyRepeat.update();
+    expect(handleKeyPressed).toHaveBeenCalledTimes(2);
   });
 });
 
