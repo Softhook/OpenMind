@@ -605,6 +605,25 @@ class TextBox {
     return { line, lineStartOffset };
   }
 
+  static getGraphemeSegmenter() {
+    if (this._graphemeSegmenter !== undefined) {
+      return this._graphemeSegmenter;
+    }
+    this._graphemeSegmenter = (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function')
+      ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+      : null;
+    return this._graphemeSegmenter;
+  }
+
+  static splitGraphemes(text) {
+    const str = text == null ? '' : String(text);
+    const segmenter = TextBox.getGraphemeSegmenter();
+    if (segmenter) {
+      return Array.from(segmenter.segment(str), (part) => part.segment);
+    }
+    return Array.from(str);
+  }
+
   wrapText(text) {
     if (text == null) text = '';
     text = String(text);
@@ -720,17 +739,18 @@ class TextBox {
                   break;
                 }
               }
-              for (let charIdx = 0; charIdx < wp.word.length; charIdx++) {
-                let char = wp.word[charIdx];
-                if (textWidth(charLine + char) <= maxTextWidth) {
-                  charLine += char;
+              const graphemes = TextBox.splitGraphemes(wp.word);
+              for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
+                let grapheme = graphemes[charIdx];
+                if (textWidth(charLine + grapheme) <= maxTextWidth) {
+                  charLine += grapheme;
                 } else {
                   if (charLine) {
                     wrappedLines.push(charLine);
                     lineCharMap.push(lineStartPos + charStartPos);
                     charStartPos += charLine.length;
                   }
-                  charLine = char;
+                  charLine = grapheme;
                 }
               }
               currentLine = charLine;
@@ -964,11 +984,12 @@ class TextBox {
           // Always render character by character for precise spacing control
           // This ensures multiple spaces are visible
           let xPos = textX;
-          for (let charIdx = 0; charIdx < lineText.length; charIdx++) {
-            let char = lineText[charIdx];
-            let absCharPos = lineStartPos + charIdx;
+          const graphemes = TextBox.splitGraphemes(lineText);
+          let absCharPos = lineStartPos;
+          for (let charIdx = 0; charIdx < graphemes.length; charIdx++) {
+            let grapheme = graphemes[charIdx];
 
-            // Check if this character is part of a link
+            // Check if this grapheme is part of a link
             let isInLink = false;
             for (const link of links) {
               if (absCharPos >= link.start && absCharPos < link.end) {
@@ -989,7 +1010,7 @@ class TextBox {
             const isItalic = this._isIndexInRanges(this.italicRanges, absCharPos);
 
             // For spaces, use measured width to ensure they take up space
-            if (char === ' ') {
+            if (grapheme === ' ') {
               // Draw a space by moving position (p5 text(' ') might collapse)
               xPos += textWidth(' ');
             } else {
@@ -1004,7 +1025,7 @@ class TextBox {
                 } else {
                   noStroke();
                 }
-                text(char, 0, 0);
+                text(grapheme, 0, 0);
                 pop();
               } else {
                 if (isBold) {
@@ -1013,10 +1034,11 @@ class TextBox {
                 } else {
                   noStroke();
                 }
-                text(char, xPos, yPos);
+                text(grapheme, xPos, yPos);
               }
-              xPos += textWidth(char);
+              xPos += textWidth(grapheme);
             }
+            absCharPos += grapheme.length;
           }
         }
       }
