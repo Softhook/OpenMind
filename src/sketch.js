@@ -321,13 +321,22 @@ const KeyRepeat = {
     s.lastNativeKeydownAt = millis();
   },
 
-  start(keyCode) {
+  start(keyCode, isNativeRepeat) {
     if (!this.isTracked(keyCode)) return;
     const now = millis();
     const s = this._ensure(keyCode);
     s.active = true;
-    s.pressedAt = now;
-    s.lastEventAt = now; // last synthetic repeat time
+    // Always reset lastEventAt so synthetic fires relative to the most recent
+    // native keydown.  This keeps the fallback cadence coordinated with the
+    // browser's native repeat cadence and prevents double-deletion overlap.
+    s.lastEventAt = now;
+    // Only set pressedAt on the initial (non-repeat) key press.  If we reset
+    // pressedAt on every native repeat the initialDelay timer is perpetually
+    // pushed out; skipping it here means synthetic only starts firing when
+    // the browser fails to deliver native repeats at all.
+    if (!isNativeRepeat) {
+      s.pressedAt = now;
+    }
     // lastNativeKeydownAt updated by noteNativeKeydown from keyPressed
   },
 
@@ -365,6 +374,15 @@ const KeyRepeat = {
 
       if (hasNativeRepeat) {
         // Browser is handling repeat, don't synthesize
+        continue;
+      }
+
+      // Safety: if p5.js reports the key is no longer physically held,
+      // stop synthesizing.  This catches the case where keyReleased()
+      // was not called (e.g. keyup event fired while focus was elsewhere)
+      // and would otherwise leave the key stuck active forever.
+      if (typeof keyIsDown === 'function' && !keyIsDown(keyCode)) {
+        s.active = false;
         continue;
       }
 
@@ -2229,8 +2247,9 @@ function handleAlignmentShortcut(keyChar, mindMapInstance, hasModifier, collabMa
 
 /**
  * Handles key press events
+ * @param {KeyboardEvent} [event] - Native keyboard event from p5.js
  */
-function keyPressed() {
+function keyPressed(event) {
   // Treat Cmd (meta) and Ctrl the same for shortcuts so macOS users can use Cmd+Z/C/V/etc.
   const isCtrl =
     keyIsDown(17) || // Ctrl (Windows/Linux)
@@ -2443,8 +2462,12 @@ function keyPressed() {
   }
   // Track native keydowns for deletion keys to coordinate with fallback repeat
   KeyRepeat.noteNativeKeydown(keyCode);
-  // Start fallback repeat tracking for deletion keys
-  KeyRepeat.start(keyCode);
+  // Start fallback repeat tracking for deletion keys.
+  // The isNativeRepeat flag (event.repeat) lets start() preserve cadence
+  // coordination with the browser's native repeats while only setting the
+  // initial-delay timer (pressedAt) on the first press — preventing both
+  // double-deletion overlap and the late-keydown-after-keyup race condition.
+  KeyRepeat.start(keyCode, !!(event && event.repeat));
 
   // Prevent default behavior for backspace
   if (keyCode === BACKSPACE) {
