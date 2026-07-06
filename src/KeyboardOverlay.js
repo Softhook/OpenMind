@@ -7,6 +7,7 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'N', description: 'Create new box' },
     { keys: 'C', description: 'Create connection from selected box' },
     { keys: '1 / 2 / 3', description: 'Set box color (Red / Orange / White)' },
+    { keys: '1 - 9 (cluster selected)', description: 'Set cluster fill color (cycles through palette)' },
     { keys: 'Backspace/Delete', description: 'Delete selected boxes or connections' },
     { keys: 'Space', description: 'Reverse the selected connection' },
     { keys: 'Shift + Click', description: 'Add and remove from selection' },
@@ -31,8 +32,10 @@ const KEYBOARD_SHORTCUTS = [
     { keys: 'Cmd/Ctrl + U', description: 'Highlight selected text' },
     { keys: 'Cmd/Ctrl + I', description: 'Italic slant selected text' },
     { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change' },
+    { keys: 'Cmd/Ctrl + Shift + Z / Cmd/Ctrl + Y', description: 'Redo the last change' },
     { keys: 'Cmd/Ctrl + S', description: 'Save the mind map as JSON' },
     { keys: 'Cmd/Ctrl + L', description: 'Load a mind map from file' },
+    { keys: 'Cmd/Ctrl + G', description: 'Group selected boxes into a cluster (select 2+ boxes first)' },
     { keys: 'Cmd/Ctrl + K', description: 'Toggle Timeline Mode (6-month calendar bar)' }
 ];
 
